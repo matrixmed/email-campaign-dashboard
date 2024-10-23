@@ -29,7 +29,7 @@ body {
     margin-right: 40px;
 }
 
-.chart-section, .d3-section {
+.chart-section, .d3-section, .table-section, .insights-section, .line-chart-section {
     margin: 20px 0;
     background-color: #222;
     padding: 20px;
@@ -55,4 +55,117 @@ h2 {
 
 #d3Chart {
     height: 300px;
+}
+
+.table-section {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+}
+
+th {
+    background-color: #333;
+    color: #ffcc00; 
+}
+
+td {
+    color: #fff;
+}
+
+tr:nth-child(even) {
+    background-color: #2a2a2d;
+}
+
+.dropdown {
+    position: absolute;
+    background-color: #333;
+    color: white;
+    padding: 10px;
+    border: 1px solid #555;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.dropdown-item {
+    padding: 5px;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background-color: #444;
+}
+
+.dropdown-arrow {
+    font-size: 10px;
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+.pagination button {
+    padding: 1px 20px;
+    margin-top: 27.5px;
+    background-color: #0077ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    align-items: right;
+    margin-right: 0px;
+    height: 30px;
+    margin-left: 10px;
+} 
+
+.pagination button:hover {
+    background-color: #005bb5;
+}
+
+.input-section {
+    display: flex;
+    margin: 20px 0;
+}
+
+.input-section div {
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+}
+
+.input-section input,
+.input-section select {
+    padding: 10px;
+    border-radius: 4px;
+    margin-right: 20px;
+    border: 1px solid #555;
+    background-color: #444;
+    color: white;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.input-section button {
+    padding: 1px 20px;
+    margin-top: 27.5px;
+    background-color: #0077ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    align-items: right;
+    margin-right: 0px;
+    height: 40px;
+    margin-left: 40px;
+}
+
+.input-section button:hover {
+    background-color: #005bb5;
 }

@@ -1,0 +1,58 @@
+body {
+    background-color: #1c1c1e;
+    font-family: 'Arial', sans-serif;
+    color: white;
+}
+
+.dashboard-container {
+    padding: 20px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #333;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+}
+
+.search-box {
+    padding: 10px;
+    font-size: 16px;
+    background-color: #444;
+    border: 1px solid #555;
+    color: white;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 400px;
+    margin-right: 40px;
+}
+
+.chart-section, .d3-section {
+    margin: 20px 0;
+    background-color: #222;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+}
+
+canvas {
+    margin-top: 20px;
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+h1 {
+    margin-left: 20px;
+    color: #0ff;
+}
+
+h2 {
+    color: #ff0077;
+}
+
+#d3Chart {
+    height: 300px;
+}

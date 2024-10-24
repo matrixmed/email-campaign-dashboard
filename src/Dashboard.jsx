@@ -229,7 +229,7 @@ const Dashboard = () => {
                 <input
                     type="text"
                     className="search-box"
-                    placeholder="Search by Publication, Brand, Month, Year"
+                    placeholder="Search by Publication"
                     value={search}
                     onChange={handleSearchChange}
                 />

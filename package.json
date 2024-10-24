@@ -36,5 +36,13 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "jest": {
+  "setupFilesAfterEnv": ["<rootDir>/setupTests.js"],
+  "verbose": true
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "jest-canvas-mock": "^2.5.2"
   }
 }

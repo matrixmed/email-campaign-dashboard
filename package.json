@@ -38,7 +38,7 @@
     ]
   },
   "jest": {
-  "setupFilesAfterEnv": ["<rootDir>/setupTests.js"],
+  "setupFilesAfterEnv": ["email-campaign-dashboard/setupTests.js"],
   "verbose": true
   },
   "devDependencies": {

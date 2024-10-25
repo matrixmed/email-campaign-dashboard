@@ -29,12 +29,16 @@ body {
     margin-right: 40px;
 }
 
-.chart-section, .d3-section, .table-section, .insights-section, .line-chart-section {
+.chart-section, .d3-section, .table-section, .insights-section, .line-chart-section, .buffer-section {
     margin: 20px 0;
     background-color: #222;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+}
+
+.buffer-section {
+    height: 200px;
 }
 
 canvas {
@@ -131,28 +135,47 @@ tr:nth-child(even) {
 
 .input-section {
     display: flex;
+    justify-content: space-between; 
     margin: 20px 0;
+    max-width: 100%;
 }
 
-.input-section div {
+.subject-selection-column {
     display: flex;
     flex-direction: column;
-    margin: 10px;
+    margin-right: 40px; 
 }
 
-.input-section input,
-.input-section select {
+.metric-selection-row {
+    display: flex;
+    align-items: flex-start; 
+}
+
+.metric-selection-row > div {
+    display: flex;
+    flex-direction: column;
+    margin-right: 40px;
+}
+
+.subject-select select, 
+.metric-selection-row select {
     padding: 10px;
     border-radius: 4px;
-    margin-right: 20px;
+    margin-top: 5px;
+    margin-bottom: 5px;
     border: 1px solid #555;
     background-color: #444;
     color: white;
-    min-width: 200px;
-    max-width: 300px;
+    width: 100%;
 }
 
-.input-section button {
+.subject-select label, 
+.metric-selection-row label {
+    color: white;
+    margin-bottom: 5px;
+}
+
+.metric-selection-row button {
     padding: 1px 20px;
     margin-top: 27.5px;
     background-color: #0077ff;
@@ -163,9 +186,21 @@ tr:nth-child(even) {
     align-items: right;
     margin-right: 0px;
     height: 40px;
-    margin-left: 40px;
+    margin-left: 10px;
+    margin-right: 15px;
 }
 
-.input-section button:hover {
+.metric-selection-row button:hover {
     background-color: #005bb5;
+}
+
+.dynamic-chart-section {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.dynamic-chart-section canvas {
+    max-width: 100%;
+    max-height: 500px; 
 }

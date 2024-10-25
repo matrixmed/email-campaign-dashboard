@@ -43,6 +43,19 @@ const Dashboard = () => {
         'Total_Click_Rate',
         'Format',
     ];
+    const insightMetrics = [
+        'Total_Opens',
+        'Total_Open_Rate',
+        'Unique_Opens',
+        'Unique_Open_Rate',
+        'Total_Clicks',
+        'Total_Click_Rate',
+        'Unique_Clicks',
+        'Unique_Click_Rate',
+        'Sent',
+        'Delivered',
+        'Delivery_Rate',
+    ];
 
     useEffect(() => {
         async function fetchBlobData() {
@@ -199,19 +212,33 @@ const Dashboard = () => {
             if (publications.length === 0) continue;
     
             const metricsSum = publications.reduce((acc, curr) => {
+                acc.Total_Opens += curr.Total_Opens || 0;
+                acc.Total_Open_Rate += curr.Total_Open_Rate || 0;
                 acc.Unique_Opens += curr.Unique_Opens || 0;
                 acc.Unique_Open_Rate += curr.Unique_Open_Rate || 0;
                 acc.Total_Clicks += curr.Total_Clicks || 0;
                 acc.Total_Click_Rate += curr.Total_Click_Rate || 0;
+                acc.Unique_Clicks += curr.Unique_Clicks || 0;
+                acc.Unique_Click_Rate += curr.Unique_Click_Rate || 0;
+                acc.Sent += curr.Sent || 0;
+                acc.Delivered += curr.Delivered || 0;
+                acc.Delivery_Rate += curr.Delivery_Rate || 0;
                 return acc;
-            }, { Unique_Opens: 0, Unique_Open_Rate: 0, Total_Clicks: 0, Total_Click_Rate: 0 });
+            }, { Total_Opens: 0, Total_Open_Rate: 0, Unique_Opens: 0, Unique_Open_Rate: 0, Total_Clicks: 0, Total_Click_Rate: 0, Unique_Clicks: 0, Unique_Click_Rate: 0, Sent: 0, Delivered: 0, Delivery_Rate: 0 });
     
             const count = publications.length;
             averageData[group] = {
+                Total_Opens: metricsSum.Total_Opens / count || 0,
+                Total_Open_Rate: metricsSum.Total_Open_Rate / count || 0,
                 Unique_Opens: metricsSum.Unique_Opens / count || 0,
                 Unique_Open_Rate: metricsSum.Unique_Open_Rate / count || 0,
                 Total_Clicks: metricsSum.Total_Clicks / count || 0,
-                Total_Click_Rate: metricsSum.Total_Click_Rate / count || 0
+                Total_Click_Rate: metricsSum.Total_Click_Rate / count || 0,
+                Unique_Clicks: metricsSum.Unique_Clicks / count || 0,
+                Unique_Click_Rate: metricsSum.Unique_Click_Rate / count || 0,
+                Sent: metricsSum.Sent / count || 0,
+                Delivered: metricsSum.Delivered / count || 0,
+                Delivery_Rate: metricsSum.Delivery_Rate / count || 0
             };
         }
     
@@ -455,7 +482,7 @@ const Dashboard = () => {
                                 onChange={(e) => setSelectedMetric(e.target.value)}
                             >
                                 <option value="">Select Metric</option>
-                                {availableMetrics.map((metric, idx) => (
+                                {insightMetrics.map((metric, idx) => (
                                     <option key={idx} value={metric}>{metric}</option>
                                 ))}
                             </select>

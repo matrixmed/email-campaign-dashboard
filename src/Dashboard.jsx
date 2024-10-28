@@ -14,7 +14,7 @@ const Dashboard = () => {
     const [selectedChartType, setSelectedChartType] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSubjects, setSelectedSubjects] = useState(['']);
-    const rowsPerPage = 7;
+    const rowsPerPage = 10;
     const dynamicChartRef = useRef(null);
     const chartRef = useRef(null);
     const lineChartRef = useRef(null); 
@@ -24,41 +24,43 @@ const Dashboard = () => {
         column3: 'Unique_Click_Rate',
         column4: 'Total_Click_Rate',
     });
-    const availableChartTypes = ['line', 'bar', 'pie', 'radar', 'polarArea'];
+    const availableChartTypes = ['bar', 'pie', 'radar', 'polarArea'];
     const availableMetrics = [
+        'Sent',
+        'Delivered',
+        'Delivery_Rate',
         'Unique_Opens',
         'Unique_Open_Rate',
         'Total_Opens',
-        'Delivery_Rate',
+        'Total_Open_Rate',
+        'Unique_Clicks',
+        'Unique_Click_Rate',
+        'Total_Clicks',
+        'Total_Click_Rate',
         'Issue_Date',
         'Deployments',
-        'Sent',
-        'Delivered',
-        'Total_Open_Rate',
-        'Unique_Clicks',
-        'Unique_Click_Rate',
-        'Total_Clicks',
-        'Total_Click_Rate',
-        'Format',
+        'Digital_Targets',
+        'List_Match',
     ];
     const insightMetrics = [
-        'Total_Opens',
-        'Total_Open_Rate',
-        'Unique_Opens',
-        'Unique_Open_Rate',
-        'Total_Clicks',
-        'Total_Click_Rate',
-        'Unique_Clicks',
-        'Unique_Click_Rate',
         'Sent',
         'Delivered',
         'Delivery_Rate',
+        'Unique_Opens',
+        'Unique_Open_Rate',
+        'Total_Opens',
+        'Total_Open_Rate',
+        'Unique_Clicks',
+        'Unique_Click_Rate',
+        'Total_Clicks',
+        'Total_Click_Rate',
+
     ];
 
     useEffect(() => {
         async function fetchBlobData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/combined_data.json?sp=r&st=2024-10-24T18:43:26Z&se=2025-10-25T02:43:26Z&sv=2022-11-02&sr=b&sig=SMe2MeMqHNbxjSOHuEuspIaEQtA8hMiHbnlt1nAZjn4%3D"; 
-    
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/combined_data.json?sp=r&st=2024-10-28T20:56:43Z&se=2025-10-28T04:56:43Z&spr=https&sv=2022-11-02&sr=b&sig=OEUeFcUZVRvz4d6yJ2%2F2h2wwO9j3OmHBGNRlNzYlPiI%3D"; 
+         
             try {    
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
@@ -122,10 +124,9 @@ const Dashboard = () => {
             chartRef.current.destroy();
         }
         const ctx = document.getElementById('myChart').getContext('2d');
-        const reversedData = filteredData.slice().reverse();
-        const last10Data = reversedData.slice(-10); 
+        const last10Data = filteredData.slice(-10); 
         const labels = last10Data.map((item) => item.Publication);
-        const data = last10Data.map((item) => item.Total_Clicks);
+        const data = last10Data.map((item) => item.Total_Click_Rate);
 
         if (labels.length === 0 || data.length === 0) return;
 
@@ -134,7 +135,7 @@ const Dashboard = () => {
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Total Clicks', 
+                    label: 'Total Click Rate', 
                     data: data,
                     backgroundColor: 'rgba(0, 255, 128, 0.7)',
                     borderColor: 'rgba(0, 255, 128, 1)',
@@ -158,27 +159,19 @@ const Dashboard = () => {
             lineChartRef.current.destroy();
         }
     
-        const ctx = document.getElementById('lineChart').getContext('2d');
-        const reversedData = filteredData.slice().reverse();
-        const last15Data = reversedData.slice(-40); 
+        const ctx = document.getElementById('barChart').getContext('2d');
+        const last15Data = filteredData.slice(-10); 
         const labels = last15Data.map((item) => item.Publication);
-        const data = last15Data.map((item) => item.Total_Opens);
+        const data = last15Data.map((item) => item.Total_Open_Rate);
     
         if (labels.length === 0 || data.length === 0) return;
     
-        const minValue = Math.min(...data);
-        const maxValue = Math.max(...data);
-    
-        const buffer = 50;
-        const suggestedMin = minValue - buffer < 0 ? 0 : minValue - buffer;
-        const suggestedMax = maxValue + buffer;
-    
         lineChartRef.current = new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Total Opens',
+                    label: 'Total Open Rate',
                     data: data,
                     backgroundColor: 'rgba(128, 128, 255, 0.7)',
                     borderColor: 'rgba(128, 128, 255, 1)',
@@ -189,13 +182,8 @@ const Dashboard = () => {
                 maintainAspectRatio: false,
                 responsive: true,
                 scales: {
-                    x: {
-                        display: false,
-                    },
                     y: {
-                        beginAtZero: false,
-                        min: suggestedMin,
-                        max: suggestedMax
+                        beginAtZero: true
                     }
                 }
             }
@@ -307,7 +295,7 @@ const Dashboard = () => {
     
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-    const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow); 
+    const currentRows = filteredData.slice().reverse().slice(indexOfFirstRow, indexOfLastRow); 
     const totalPages = Math.ceil(filteredData.length / rowsPerPage); 
     const maxPageButtons = 5;
 
@@ -449,7 +437,7 @@ const Dashboard = () => {
             </div>
 
             <div className="line-chart-section">
-                <canvas id="lineChart" width="400" height="300"></canvas>
+                <canvas id="barChart" width="400" height="300"></canvas>
             </div>
 
             <div className="insights-section">
@@ -458,7 +446,7 @@ const Dashboard = () => {
                     <div className="subject-selection-column">
                         {selectedSubjects.map((subject, index) => (
                             <div className='subject-select' key={index}>
-                                <label>Subject {index + 1}:</label>
+                                <label>Campaign {index + 1}:</label>
                                 <select
                                     value={subject}
                                     onChange={(e) => handleSubjectChange(index, e.target.value)}

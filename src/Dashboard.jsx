@@ -19,9 +19,9 @@ const Dashboard = () => {
     const chartRef = useRef(null);
     const lineChartRef = useRef(null); 
     const [selectedColumn, setSelectedColumn] = useState({
-        column1: 'Unique_Opens',
-        column2: 'Unique_Open_Rate',
-        column3: 'Total_Clicks',
+        column1: 'Unique_Open_Rate',
+        column2: 'Total_Open_Rate',
+        column3: 'Unique_Click_Rate',
         column4: 'Total_Click_Rate',
     });
     const availableChartTypes = ['line', 'bar', 'pie', 'radar', 'polarArea'];
@@ -30,8 +30,6 @@ const Dashboard = () => {
         'Unique_Open_Rate',
         'Total_Opens',
         'Delivery_Rate',
-        'Journal',
-        'Type',
         'Issue_Date',
         'Deployments',
         'Sent',

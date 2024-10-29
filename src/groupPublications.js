@@ -1,11 +1,11 @@
 const findGroup = (publicationName) => {
-    if (/JCADTV.*Vitiligo/i.test(publicationName)) return 'JCADTV Vitiligo';
-    if (/JCADTV.*Atopic Dermatitis/i.test(publicationName)) return 'JCADTV Atopic Dermatitis';
-    if (/JCADTV.*Skin Barrier Care/i.test(publicationName)) return 'JCADTV Skin Barrier Care';
-    if (/JCADTV.*Skincare Science/i.test(publicationName)) return 'JCADTV Skincare Science';
-    if (/JCADTV.*Therapeutic Skincare/i.test(publicationName)) return 'JCADTV Therapeutic Skincare';
-    if (/JCADTV.*Targeted Phototherapy/i.test(publicationName)) return 'JCADTV Targeted Phototherapy';
-    if (/JCADTV.*Psoriasis/i.test(publicationName)) return 'JCADTV Psoriasis';
+    if (/JCADTV.*Vitiligo/i.test(publicationName)) return 'JCADTV EP in Vitiligo';
+    if (/JCADTV.*Atopic Dermatitis/i.test(publicationName)) return 'JCADTV EP in Atopic Dermatitis';
+    if (/JCADTV.*Skin Barrier Care/i.test(publicationName)) return 'JCADTV EP in Skin Barrier Care';
+    if (/JCADTV.*Skincare Science/i.test(publicationName)) return 'JCADTV EP in Skincare Science';
+    if (/JCADTV.*Therapeutic Skincare/i.test(publicationName)) return 'JCADTV EP in Therapeutic Skincare';
+    if (/JCADTV.*Targeted Phototherapy/i.test(publicationName)) return 'JCADTV EP in Targeted Phototherapy';
+    if (/JCADTV.*Psoriasis/i.test(publicationName)) return 'JCADTV EP in Psoriasis';
     if (/JCADTV/i.test(publicationName)) return 'JCADTV';
     if (/JCAD.TV/i.test(publicationName)) return 'JCADTV';
 
@@ -72,13 +72,13 @@ const groupPublications = (data) => {
             'CNS': [],
             'The Neuroscience Report': [],
             'Psychiatry': [],
-            'JCADTV Vitiligo': [],
-            'JCADTV Atopic Dermatitis': [],
-            'JCADTV Skin Barrier Care': [],
-            'JCADTV Skincare Science': [],
-            'JCADTV Therapeutic Skincare': [],
-            'JCADTV Targeted Phototherapy': [],
-            'JCADTV Psoriasis': [],
+            'JCADTV EP in Vitiligo': [],
+            'JCADTV EP in Atopic Dermatitis': [],
+            'JCADTV EP in Skin Barrier Care': [],
+            'JCADTV EP in Skincare Science': [],
+            'JCADTV EP in Therapeutic Skincare': [],
+            'JCADTV EP in Targeted Phototherapy': [],
+            'JCADTV EP in Psoriasis': [],
             'JCADTV': [],
             'JCAD': [],
             'JCAD NPPA': [],

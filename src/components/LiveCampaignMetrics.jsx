@@ -4,6 +4,8 @@ import Chart from 'chart.js/auto';
 const LiveCampaignMetrics = () => {
     const [campaignData, setCampaignData] = useState([]);
     const [latestCampaigns, setLatestCampaigns] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const campaignsPerPage = 2;
 
     useEffect(() => {
         async function fetchCampaignData() {
@@ -22,16 +24,13 @@ const LiveCampaignMetrics = () => {
 
     const getLatestCampaigns = (data) => {
         const latestRecords = {};
-        
         data.forEach(record => {
             const campaignName = record.Campaign;
             const recordDate = new Date(record.Date);
-            
             if (!latestRecords[campaignName] || recordDate > new Date(latestRecords[campaignName].Date)) {
                 latestRecords[campaignName] = record;
             }
         });
-        
         return Object.values(latestRecords);
     };
 
@@ -40,7 +39,7 @@ const LiveCampaignMetrics = () => {
             .filter(record => record.Campaign === campaignName)
             .sort((a, b) => new Date(a.Date) - new Date(b.Date));
     };
-    
+
     useEffect(() => {
         latestCampaigns.forEach((campaign, index) => {
             const canvasId = `lineChart-${index}`;
@@ -61,9 +60,7 @@ const LiveCampaignMetrics = () => {
                     date.setDate(date.getDate() + 1);
                     return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
                 });
-    
-                const dataPoints = twoWeeksData.map(record => record.Unique_Open_Rate);
-    
+                const dataPoints = twoWeeksData.map(record => record.Unique_Opens);
                 if (canvasElement.chartInstance) {
                     canvasElement.chartInstance.destroy();
                 }
@@ -73,12 +70,12 @@ const LiveCampaignMetrics = () => {
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Unique Open Rate',
+                            label: 'Unique Opens',
                             data: dataPoints,
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             fill: false,
-                            tension: 0.3 
+                            tension: 0.3
                         }]
                     },
                     options: {
@@ -95,29 +92,28 @@ const LiveCampaignMetrics = () => {
                             }
                         },
                         scales: {
-                            y: { 
-                                beginAtZero: true, 
-                                title: { display: true, text: 'Unique Open Rate' } 
-                            },
-                            x: { 
-                                title: { display: true, text: 'Date' } 
-                            }
+                            y: { beginAtZero: true, title: { display: true, text: 'Unique Open Rate' } },
+                            x: { title: { display: true, text: 'Date' } }
                         }
                     }
                 });
-    
                 canvasElement.chartInstance = chartInstance;
-            } else {
-                console.warn(`Canvas element with id #${canvasId} not found`);
             }
         });
-    }, [latestCampaigns, campaignData]);    
+    }, [latestCampaigns, campaignData, currentPage]);
+
+    const totalPages = Math.ceil(latestCampaigns.length / campaignsPerPage);
+    const indexOfLastCampaign = currentPage * campaignsPerPage;
+    const indexOfFirstCampaign = indexOfLastCampaign - campaignsPerPage;
+    const currentCampaigns = latestCampaigns.slice(indexOfFirstCampaign, indexOfLastCampaign);
+
+    const handlePagination = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
         <div className="live-campaign-metrics">
             <h2>Live Campaign Metrics</h2>
             <div className="campaign-grid">
-                {latestCampaigns.map((campaign, index) => (
+                {currentCampaigns.map((campaign, index) => (
                     <div key={index} className="campaign-box">
                         <h3>{campaign.Campaign}</h3>
                         <table>
@@ -140,6 +136,23 @@ const LiveCampaignMetrics = () => {
                         </div>
                     </div>
                 ))}
+            </div>
+            <div className="pagination">
+                {currentPage > 1 && (
+                    <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
+                )}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                    <button
+                        key={num}
+                        onClick={() => handlePagination(num)}
+                        className={currentPage === num ? 'active' : ''}
+                    >
+                        {num}
+                    </button>
+                ))}
+                {currentPage < totalPages && (
+                    <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
+                )}
             </div>
         </div>
     );

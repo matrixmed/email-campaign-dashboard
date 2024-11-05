@@ -37,8 +37,6 @@ const Dashboard = () => {
         'Total_Click_Rate',
         'Issue_Date',
         'Deployments',
-        'Digital_Targets',
-        'List_Match',
     ];
     const rowsPerPage = 10;
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);

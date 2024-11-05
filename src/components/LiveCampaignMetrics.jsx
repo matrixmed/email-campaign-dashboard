@@ -45,7 +45,7 @@ const LiveCampaignMetrics = () => {
         latestCampaigns.forEach((campaign, index) => {
             const canvasId = `lineChart-${index}`;
             const canvasElement = document.getElementById(canvasId);
-
+    
             if (canvasElement) {
                 const ctx = canvasElement.getContext('2d');
                 
@@ -55,14 +55,19 @@ const LiveCampaignMetrics = () => {
                     console.warn(`No data available for the last two weeks for campaign: ${campaign.Campaign}`);
                     return;
                 }
-                
-                const labels = twoWeeksData.map(record => new Date(record.Date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }));
+    
+                const labels = twoWeeksData.map(record => {
+                    const date = new Date(record.Date);
+                    date.setDate(date.getDate() + 1);
+                    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+                });
+    
                 const dataPoints = twoWeeksData.map(record => record.Unique_Open_Rate);
-
+    
                 if (canvasElement.chartInstance) {
                     canvasElement.chartInstance.destroy();
                 }
-
+    
                 const chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -100,15 +105,13 @@ const LiveCampaignMetrics = () => {
                         }
                     }
                 });
-
+    
                 canvasElement.chartInstance = chartInstance;
             } else {
                 console.warn(`Canvas element with id #${canvasId} not found`);
-                
-
             }
         });
-    }, [latestCampaigns, campaignData]);
+    }, [latestCampaigns, campaignData]);    
 
     return (
         <div className="live-campaign-metrics">

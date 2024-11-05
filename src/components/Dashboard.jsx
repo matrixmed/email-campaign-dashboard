@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { groupPublications } from './groupPublications';
+import { groupPublications } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
 import TotalClickRateChart from './TotalClickRateChart';
 import UniqueOpenRateChart from './UniqueOpenRateChart';
 import InsightsSection from './InsightsSection';
-import './Dashboard.css';
 
 const Dashboard = () => {
     const [metricsData, setMetricsData] = useState([]);

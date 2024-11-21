@@ -333,4 +333,131 @@ tr:nth-child(even) {
   max-width: 100%;
   max-height: 500px; 
 }
- 
+
+/* Light theme styles */
+body.light {
+  background-color: #f9f9f9;
+  color: #222;
+}
+
+body.light .dashboard-header {
+  background-color: #fff;
+  box-shadow: 0 4px 10px rgba(117, 117, 117, 0.7);
+}
+
+body.light .search-box {
+  background-color: #fff;
+  border-color: #ccc;
+  color: #222;
+}
+
+body.light .chart-section,
+body.light .table-section,
+body.light .insights-section,
+body.light .buffer-section,
+body.light .live-campaign-metrics {
+  background-color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.light th {
+  background-color: #f3f3f3;
+  color: #333;
+}
+
+body.light tr:nth-child(even) {
+  background-color: #f5f5f5;
+}
+
+body.light .pagination button {
+  background-color: #0077ff;
+  color: white;
+}
+
+body.light .pagination button:hover {
+  background-color: #005bb5;
+}
+
+body.light h1 {
+  color: #333;
+}
+
+body.light h2 {
+  color: #555;
+}
+
+body.light table th {
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+body.light table td {
+  color: #333;
+}
+
+body.light tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+body.light .live-campaign-metrics {
+  background-color: #ffffff !important; 
+  color: #212529; 
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.light .live-campaign-metrics h3 {
+  color: #212529;
+}
+
+body.light .live-campaign-metrics .campaign-box {
+  background-color: #f9f9f9 !important; 
+  border-color: #ddd;
+}
+
+body.light .live-campaign-metrics table tr:nth-child(odd) {
+  background-color: #f8f9fa !important;
+}
+
+body.light .live-campaign-metrics table tr:nth-child(even) {
+  background-color: #ffffff !important; 
+}
+
+body.light .live-campaign-metrics table td {
+  color: #495057 !important;
+  padding: 8px; 
+}
+
+body.light .live-campaign-metrics table th {
+  background-color: #e9ecef !important;
+  color: #343a40;
+  font-weight: bold;
+  text-align: left;
+  padding: 10px;
+}
+
+body.light .line-chart-container canvas {
+  background-color: #ffffff !important; 
+  border: 1px solid #ccc; 
+  border-radius: 4px;
+}
+
+body.light .subject-select select, 
+body.light .metric-selection-row select {
+  background-color: #fff;
+  border-color: #ccc;
+  color: #495057;
+}
+
+body.light .subject-select label, 
+body.light .metric-selection-row label {
+  color: #495057;
+}
+
+body.light .metric-selection-row button {
+  background-color: #0056b3;
+  color: white;
+}
+
+body.light .metric-selection-row button:hover {
+  background-color: #004085;
+}

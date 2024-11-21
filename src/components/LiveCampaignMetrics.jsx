@@ -60,17 +60,19 @@ const LiveCampaignMetrics = () => {
                     date.setDate(date.getDate() + 1);
                     return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
                 });
-                const dataPoints = twoWeeksData.map(record => record.Unique_Opens);
+                
+                const dataPoints = twoWeeksData.map(record => record.Unique_Open_Rate * 100);
+                
                 if (canvasElement.chartInstance) {
                     canvasElement.chartInstance.destroy();
                 }
-    
+                
                 const chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Unique Opens',
+                            label: 'Unique Opens (%)',
                             data: dataPoints,
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -84,20 +86,21 @@ const LiveCampaignMetrics = () => {
                             tooltip: {
                                 callbacks: {
                                     label: (context) => {
-                                        const date = context.label;
-                                        const rate = context.raw;
-                                        return `${date} - ${rate.toFixed(2)}`;
+                                        return `${context.raw.toFixed(2)}%`;
                                     }
                                 }
                             }
                         },
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Unique Open Rate' } },
+                            y: { 
+                                beginAtZero: true, 
+                                title: { display: true, text: 'Unique Open Rate (%)' } 
+                            },
                             x: { title: { display: true, text: 'Date' } }
                         }
                     }
                 });
-                canvasElement.chartInstance = chartInstance;
+                canvasElement.chartInstance = chartInstance;                
             }
         });
     }, [latestCampaigns, campaignData, currentPage]);

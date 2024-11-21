@@ -20,11 +20,11 @@ const MetricsTable = ({
 
     return (
         <div className="table-section">
-            <h2>Key Metrics Table</h2>
+            <h2>Completed Campaign Metrics</h2>
             <table>
                 <thead>
                     <tr>
-                        <th>Publication</th>
+                        <th>Campaign</th>
                         <th onClick={() => toggleDropdown('column1')}>
                             {selectedColumn.column1}{' '}
                             <span className="dropdown-arrow">▼</span>

@@ -20,7 +20,7 @@ const UniqueOpenRateChart = ({ filteredData }) => {
             data: {
                 labels,
                 datasets: [{
-                    label: 'Unique Open Rate',
+                    label: 'Unique Open Rate (Past 10 Campaigns)',
                     data,
                     backgroundColor: 'rgba(128, 128, 255, 0.7)',
                     borderColor: 'rgba(128, 128, 255, 1)',
@@ -31,8 +31,15 @@ const UniqueOpenRateChart = ({ filteredData }) => {
                 maintainAspectRatio: false,
                 responsive: true,
                 scales: {
-                    y: { beginAtZero: true }
-                }
+                    y: {
+                        beginAtZero: true,
+                    },
+                    x: {
+                        ticks: {
+                            display: false, 
+                        },
+                    },
+                },
             }
         });
     }, [filteredData]);

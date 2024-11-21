@@ -20,7 +20,7 @@ const TotalClickChartSection = ({ filteredData }) => {
             data: {
                 labels,
                 datasets: [{
-                    label: 'Total Click Rate',
+                    label: 'Total Click Rate (Past 10 Campaigns)',
                     data,
                     backgroundColor: 'rgba(0, 255, 128, 0.7)',
                     borderColor: 'rgba(0, 255, 128, 1)',
@@ -31,8 +31,15 @@ const TotalClickChartSection = ({ filteredData }) => {
                 maintainAspectRatio: false,
                 responsive: true,
                 scales: {
-                    y: { beginAtZero: true }
-                }
+                    y: {
+                        beginAtZero: true,
+                    },
+                    x: {
+                        ticks: {
+                            display: false, 
+                        },
+                    },
+                },
             }
         });
     }, [filteredData]);

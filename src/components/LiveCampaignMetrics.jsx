@@ -3,9 +3,14 @@ import Chart from 'chart.js/auto';
 
 const LiveCampaignMetrics = () => {
     const [campaignData, setCampaignData] = useState([]);
-    const [latestCampaigns, setLatestCampaigns] = useState([]);
+    const [aggregatedCampaigns, setAggregatedCampaigns] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const campaignsPerPage = 2;
+
+    const getTodayDate = () => {
+        const today = new Date();
+        return today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    };
 
     useEffect(() => {
         async function fetchCampaignData() {
@@ -14,7 +19,8 @@ const LiveCampaignMetrics = () => {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
                 setCampaignData(jsonData);
-                setLatestCampaigns(getLatestCampaigns(jsonData));
+                const aggregatedData = aggregateCampaignData(jsonData, getTodayDate());
+                setAggregatedCampaigns(aggregatedData);
             } catch (error) {
                 console.error("Error fetching campaign data:", error);
             }
@@ -22,42 +28,79 @@ const LiveCampaignMetrics = () => {
         fetchCampaignData();
     }, []);
 
-    const getLatestCampaigns = (data) => {
-        const latestRecords = {};
-        data.forEach(record => {
+    const aggregateCampaignData = (data, date) => {
+        const filteredData = data.filter(record => record.Date === date);
+        const aggregated = {};
+
+        filteredData.forEach(record => {
             const campaignName = record.Campaign;
-            const recordDate = new Date(record.Date);
-            if (!latestRecords[campaignName] || recordDate > new Date(latestRecords[campaignName].Date)) {
-                latestRecords[campaignName] = record;
+
+            if (!aggregated[campaignName]) {
+                aggregated[campaignName] = { ...record };
+            } else {
+                // Sum metrics
+                aggregated[campaignName].Sent += record.Sent;
+                aggregated[campaignName].Delivered += record.Delivered;
+                aggregated[campaignName].Unique_Opens += record.Unique_Opens;
+                aggregated[campaignName].Total_Opens += record.Total_Opens;
+                aggregated[campaignName].Unique_Clicks += record.Unique_Clicks;
+                aggregated[campaignName].Total_Clicks += record.Total_Clicks;
+
+                // Recalculate rates
+                aggregated[campaignName].Delivery_Rate = aggregated[campaignName].Delivered / aggregated[campaignName].Sent || 0;
+                aggregated[campaignName].Unique_Open_Rate = aggregated[campaignName].Unique_Opens / aggregated[campaignName].Sent || 0;
+                aggregated[campaignName].Total_Open_Rate = aggregated[campaignName].Total_Opens / aggregated[campaignName].Sent || 0;
+                aggregated[campaignName].Unique_Click_Rate = aggregated[campaignName].Unique_Clicks / aggregated[campaignName].Sent || 0;
+                aggregated[campaignName].Total_Click_Rate = aggregated[campaignName].Total_Clicks / aggregated[campaignName].Sent || 0;
             }
         });
-        return Object.values(latestRecords);
+
+        return Object.values(aggregated);
     };
 
+    const generateChartData = (campaignName) => {
+        const filteredData = campaignData.filter(record => record.Campaign === campaignName);
+    
+        const groupedByDate = {};
+    
+        filteredData.forEach(record => {
+            const date = record.Date;
+            if (!groupedByDate[date]) {
+                groupedByDate[date] = { totalRate: record.Unique_Open_Rate, count: 1 };
+            } else {
+                groupedByDate[date].totalRate += record.Unique_Open_Rate; // Accumulate the open rates
+                groupedByDate[date].count += 1; // Count the entries for averaging
+            }
+        });
+    
+        // Log grouped data to confirm accuracy
+        console.log("Grouped Data by Date:", groupedByDate);
+    
+        // Calculate the average for each date and return the data points
+        const chartData = Object.keys(groupedByDate).map(date => ({
+            date,
+            avgRate: groupedByDate[date].totalRate / groupedByDate[date].count, // Calculate the average
+        }));
+    
+        // Log chart data to debug
+        console.log("Chart Data:", chartData);
+    
+        return chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    };
+    
     useEffect(() => {
-        latestCampaigns.forEach((campaign, index) => {
+        aggregatedCampaigns.forEach((campaign, index) => {
             const canvasId = `lineChart-${index}`;
             const canvasElement = document.getElementById(canvasId);
     
             if (canvasElement) {
                 const ctx = canvasElement.getContext('2d');
     
-                const campaignDataFiltered = campaignData
-                    .filter(record => record.Campaign === campaign.Campaign)
-                    .sort((a, b) => new Date(a.Date) - new Date(b.Date));
-    
-                if (campaignDataFiltered.length === 0) {
-                    console.warn(`No data available for the campaign: ${campaign.Campaign}`);
-                    return;
-                }
-    
-                const labels = campaignDataFiltered.map(record => {
-                    const date = new Date(record.Date);
-                    date.setDate(date.getDate() + 1); 
-                    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-                });
-    
-                const dataPoints = campaignDataFiltered.map(record => record.Unique_Open_Rate * 100);
+                const chartData = generateChartData(campaign.Campaign);
+                const labels = chartData.map(item =>
+                    new Date(item.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })
+                );
+                const dataPoints = chartData.map(item => (item.avgRate * 100).toFixed(2)); // Convert to percentage
     
                 if (canvasElement.chartInstance) {
                     canvasElement.chartInstance.destroy();
@@ -68,7 +111,7 @@ const LiveCampaignMetrics = () => {
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Unique Opens (%)',
+                            label: 'Unique Open Rate (%)',
                             data: dataPoints,
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -81,7 +124,7 @@ const LiveCampaignMetrics = () => {
                         plugins: {
                             tooltip: {
                                 callbacks: {
-                                    label: (context) => `${context.raw.toFixed(2)}%`,
+                                    label: (context) => `${context.raw}%`,
                                 },
                             },
                         },
@@ -100,12 +143,14 @@ const LiveCampaignMetrics = () => {
                 canvasElement.chartInstance = chartInstance;
             }
         });
-    }, [latestCampaigns, campaignData]);
+    }, [aggregatedCampaigns, campaignData]);
+    
+        
 
-    const totalPages = Math.ceil(latestCampaigns.length / campaignsPerPage);
+    const totalPages = Math.ceil(aggregatedCampaigns.length / campaignsPerPage);
     const indexOfLastCampaign = currentPage * campaignsPerPage;
     const indexOfFirstCampaign = indexOfLastCampaign - campaignsPerPage;
-    const currentCampaigns = latestCampaigns.slice(indexOfFirstCampaign, indexOfLastCampaign);
+    const currentCampaigns = aggregatedCampaigns.slice(indexOfFirstCampaign, indexOfLastCampaign);
 
     const handlePagination = (pageNumber) => setCurrentPage(pageNumber);
 

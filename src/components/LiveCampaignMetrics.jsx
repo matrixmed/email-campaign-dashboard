@@ -9,7 +9,7 @@ const LiveCampaignMetrics = () => {
 
     const getTodayDate = () => {
         const today = new Date();
-        return today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        return today.toISOString().split('T')[0]; 
     };
 
     useEffect(() => {
@@ -38,7 +38,6 @@ const LiveCampaignMetrics = () => {
             if (!aggregated[campaignName]) {
                 aggregated[campaignName] = { ...record };
             } else {
-                // Sum metrics
                 aggregated[campaignName].Sent += record.Sent;
                 aggregated[campaignName].Delivered += record.Delivered;
                 aggregated[campaignName].Unique_Opens += record.Unique_Opens;
@@ -46,7 +45,6 @@ const LiveCampaignMetrics = () => {
                 aggregated[campaignName].Unique_Clicks += record.Unique_Clicks;
                 aggregated[campaignName].Total_Clicks += record.Total_Clicks;
 
-                // Recalculate rates
                 aggregated[campaignName].Delivery_Rate = aggregated[campaignName].Delivered / aggregated[campaignName].Sent || 0;
                 aggregated[campaignName].Unique_Open_Rate = aggregated[campaignName].Unique_Opens / aggregated[campaignName].Sent || 0;
                 aggregated[campaignName].Total_Open_Rate = aggregated[campaignName].Total_Opens / aggregated[campaignName].Sent || 0;
@@ -68,21 +66,18 @@ const LiveCampaignMetrics = () => {
             if (!groupedByDate[date]) {
                 groupedByDate[date] = { totalRate: record.Unique_Open_Rate, count: 1 };
             } else {
-                groupedByDate[date].totalRate += record.Unique_Open_Rate; // Accumulate the open rates
-                groupedByDate[date].count += 1; // Count the entries for averaging
+                groupedByDate[date].totalRate += record.Unique_Open_Rate; 
+                groupedByDate[date].count += 1;
             }
         });
     
-        // Log grouped data to confirm accuracy
         console.log("Grouped Data by Date:", groupedByDate);
     
-        // Calculate the average for each date and return the data points
         const chartData = Object.keys(groupedByDate).map(date => ({
             date,
-            avgRate: groupedByDate[date].totalRate / groupedByDate[date].count, // Calculate the average
+            avgRate: groupedByDate[date].totalRate / groupedByDate[date].count,
         }));
     
-        // Log chart data to debug
         console.log("Chart Data:", chartData);
     
         return chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -100,7 +95,7 @@ const LiveCampaignMetrics = () => {
                 const labels = chartData.map(item =>
                     new Date(item.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })
                 );
-                const dataPoints = chartData.map(item => (item.avgRate * 100).toFixed(2)); // Convert to percentage
+                const dataPoints = chartData.map(item => (item.avgRate * 100).toFixed(2));
     
                 if (canvasElement.chartInstance) {
                     canvasElement.chartInstance.destroy();
@@ -144,8 +139,6 @@ const LiveCampaignMetrics = () => {
             }
         });
     }, [aggregatedCampaigns, campaignData]);
-    
-        
 
     const totalPages = Math.ceil(aggregatedCampaigns.length / campaignsPerPage);
     const indexOfLastCampaign = currentPage * campaignsPerPage;

@@ -31,10 +31,10 @@ const LiveCampaignMetrics = () => {
     const aggregateCampaignData = (data, date) => {
         const filteredData = data.filter(record => record.Date === date);
         const aggregated = {};
-
+    
         filteredData.forEach(record => {
             const campaignName = record.Campaign;
-
+    
             if (!aggregated[campaignName]) {
                 aggregated[campaignName] = { ...record };
             } else {
@@ -44,7 +44,7 @@ const LiveCampaignMetrics = () => {
                 aggregated[campaignName].Total_Opens += record.Total_Opens;
                 aggregated[campaignName].Unique_Clicks += record.Unique_Clicks;
                 aggregated[campaignName].Total_Clicks += record.Total_Clicks;
-
+    
                 aggregated[campaignName].Delivery_Rate = aggregated[campaignName].Delivered / aggregated[campaignName].Sent || 0;
                 aggregated[campaignName].Unique_Open_Rate = aggregated[campaignName].Unique_Opens / aggregated[campaignName].Sent || 0;
                 aggregated[campaignName].Total_Open_Rate = aggregated[campaignName].Total_Opens / aggregated[campaignName].Sent || 0;
@@ -52,9 +52,9 @@ const LiveCampaignMetrics = () => {
                 aggregated[campaignName].Total_Click_Rate = aggregated[campaignName].Total_Clicks / aggregated[campaignName].Sent || 0;
             }
         });
-
-        return Object.values(aggregated);
-    };
+    
+        return Object.values(aggregated).filter(campaign => campaign.Sent >= 5);
+    };    
 
     const generateChartData = (campaignName) => {
         const filteredData = campaignData.filter(record => record.Campaign === campaignName);

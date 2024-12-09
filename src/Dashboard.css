@@ -119,6 +119,41 @@ h1 {
 h2 {
   color: #ff0077;
 }
+
+.rows-per-page {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  margin-top: -50px;
+  justify-content: flex-end;
+}
+
+.rows-per-page select {
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.export-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -30px;
+}
+
+.export-button {
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.export-button:hover {
+  background-color: #0056b3;
+}
  
 #d3Chart {
   height: 300px;

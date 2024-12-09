@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { groupPublications } from '../groupPublications';
+import { groupPublications, findGroup } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
 import TotalClickRateChart from './TotalClickRateChart';
@@ -18,25 +18,30 @@ const Dashboard = () => {
     const [selectedChartType, setSelectedChartType] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSubjects, setSelectedSubjects] = useState(['']);
-    
+
     const toggleTheme = () => {
-        setIsDarkTheme((prevTheme) => !prevTheme); 
+        setIsDarkTheme((prevTheme) => !prevTheme);
     };
-    
+
     const [selectedColumn, setSelectedColumn] = useState({
         column1: 'Unique_Open_Rate',
         column2: 'Total_Open_Rate',
         column3: 'Unique_Click_Rate',
         column4: 'Total_Click_Rate',
     });
-    
+
     const availableMetrics = [
         'Sent', 'Delivered', 'Delivery_Rate', 'Unique_Opens', 'Unique_Open_Rate',
         'Total_Opens', 'Total_Open_Rate', 'Unique_Clicks', 'Unique_Click_Rate',
-        'Total_Clicks', 'Total_Click_Rate', 'Issue_Date', 'Deployments',
+        'Total_Clicks', 'Total_Click_Rate',
     ];
-    
-    const rowsPerPage = 10;
+
+    const handleRowsPerPageChange = (e) => {
+        setRowsPerPage(Number(e.target.value));
+        setCurrentPage(1);
+    };
+
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
@@ -44,7 +49,7 @@ const Dashboard = () => {
     useEffect(() => {
         document.body.className = isDarkTheme ? "dark" : "light";
     }, [isDarkTheme]);
-      
+
     useEffect(() => {
         async function fetchBlobData() {
             const blobUrl = "https://emaildash.blob.core.windows.net/json-data/combined_data.json?sp=r&st=2024-10-28T20:56:43Z&se=2025-10-28T04:56:43Z&spr=https&sv=2022-11-02&sr=b&sig=OEUeFcUZVRvz4d6yJ2%2F2h2wwO9j3OmHBGNRlNzYlPiI%3D";
@@ -53,7 +58,6 @@ const Dashboard = () => {
                 const jsonData = await response.json();
                 setMetricsData(jsonData);
                 setFilteredData(jsonData);
-                setAvailableSubjects([...new Set(jsonData.map((item) => item.Publication.split(" ")[0]))]);
             } catch (error) {
                 console.error("Error fetching blob data:", error);
             }
@@ -63,8 +67,13 @@ const Dashboard = () => {
 
     useEffect(() => {
         const groupedPublications = groupPublications(metricsData);
-        setAvailableSubjects(Object.keys(groupedPublications));
-        setAveragedData(calculateAverages(groupedPublications));
+
+        const validGroups = Object.keys(groupedPublications).filter(
+            (group) => groupedPublications[group].length >= 3
+        );
+
+        setAvailableSubjects(validGroups);
+        setAveragedData(calculateAverages(groupedPublications, validGroups));
     }, [metricsData]);
 
     const handleSearchChange = (e) => {
@@ -91,12 +100,10 @@ const Dashboard = () => {
         if (index === newSubjects.length - 1 && value && newSubjects.length < 4) setSelectedSubjects([...newSubjects, '']);
     };
 
-    const calculateAverages = (groups) => {
+    const calculateAverages = (groups, validGroups) => {
         const averageData = {};
-        for (const group in groups) {
+        validGroups.forEach((group) => {
             const publications = groups[group];
-            if (publications.length === 0) continue;
-
             const metricsSum = publications.reduce((acc, curr) => {
                 acc.Total_Opens += curr.Total_Opens || 0;
                 acc.Total_Open_Rate += curr.Total_Open_Rate || 0;
@@ -111,7 +118,7 @@ const Dashboard = () => {
                 acc.Delivery_Rate += curr.Delivery_Rate || 0;
                 return acc;
             }, { Total_Opens: 0, Total_Open_Rate: 0, Unique_Opens: 0, Unique_Open_Rate: 0, Total_Clicks: 0, Total_Click_Rate: 0, Unique_Clicks: 0, Unique_Click_Rate: 0, Sent: 0, Delivered: 0, Delivery_Rate: 0 });
-    
+
             const count = publications.length;
             averageData[group] = {
                 Total_Opens: metricsSum.Total_Opens / count || 0,
@@ -126,7 +133,7 @@ const Dashboard = () => {
                 Delivered: metricsSum.Delivered / count || 0,
                 Delivery_Rate: metricsSum.Delivery_Rate / count || 0
             };
-        }
+        });
         return averageData;
     };
 
@@ -143,11 +150,11 @@ const Dashboard = () => {
                 />
                 <div className="toggle-switch" onClick={toggleTheme}>
                     <label className="switch-label">
-                        <input 
-                            type="checkbox" 
-                            className="checkbox" 
-                            checked={!isDarkTheme} 
-                            onChange={toggleTheme} 
+                        <input
+                            type="checkbox"
+                            className="checkbox"
+                            checked={!isDarkTheme}
+                            onChange={toggleTheme}
                         />
                         <span className="slider"></span>
                     </label>
@@ -163,7 +170,8 @@ const Dashboard = () => {
                 rowsPerPage={rowsPerPage}
                 handlePagination={handlePagination}
                 availableMetrics={availableMetrics}
-                totalPages={totalPages}
+                totalPages={Math.ceil(filteredData.length / rowsPerPage)}
+                handleRowsPerPageChange={handleRowsPerPageChange}
             />
             <LiveCampaignMetrics />
             <UniqueOpenRateChart filteredData={filteredData} />

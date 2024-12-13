@@ -231,22 +231,20 @@ tr:nth-child(even) {
   background-color: #005bb5;
 }
 
-
 .live-campaign-metrics {
-    margin-top: 20px;
-    background-color: #222;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+  margin-top: 20px;
+  background-color: #222;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
 }
 
- 
 .live-campaign-metrics {
-    margin-top: 20px;
-    background-color: #222;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+  margin-top: 20px;
+  background-color: #222;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
 }
 
 .campaign-grid {
@@ -284,7 +282,61 @@ tr:nth-child(even) {
 .campaign-box table tr:nth-child(even) {
   background-color: #333;
 }
+
+.digital-journals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.digital-journals-controls {
+  display: flex;
+  justify-content: flex-end; 
+  align-items: center;
+  gap: 15px;
+}
+
+.digital-journals-search-box {
+  padding: 10px;
+  font-size: 16px;
+  width: 100%;
+  max-width: 400px;
+  background-color: #444;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 4px;
+  margin: 0 auto; 
+}
+
+.search-container {
+  flex: 1;
+  display: flex;
+  justify-content: center; 
+}
+
+.digital-ed-rows-per-page {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  justify-content: flex-end;
+}
+
+.digital-ed-rows-per-page select {
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.digital-ed-rows-per-page label {
+  font-size: 14px;
+}
  
+.title-column {
+  width: 650px;
+}
+
 .line-chart-container {
   width: 100%;
   height: 150px;
@@ -381,6 +433,12 @@ body.light .dashboard-header {
 }
 
 body.light .search-box {
+  background-color: #fff;
+  border-color: #ccc;
+  color: #222;
+}
+
+body.light .digital-journals-search-box {
   background-color: #fff;
   border-color: #ccc;
   color: #222;

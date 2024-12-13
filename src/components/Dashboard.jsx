@@ -5,6 +5,7 @@ import MetricsTable from './MetricsTable';
 import TotalClickRateChart from './TotalClickRateChart';
 import UniqueOpenRateChart from './UniqueOpenRateChart';
 import InsightsSection from './InsightsSection';
+import DigitalJournals from './DigitalJournals';
 
 const Dashboard = () => {
     const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -140,7 +141,7 @@ const Dashboard = () => {
     return (
         <div className={`dashboard-container ${isDarkTheme ? 'dark' : 'light'}`}>
             <header className="dashboard-header">
-                <h1>Matrix Email Metrics Dashboard</h1>
+                <h1>Matrix Metrics Dashboard</h1>
                 <input
                     type="text"
                     className="search-box"
@@ -176,6 +177,7 @@ const Dashboard = () => {
             <LiveCampaignMetrics />
             <UniqueOpenRateChart filteredData={filteredData} />
             <TotalClickRateChart filteredData={filteredData} />
+            <DigitalJournals />
             <InsightsSection
                 availableSubjects={availableSubjects}
                 selectedSubjects={selectedSubjects}

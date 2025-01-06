@@ -2,6 +2,7 @@ import React from 'react';
 
 const MetricsTable = ({
     filteredData,
+    fullFilteredData,
     selectedColumn,
     toggleDropdown,
     handleColumnChange,
@@ -15,31 +16,30 @@ const MetricsTable = ({
     }) => {
     const currentRows = filteredData.slice().slice(0, rowsPerPage);
 
-    const exportToCSV = () => {
-        // Use the entire filtered dataset for export, not just the current page
+    const exportToCSV = (fullData) => {
         const header = ['Campaign', ...availableMetrics];
     
-        // Map over the entire filtered data
-        const rows = filteredData.map(item => [
+        const rows = fullData.map(item => [
             item.Publication,
             ...availableMetrics.map(metric => item[metric] ?? ""), 
         ]);
     
         const csvContent = [header, ...rows]
-            .map(row => row.join(","))
+            .map(row => row.map(field => 
+                `"${String(field).replace(/"/g, '""')}"`
+            ).join(","))
             .join("\n");
     
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", "filtered_data.csv");
+        link.setAttribute("download", "email_metrics_data.csv");
         link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
-    
 
     const maxPageButtons = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
@@ -166,7 +166,10 @@ const MetricsTable = ({
                 )}
             </div>
             <div className="export-button-container">
-                <button className="export-button" onClick={exportToCSV}>
+                <button
+                    className="export-button"
+                    onClick={() => exportToCSV(fullFilteredData)} 
+                >
                     Export CSV
                 </button>
             </div>

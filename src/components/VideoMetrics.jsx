@@ -1,32 +1,39 @@
 import React, { useState, useEffect } from 'react';
 
-const DigitalJournals = () => {
-    const [journalsData, setJournalsData] = useState([]);
+const VideoMetrics = () => {
+    const [videosData, setVideosData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [selectedMetrics, setSelectedMetrics] = useState({
+        views: 'views',
+        impressions: 'impressions',
+        finishes: 'finishes',
+        mean_percent_watched: 'mean_percent_watched'
+    });
+    const [dropdownOpen, setDropdownOpen] = useState({});
 
     useEffect(() => {
-        async function fetchDigitalJournalsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/digital_journals.json?sp=r&st=2024-12-13T19:03:45Z&se=2026-02-02T03:03:45Z&spr=https&sv=2022-11-02&sr=b&sig=hjMiExsLHgoC9r5LhPAiejFCUVLZ2Bkv2VP0ZsPXBwM%3D";
+        async function fetchVideoMetricsData() {
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/video_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
-                const sortedData = jsonData.sort((a, b) => b.sessions - a.sessions);
-                setJournalsData(sortedData);
+                const sortedData = jsonData.sort((a, b) => b.views - a.views);
+                setVideosData(sortedData);
                 setFilteredData(sortedData);
             } catch (error) {
-                console.error("Error fetching digital journals data:", error);
+                console.error("Error fetching video metrics data:", error);
             }
         }
-        fetchDigitalJournalsData();
+        fetchVideoMetricsData();
     }, []);
 
     const handleSearchChange = (e) => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
-        setFilteredData(journalsData.filter(item =>
+        setFilteredData(videosData.filter(item =>
             searchValue.split(' ').every(word => item.title.toLowerCase().includes(word))
         ));
         setCurrentPage(1);
@@ -41,47 +48,33 @@ const DigitalJournals = () => {
         setCurrentPage(pageNumber);
     };
 
-    const formatTitle = (title) => {
-        return title
-            .toLowerCase()
-            .replace(/\b\w/g, char => char.toUpperCase());
+    const toggleDropdown = (metricKey) => {
+        setDropdownOpen(prev => ({ ...prev, [metricKey]: !prev[metricKey] }));
     };
 
-    const formatEngagement = (seconds) => {
-        if (isNaN(seconds) || seconds < 0) {
-            return "0.00 minutes"; 
-        }
-    
-        const minutes = seconds / 60; 
-        return `${minutes.toFixed(2)} minutes`; 
-    };    
+    const handleMetricChange = (metricKey, newMetric) => {
+        setSelectedMetrics(prev => ({ ...prev, [metricKey]: newMetric }));
+        setDropdownOpen(prev => ({ ...prev, [metricKey]: false }));
+    };
 
     const exportToCSV = () => {
-        const header = ['Title', 'Sessions', 'Engaged Sessions', 'Avg Session Duration', 'Bounce Rate', 'Active Users', 'Property', 'Page Number', 'Count'];
-    
+        const header = ['Title', ...Object.values(selectedMetrics)];
         const rows = filteredData.map(item => [
             item.title,
-            item.sessions,
-            item.engagedSessions,
-            item.averageSessionDuration,
-            item.bounceRate,
-            item.activeUsers,
-            item.property,
-            item.pageNumber,
-            item.count
+            ...Object.values(selectedMetrics).map(metric => item[metric] ?? "")
         ]);
-    
+
         const csvContent = [header, ...rows]
             .map(row => row.map(field => 
                 `"${String(field).replace(/"/g, '""')}"`
             ).join(","))
             .join("\n");
-    
+
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", "digital_journals_data.csv");
+        link.setAttribute("download", "video_metrics_data.csv");
         link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
@@ -93,6 +86,8 @@ const DigitalJournals = () => {
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
 
+    const availableMetrics = Object.keys(filteredData[0] || {}).filter(key => key !== 'title');
+
     const maxPageButtons = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
     const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
@@ -100,7 +95,7 @@ const DigitalJournals = () => {
     return (
         <div className="table-section">
             <div className="digital-journals-header">
-                <h2>Digital Journal Metrics</h2>
+                <h2>JCAD TV Metrics</h2>
                 <div className="search-container">
                     <input
                         type="text"
@@ -118,7 +113,7 @@ const DigitalJournals = () => {
                             value={rowsPerPage}
                             onChange={handleRowsPerPageChange}
                         >
-                            {[10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
+                            {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
                                 <option key={num} value={num}>
                                     {num}
                                 </option>
@@ -131,27 +126,37 @@ const DigitalJournals = () => {
             <table>
                 <thead>
                     <tr>
-                        <th className="title-column">Title</th>
-                        <th>Sessions</th>
-                        <th>Engaged Sessions</th>
-                        <th>Avg Session Duration</th>
-                        <th>Bounce Rate</th>
-                        <th>Active Users</th>
+                        <th>Title</th>
+                        {Object.keys(selectedMetrics).map(metricKey => (
+                            <th key={metricKey} onClick={() => toggleDropdown(metricKey)}>
+                                {selectedMetrics[metricKey]}{' '}
+                                <span className="dropdown-arrow">▼</span>
+                                {dropdownOpen[metricKey] && (
+                                    <div className="dropdown">
+                                        {availableMetrics.map((metric, index) => (
+                                            <div
+                                                key={index}
+                                                onClick={() => handleMetricChange(metricKey, metric)}
+                                                className="dropdown-item"
+                                            >
+                                                {metric}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </th>
+                        ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {currentRows
-                        .filter(item => item.title.toLowerCase() !== "title not found")
-                        .map((item, index) => (
-                            <tr key={index}>
-                                <td className="title-cell">{formatTitle(item.title)}</td>
-                                <td>{item.sessions}</td>
-                                <td>{item.engagedSessions}</td>
-                                <td>{formatEngagement(item.averageSessionDuration)}</td>
-                                <td>{(item.bounceRate * 100).toFixed(2)}%</td>
-                                <td>{item.activeUsers}</td>
-                            </tr>
-                        ))}
+                    {currentRows.map((item, index) => (
+                        <tr key={index}>
+                            <td>{item.title}</td>
+                            {Object.keys(selectedMetrics).map(metricKey => (
+                                <td key={metricKey}>{item[selectedMetrics[metricKey]]}</td>
+                            ))}
+                        </tr>
+                    ))}
                 </tbody>
             </table>
             <div className="pagination">
@@ -180,4 +185,4 @@ const DigitalJournals = () => {
     );
 };
 
-export default DigitalJournals;
+export default VideoMetrics;

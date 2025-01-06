@@ -6,6 +6,7 @@ import TotalClickRateChart from './TotalClickRateChart';
 import UniqueOpenRateChart from './UniqueOpenRateChart';
 import InsightsSection from './InsightsSection';
 import DigitalJournals from './DigitalJournals';
+import VideoMetrics from './VideoMetrics';
 
 const Dashboard = () => {
     const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -53,7 +54,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         async function fetchBlobData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/combined_data.json?sp=r&st=2024-10-28T20:56:43Z&se=2025-10-28T04:56:43Z&spr=https&sv=2022-11-02&sr=b&sig=OEUeFcUZVRvz4d6yJ2%2F2h2wwO9j3OmHBGNRlNzYlPiI%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-01-06T21:20:12Z&se=2026-02-01T05:20:12Z&spr=https&sv=2022-11-02&sr=b&sig=ZmQqvxKPcL6k76gen296HkGh6n1P9Wj4dv8N%2B64GTaU%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
@@ -163,6 +164,7 @@ const Dashboard = () => {
             </header>
             <MetricsTable
                 filteredData={filteredData.slice().reverse().slice(indexOfFirstRow, indexOfLastRow)}
+                fullFilteredData={filteredData}
                 selectedColumn={selectedColumn}
                 toggleDropdown={toggleDropdown}
                 handleColumnChange={handleColumnChange}
@@ -175,9 +177,8 @@ const Dashboard = () => {
                 handleRowsPerPageChange={handleRowsPerPageChange}
             />
             <LiveCampaignMetrics />
-            <UniqueOpenRateChart filteredData={filteredData} />
-            <TotalClickRateChart filteredData={filteredData} />
             <DigitalJournals />
+            <VideoMetrics />
             <InsightsSection
                 availableSubjects={availableSubjects}
                 selectedSubjects={selectedSubjects}

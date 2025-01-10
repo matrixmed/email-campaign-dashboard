@@ -1,8 +1,8 @@
 import React from 'react';
 
 const MetricsTable = ({
-    filteredData,
-    fullFilteredData,
+    currentRows,
+    processedFullData,
     selectedColumn,
     toggleDropdown,
     handleColumnChange,
@@ -14,22 +14,21 @@ const MetricsTable = ({
     totalPages,
     handleRowsPerPageChange,
     }) => {
-    const currentRows = filteredData.slice().slice(0, rowsPerPage);
-
+        
     const exportToCSV = (fullData) => {
         const header = ['Campaign', ...availableMetrics];
-    
+        
         const rows = fullData.map(item => [
             item.Publication,
-            ...availableMetrics.map(metric => item[metric] ?? ""), 
+            ...availableMetrics.map(metric => item[metric] ?? ""),
         ]);
-    
+        
         const csvContent = [header, ...rows]
             .map(row => row.map(field => 
                 `"${String(field).replace(/"/g, '""')}"`
             ).join(","))
             .join("\n");
-    
+        
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -66,84 +65,38 @@ const MetricsTable = ({
                 <thead>
                     <tr>
                         <th>Campaign</th>
-                        <th onClick={() => toggleDropdown('column1')}>
-                            {selectedColumn.column1}{' '}
-                            <span className="dropdown-arrow">▼</span>
-                            {dropdownOpen.column1 && (
-                                <div className="dropdown">
-                                    {availableMetrics.map((metric, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => handleColumnChange('column1', metric)}
-                                            className="dropdown-item"
-                                        >
-                                            {metric}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </th>
-                        <th onClick={() => toggleDropdown('column2')}>
-                            {selectedColumn.column2}{' '}
-                            <span className="dropdown-arrow">▼</span>
-                            {dropdownOpen.column2 && (
-                                <div className="dropdown">
-                                    {availableMetrics.map((metric, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => handleColumnChange('column2', metric)}
-                                            className="dropdown-item"
-                                        >
-                                            {metric}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </th>
-                        <th onClick={() => toggleDropdown('column3')}>
-                            {selectedColumn.column3}{' '}
-                            <span className="dropdown-arrow">▼</span>
-                            {dropdownOpen.column3 && (
-                                <div className="dropdown">
-                                    {availableMetrics.map((metric, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => handleColumnChange('column3', metric)}
-                                            className="dropdown-item"
-                                        >
-                                            {metric}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </th>
-                        <th onClick={() => toggleDropdown('column4')}>
-                            {selectedColumn.column4}{' '}
-                            <span className="dropdown-arrow">▼</span>
-                            {dropdownOpen.column4 && (
-                                <div className="dropdown">
-                                    {availableMetrics.map((metric, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => handleColumnChange('column4', metric)}
-                                            className="dropdown-item"
-                                        >
-                                            {metric}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </th>
+                        {Object.entries(selectedColumn).map(([colKey, colValue]) => (
+                            <th key={colKey} onClick={() => toggleDropdown(colKey)}>
+                                {colValue}{' '}
+                                <span className="dropdown-arrow">▼</span>
+                                {dropdownOpen[colKey] && (
+                                    <div className="dropdown">
+                                        {availableMetrics.map((metric, index) => (
+                                            <div
+                                                key={index}
+                                                onClick={() => handleColumnChange(colKey, metric)}
+                                                className="dropdown-item"
+                                            >
+                                                {metric}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </th>
+                        ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {currentRows.map((item, index) => (
+                    {currentRows && currentRows.map((item, index) => (
                         <tr key={index}>
                             <td>{item.Publication}</td>
-                            <td>{item[selectedColumn.column1]}</td>
-                            <td>{item[selectedColumn.column2]}</td>
-                            <td>{item[selectedColumn.column3]}</td>
-                            <td>{item[selectedColumn.column4]}</td>
+                            {Object.values(selectedColumn).map((col, colIndex) => (
+                                <td key={colIndex}>
+                                    {typeof item[col] === 'number' 
+                                        ? item[col].toFixed(2) 
+                                        : item[col]}
+                                </td>
+                            ))}
                         </tr>
                     ))}
                 </tbody>
@@ -168,7 +121,7 @@ const MetricsTable = ({
             <div className="export-button-container">
                 <button
                     className="export-button"
-                    onClick={() => exportToCSV(fullFilteredData)} 
+                    onClick={() => exportToCSV(processedFullData)}
                 >
                     Export CSV
                 </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import _ from 'lodash';
 import { groupPublications, findGroup } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
@@ -11,7 +12,8 @@ import VideoMetrics from './VideoMetrics';
 const Dashboard = () => {
     const [isDarkTheme, setIsDarkTheme] = useState(true);
     const [metricsData, setMetricsData] = useState([]);
-    const [filteredData, setFilteredData] = useState([]);
+    const [rawFilteredData, setRawFilteredData] = useState([]);
+    const [processedData, setProcessedData] = useState([]);
     const [averagedData, setAveragedData] = useState({});
     const [search, setSearch] = useState('');
     const [availableSubjects, setAvailableSubjects] = useState([]);
@@ -20,10 +22,7 @@ const Dashboard = () => {
     const [selectedChartType, setSelectedChartType] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSubjects, setSelectedSubjects] = useState(['']);
-
-    const toggleTheme = () => {
-        setIsDarkTheme((prevTheme) => !prevTheme);
-    };
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     const [selectedColumn, setSelectedColumn] = useState({
         column1: 'Unique_Open_Rate',
@@ -38,15 +37,44 @@ const Dashboard = () => {
         'Total_Clicks', 'Total_Click_Rate',
     ];
 
-    const handleRowsPerPageChange = (e) => {
-        setRowsPerPage(Number(e.target.value));
-        setCurrentPage(1);
+    const cleanCampaignName = (name) => {
+        return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
     };
 
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-    const indexOfLastRow = currentPage * rowsPerPage;
-    const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+    const processData = (data) => {
+        if (!data || !data.length) return [];
+        
+        const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
+        const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Publication));
+
+        return Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
+            if (deployments.length === 1) {
+                return { ...deployments[0], Publication: campaignName };
+            }
+
+            const totalDelivered = _.sumBy(deployments, 'Delivered');
+            const totalSent = _.sumBy(deployments, 'Sent');
+            const totalUniqueOpens = _.sumBy(deployments, 'Unique_Opens');
+            const totalTotalOpens = _.sumBy(deployments, 'Total_Opens');
+            const totalUniqueClicks = _.sumBy(deployments, 'Unique_Clicks');
+            const totalTotalClicks = _.sumBy(deployments, 'Total_Clicks');
+
+            return {
+                Publication: campaignName,
+                Sent: totalSent,
+                Delivered: totalDelivered,
+                Delivery_Rate: (totalDelivered / totalSent) * 100,
+                Unique_Opens: totalUniqueOpens,
+                Total_Opens: totalTotalOpens,
+                Unique_Open_Rate: (totalUniqueOpens / totalDelivered) * 100,
+                Total_Open_Rate: (totalTotalOpens / totalDelivered) * 100,
+                Unique_Clicks: totalUniqueClicks,
+                Total_Clicks: totalTotalClicks,
+                Unique_Click_Rate: (totalUniqueClicks / totalDelivered) * 100,
+                Total_Click_Rate: (totalTotalClicks / totalDelivered) * 100,
+            };
+        });
+    };
 
     useEffect(() => {
         document.body.className = isDarkTheme ? "dark" : "light";
@@ -54,12 +82,12 @@ const Dashboard = () => {
 
     useEffect(() => {
         async function fetchBlobData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-01-06T21:20:12Z&se=2026-02-01T05:20:12Z&spr=https&sv=2022-11-02&sr=b&sig=ZmQqvxKPcL6k76gen296HkGh6n1P9Wj4dv8N%2B64GTaU%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-01-07T18:37:21Z&se=2026-07-02T01:37:21Z&spr=https&sv=2022-11-02&sr=b&sig=rR0%2BtfmX5cs31JQ%2BWMBZeNTSe%2Biahtm%2Fui1cubaVVuo%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
                 setMetricsData(jsonData);
-                setFilteredData(jsonData);
+                setRawFilteredData(jsonData);
             } catch (error) {
                 console.error("Error fetching blob data:", error);
             }
@@ -68,12 +96,15 @@ const Dashboard = () => {
     }, []);
 
     useEffect(() => {
-        const groupedPublications = groupPublications(metricsData);
+        const processed = processData(rawFilteredData);
+        setProcessedData(processed);
+    }, [rawFilteredData]);
 
+    useEffect(() => {
+        const groupedPublications = groupPublications(metricsData);
         const validGroups = Object.keys(groupedPublications).filter(
             (group) => groupedPublications[group].length >= 3
         );
-
         setAvailableSubjects(validGroups);
         setAveragedData(calculateAverages(groupedPublications, validGroups));
     }, [metricsData]);
@@ -81,25 +112,41 @@ const Dashboard = () => {
     const handleSearchChange = (e) => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
-        setFilteredData(metricsData.filter(item =>
+        setRawFilteredData(metricsData.filter(item =>
             searchValue.split(' ').every(word => item.Publication.toLowerCase().includes(word))
         ));
+        setCurrentPage(1);
     };
 
     const handleColumnChange = (column, metric) => {
-        setSelectedColumn((prevState) => ({ ...prevState, [column]: metric }));
-        setDropdownOpen((prevState) => ({ ...prevState, [column]: false }));
+        setSelectedColumn(prev => ({ ...prev, [column]: metric }));
+        setDropdownOpen(prev => ({ ...prev, [column]: false }));
     };
 
-    const toggleDropdown = (column) => setDropdownOpen((prevState) => ({ ...prevState, [column]: !prevState[column] }));
+    const toggleDropdown = (column) => {
+        setDropdownOpen(prev => ({ ...prev, [column]: !prev[column] }));
+    };
 
-    const handlePagination = (pageNumber) => setCurrentPage(pageNumber);
+    const handlePagination = (pageNumber) => {
+        setCurrentPage(pageNumber);
+    };
+
+    const handleRowsPerPageChange = (e) => {
+        setRowsPerPage(Number(e.target.value));
+        setCurrentPage(1);
+    };
+
+    const toggleTheme = () => {
+        setIsDarkTheme(prev => !prev);
+    };
 
     const handleSubjectChange = (index, value) => {
         const newSubjects = [...selectedSubjects];
         newSubjects[index] = value;
         setSelectedSubjects(newSubjects);
-        if (index === newSubjects.length - 1 && value && newSubjects.length < 4) setSelectedSubjects([...newSubjects, '']);
+        if (index === newSubjects.length - 1 && value && newSubjects.length < 4) {
+            setSelectedSubjects([...newSubjects, '']);
+        }
     };
 
     const calculateAverages = (groups, validGroups) => {
@@ -107,37 +154,27 @@ const Dashboard = () => {
         validGroups.forEach((group) => {
             const publications = groups[group];
             const metricsSum = publications.reduce((acc, curr) => {
-                acc.Total_Opens += curr.Total_Opens || 0;
-                acc.Total_Open_Rate += curr.Total_Open_Rate || 0;
-                acc.Unique_Opens += curr.Unique_Opens || 0;
-                acc.Unique_Open_Rate += curr.Unique_Open_Rate || 0;
-                acc.Total_Clicks += curr.Total_Clicks || 0;
-                acc.Total_Click_Rate += curr.Total_Click_Rate || 0;
-                acc.Unique_Clicks += curr.Unique_Clicks || 0;
-                acc.Unique_Click_Rate += curr.Unique_Click_Rate || 0;
-                acc.Sent += curr.Sent || 0;
-                acc.Delivered += curr.Delivered || 0;
-                acc.Delivery_Rate += curr.Delivery_Rate || 0;
+                Object.keys(curr).forEach(key => {
+                    if (typeof curr[key] === 'number') {
+                        acc[key] = (acc[key] || 0) + (curr[key] || 0);
+                    }
+                });
                 return acc;
-            }, { Total_Opens: 0, Total_Open_Rate: 0, Unique_Opens: 0, Unique_Open_Rate: 0, Total_Clicks: 0, Total_Click_Rate: 0, Unique_Clicks: 0, Unique_Click_Rate: 0, Sent: 0, Delivered: 0, Delivery_Rate: 0 });
+            }, {});
 
             const count = publications.length;
-            averageData[group] = {
-                Total_Opens: metricsSum.Total_Opens / count || 0,
-                Total_Open_Rate: metricsSum.Total_Open_Rate / count || 0,
-                Unique_Opens: metricsSum.Unique_Opens / count || 0,
-                Unique_Open_Rate: metricsSum.Unique_Open_Rate / count || 0,
-                Total_Clicks: metricsSum.Total_Clicks / count || 0,
-                Total_Click_Rate: metricsSum.Total_Click_Rate / count || 0,
-                Unique_Clicks: metricsSum.Unique_Clicks / count || 0,
-                Unique_Click_Rate: metricsSum.Unique_Click_Rate / count || 0,
-                Sent: metricsSum.Sent / count || 0,
-                Delivered: metricsSum.Delivered / count || 0,
-                Delivery_Rate: metricsSum.Delivery_Rate / count || 0
-            };
+            averageData[group] = Object.keys(metricsSum).reduce((acc, key) => {
+                acc[key] = metricsSum[key] / count;
+                return acc;
+            }, {});
         });
         return averageData;
     };
+
+    const reversedData = [...processedData].reverse();
+    const totalPages = Math.ceil(reversedData.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const currentPageData = reversedData.slice(startIndex, startIndex + rowsPerPage);
 
     return (
         <div className={`dashboard-container ${isDarkTheme ? 'dark' : 'light'}`}>
@@ -162,9 +199,10 @@ const Dashboard = () => {
                     </label>
                 </div>
             </header>
+            
             <MetricsTable
-                filteredData={filteredData.slice().reverse().slice(indexOfFirstRow, indexOfLastRow)}
-                fullFilteredData={filteredData}
+                currentRows={currentPageData}
+                processedFullData={processedData}
                 selectedColumn={selectedColumn}
                 toggleDropdown={toggleDropdown}
                 handleColumnChange={handleColumnChange}
@@ -173,7 +211,7 @@ const Dashboard = () => {
                 rowsPerPage={rowsPerPage}
                 handlePagination={handlePagination}
                 availableMetrics={availableMetrics}
-                totalPages={Math.ceil(filteredData.length / rowsPerPage)}
+                totalPages={totalPages}
                 handleRowsPerPageChange={handleRowsPerPageChange}
             />
             <LiveCampaignMetrics />

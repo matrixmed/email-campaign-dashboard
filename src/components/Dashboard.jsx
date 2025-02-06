@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
-import { groupPublications, findGroup } from '../groupPublications';
+import { groupPublications } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
 import TotalClickRateChart from './TotalClickRateChart';
@@ -32,9 +32,9 @@ const Dashboard = () => {
     });
 
     const availableMetrics = [
-        'Sent', 'Delivered', 'Delivery_Rate', 'Unique_Opens', 'Unique_Open_Rate',
-        'Total_Opens', 'Total_Open_Rate', 'Unique_Clicks', 'Unique_Click_Rate',
-        'Total_Clicks', 'Total_Click_Rate',
+        'Sent', 'Hard_Bounces', 'Soft_Bounces', 'Total_Bounces', 'Delivered', 'Delivery_Rate', 
+        'Unique_Opens', 'Unique_Open_Rate', 'Total_Opens', 'Total_Open_Rate', 'Unique_Clicks', 
+        'Unique_Click_Rate', 'Total_Clicks', 'Total_Click_Rate', 'Filtered_Bot_Clicks',
     ];
 
     const cleanCampaignName = (name) => {
@@ -45,33 +45,49 @@ const Dashboard = () => {
         if (!data || !data.length) return [];
         
         const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
-        const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Publication));
-
+        const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
+    
         return Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
             if (deployments.length === 1) {
-                return { ...deployments[0], Publication: campaignName };
+                return { ...deployments[0], Campaign: campaignName };
             }
-
-            const totalDelivered = _.sumBy(deployments, 'Delivered');
-            const totalSent = _.sumBy(deployments, 'Sent');
+    
+            const deployment1 = deployments.find(d => {
+                const name = d.Campaign.toLowerCase();
+                return name.includes('deployment 1') || 
+                       name.includes('deployment #1') || 
+                       name.includes('deployment1');
+            });
+    
+            const baseDeployment = deployment1 || deployments[0];
+    
             const totalUniqueOpens = _.sumBy(deployments, 'Unique_Opens');
             const totalTotalOpens = _.sumBy(deployments, 'Total_Opens');
             const totalUniqueClicks = _.sumBy(deployments, 'Unique_Clicks');
             const totalTotalClicks = _.sumBy(deployments, 'Total_Clicks');
-
+            const totalHardBounces = _.sumBy(deployments, 'Hard_Bounces');
+            const totalSoftBounces = _.sumBy(deployments, 'Soft_Bounces');
+            const totalBounces = _.sumBy(deployments, 'Total_Bounces');
+            const totalBotClicks = _.sumBy(deployments, 'Filtered_Bot_Clicks');
+    
             return {
-                Publication: campaignName,
-                Sent: totalSent,
-                Delivered: totalDelivered,
-                Delivery_Rate: (totalDelivered / totalSent) * 100,
+                Campaign: campaignName,
+                Sent: baseDeployment.Sent,
+                Total_Bounces: totalBounces,
+                Hard_Bounces: totalHardBounces,
+                Soft_Bounces: totalSoftBounces,
+                Delivered: baseDeployment.Delivered,
+                Delivery_Rate: (baseDeployment.Delivered / baseDeployment.Sent) * 100,
                 Unique_Opens: totalUniqueOpens,
                 Total_Opens: totalTotalOpens,
-                Unique_Open_Rate: (totalUniqueOpens / totalDelivered) * 100,
-                Total_Open_Rate: (totalTotalOpens / totalDelivered) * 100,
+                Unique_Open_Rate: (totalUniqueOpens / baseDeployment.Delivered) * 100,
+                Total_Open_Rate: (totalTotalOpens / baseDeployment.Delivered) * 100,
                 Unique_Clicks: totalUniqueClicks,
                 Total_Clicks: totalTotalClicks,
-                Unique_Click_Rate: (totalUniqueClicks / totalDelivered) * 100,
-                Total_Click_Rate: (totalTotalClicks / totalDelivered) * 100,
+                Unique_Click_Rate: (totalUniqueClicks / baseDeployment.Delivered) * 100,
+                Total_Click_Rate: (totalTotalClicks / baseDeployment.Delivered) * 100,
+                Filtered_Bot_Clicks: totalBotClicks,
+                DeploymentCount: deployments.length
             };
         });
     };
@@ -82,7 +98,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         async function fetchBlobData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-01-07T18:37:21Z&se=2026-07-02T01:37:21Z&spr=https&sv=2022-11-02&sr=b&sig=rR0%2BtfmX5cs31JQ%2BWMBZeNTSe%2Biahtm%2Fui1cubaVVuo%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-02-04T22:10:35Z&se=2025-08-13T05:10:35Z&spr=https&sv=2022-11-02&sr=b&sig=QtsT4dSLE2uZNhqJdIfRw%2FNgQNOZOwOXzmNZfEhyFGU%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
@@ -113,7 +129,7 @@ const Dashboard = () => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
         setRawFilteredData(metricsData.filter(item =>
-            searchValue.split(' ').every(word => item.Publication.toLowerCase().includes(word))
+            searchValue.split(' ').every(word => item.Campaign.toLowerCase().includes(word))
         ));
         setCurrentPage(1);
     };
@@ -152,8 +168,8 @@ const Dashboard = () => {
     const calculateAverages = (groups, validGroups) => {
         const averageData = {};
         validGroups.forEach((group) => {
-            const publications = groups[group];
-            const metricsSum = publications.reduce((acc, curr) => {
+            const Campaigns = groups[group];
+            const metricsSum = Campaigns.reduce((acc, curr) => {
                 Object.keys(curr).forEach(key => {
                     if (typeof curr[key] === 'number') {
                         acc[key] = (acc[key] || 0) + (curr[key] || 0);
@@ -162,7 +178,7 @@ const Dashboard = () => {
                 return acc;
             }, {});
 
-            const count = publications.length;
+            const count = Campaigns.length;
             averageData[group] = Object.keys(metricsSum).reduce((acc, key) => {
                 acc[key] = metricsSum[key] / count;
                 return acc;

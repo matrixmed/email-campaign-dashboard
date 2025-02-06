@@ -193,9 +193,11 @@ tr:nth-child(even) {
   color: white;
   padding: 10px;
   border: 1px solid #555;
-  max-height: 200px;
+  max-height: 650px;
   overflow-y: auto;
   z-index: 1000;
+  margin-top: 7px;
+  margin-left: -12px;
 }
  
 .dropdown-item {
@@ -208,9 +210,47 @@ tr:nth-child(even) {
 }
  
 .dropdown-arrow {
-  font-size: 10px;
-  margin-left: 5px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.dropdown-arrow svg {
+  color: #0ff;
+}
+
+.sortable-header {
+  cursor: pointer;
+  position: relative;
+}
+
+.sortable-header:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+body.light .sortable-header:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+body.light .dropdown {
+  background-color: #eeeeee;
+  color: #333;
+}
+
+body.light .dropdown-item:hover {
+  background-color: #aaaaaa;
+  color: #333;
+}
+
+body.light .dropdown-arrow svg {
+  color: #333;
 }
  
 .pagination button {
@@ -229,6 +269,11 @@ tr:nth-child(even) {
  
 .pagination button:hover {
   background-color: #005bb5;
+}
+
+.pagination-ellipsis {
+  margin-left: 12px;
+  margin-bottom: -20px;
 }
 
 .live-campaign-metrics {

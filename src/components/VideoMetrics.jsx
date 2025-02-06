@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { videoMetricDisplayNames } from './metricDisplayNames';
 
 const VideoMetrics = () => {
     const [videosData, setVideosData] = useState([]);
@@ -6,13 +7,26 @@ const VideoMetrics = () => {
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [activeDropdown, setActiveDropdown] = useState(null);
     const [selectedMetrics, setSelectedMetrics] = useState({
-        views: 'views',
-        impressions: 'impressions',
-        finishes: 'finishes',
-        mean_percent_watched: 'mean_percent_watched'
+        col1: 'views',
+        col2: 'impressions',
+        col3: 'finishes',
+        col4: 'mean_percent_watched'
     });
-    const [dropdownOpen, setDropdownOpen] = useState({});
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.sortable-header')) {
+                setActiveDropdown(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         async function fetchVideoMetricsData() {
@@ -48,17 +62,17 @@ const VideoMetrics = () => {
         setCurrentPage(pageNumber);
     };
 
-    const toggleDropdown = (metricKey) => {
-        setDropdownOpen(prev => ({ ...prev, [metricKey]: !prev[metricKey] }));
+    const toggleDropdown = (colKey) => {
+        setActiveDropdown(activeDropdown === colKey ? null : colKey);
     };
 
-    const handleMetricChange = (metricKey, newMetric) => {
-        setSelectedMetrics(prev => ({ ...prev, [metricKey]: newMetric }));
-        setDropdownOpen(prev => ({ ...prev, [metricKey]: false }));
+    const handleMetricChange = (colKey, newMetric) => {
+        setSelectedMetrics(prev => ({ ...prev, [colKey]: newMetric }));
+        setActiveDropdown(null);
     };
 
     const exportToCSV = () => {
-        const header = ['Title', ...Object.values(selectedMetrics)];
+        const header = ['Title', ...Object.values(selectedMetrics).map(metric => videoMetricDisplayNames[metric])];
         const rows = filteredData.map(item => [
             item.title,
             ...Object.values(selectedMetrics).map(metric => item[metric] ?? "")
@@ -86,7 +100,11 @@ const VideoMetrics = () => {
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
 
-    const availableMetrics = Object.keys(filteredData[0] || {}).filter(key => key !== 'title');
+    const availableMetrics = [
+        'views', 'impressions', 'finishes', 'downloads', 
+        'unique_impressions', 'unique_viewers', 'mean_percent_watched',
+        'mean_seconds_watched', 'total_seconds_watched', 'created'
+    ];
 
     const maxPageButtons = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
@@ -114,9 +132,7 @@ const VideoMetrics = () => {
                             onChange={handleRowsPerPageChange}
                         >
                             {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
-                                <option key={num} value={num}>
-                                    {num}
-                                </option>
+                                <option key={num} value={num}>{num}</option>
                             ))}
                         </select>
                     </div>
@@ -127,19 +143,47 @@ const VideoMetrics = () => {
                 <thead>
                     <tr>
                         <th>Title</th>
-                        {Object.keys(selectedMetrics).map(metricKey => (
-                            <th key={metricKey} onClick={() => toggleDropdown(metricKey)}>
-                                {selectedMetrics[metricKey]}{' '}
-                                <span className="dropdown-arrow">▼</span>
-                                {dropdownOpen[metricKey] && (
-                                    <div className="dropdown">
-                                        {availableMetrics.map((metric, index) => (
+                        {Object.entries(selectedMetrics).map(([colKey, colValue]) => (
+                            <th 
+                                key={colKey}
+                                className="sortable-header relative"
+                            >
+                                <div 
+                                    className="header-content cursor-pointer"
+                                    onClick={() => toggleDropdown(colKey)}
+                                >
+                                    <span>{videoMetricDisplayNames[colValue]}</span>
+                                    <span className="dropdown-arrow">
+                                        <svg 
+                                            width="12" 
+                                            height="12" 
+                                            viewBox="0 0 24 24" 
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            strokeWidth="2"
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round"
+                                            style={{ 
+                                                transform: activeDropdown === colKey ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                transition: 'transform 0.2s'
+                                            }}
+                                        >
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </span>
+                                </div>
+                                {activeDropdown === colKey && (
+                                    <div className="dropdown absolute right-0 mt-2 py-2 w-48 bg-white rounded-md shadow-lg z-10">
+                                        {availableMetrics.map((metric) => (
                                             <div
-                                                key={index}
-                                                onClick={() => handleMetricChange(metricKey, metric)}
-                                                className="dropdown-item"
+                                                key={metric}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleMetricChange(colKey, metric);
+                                                }}
+                                                className="dropdown-item px-4 py-2 hover:bg-gray-100 cursor-pointer"
                                             >
-                                                {metric}
+                                                {videoMetricDisplayNames[metric]}
                                             </div>
                                         ))}
                                     </div>
@@ -152,13 +196,20 @@ const VideoMetrics = () => {
                     {currentRows.map((item, index) => (
                         <tr key={index}>
                             <td>{item.title}</td>
-                            {Object.keys(selectedMetrics).map(metricKey => (
-                                <td key={metricKey}>{item[selectedMetrics[metricKey]]}</td>
+                            {Object.values(selectedMetrics).map((metric, idx) => (
+                                <td key={idx}>
+                                    {typeof item[metric] === 'number' 
+                                        ? (metric.includes('percent') || metric.includes('watched') 
+                                            ? `${item[metric].toFixed(2)}%` 
+                                            : item[metric].toLocaleString())
+                                        : item[metric]}
+                                </td>
                             ))}
                         </tr>
                     ))}
                 </tbody>
             </table>
+            
             <div className="pagination">
                 {currentPage > 1 && (
                     <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>

@@ -9,7 +9,7 @@ const DigitalJournals = () => {
 
     useEffect(() => {
         async function fetchDigitalJournalsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/digital_journals.json?sp=r&st=2024-12-13T19:03:45Z&se=2026-02-02T03:03:45Z&spr=https&sv=2022-11-02&sr=b&sig=hjMiExsLHgoC9r5LhPAiejFCUVLZ2Bkv2VP0ZsPXBwM%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/digital_journals.json?sp=r&st=2025-01-21T16:21:46Z&se=2026-01-16T00:21:46Z&spr=https&sv=2022-11-02&sr=b&sig=MFOpHD3Ymdm5gvDHtNaPdET3gHmppRPckTTdTii5Zz0%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();

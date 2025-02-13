@@ -3,8 +3,6 @@ import _ from 'lodash';
 import { groupPublications } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
-import TotalClickRateChart from './TotalClickRateChart';
-import UniqueOpenRateChart from './UniqueOpenRateChart';
 import InsightsSection from './InsightsSection';
 import DigitalJournals from './DigitalJournals';
 import VideoMetrics from './VideoMetrics';

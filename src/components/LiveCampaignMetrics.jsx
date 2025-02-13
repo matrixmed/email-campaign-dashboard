@@ -17,13 +17,17 @@ const LiveCampaignMetrics = () => {
                     return name.replace(/\s*-?\s*Deployment\s+(?:#?\d+|\w+)(?:\s+.*)?$/i, '').trim();
                 };
 
+                const isDeploymentOne = (campaignName) => {
+                    return /deployment\s*(?:#?\s*1|one|1st|\bfirst\b)/i.test(campaignName);
+                };
+
                 const groupedByBase = _.groupBy(data, item => getBaseName(item.Campaign));
                 const processedMetrics = Object.entries(groupedByBase).map(([baseName, campaigns]) => {
                     const validDeployments = campaigns.filter(c => c.Sent > 0 && c.Delivered > 0 && c.Unique_Opens !== "NA");
 
                     if (validDeployments.length === 0) return null;
 
-                    const baseDeployment = validDeployments[0];
+                    const deployment1 = validDeployments.find(c => isDeploymentOne(c.Campaign)) || validDeployments[0];
 
                     const sumMetric = (key) => {
                         return _.sum(validDeployments.map(c => (c[key] !== "NA" ? c[key] : 0)));
@@ -32,8 +36,8 @@ const LiveCampaignMetrics = () => {
                     const combined = {
                         Campaign: baseName,
                         Send_Date: _.maxBy(validDeployments, 'Send_Date').Send_Date,
-                        Sent: baseDeployment.Sent,
-                        Delivered: baseDeployment.Delivered,
+                        Sent: deployment1.Sent,
+                        Delivered: deployment1.Delivered,
                         Total_Bounces: sumMetric('Total_Bounces'),
                         Hard_Bounces: sumMetric('Hard_Bounces'),
                         Soft_Bounces: sumMetric('Soft_Bounces'),
@@ -46,11 +50,11 @@ const LiveCampaignMetrics = () => {
                         Deployments: validDeployments.map(d => d.Campaign)
                     };
 
-                    combined.Delivery_Rate = (combined.Delivered / baseDeployment.Sent) * 100 || 0;
-                    combined.Unique_Open_Rate = (combined.Unique_Opens / baseDeployment.Delivered) * 100 || 0;
-                    combined.Total_Open_Rate = (combined.Total_Opens / baseDeployment.Delivered) * 100 || 0;
-                    combined.Unique_Click_Rate = (combined.Unique_Clicks / baseDeployment.Delivered) * 100 || 0;
-                    combined.Total_Click_Rate = (combined.Total_Clicks / baseDeployment.Delivered) * 100 || 0;
+                    combined.Delivery_Rate = Number(((combined.Delivered / deployment1.Sent) * 100).toFixed(2));
+                    combined.Unique_Open_Rate = Number(((combined.Unique_Opens / deployment1.Delivered) * 100).toFixed(2));
+                    combined.Total_Open_Rate = Number(((combined.Total_Opens / deployment1.Delivered) * 100).toFixed(2));
+                    combined.Unique_Click_Rate = Number(((combined.Unique_Clicks / deployment1.Delivered) * 100).toFixed(2));
+                    combined.Total_Click_Rate = Number(((combined.Total_Clicks / deployment1.Delivered) * 100).toFixed(2));
 
                     return combined;
                 }).filter(Boolean);

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { metricDisplayNames } from './metricDisplayNames'
+import React, { useEffect } from 'react';
+import { metricDisplayNames } from './metricDisplayNames';
 
 const MetricsTable = ({
     currentRows,
@@ -12,7 +12,7 @@ const MetricsTable = ({
     availableMetrics,
     totalPages,
     handleRowsPerPageChange,
-    }) => {
+}) => {
     const [activeDropdown, setActiveDropdown] = React.useState(null);
 
     useEffect(() => {
@@ -32,11 +32,31 @@ const MetricsTable = ({
         setActiveDropdown(activeDropdown === colKey ? null : colKey);
     };
 
+    const formatValue = (value, metric) => {
+        // Convert string numbers to actual numbers
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (typeof numValue !== 'number' || isNaN(numValue)) return value;
+        
+        // Add any non-percentage metrics here that shouldn't be rounded
+        const nonPercentageMetrics = ['Sent', 'Hard_Bounces', 'Soft_Bounces', 'Total_Bounces', 
+            'Delivered', 'Unique_Opens', 'Total_Opens', 'Unique_Clicks', 'Total_Clicks', 
+            'Filtered_Bot_Clicks'];
+            
+        if (nonPercentageMetrics.includes(metric)) {
+            return value.toLocaleString();
+        }
+        
+        // For percentage metrics, always round to 2 decimal places
+        return Number(value).toFixed(2);
+    };
+
     const exportToCSV = (fullData) => {
         const header = ['Campaign', ...availableMetrics];
         const rows = fullData.map(item => [
             item.Campaign,
-            ...availableMetrics.map(metric => item[metric] ?? ""),
+            ...availableMetrics.map(metric => 
+                typeof item[metric] === 'number' ? formatValue(item[metric], metric) : (item[metric] ?? "")
+            ),
         ]);
         
         const csvContent = [header, ...rows]
@@ -78,7 +98,7 @@ const MetricsTable = ({
                 </select>
             </div>
             <table>
-            <thead>
+                <thead>
                     <tr>
                         <th>Campaign</th>
                         {Object.entries(selectedColumn).map(([colKey, colValue]) => (
@@ -135,9 +155,7 @@ const MetricsTable = ({
                             <td>{item.Campaign}</td>
                             {Object.values(selectedColumn).map((col, colIndex) => (
                                 <td key={colIndex}>
-                                    {typeof item[col] === 'number' 
-                                        ? item[col].toFixed(2) 
-                                        : item[col]}
+                                    {formatValue(item[col], col)}
                                 </td>
                             ))}
                         </tr>

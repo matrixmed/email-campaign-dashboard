@@ -1,5 +1,8 @@
 export const metricDisplayNames = {
     'Sent': 'Sent',
+    'Hard_Bounces': 'Hard Bounces',
+    'Soft_Bounces': 'Soft Bounces',
+    'Total_Bounces': 'Total Bounces',
     'Delivered': 'Delivered',
     'Delivery_Rate': 'Delivery Rate',
     'Unique_Opens': 'Unique Opens',
@@ -9,7 +12,8 @@ export const metricDisplayNames = {
     'Unique_Clicks': 'Unique Clicks',
     'Unique_Click_Rate': 'Unique Click Rate',
     'Total_Clicks': 'Total Clicks',
-    'Total_Click_Rate': 'Total Click Rate'
+    'Total_Click_Rate': 'Total Click Rate',
+    'Filtered_Bot_Clicks': 'Bot Clicks'
 };
 
 export const videoMetricDisplayNames = {

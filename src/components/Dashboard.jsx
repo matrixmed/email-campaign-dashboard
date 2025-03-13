@@ -6,6 +6,7 @@ import MetricsTable from './MetricsTable';
 import InsightsSection from './InsightsSection';
 import DigitalJournals from './DigitalJournals';
 import VideoMetrics from './VideoMetrics';
+import ChatInterface from './ChatInterface';
 
 const Dashboard = () => {
     const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -82,8 +83,8 @@ const Dashboard = () => {
                 Total_Open_Rate: (totalTotalOpens / baseDeployment.Delivered) * 100,
                 Unique_Clicks: totalUniqueClicks,
                 Total_Clicks: totalTotalClicks,
-                Unique_Click_Rate: (totalUniqueClicks / baseDeployment.Delivered) * 100,
-                Total_Click_Rate: (totalTotalClicks / baseDeployment.Delivered) * 100,
+                Unique_Click_Rate: (totalUniqueClicks / totalUniqueOpens) * 100,
+                Total_Click_Rate: (totalTotalClicks / totalTotalOpens) * 100,
                 Filtered_Bot_Clicks: totalBotClicks,
                 DeploymentCount: deployments.length
             };
@@ -231,6 +232,7 @@ const Dashboard = () => {
             <LiveCampaignMetrics />
             <DigitalJournals />
             <VideoMetrics />
+            <ChatInterface />
             <InsightsSection
                 availableSubjects={availableSubjects}
                 selectedSubjects={selectedSubjects}
@@ -241,8 +243,6 @@ const Dashboard = () => {
                 setSelectedChartType={setSelectedChartType}
                 averagedData={averagedData}
             />
-            <div className="buffer-section"></div>
-            <div className="buffer-section"></div>
         </div>
     );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import QueryEngine from '../backend/query-engine';
 import DisplayComponents from './DisplayComponents';
-
+import QueryQuestions from './QueryQuestions';
 const { 
   TopUsersDisplay, 
   ContentPerformanceDisplay, 
@@ -20,15 +20,7 @@ const ChatInterface = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [queryHistory, setQueryHistory] = useState([]);
-  const [suggestions] = useState([
-    'Show me top engaged users in dermatology',
-    'What content works best for oncologists?',
-    'When do physicians prefer to read our content?',
-    'Give me an overview of our audience',
-    'How many users do we have?',
-    'Compare dermatology vs oncology engagement'
-  ]);
-  
+  const [suggestions, setSuggestions] = useState([]);
   const resultsEndRef = useRef(null);
   const queryEngineRef = useRef(null);
   
@@ -60,6 +52,21 @@ const ChatInterface = () => {
       console.log('Error saving to localStorage:', e);
     }
   }, [queryHistory, results]);
+
+  useEffect(() => {
+    const allQuestions = [...QueryQuestions];
+    const selectedQuestions = [];
+    
+    for (let i = 0; i < 5; i++) {
+      if (allQuestions.length === 0) break;
+      
+      const randomIndex = Math.floor(Math.random() * allQuestions.length);
+      selectedQuestions.push(allQuestions[randomIndex]);
+      allQuestions.splice(randomIndex, 1);
+    }
+    
+    setSuggestions(selectedQuestions);
+  }, []);
   
   const handleSuggestionClick = (suggestion) => {
     setQuery(suggestion);
@@ -68,6 +75,43 @@ const ChatInterface = () => {
   const handleClearResults = () => {
     setResults([]);
     localStorage.removeItem('results');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!query.trim()) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!queryEngineRef.current) {
+        queryEngineRef.current = new QueryEngine();
+        await queryEngineRef.current.initialize();
+      }
+      
+      const result = await queryEngineRef.current.processQuery(query);
+      
+      setResults(prevResults => [result, ...prevResults]);
+      
+      if (!queryHistory.includes(query)) {
+        setQueryHistory(prevHistory => [...prevHistory, query]);
+      }
+      
+      setQuery('');
+      
+      if (resultsEndRef.current) {
+        resultsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    } catch (err) {
+      console.error('Error processing query:', err);
+      setError(`Failed to process query: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
   
   const safeRender = (component) => {
@@ -110,7 +154,7 @@ const ChatInterface = () => {
       journeyPatterns: {}
     };
     
-    const data = {...defaultData, ...result};
+    const data = result;
     
     switch (result.responseType) {
       case 'top_users':

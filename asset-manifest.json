@@ -1,17 +1,17 @@
 {
   "files": {
     "main.css": "/email-campaign-dashboard/static/css/main.0fa7d803.css",
-    "main.js": "/email-campaign-dashboard/static/js/main.c5a059f8.js",
+    "main.js": "/email-campaign-dashboard/static/js/main.7c1040ea.js",
     "static/js/513.b52fbb93.chunk.js": "/email-campaign-dashboard/static/js/513.b52fbb93.chunk.js",
     "static/js/453.012b948e.chunk.js": "/email-campaign-dashboard/static/js/453.012b948e.chunk.js",
     "index.html": "/email-campaign-dashboard/index.html",
     "main.0fa7d803.css.map": "/email-campaign-dashboard/static/css/main.0fa7d803.css.map",
-    "main.c5a059f8.js.map": "/email-campaign-dashboard/static/js/main.c5a059f8.js.map",
+    "main.7c1040ea.js.map": "/email-campaign-dashboard/static/js/main.7c1040ea.js.map",
     "513.b52fbb93.chunk.js.map": "/email-campaign-dashboard/static/js/513.b52fbb93.chunk.js.map",
     "453.012b948e.chunk.js.map": "/email-campaign-dashboard/static/js/453.012b948e.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.0fa7d803.css",
-    "static/js/main.c5a059f8.js"
+    "static/js/main.7c1040ea.js"
   ]
 }

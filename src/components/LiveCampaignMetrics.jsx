@@ -53,8 +53,8 @@ const LiveCampaignMetrics = () => {
                     combined.Delivery_Rate = Number(((combined.Delivered / deployment1.Sent) * 100).toFixed(2));
                     combined.Unique_Open_Rate = Number(((combined.Unique_Opens / deployment1.Delivered) * 100).toFixed(2));
                     combined.Total_Open_Rate = Number(((combined.Total_Opens / deployment1.Delivered) * 100).toFixed(2));
-                    combined.Unique_Click_Rate = Number(((combined.Unique_Clicks / deployment1.Delivered) * 100).toFixed(2));
-                    combined.Total_Click_Rate = Number(((combined.Total_Clicks / deployment1.Delivered) * 100).toFixed(2));
+                    combined.Unique_Click_Rate = Number(((combined.Unique_Clicks / combined.Unique_Opens) * 100).toFixed(2));
+                    combined.Total_Click_Rate = Number(((combined.Total_Clicks / combined.Total_Opens) * 100).toFixed(2));
 
                     return combined;
                 }).filter(Boolean);

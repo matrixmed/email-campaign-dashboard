@@ -3,6 +3,13 @@ import Dashboard from './components/Dashboard';
 import MatrixSignIn from './components/MatrixSignIn';
 import './Dashboard.css';
 import './MatrixSignIn.css';
+import './themes/SpaceTheme.css';
+import './themes/SpaceTheme.css';
+import './themes/MarbleTheme.css';
+import './themes/CyberpunkTheme.css';
+import './themes/HolographicTheme.css';
+import './themes/CompanyTheme.css';
+import './themes/SynthwaveTheme.css';
 
 const SESSION_DURATION = 10 * 60 * 60 * 1000;
 

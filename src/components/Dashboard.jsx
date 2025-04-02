@@ -3,10 +3,12 @@ import _ from 'lodash';
 import { groupPublications } from '../groupPublications';
 import LiveCampaignMetrics from './LiveCampaignMetrics';
 import MetricsTable from './MetricsTable';
-import InsightsSection from './InsightsSection';
+// import InsightsSection from './InsightsSection';
 import DigitalJournals from './DigitalJournals';
 import VideoMetrics from './VideoMetrics';
 import ChatInterface from './ChatInterface';
+import { createStars } from '../themes/stars';
+import { createShootingStars } from '../themes/stars';
 
 const Dashboard = () => {
     const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -15,6 +17,7 @@ const Dashboard = () => {
     const [processedData, setProcessedData] = useState([]);
     const [averagedData, setAveragedData] = useState({});
     const [search, setSearch] = useState('');
+    const [selectedDeployment, setSelectedDeployment] = useState('all'); 
     const [availableSubjects, setAvailableSubjects] = useState([]);
     const [dropdownOpen, setDropdownOpen] = useState({});
     const [selectedMetric, setSelectedMetric] = useState('');
@@ -22,6 +25,7 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSubjects, setSelectedSubjects] = useState(['']);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [currentTheme, setCurrentTheme] = useState('dark');
 
     const [selectedColumn, setSelectedColumn] = useState({
         column1: 'Unique_Open_Rate',
@@ -36,12 +40,47 @@ const Dashboard = () => {
         'Unique_Click_Rate', 'Total_Clicks', 'Total_Click_Rate', 'Filtered_Bot_Clicks',
     ];
 
+    const availableThemes = [
+        { value: 'dark', label: 'Dark Theme' },
+        { value: 'light', label: 'Light Theme' },
+        { value: 'space-theme', label: 'Space Theme' }
+        /*
+        { value: 'cyberpunk-theme', label: 'Cyberpunk Theme' },
+        { value: 'holographic-theme', label: 'Holographic Theme' },
+        { value: 'synthwave-theme', label: 'Synthwave Theme' }
+         */
+    ];
+
     const cleanCampaignName = (name) => {
         return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
     };
 
+    const filterByDeployment = (data) => {
+        if (selectedDeployment === 'all') return data;
+        
+        return data.filter(item => {
+            const match = item.Campaign.match(/\s*[-–—]\s*deployment\s*#?(\d+)|\s+deployment\s*#?(\d+)/i);
+            
+            if (selectedDeployment === 'none') {
+                return !match;
+            }
+            
+            if (match) {
+                const num = match[1] || match[2];
+                return num === selectedDeployment;
+            }
+            
+            return false;
+        });
+    };
+
     const processData = (data) => {
         if (!data || !data.length) return [];
+        
+        if (selectedDeployment !== 'all') {
+            const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
+            return validDeliveries;
+        }
         
         const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
         const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
@@ -92,6 +131,56 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
+        document.body.classList.remove(
+            'dark', 
+            'light', 
+            'space-theme',
+            'marble-theme',
+            'cyberpunk-theme',
+            'holographic-theme',
+            'company-theme',
+            'synthwave-theme'
+        );
+        
+        document.body.classList.add(currentTheme);
+        
+        if (currentTheme === 'light') {
+            document.body.style.backgroundColor = '#f9f9f9';  
+        } else if (currentTheme === 'dark') {
+            document.body.style.backgroundColor = '#1c1c1e';  
+        } else if (currentTheme === 'space-theme') {
+            document.body.style.backgroundColor = '#050a1f'; 
+            createStars();
+            createShootingStars();
+        } else if (currentTheme === 'cyberpunk-theme') {
+            document.body.style.backgroundColor = '#0a0a0f'; 
+        } else if (currentTheme === 'holographic-theme') {
+            document.body.style.backgroundColor = 'rgba(10, 15, 30, 0.9)';  
+        } else if (currentTheme === 'synthwave-theme') {
+            document.body.style.backgroundColor = '#1a1a2e'; 
+        }
+        
+        if (currentTheme !== 'space-theme') {
+            const stars = document.querySelectorAll('.star, .shooting-star');
+            stars.forEach(star => star.remove());
+            
+            const starryBackground = document.querySelector('.starry-background');
+            if (starryBackground) {
+                starryBackground.remove();
+            }
+            
+            setIsDarkTheme(currentTheme === 'dark');
+        }
+
+        if (currentTheme === 'cyberpunk-theme') {
+            const heading = document.querySelector('h1');
+            if (heading) {
+                heading.setAttribute('data-text', heading.textContent);
+            }
+        }
+    }, [currentTheme]);
+
+    useEffect(() => {
         document.body.className = isDarkTheme ? "dark" : "light";
     }, [isDarkTheme]);
 
@@ -109,6 +198,17 @@ const Dashboard = () => {
         }
         fetchBlobData();
     }, []);
+
+    useEffect(() => {
+        const searchFiltered = metricsData.filter(item =>
+            search.split(' ').every(word => item.Campaign.toLowerCase().includes(word.toLowerCase()))
+        );
+        
+        const deploymentFiltered = filterByDeployment(searchFiltered);
+        
+        setRawFilteredData(deploymentFiltered);
+        setCurrentPage(1);
+    }, [search, selectedDeployment, metricsData]);
 
     useEffect(() => {
         const processed = processData(rawFilteredData);
@@ -150,9 +250,22 @@ const Dashboard = () => {
         setRowsPerPage(Number(e.target.value));
         setCurrentPage(1);
     };
+    
+    const handleDeploymentChange = (value) => {
+        setSelectedDeployment(value);
+        setCurrentPage(1);
+    };
 
     const toggleTheme = () => {
-        setIsDarkTheme(prev => !prev);
+        setCurrentTheme(prevTheme => {
+            const currentIndex = availableThemes.findIndex(theme => theme.value === prevTheme);
+            const nextIndex = (currentIndex + 1) % availableThemes.length;
+            return availableThemes[nextIndex].value;
+        });
+    };
+
+    const selectTheme = (theme) => {
+        setCurrentTheme(theme);
     };
 
     const handleSubjectChange = (index, value) => {
@@ -192,7 +305,7 @@ const Dashboard = () => {
     const currentPageData = reversedData.slice(startIndex, startIndex + rowsPerPage);
 
     return (
-        <div className={`dashboard-container ${isDarkTheme ? 'dark' : 'light'}`}>
+        <div className={`dashboard-container ${currentTheme}`}>
             <header className="dashboard-header">
                 <h1>Matrix Metrics Dashboard</h1>
                 <input
@@ -202,16 +315,21 @@ const Dashboard = () => {
                     value={search}
                     onChange={handleSearchChange}
                 />
-                <div className="toggle-switch" onClick={toggleTheme}>
-                    <label className="switch-label">
-                        <input
-                            type="checkbox"
-                            className="checkbox"
-                            checked={!isDarkTheme}
-                            onChange={toggleTheme}
-                        />
-                        <span className="slider"></span>
-                    </label>
+                
+                <div className="theme-controls">
+                    <div className="theme-selector">
+                        <select 
+                            value={currentTheme}
+                            onChange={(e) => selectTheme(e.target.value)}
+                            className="theme-select"
+                        >
+                            {availableThemes.map(theme => (
+                                <option key={theme.value} value={theme.value}>
+                                    {theme.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </header>
             
@@ -228,11 +346,14 @@ const Dashboard = () => {
                 availableMetrics={availableMetrics}
                 totalPages={totalPages}
                 handleRowsPerPageChange={handleRowsPerPageChange}
+                selectedDeployment={selectedDeployment}
+                handleDeploymentChange={handleDeploymentChange}
             />
             <LiveCampaignMetrics />
             <DigitalJournals />
             <VideoMetrics />
             <ChatInterface />
+           {/*
             <InsightsSection
                 availableSubjects={availableSubjects}
                 selectedSubjects={selectedSubjects}
@@ -243,6 +364,7 @@ const Dashboard = () => {
                 setSelectedChartType={setSelectedChartType}
                 averagedData={averagedData}
             />
+            */}
         </div>
     );
 };

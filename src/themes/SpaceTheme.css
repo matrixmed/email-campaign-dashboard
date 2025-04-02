@@ -1,0 +1,376 @@
+/* Space Theme CSS */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap');
+
+/* Base styles for space theme */
+body.space-theme {
+  background-color: #050a1f;
+  color: white;
+  position: relative;
+  font-family: 'Space Mono', monospace;
+}
+
+/* Starry background */
+.starry-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.star {
+  position: absolute;
+  background-color: white;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: twinkle 4s infinite ease-in-out;
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+.shooting-star {
+  position: absolute;
+  width: 100px;
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 1));
+  animation: shoot 6s linear infinite;
+  opacity: 0;
+  transform: rotate(45deg);
+}
+
+@keyframes shoot {
+  0% { transform: translateX(-100px) translateY(0) rotate(45deg); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 100px)) translateY(calc(100vh + 100px)) rotate(45deg); opacity: 0; }
+}
+
+/* Space theme header */
+body.space-theme .dashboard-header {
+  background: linear-gradient(135deg, #f44336, #9c27b0, #ff9800);
+  color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.space-theme h1 {
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(150, 150, 255, 0.6);
+}
+
+body.space-theme h2 {
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+}
+
+/* Space theme search box */
+body.space-theme .search-box,
+body.space-theme .digital-journals-search-box {
+  background-color: rgba(40, 40, 50, 0.7);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  color: white;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(100, 100, 255, 0.2);
+}
+
+body.space-theme .search-box:focus,
+body.space-theme .digital-journals-search-box:focus {
+  border-color: rgba(100, 100, 255, 0.8);
+  box-shadow: 0 0 15px rgba(100, 100, 255, 0.4);
+}
+
+/* Space theme sections */
+body.space-theme .chart-section,
+body.space-theme .table-section,
+body.space-theme .insights-section,
+body.space-theme .buffer-section,
+body.space-theme .live-campaign-metrics,
+body.space-theme .chat-interface {
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 40, 0.9));
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(100, 100, 255, 0.1);
+  padding: 25px;
+  z-index: 1;
+}
+
+/* Space theme section borders */
+body.space-theme .chart-section::before,
+body.space-theme .table-section::before,
+body.space-theme .insights-section::before,
+body.space-theme .buffer-section::before,
+body.space-theme .live-campaign-metrics::before,
+body.space-theme .chat-interface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(135deg, #f44336, #9c27b0, #ff9800);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Space theme tables */
+body.space-theme table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+
+body.space-theme th {
+  background-color: rgba(103, 58, 183, 0.8);
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  border: none;
+}
+
+body.space-theme td {
+  color: #fff;
+  background-color: rgba(30, 30, 50, 0.5);
+  border: none;
+}
+
+body.space-theme tr:nth-child(even) td {
+  background-color: rgba(40, 40, 60, 0.5);
+}
+
+body.space-theme tr:hover td {
+  background-color: rgba(60, 60, 100, 0.5);
+}
+
+/* Space theme buttons */
+body.space-theme button,
+body.space-theme .space-button,
+body.space-theme .pagination button,
+body.space-theme .query-button {
+  background: rgba(103, 58, 183, 0.8);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+body.space-theme button:hover,
+body.space-theme .space-button:hover,
+body.space-theme .pagination button:hover,
+body.space-theme .query-button:hover {
+  background: rgba(103, 58, 183, 1);
+  box-shadow: 0 0 15px rgba(103, 58, 183, 0.5);
+}
+
+body.space-theme button::after,
+body.space-theme .space-button::after,
+body.space-theme .pagination button::after,
+body.space-theme .query-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+body.space-theme button:hover::after,
+body.space-theme .space-button:hover::after,
+body.space-theme .pagination button:hover::after,
+body.space-theme .query-button:hover::after {
+  left: 100%;
+}
+
+/* Space theme inputs and selects */
+body.space-theme input,
+body.space-theme select,
+body.space-theme .deployment-select,
+body.space-theme .rows-control select {
+  background-color: rgba(40, 40, 50, 0.7);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  color: white;
+  border-radius: 5px;
+  padding: 8px 12px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+body.space-theme input:focus,
+body.space-theme select:focus {
+  border-color: rgba(100, 100, 255, 0.8);
+  box-shadow: 0 0 10px rgba(100, 100, 255, 0.2);
+}
+
+/* Space theme dropdown */
+body.space-theme .dropdown {
+  background-color: rgba(30, 30, 50, 0.95);
+  border: 1px solid rgba(100, 100, 255, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+}
+
+body.space-theme .dropdown-item:hover {
+  background-color: rgba(60, 60, 100, 0.5);
+}
+
+body.space-theme .dropdown-arrow svg {
+  color: #0ff;
+}
+
+/* Space theme toggle */
+body.space-theme .toggle-switch {
+  --light: #d8dbe0;
+  --dark: #050a1f;
+  --link: rgb(27, 129, 112);
+  --link-hover: rgb(24, 94, 82);
+}
+
+body.space-theme .switch-label {
+  background-color: var(--dark);
+}
+
+body.space-theme .checkbox:checked ~ .slider {
+  background-color: var(--light);
+}
+
+body.space-theme .slider::before {
+  box-shadow: inset 12px -4px 0px 0px var(--light);
+  background-color: var(--dark);
+}
+
+/* Chat interface */
+body.space-theme .query-input {
+  background-color: rgba(40, 40, 50, 0.7);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  color: white;
+}
+
+body.space-theme .query-input:focus {
+  border-color: rgba(100, 100, 255, 0.8);
+  box-shadow: 0 0 15px rgba(100, 100, 255, 0.2);
+}
+
+body.space-theme .sample-queries h3 {
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+}
+
+body.space-theme .sample-queries li {
+  background-color: rgba(40, 40, 60, 0.5);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  transition: all 0.3s;
+}
+
+body.space-theme .sample-queries li:hover {
+  background-color: rgba(60, 60, 100, 0.5);
+  box-shadow: 0 0 15px rgba(100, 100, 255, 0.2);
+}
+
+/* Space theme scrollbars */
+body.space-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.space-theme ::-webkit-scrollbar-track {
+  background: rgba(30, 30, 50, 0.5);
+  border-radius: 4px;
+}
+
+body.space-theme ::-webkit-scrollbar-thumb {
+  background: rgba(103, 58, 183, 0.7);
+  border-radius: 4px;
+}
+
+body.space-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(103, 58, 183, 0.9);
+}
+
+/* Theme selector dropdown */
+.theme-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.theme-selector {
+  position: relative;
+}
+
+.theme-select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+body.space-theme .theme-select {
+  background-color: rgba(40, 40, 50, 0.7);
+  color: white;
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  padding: 8px 12px;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* Loader spinner */
+body.space-theme .spinner div {
+  border-color: #0ff;
+  background-color: rgba(0, 255, 255, 0.1);
+}
+
+/* Any additional adjustments for specific components */
+body.space-theme .campaign-box {
+  background: rgba(40, 40, 60, 0.5);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+}
+
+body.space-theme .campaign-box h3 {
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+}
+
+body.space-theme .attached-tooltip {
+  background-color: rgba(30, 30, 50, 0.95);
+  border: 1px solid rgba(100, 100, 255, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+}
+
+body.space-theme .tooltip-bottom::before,
+body.space-theme .tooltip-top::before {
+  background-color: rgba(30, 30, 50, 0.95);
+  border-color: rgba(100, 100, 255, 0.3);
+}
+
+/* Responsive adjustments for space theme */
+@media (max-width: 768px) {
+  body.space-theme .dashboard-header {
+    flex-direction: column;
+    padding: 15px;
+  }
+  
+  body.space-theme .theme-controls {
+    margin-top: 15px;
+    width: 100%;
+    justify-content: center;
+  }
+}

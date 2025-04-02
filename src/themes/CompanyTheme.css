@@ -1,0 +1,523 @@
+/* Corporate Brand Theme CSS */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Montserrat:wght@400;500;600&display=swap');
+
+/* Base styles for corporate theme */
+body.company-theme {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+  position: relative;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Corporate primary colors - Customizable 
+ * These can be changed to match specific corporate brand colors
+ */
+:root {
+  --company-primary: #0056b3;       /* Main brand color */
+  --company-secondary: #6c757d;     /* Secondary brand color */
+  --company-accent: #28a745;        /* Accent color */
+  --company-dark: #343a40;          /* Dark content color */
+  --company-light: #f8f9fa;         /* Light background color */
+  --company-white: #ffffff;         /* White color */
+  --company-muted: #e9ecef;         /* Muted background color */
+  --company-border: #dee2e6;        /* Border color */
+  --company-hover: #004494;         /* Hover state color */
+  --company-gradient-start: #0056b3; /* Gradient start color */
+  --company-gradient-end: #007bff;  /* Gradient end color */
+}
+
+/* Corporate header */
+body.company-theme .dashboard-header {
+  background: var(--company-white);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-bottom: 3px solid var(--company-primary);
+  margin-bottom: 20px;
+}
+
+body.company-theme h1 {
+  color: var(--company-primary);
+  font-family: 'Montserrat', sans-serif;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+body.company-theme h2 {
+  color: var(--company-secondary);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* Corporate sections */
+body.company-theme .chart-section,
+body.company-theme .table-section,
+body.company-theme .insights-section,
+body.company-theme .buffer-section,
+body.company-theme .live-campaign-metrics,
+body.company-theme .chat-interface {
+  background: var(--company-white);
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--company-border);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* Section headers */
+body.company-theme .chart-section h2,
+body.company-theme .table-section h2,
+body.company-theme .insights-section h2,
+body.company-theme .buffer-section h2,
+body.company-theme .live-campaign-metrics h2,
+body.company-theme .chat-interface h2 {
+  color: var(--company-dark);
+  font-size: 1.25rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--company-border);
+  margin-bottom: 15px;
+}
+
+/* Corporate tables */
+body.company-theme table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: none;
+}
+
+body.company-theme th {
+  background-color: var(--company-muted);
+  color: var(--company-dark);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0;
+  border: none;
+  border-bottom: 2px solid var(--company-primary);
+  padding: 12px 16px;
+}
+
+body.company-theme td {
+  color: var(--company-dark);
+  background-color: var(--company-white);
+  border: none;
+  border-bottom: 1px solid var(--company-border);
+  padding: 10px 16px;
+}
+
+body.company-theme tr:nth-child(even) td {
+  background-color: var(--company-light);
+}
+
+body.company-theme tr:hover td {
+  background-color: rgba(0, 86, 179, 0.05);
+}
+
+/* Corporate buttons */
+body.company-theme button,
+body.company-theme .space-button,
+body.company-theme .pagination button,
+body.company-theme .query-button {
+  background: var(--company-primary);
+  color: var(--company-white);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.company-theme button:hover,
+body.company-theme .space-button:hover,
+body.company-theme .pagination button:hover,
+body.company-theme .query-button:hover {
+  background: var(--company-hover);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Disabled buttons */
+body.company-theme button:disabled,
+body.company-theme .space-button:disabled,
+body.company-theme .pagination button:disabled,
+body.company-theme .query-button:disabled {
+  background: var(--company-secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Secondary buttons */
+body.company-theme .secondary-button {
+  background: var(--company-white);
+  color: var(--company-primary);
+  border: 1px solid var(--company-primary);
+}
+
+body.company-theme .secondary-button:hover {
+  background: rgba(0, 86, 179, 0.05);
+  color: var(--company-hover);
+}
+
+/* Inputs and selects */
+body.company-theme input,
+body.company-theme select,
+body.company-theme .deployment-select,
+body.company-theme .rows-control select,
+body.company-theme .query-input {
+  background-color: var(--company-white);
+  border: 1px solid var(--company-border);
+  color: var(--company-dark);
+  border-radius: 4px;
+  padding: 8px 12px;
+  outline: none;
+  transition: all 0.2s;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+}
+
+body.company-theme input:focus,
+body.company-theme select:focus,
+body.company-theme .query-input:focus {
+  border-color: var(--company-primary);
+  box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+/* Dropdown styling */
+body.company-theme .dropdown {
+  background-color: var(--company-white);
+  border: 1px solid var(--company-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+body.company-theme .dropdown-item {
+  font-family: 'Poppins', sans-serif;
+  padding: 8px 12px;
+}
+
+body.company-theme .dropdown-item:hover {
+  background-color: rgba(0, 86, 179, 0.05);
+}
+
+body.company-theme .dropdown-arrow svg {
+  color: var(--company-primary);
+}
+
+/* Theme selector styling */
+body.company-theme .theme-select {
+  background-color: var(--company-white);
+  color: var(--company-dark);
+  border: 1px solid var(--company-border);
+  padding: 8px 12px;
+  font-family: 'Poppins', sans-serif;
+  border-radius: 4px;
+}
+
+/* Search box styling */
+body.company-theme .search-box,
+body.company-theme .digital-journals-search-box {
+  background-color: var(--company-white);
+  border: 1px solid var(--company-border);
+  color: var(--company-dark);
+  border-radius: 4px;
+  font-family: 'Poppins', sans-serif;
+  box-shadow: none;
+}
+
+body.company-theme .search-box:focus,
+body.company-theme .digital-journals-search-box:focus {
+  border-color: var(--company-primary);
+  box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+/* Campaign boxes */
+body.company-theme .campaign-box {
+  background: var(--company-white);
+  border: 1px solid var(--company-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+body.company-theme .campaign-box h3 {
+  color: var(--company-primary);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--company-border);
+}
+
+/* Tooltips */
+body.company-theme .attached-tooltip {
+  background-color: var(--company-white);
+  border: 1px solid var(--company-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: var(--company-dark);
+  font-family: 'Poppins', sans-serif;
+  border-radius: 4px;
+}
+
+body.company-theme .tooltip-bottom::before,
+body.company-theme .tooltip-top::before {
+  background-color: var(--company-white);
+  border-color: var(--company-border);
+}
+
+/* Scrollbars */
+body.company-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.company-theme ::-webkit-scrollbar-track {
+  background: var(--company-light);
+  border-radius: 4px;
+}
+
+body.company-theme ::-webkit-scrollbar-thumb {
+  background: var(--company-secondary);
+  border-radius: 4px;
+}
+
+body.company-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--company-primary);
+}
+
+/* Sample query lists */
+body.company-theme .sample-queries h3 {
+  color: var(--company-primary);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+}
+
+body.company-theme .sample-queries li {
+  background-color: var(--company-light);
+  border: 1px solid var(--company-border);
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.2s;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+body.company-theme .sample-queries li:hover {
+  background-color: rgba(0, 86, 179, 0.05);
+  border-color: var(--company-primary);
+}
+
+/* Toggle switch */
+body.company-theme .toggle-switch {
+  --light: var(--company-primary);
+  --dark: var(--company-white);
+}
+
+body.company-theme .switch-label {
+  background-color: var(--company-muted);
+  border: 1px solid var(--company-border);
+  border-radius: 30px;
+}
+
+body.company-theme .checkbox:checked ~ .slider {
+  background-color: var(--company-primary);
+}
+
+body.company-theme .slider::before {
+  box-shadow: none;
+  background-color: var(--company-white);
+}
+
+body.company-theme .checkbox:checked ~ .slider::before {
+  box-shadow: none;
+  background-color: var(--company-white);
+}
+
+/* Pagination */
+body.company-theme .pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+body.company-theme .pagination button {
+  margin: 0 5px;
+  min-width: 36px;
+  text-align: center;
+}
+
+body.company-theme .pagination button.active {
+  background-color: var(--company-secondary);
+}
+
+/* Corporate card layouts */
+body.company-theme .card {
+  background: var(--company-white);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--company-border);
+  margin-bottom: 20px;
+}
+
+body.company-theme .card-header {
+  padding: 15px 20px;
+  background: var(--company-light);
+  border-bottom: 1px solid var(--company-border);
+}
+
+body.company-theme .card-title {
+  color: var(--company-primary);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  margin: 0;
+}
+
+body.company-theme .card-body {
+  padding: 20px;
+}
+
+/* Data visualization enhancements */
+body.company-theme canvas {
+  background-color: var(--company-white);
+  border: 1px solid var(--company-border);
+  border-radius: 6px;
+}
+
+/* Progress bars */
+body.company-theme .progress {
+  height: 8px;
+  background-color: var(--company-muted);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+body.company-theme .progress-bar {
+  height: 100%;
+  background: linear-gradient(to right, var(--company-gradient-start), var(--company-gradient-end));
+  border-radius: 4px;
+}
+
+/* Badges */
+body.company-theme .badge {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+body.company-theme .badge-primary {
+  background-color: var(--company-primary);
+  color: var(--company-white);
+}
+
+body.company-theme .badge-secondary {
+  background-color: var(--company-secondary);
+  color: var(--company-white);
+}
+
+body.company-theme .badge-success {
+  background-color: var(--company-accent);
+  color: var(--company-white);
+}
+
+/* Consistent brand header */
+body.company-theme .brand-header {
+  background: linear-gradient(to right, var(--company-gradient-start), var(--company-gradient-end));
+  color: var(--company-white);
+  padding: 10px 0;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Company logos and branding
+ * Add custom logos by setting the background-image
+ */
+body.company-theme .company-logo {
+  height: 40px;
+  width: 150px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  /* Set your company logo here */
+  /* background-image: url('your-logo-url.png'); */
+}
+
+/* Dark mode company variant */
+body.company-theme.dark-variant {
+  background-color: #1e2229 !important;
+  color: #f8f9fa !important;
+}
+
+body.company-theme.dark-variant .dashboard-header,
+body.company-theme.dark-variant .chart-section,
+body.company-theme.dark-variant .table-section,
+body.company-theme.dark-variant .insights-section,
+body.company-theme.dark-variant .buffer-section,
+body.company-theme.dark-variant .live-campaign-metrics,
+body.company-theme.dark-variant .chat-interface,
+body.company-theme.dark-variant .campaign-box,
+body.company-theme.dark-variant .dropdown,
+body.company-theme.dark-variant .attached-tooltip {
+  background: #2a303b;
+  border-color: #343a40;
+  color: #f8f9fa;
+}
+
+body.company-theme.dark-variant th {
+  background-color: #343a40;
+  color: #f8f9fa;
+  border-bottom: 2px solid var(--company-primary);
+}
+
+body.company-theme.dark-variant td {
+  color: #f8f9fa;
+  background-color: #2a303b;
+  border-bottom: 1px solid #343a40;
+}
+
+body.company-theme.dark-variant tr:nth-child(even) td {
+  background-color: #272d36;
+}
+
+body.company-theme.dark-variant input,
+body.company-theme.dark-variant select,
+body.company-theme.dark-variant .deployment-select,
+body.company-theme.dark-variant .rows-control select,
+body.company-theme.dark-variant .query-input,
+body.company-theme.dark-variant .search-box,
+body.company-theme.dark-variant .digital-journals-search-box {
+  background-color: #343a40;
+  border-color: #495057;
+  color: #f8f9fa;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  body.company-theme .dashboard-header {
+    flex-direction: column;
+    padding: 15px;
+  }
+  
+  body.company-theme h1 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+  }
+  
+  body.company-theme .theme-controls {
+    margin-top: 15px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  body.company-theme .campaign-grid {
+    grid-template-columns: 1fr;
+  }
+}

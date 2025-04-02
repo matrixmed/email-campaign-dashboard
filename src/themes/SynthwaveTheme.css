@@ -1,0 +1,600 @@
+/* Enhanced Synthwave Theme CSS */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=VT323&display=swap');
+
+/* Base styles for synthwave theme */
+body.synthwave-theme {
+  background-color: #1f0033 !important;
+  color: #f8f9fa !important;
+  position: relative;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  overflow-x: hidden;
+}
+
+/* Create synthwave sunset and grid background */
+body.synthwave-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(0deg, 
+      rgba(27, 0, 55, 1) 0%, 
+      rgba(69, 0, 99, 1) 40%, 
+      rgba(107, 12, 125, 0.8) 60%, 
+      rgba(131, 18, 138, 0.6) 70%, 
+      rgba(156, 26, 153, 0.4) 80%);
+  z-index: -20;
+  pointer-events: none;
+}
+
+/* Synthwave sun */
+body.synthwave-theme::after {
+  content: '';
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 80px;
+  background: #FFCC33;
+  border-radius: 160px 160px 0 0;
+  box-shadow: 
+    0 0 40px #FFCC33,
+    0 0 60px #ff9a00,
+    0 0 80px #ff5500;
+  z-index: -19;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* Sun stripes */
+@keyframes sun-stripes {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+body.synthwave-theme .dashboard-container::before {
+  content: '';
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 60px;
+  background-image: linear-gradient(
+    0deg,
+    transparent 0%, transparent 10%,
+    #FF3366 10%, #FF3366 15%,
+    transparent 15%, transparent 25%,
+    #FF3366 25%, #FF3366 30%,
+    transparent 30%, transparent 40%,
+    #FF3366 40%, #FF3366 45%,
+    transparent 45%, transparent 55%,
+    #FF3366 55%, #FF3366 60%,
+    transparent 60%, transparent 70%,
+    #FF3366 70%, #FF3366 75%,
+    transparent 75%, transparent 85%,
+    #FF3366 85%, #FF3366 90%,
+    transparent 90%, transparent 100%
+  );
+  border-radius: 140px 140px 0 0;
+  z-index: -18;
+  pointer-events: none;
+  opacity: 0.7;
+  animation: sun-stripes 3s ease-in-out infinite;
+}
+
+/* Perspective grid lines */
+.synthwave-grid {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  background-image: 
+    linear-gradient(0deg, #00CCFF 1px, transparent 1px),
+    linear-gradient(90deg, #00CCFF 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px;
+  transform: perspective(500px) rotateX(60deg);
+  transform-origin: bottom;
+  z-index: -15;
+  pointer-events: none;
+  opacity: 0.4;
+  animation: grid-move 20s linear infinite;
+}
+
+@keyframes grid-move {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 0 100px, 0 0;
+  }
+}
+
+/* Neon text effects */
+@keyframes neon-pink-pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 5px rgba(255, 51, 102, 1),
+      0 0 10px rgba(255, 51, 102, 1),
+      0 0 20px rgba(255, 51, 102, 1),
+      0 0 40px rgba(255, 51, 102, 0.8),
+      0 0 80px rgba(255, 51, 102, 0.5);
+  }
+  50% {
+    text-shadow: 
+      0 0 5px rgba(255, 51, 102, 0.8),
+      0 0 10px rgba(255, 51, 102, 0.8),
+      0 0 20px rgba(255, 51, 102, 0.8),
+      0 0 40px rgba(255, 51, 102, 0.5),
+      0 0 80px rgba(255, 51, 102, 0.3);
+  }
+}
+
+@keyframes neon-blue-pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 5px rgba(0, 204, 255, 1),
+      0 0 10px rgba(0, 204, 255, 1),
+      0 0 20px rgba(0, 204, 255, 1),
+      0 0 40px rgba(0, 204, 255, 0.8),
+      0 0 80px rgba(0, 204, 255, 0.5);
+  }
+  50% {
+    text-shadow: 
+      0 0 5px rgba(0, 204, 255, 0.8),
+      0 0 10px rgba(0, 204, 255, 0.8),
+      0 0 20px rgba(0, 204, 255, 0.8),
+      0 0 40px rgba(0, 204, 255, 0.5),
+      0 0 80px rgba(0, 204, 255, 0.3);
+  }
+}
+
+/* CRT scan line effect */
+@keyframes scan-line {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+body.synthwave-theme .dashboard-container::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(to bottom, 
+    transparent 0%,
+    rgba(32, 32, 32, 0.2) 50%, 
+    transparent 100%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Synthwave header */
+body.synthwave-theme .dashboard-header {
+  background: rgba(31, 0, 51, 0.7);
+  box-shadow: 0 4px 30px rgba(255, 51, 102, 0.5);
+  border-bottom: 2px solid #FF3366;
+  margin-bottom: 30px;
+  padding: 15px 20px;
+  position: relative;
+  overflow: hidden;
+  z-index: 10;
+}
+
+body.synthwave-theme h1 {
+  color: #FF3366;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 3px;
+  font-weight: 700;
+  text-transform: uppercase;
+  animation: neon-pink-pulse 2s ease-in-out infinite;
+  margin: 0;
+}
+
+body.synthwave-theme h2 {
+  color: #00CCFF;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  animation: neon-blue-pulse 2s ease-in-out infinite alternate;
+}
+
+/* Synthwave sections */
+body.synthwave-theme .chart-section,
+body.synthwave-theme .table-section,
+body.synthwave-theme .insights-section,
+body.synthwave-theme .buffer-section,
+body.synthwave-theme .live-campaign-metrics,
+body.synthwave-theme .chat-interface {
+  background: rgba(31, 0, 51, 0.7);
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.3);
+  border: 1px solid #00CCFF;
+  padding: 25px;
+  margin-bottom: 30px;
+}
+
+/* Neon borders */
+body.synthwave-theme .chart-section::before,
+body.synthwave-theme .table-section::before,
+body.synthwave-theme .insights-section::before,
+body.synthwave-theme .buffer-section::before,
+body.synthwave-theme .live-campaign-metrics::before,
+body.synthwave-theme .chat-interface::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, #FF3366, #00CCFF);
+  z-index: 1;
+}
+
+body.synthwave-theme .chart-section::after,
+body.synthwave-theme .table-section::after,
+body.synthwave-theme .insights-section::after,
+body.synthwave-theme .buffer-section::after,
+body.synthwave-theme .live-campaign-metrics::after,
+body.synthwave-theme .chat-interface::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, #00CCFF, #FF3366);
+  z-index: 1;
+}
+
+/* Synthwave tables */
+body.synthwave-theme table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 5px;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+}
+
+body.synthwave-theme th {
+  background-color: rgba(51, 10, 70, 0.7);
+  color: #00CCFF;
+  letter-spacing: 2px;
+  padding: 15px 16px;
+  text-transform: uppercase;
+  animation: neon-blue-pulse 2s ease-in-out infinite;
+  position: relative;
+  border-bottom: 1px solid #00CCFF;
+}
+
+body.synthwave-theme td {
+  color: #ffffff;
+  background-color: rgba(51, 10, 70, 0.5);
+  padding: 12px 16px;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(0, 204, 255, 0.3);
+}
+
+body.synthwave-theme tr:nth-child(even) td {
+  background-color: rgba(61, 20, 80, 0.5);
+}
+
+body.synthwave-theme tr:hover td {
+  background-color: rgba(255, 51, 102, 0.2);
+}
+
+/* First column styling */
+body.synthwave-theme td:first-child {
+  color: #ffffff;
+  font-family: 'VT323', monospace;
+}
+
+/* Numeric value columns styling */
+body.synthwave-theme td:not(:first-child) {
+  text-align: right;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+/* Glowing buttons */
+body.synthwave-theme button,
+body.synthwave-theme .space-button,
+body.synthwave-theme .pagination button,
+body.synthwave-theme .query-button {
+  background: rgba(31, 0, 51, 0.8);
+  color: #00CCFF;
+  border: 2px solid #00CCFF;
+  border-radius: 4px;
+  padding: 10px 20px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.5);
+  animation: neon-blue-pulse 2s ease-in-out infinite;
+}
+
+body.synthwave-theme button:hover,
+body.synthwave-theme .space-button:hover,
+body.synthwave-theme .pagination button:hover,
+body.synthwave-theme .query-button:hover {
+  background: rgba(255, 51, 102, 0.2);
+  color: #FF3366;
+  border-color: #FF3366;
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.8);
+  transform: translateY(-2px);
+  animation: neon-pink-pulse 2s ease-in-out infinite;
+}
+
+/* Button glow effect */
+body.synthwave-theme button::after,
+body.synthwave-theme .space-button::after,
+body.synthwave-theme .pagination button::after,
+body.synthwave-theme .query-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 204, 255, 0.4), transparent);
+  transition: 0.5s;
+}
+
+body.synthwave-theme button:hover::after,
+body.synthwave-theme .space-button:hover::after,
+body.synthwave-theme .pagination button:hover::after,
+body.synthwave-theme .query-button:hover::after {
+  left: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 51, 102, 0.4), transparent);
+}
+
+/* Inputs and selects */
+body.synthwave-theme input,
+body.synthwave-theme select,
+body.synthwave-theme .deployment-select,
+body.synthwave-theme .rows-control select,
+body.synthwave-theme .query-input {
+  background-color: rgba(31, 0, 51, 0.7);
+  border: 2px solid #00CCFF;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 10px 15px;
+  outline: none;
+  transition: all 0.3s;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.3);
+}
+
+body.synthwave-theme input:focus,
+body.synthwave-theme select:focus,
+body.synthwave-theme .query-input:focus {
+  border-color: #FF3366;
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
+}
+
+/* Dropdown styling */
+body.synthwave-theme .dropdown {
+  background-color: rgba(31, 0, 51, 0.95);
+  border: 2px solid #00CCFF;
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
+  backdrop-filter: blur(5px);
+  border-radius: 4px;
+}
+
+body.synthwave-theme .dropdown-item {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  padding: 8px 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+body.synthwave-theme .dropdown-item:hover {
+  background-color: rgba(255, 51, 102, 0.2);
+  color: #FF3366;
+  text-shadow: 0 0 5px rgba(255, 51, 102, 0.8);
+}
+
+body.synthwave-theme .dropdown-arrow svg {
+  color: #00CCFF;
+  filter: drop-shadow(0 0 5px rgba(0, 204, 255, 0.8));
+}
+
+/* Theme selector styling */
+body.synthwave-theme .theme-select {
+  background-color: rgba(31, 0, 51, 0.7);
+  color: #00CCFF;
+  border: 2px solid #00CCFF;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.3);
+  text-shadow: 0 0 5px rgba(0, 204, 255, 0.8);
+}
+
+/* Search box styling */
+body.synthwave-theme .search-box,
+body.synthwave-theme .digital-journals-search-box {
+  background-color: rgba(31, 0, 51, 0.7);
+  border: 2px solid #00CCFF;
+  color: #ffffff;
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+}
+
+body.synthwave-theme .search-box:focus,
+body.synthwave-theme .digital-journals-search-box:focus {
+  border-color: #FF3366;
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+}
+
+/* Campaign boxes */
+body.synthwave-theme .campaign-box {
+  background: rgba(31, 0, 51, 0.7);
+  border: 2px solid #00CCFF;
+  border-radius: 4px;
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+body.synthwave-theme .campaign-box h3 {
+  color: #00CCFF;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px rgba(0, 204, 255, 0.8);
+}
+
+/* Tooltips */
+body.synthwave-theme .attached-tooltip {
+  background-color: rgba(31, 0, 51, 0.95);
+  border: 2px solid #FF3366;
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+  color: #ffffff;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  border-radius: 4px;
+  backdrop-filter: blur(5px);
+}
+
+body.synthwave-theme .tooltip-bottom::before,
+body.synthwave-theme .tooltip-top::before {
+  background-color: rgba(31, 0, 51, 0.95);
+  border-color: #FF3366;
+}
+
+/* Scrollbars */
+body.synthwave-theme ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: rgba(31, 0, 51, 0.5);
+}
+
+body.synthwave-theme ::-webkit-scrollbar-track {
+  background: rgba(31, 0, 51, 0.5);
+  border-radius: 0;
+}
+
+body.synthwave-theme ::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #FF3366, #00CCFF);
+  border-radius: 0;
+}
+
+body.synthwave-theme ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #00CCFF, #FF3366);
+}
+
+/* Sample query lists */
+body.synthwave-theme .sample-queries h3 {
+  color: #00CCFF;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px rgba(0, 204, 255, 0.8);
+}
+
+body.synthwave-theme .sample-queries li {
+  background-color: rgba(31, 0, 51, 0.7);
+  border: 1px solid #00CCFF;
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.2);
+}
+
+body.synthwave-theme .sample-queries li:hover {
+  background-color: rgba(255, 51, 102, 0.2);
+  border-color: #FF3366;
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.3);
+}
+
+/* Toggle switch */
+body.synthwave-theme .toggle-switch {
+  --light: #FF3366;
+  --dark: rgba(31, 0, 51, 0.7);
+}
+
+body.synthwave-theme .switch-label {
+  background-color: var(--dark);
+  border: 2px solid #00CCFF;
+  border-radius: 30px;
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.5);
+}
+
+body.synthwave-theme .checkbox:checked ~ .slider {
+  background-color: rgba(255, 51, 102, 0.2);
+}
+
+body.synthwave-theme .slider::before {
+  box-shadow: none;
+  background-color: #00CCFF;
+}
+
+body.synthwave-theme .checkbox:checked ~ .slider::before {
+  box-shadow: none;
+  background-color: var(--light);
+}
+
+/* Data visualization */
+body.synthwave-theme canvas {
+  border: 2px solid #00CCFF;
+  border-radius: 4px;
+  background-color: rgba(31, 0, 51, 0.7);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+}
+
+/* Pagination */
+body.synthwave-theme .pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+body.synthwave-theme .pagination button {
+  margin: 0 5px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Create grid lines for the synthetic feel */
+body.synthwave-theme .dashboard-container {
+  position: relative;
+}

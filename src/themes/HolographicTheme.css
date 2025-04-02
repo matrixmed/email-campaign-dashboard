@@ -1,0 +1,655 @@
+/* Enhanced Holographic/AR Theme CSS */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@300;400;500;700&display=swap');
+
+/* Base styles for enhanced holographic theme */
+body.holographic-theme {
+  background-color: #0c0c1d !important;
+  color: #e3f2fd !important;
+  position: relative;
+  font-family: 'Rajdhani', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Holographic futuristic background */
+body.holographic-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at top right, rgba(255, 84, 175, 0.1), transparent 60%),
+    radial-gradient(circle at bottom left, rgba(80, 150, 255, 0.1), transparent 60%),
+    linear-gradient(to bottom, #0c0c1d 0%, #151528 100%);
+  z-index: -20;
+  pointer-events: none;
+}
+
+/* Grid lines for holographic effect */
+body.holographic-theme::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(to right, rgba(80, 150, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(80, 150, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: -10;
+  pointer-events: none;
+}
+
+/* Holographic panel glow effect */
+@keyframes panel-pulse {
+  0% {
+    box-shadow: 
+      0 0 10px rgba(80, 150, 255, 0.3),
+      0 0 20px rgba(80, 150, 255, 0.2),
+      0 0 30px rgba(80, 150, 255, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 15px rgba(255, 84, 175, 0.3),
+      0 0 30px rgba(255, 84, 175, 0.2),
+      0 0 45px rgba(255, 84, 175, 0.1);
+  }
+  100% {
+    box-shadow: 
+      0 0 10px rgba(80, 150, 255, 0.3),
+      0 0 20px rgba(80, 150, 255, 0.2),
+      0 0 30px rgba(80, 150, 255, 0.1);
+  }
+}
+
+@keyframes text-glow {
+  0% {
+    text-shadow: 
+      0 0 5px rgba(80, 150, 255, 0.8),
+      0 0 10px rgba(80, 150, 255, 0.5);
+  }
+  50% {
+    text-shadow: 
+      0 0 5px rgba(255, 84, 175, 0.8),
+      0 0 10px rgba(255, 84, 175, 0.5);
+  }
+  100% {
+    text-shadow: 
+      0 0 5px rgba(80, 150, 255, 0.8),
+      0 0 10px rgba(80, 150, 255, 0.5);
+  }
+}
+
+/* Neon border animation */
+@keyframes neon-border-pulse {
+  0% {
+    border-color: rgba(80, 150, 255, 0.7);
+    box-shadow: 
+      0 0 10px rgba(80, 150, 255, 0.5),
+      0 0 20px rgba(80, 150, 255, 0.3),
+      inset 0 0 10px rgba(80, 150, 255, 0.3);
+  }
+  50% {
+    border-color: rgba(255, 84, 175, 0.7);
+    box-shadow: 
+      0 0 10px rgba(255, 84, 175, 0.5),
+      0 0 20px rgba(255, 84, 175, 0.3),
+      inset 0 0 10px rgba(255, 84, 175, 0.3);
+  }
+  100% {
+    border-color: rgba(80, 150, 255, 0.7);
+    box-shadow: 
+      0 0 10px rgba(80, 150, 255, 0.5),
+      0 0 20px rgba(80, 150, 255, 0.3),
+      inset 0 0 10px rgba(80, 150, 255, 0.3);
+  }
+}
+
+/* Enhanced holographic header */
+body.holographic-theme .dashboard-header {
+  background: rgba(15, 15, 35, 0.6);
+  border: 2px solid rgba(80, 150, 255, 0.6);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 10px rgba(80, 150, 255, 0.5),
+    0 0 20px rgba(80, 150, 255, 0.3),
+    inset 0 0 10px rgba(80, 150, 255, 0.3);
+  animation: neon-border-pulse 4s infinite alternate;
+  margin-bottom: 25px;
+  position: relative;
+  overflow: hidden;
+}
+
+body.holographic-theme h1 {
+  color: #e3f2fd;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  position: relative;
+  animation: text-glow 4s infinite alternate;
+}
+
+body.holographic-theme h2 {
+  color: #e3f2fd;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: relative;
+  animation: text-glow 4s infinite alternate;
+}
+
+/* Enhanced holographic sections */
+body.holographic-theme .chart-section,
+body.holographic-theme .table-section,
+body.holographic-theme .insights-section,
+body.holographic-theme .buffer-section,
+body.holographic-theme .live-campaign-metrics,
+body.holographic-theme .chat-interface {
+  background: rgba(15, 15, 35, 0.4);
+  border: 2px solid rgba(80, 150, 255, 0.6);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 15px rgba(80, 150, 255, 0.5),
+    0 0 30px rgba(80, 150, 255, 0.3),
+    inset 0 0 15px rgba(80, 150, 255, 0.3);
+  animation: neon-border-pulse 4s infinite alternate;
+  padding: 20px;
+  margin-bottom: 25px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Corner accents on sections */
+body.holographic-theme .chart-section::before,
+body.holographic-theme .table-section::before,
+body.holographic-theme .insights-section::before,
+body.holographic-theme .buffer-section::before,
+body.holographic-theme .live-campaign-metrics::before,
+body.holographic-theme .chat-interface::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  border-top: 2px solid rgba(255, 84, 175, 0.8);
+  border-left: 2px solid rgba(255, 84, 175, 0.8);
+}
+
+body.holographic-theme .chart-section::after,
+body.holographic-theme .table-section::after,
+body.holographic-theme .insights-section::after,
+body.holographic-theme .buffer-section::after,
+body.holographic-theme .live-campaign-metrics::after,
+body.holographic-theme .chat-interface::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  border-bottom: 2px solid rgba(255, 84, 175, 0.8);
+  border-right: 2px solid rgba(255, 84, 175, 0.8);
+}
+
+/* Holographic scanning effect */
+@keyframes scan-line {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+body.holographic-theme .chart-section:hover::before,
+body.holographic-theme .table-section:hover::before,
+body.holographic-theme .insights-section:hover::before,
+body.holographic-theme .buffer-section:hover::before,
+body.holographic-theme .live-campaign-metrics:hover::before,
+body.holographic-theme .chat-interface:hover::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right,
+    rgba(255, 84, 175, 0),
+    rgba(255, 84, 175, 0.8),
+    rgba(255, 84, 175, 0));
+  z-index: 10;
+  pointer-events: none;
+  animation: scan-line 1.5s ease-in-out;
+}
+
+/* Enhanced tables */
+body.holographic-theme table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 5px;
+}
+
+body.holographic-theme th {
+  background-color: rgba(19, 19, 44, 0.8);
+  color: #e3f2fd;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  border: none;
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.8);
+  position: relative;
+}
+
+body.holographic-theme th::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, 
+    rgba(80, 150, 255, 0.8), 
+    rgba(255, 84, 175, 0.8));
+}
+
+body.holographic-theme td {
+  color: #e3f2fd;
+  background-color: rgba(19, 19, 44, 0.5);
+  padding: 10px 16px;
+  border: none;
+  position: relative;
+}
+
+body.holographic-theme tr:nth-child(even) td {
+  background-color: rgba(24, 24, 52, 0.5);
+}
+
+body.holographic-theme tr:hover td {
+  background-color: rgba(80, 150, 255, 0.2);
+}
+
+/* First column special styling */
+body.holographic-theme td:first-child {
+  border-left: 2px solid rgba(255, 84, 175, 0.5);
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Enhanced buttons */
+body.holographic-theme button,
+body.holographic-theme .space-button,
+body.holographic-theme .pagination button,
+body.holographic-theme .query-button {
+  background: rgba(19, 19, 44, 0.8);
+  color: #e3f2fd;
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.3);
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+body.holographic-theme button:hover,
+body.holographic-theme .space-button:hover,
+body.holographic-theme .pagination button:hover,
+body.holographic-theme .query-button:hover {
+  background: rgba(80, 150, 255, 0.2);
+  border-color: rgba(255, 84, 175, 0.7);
+  box-shadow: 
+    0 0 10px rgba(255, 84, 175, 0.5),
+    0 0 20px rgba(255, 84, 175, 0.3);
+  text-shadow: 0 0 5px rgba(255, 84, 175, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Button scan effect */
+body.holographic-theme button::after,
+body.holographic-theme .space-button::after,
+body.holographic-theme .pagination button::after,
+body.holographic-theme .query-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.2), 
+    transparent);
+  transition: 0.5s;
+}
+
+body.holographic-theme button:hover::after,
+body.holographic-theme .space-button:hover::after,
+body.holographic-theme .pagination button:hover::after,
+body.holographic-theme .query-button:hover::after {
+  left: 100%;
+}
+
+/* Enhanced inputs and selects */
+body.holographic-theme input,
+body.holographic-theme select,
+body.holographic-theme .deployment-select,
+body.holographic-theme .rows-control select,
+body.holographic-theme .query-input {
+  background-color: rgba(19, 19, 44, 0.7);
+  color: #e3f2fd;
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 400;
+  outline: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.3);
+}
+
+body.holographic-theme input:focus,
+body.holographic-theme select:focus,
+body.holographic-theme .query-input:focus {
+  border-color: rgba(255, 84, 175, 0.7);
+  box-shadow: 
+    0 0 10px rgba(255, 84, 175, 0.5),
+    0 0 20px rgba(255, 84, 175, 0.3);
+}
+
+/* Enhanced dropdown styling */
+body.holographic-theme .dropdown {
+  background-color: rgba(15, 15, 35, 0.95);
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 10px rgba(80, 150, 255, 0.5),
+    0 0 20px rgba(80, 150, 255, 0.3);
+}
+
+body.holographic-theme .dropdown-item {
+  font-family: 'Rajdhani', sans-serif;
+  padding: 8px 12px;
+  transition: all 0.2s;
+}
+
+body.holographic-theme .dropdown-item:hover {
+  background-color: rgba(80, 150, 255, 0.2);
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
+}
+
+body.holographic-theme .dropdown-arrow svg {
+  color: rgba(80, 150, 255, 0.8);
+  filter: drop-shadow(0 0 2px rgba(80, 150, 255, 0.5));
+}
+
+/* Enhanced theme selector */
+body.holographic-theme .theme-select {
+  background-color: rgba(19, 19, 44, 0.7);
+  color: #e3f2fd;
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 400;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.3);
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
+}
+
+/* Enhanced search box */
+body.holographic-theme .search-box,
+body.holographic-theme .digital-journals-search-box {
+  background-color: rgba(19, 19, 44, 0.7);
+  color: #e3f2fd;
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 400;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.3);
+}
+
+body.holographic-theme .search-box:focus,
+body.holographic-theme .digital-journals-search-box:focus {
+  border-color: rgba(255, 84, 175, 0.7);
+  box-shadow: 
+    0 0 10px rgba(255, 84, 175, 0.5),
+    0 0 20px rgba(255, 84, 175, 0.3);
+}
+
+/* Enhanced campaign boxes */
+body.holographic-theme .campaign-box {
+  background: rgba(15, 15, 35, 0.6);
+  border: 2px solid rgba(80, 150, 255, 0.6);
+  border-radius: 8px;
+  box-shadow: 
+    0 0 10px rgba(80, 150, 255, 0.5),
+    0 0 20px rgba(80, 150, 255, 0.3),
+    inset 0 0 10px rgba(80, 150, 255, 0.3);
+  animation: neon-border-pulse 4s infinite alternate;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+body.holographic-theme .campaign-box h3 {
+  color: #e3f2fd;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
+}
+
+/* Enhanced tooltips */
+body.holographic-theme .attached-tooltip {
+  background-color: rgba(15, 15, 35, 0.95);
+  border: 2px solid rgba(255, 84, 175, 0.7);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 10px rgba(255, 84, 175, 0.5),
+    0 0 20px rgba(255, 84, 175, 0.3);
+  color: #e3f2fd;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 400;
+}
+
+body.holographic-theme .tooltip-bottom::before,
+body.holographic-theme .tooltip-top::before {
+  background-color: rgba(15, 15, 35, 0.95);
+  border-color: rgba(255, 84, 175, 0.7);
+}
+
+/* Enhanced scrollbars */
+body.holographic-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: rgba(15, 15, 35, 0.5);
+}
+
+body.holographic-theme ::-webkit-scrollbar-track {
+  background: rgba(15, 15, 35, 0.5);
+  border-radius: 4px;
+}
+
+body.holographic-theme ::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, 
+    rgba(80, 150, 255, 0.7), 
+    rgba(255, 84, 175, 0.7));
+  border-radius: 4px;
+}
+
+body.holographic-theme ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, 
+    rgba(255, 84, 175, 0.7), 
+    rgba(80, 150, 255, 0.7));
+}
+
+/* Enhanced sample queries */
+body.holographic-theme .sample-queries h3 {
+  color: #e3f2fd;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
+}
+
+body.holographic-theme .sample-queries li {
+  background-color: rgba(19, 19, 44, 0.7);
+  border: 2px solid rgba(80, 150, 255, 0.5);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 400;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.2);
+}
+
+body.holographic-theme .sample-queries li:hover {
+  background-color: rgba(80, 150, 255, 0.2);
+  border-color: rgba(255, 84, 175, 0.5);
+  box-shadow: 
+    0 0 10px rgba(255, 84, 175, 0.3),
+    0 0 20px rgba(255, 84, 175, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Enhanced toggle switch */
+body.holographic-theme .toggle-switch {
+  --light: rgba(255, 84, 175, 0.7);
+  --dark: rgba(19, 19, 44, 0.7);
+}
+
+body.holographic-theme .switch-label {
+  background-color: var(--dark);
+  border: 2px solid rgba(80, 150, 255, 0.7);
+  border-radius: 20px;
+  box-shadow: 0 0 10px rgba(80, 150, 255, 0.3);
+}
+
+body.holographic-theme .checkbox:checked ~ .slider {
+  background-color: rgba(80, 150, 255, 0.2);
+}
+
+body.holographic-theme .slider::before {
+  box-shadow: none;
+  background-color: rgba(80, 150, 255, 0.7);
+}
+
+body.holographic-theme .checkbox:checked ~ .slider::before {
+  box-shadow: none;
+  background-color: var(--light);
+}
+
+/* Enhanced data visualizations */
+body.holographic-theme canvas {
+  border: 2px solid rgba(80, 150, 255, 0.6);
+  border-radius: 8px;
+  background-color: rgba(15, 15, 35, 0.4);
+  box-shadow: 
+    0 0 10px rgba(80, 150, 255, 0.5),
+    0 0 20px rgba(80, 150, 255, 0.3);
+}
+
+/* Enhanced pagination */
+body.holographic-theme .pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+body.holographic-theme .pagination button {
+  margin: 0 5px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Glowing text for metrics values */
+body.holographic-theme td:nth-child(2),
+body.holographic-theme td:nth-child(3),
+body.holographic-theme td:nth-child(4),
+body.holographic-theme td:nth-child(5) {
+  color: #fff;
+  text-shadow: 0 0 5px rgba(80, 150, 255, 0.8);
+  font-weight: 500;
+}
+
+/* Alternate column colors for better visibility */
+body.holographic-theme td:nth-child(2n) {
+  text-shadow: 0 0 5px rgba(255, 84, 175, 0.8);
+}
+
+/* Add a futuristic linear loading bar to the top of the page */
+@keyframes progress {
+  0% {
+    width: 0;
+    opacity: 1;
+  }
+  50% {
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0;
+  }
+}
+
+body.holographic-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(to right, 
+    rgba(80, 150, 255, 0.8), 
+    rgba(255, 84, 175, 0.8));
+  z-index: 1000;
+  animation: progress 2s ease-out forwards;
+}
+
+/* Additional corner brackets on dashboard container for HUD feel */
+body.holographic-theme .dashboard-container {
+  position: relative;
+  padding: 10px;
+}
+
+body.holographic-theme .dashboard-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: 
+    linear-gradient(to right, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 0 0,
+    linear-gradient(to right, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 0 100%,
+    linear-gradient(to left, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 100% 0,
+    linear-gradient(to left, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 100% 100%,
+    linear-gradient(to bottom, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 0 0,
+    linear-gradient(to bottom, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 100% 0,
+    linear-gradient(to top, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 0 100%,
+    linear-gradient(to top, rgba(80, 150, 255, 0.8) 2px, transparent 2px) 100% 100%;
+  background-repeat: no-repeat;
+  background-size: 40px 40px;
+  background-clip: content-box;
+  padding: 10px;
+  z-index: 10;
+}

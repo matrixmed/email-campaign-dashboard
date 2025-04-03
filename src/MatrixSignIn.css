@@ -54,6 +54,16 @@
   100% { transform: translateX(calc(100vw + 100px)) translateY(calc(100vh + 100px)) rotate(30deg); opacity: 0; }
 }
 
+/* Space particle effect */
+.space-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
 .matrix-signin__box {
   position: relative;
   width: 400px;
@@ -61,6 +71,8 @@
   overflow: hidden;
   z-index: 10;
   padding: 40px;
+  background-color: rgba(10, 10, 25, 0.5);
+  backdrop-filter: blur(10px);
 }
 
 .matrix-signin__box::before {
@@ -70,6 +82,7 @@
   background: linear-gradient(to right, #f44336, #ff9800);
   border-radius: 12px;
   padding: 1px;
+  z-index: -1;
 }
 
 .matrix-signin__box::after {
@@ -78,6 +91,7 @@
   inset: 1px;
   background: linear-gradient(135deg, #f44336, #9c27b0, #ff9800);
   border-radius: 11px;
+  z-index: -1;
 }
 
 .matrix-signin__title {
@@ -87,7 +101,8 @@
   margin-bottom: 40px;
   position: relative;
   z-index: 1;
-  font-family: 'Orbitron';
+  font-family: 'Orbitron', sans-serif;
+  text-shadow: 0 0 10px rgba(103, 58, 183, 0.8);
 }
 
 .matrix-signin__form {
@@ -137,11 +152,11 @@
   box-sizing: border-box;
   margin-top: 20px;
   padding: 15px;
-  background: rgb(103, 58, 183, 0.8);
+  background: rgba(103, 58, 183, 0.8);
   border: none;
   border-radius: 5px;
   font-weight: bold;
-  font-family: 'Orbitron';
+  font-family: 'Orbitron', sans-serif;
   color: white;
   font-size: 18px;
   letter-spacing: 1px;
@@ -151,6 +166,7 @@
 
 .matrix-signin__button:hover {
   background: rgba(103, 58, 183, 1);
+  box-shadow: 0 0 15px rgba(103, 58, 183, 0.5);
 }
 
 .matrix-signin__error {

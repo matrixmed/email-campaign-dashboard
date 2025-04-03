@@ -75,6 +75,73 @@ const LiveCampaignMetrics = () => {
     const currentCampaigns = metrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
     const totalPages = Math.ceil(metrics.length / campaignsPerPage);
 
+    const exportToCSV = () => {
+        // Define headers for CSV
+        const headers = [
+            'Campaign',
+            'Send_Date',
+            'Sent',
+            'Delivered',
+            'Delivery_Rate',
+            'Total_Bounces',
+            'Hard_Bounces',
+            'Soft_Bounces',
+            'Unique_Opens',
+            'Unique_Open_Rate',
+            'Total_Opens',
+            'Total_Open_Rate',
+            'Unique_Clicks',
+            'Unique_Click_Rate',
+            'Total_Clicks',
+            'Total_Click_Rate',
+            'Filtered_Bot_Clicks',
+            'DeploymentCount'
+        ];
+
+        // Format data rows
+        const rows = metrics.map(item => [
+            item.Campaign,
+            item.Send_Date || '',
+            item.Sent,
+            item.Delivered,
+            item.Delivery_Rate,
+            item.Total_Bounces,
+            item.Hard_Bounces,
+            item.Soft_Bounces,
+            item.Unique_Opens,
+            item.Unique_Open_Rate,
+            item.Total_Opens,
+            item.Total_Open_Rate,
+            item.Unique_Clicks,
+            item.Unique_Click_Rate,
+            item.Total_Clicks,
+            item.Total_Click_Rate,
+            item.Filtered_Bot_Clicks,
+            item.DeploymentCount
+        ]);
+        
+        // Create CSV content
+        const csvContent = [
+            headers.map(h => `"${h}"`).join(','),
+            ...rows.map(row => 
+                row.map(cell => 
+                    `"${String(cell).replace(/"/g, '""')}"`
+                ).join(',')
+            )
+        ].join('\n');
+        
+        // Create and trigger download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'live_campaign_metrics.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="live-campaign-metrics">
             <h2>Live Campaign Metrics</h2>
@@ -145,6 +212,14 @@ const LiveCampaignMetrics = () => {
                 {currentPage < totalPages && (
                     <button onClick={() => setCurrentPage(p => p + 1)}>Next</button>
                 )}
+            </div>
+            <div className="export-button-container">
+                <button
+                    className="export-button"
+                    onClick={exportToCSV}
+                >
+                    Export CSV
+                </button>
             </div>
         </div>
     );

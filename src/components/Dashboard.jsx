@@ -84,19 +84,19 @@ const Dashboard = () => {
         
         const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
         const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
-    
+
         return Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
             if (deployments.length === 1) {
                 return { ...deployments[0], Campaign: campaignName };
             }
-    
+
             const deployment1 = deployments.find(d => {
                 const name = d.Campaign.toLowerCase();
                 return name.includes('deployment 1') || 
-                       name.includes('deployment #1') || 
-                       name.includes('deployment1');
+                    name.includes('deployment #1') || 
+                    name.includes('deployment1');
             });
-    
+
             const baseDeployment = deployment1 || deployments[0];
     
             const totalUniqueOpens = _.sumBy(deployments, 'Unique_Opens');
@@ -110,6 +110,7 @@ const Dashboard = () => {
     
             return {
                 Campaign: campaignName,
+                Send_Date: baseDeployment.Send_Date,
                 Sent: baseDeployment.Sent,
                 Total_Bounces: totalBounces,
                 Hard_Bounces: totalHardBounces,

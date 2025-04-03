@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import '../journal.css';
 
 const DigitalJournals = () => {
     const [journalsData, setJournalsData] = useState([]);
@@ -6,29 +8,62 @@ const DigitalJournals = () => {
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedJournal, setSelectedJournal] = useState(null);
+    const [timeframeFilter, setTimeframeFilter] = useState('all');
+    const modalRef = useRef(null);
 
     useEffect(() => {
-        async function fetchDigitalJournalsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/digital_journals.json?sp=r&st=2025-01-21T16:21:46Z&se=2026-01-16T00:21:46Z&spr=https&sv=2022-11-02&sr=b&sig=MFOpHD3Ymdm5gvDHtNaPdET3gHmppRPckTTdTii5Zz0%3D";
+        async function fetchUrlData() {
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/url_data.json?sp=r&st=2025-04-02T17:55:58Z&se=2026-11-27T02:55:58Z&spr=https&sv=2024-11-04&sr=b&sig=Zyacd8fbn%2F1ScBI1xCegQsrPq1qYEziijSd3EA3461I%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
-                const sortedData = jsonData.sort((a, b) => b.sessions - a.sessions);
+                
+                const sortedData = jsonData.urls.sort((a, b) => b.totalUsers - a.totalUsers);
                 setJournalsData(sortedData);
                 setFilteredData(sortedData);
             } catch (error) {
-                console.error("Error fetching digital journals data:", error);
+                console.error("Error fetching URL data:", error);
             }
         }
-        fetchDigitalJournalsData();
+        fetchUrlData();
     }, []);
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                setIsModalOpen(false);
+            }
+        }
+        
+        if (isModalOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isModalOpen]);
 
     const handleSearchChange = (e) => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
-        setFilteredData(journalsData.filter(item =>
-            searchValue.split(' ').every(word => item.title.toLowerCase().includes(word))
-        ));
+        
+        setFilteredData(journalsData.filter(item => {
+            const titleMatch = item.title && searchValue.split(' ').every(word => 
+                item.title.toLowerCase().includes(word));
+            const urlMatch = item.url && searchValue.split(' ').every(word => 
+                item.url.toLowerCase().includes(word));
+            const fullUrlMatch = item.fullUrl && searchValue.split(' ').every(word => 
+                item.fullUrl.toLowerCase().includes(word));
+                
+            return titleMatch || urlMatch || fullUrlMatch;
+        }));
+        
         setCurrentPage(1);
     };
 
@@ -41,7 +76,18 @@ const DigitalJournals = () => {
         setCurrentPage(pageNumber);
     };
 
+    const handleJournalClick = (journal) => {
+        setSelectedJournal(journal);
+        setIsModalOpen(true);
+        setTimeframeFilter('all');
+    };
+
+    const handleTimeframeChange = (e) => {
+        setTimeframeFilter(e.target.value);
+    };
+
     const formatTitle = (title) => {
+        if (!title) return "Untitled";
         return title
             .toLowerCase()
             .replace(/\b\w/g, char => char.toUpperCase());
@@ -49,7 +95,7 @@ const DigitalJournals = () => {
 
     const formatEngagement = (seconds) => {
         if (isNaN(seconds) || seconds < 0) {
-            return "0 s";
+            return "0s";
         }
 
         seconds = Math.round(seconds);
@@ -66,21 +112,47 @@ const DigitalJournals = () => {
         }
         
         return `${minutes}m ${remainingSeconds}s`;
-    };   
+    };
+    
+    const formatBounceRate = (rate) => {
+        if (isNaN(rate)) return "0%";
+        return `${(rate * 100).toFixed(2)}%`;
+    };
+    
+    const formatNumber = (num) => {
+        if (isNaN(num)) return "0";
+        return num.toLocaleString();
+    };
+    
+    const getTimeframeData = (journal) => {
+        if (!journal || !journal.timeData) return [];
+        
+        const timeDataArray = Object.entries(journal.timeData).map(([month, data]) => ({
+            month,
+            users: data.users || 0,
+            avgDuration: data.avgDuration || 0,
+            bounceRate: (data.bounceRate || 0) * 100
+        }));
+        
+        timeDataArray.sort((a, b) => a.month.localeCompare(b.month));
+        
+        if (timeframeFilter === 'all') {
+            return timeDataArray;
+        } else {
+            const monthsToShow = parseInt(timeframeFilter, 10);
+            return timeDataArray.slice(-monthsToShow);
+        }
+    };
 
     const exportToCSV = () => {
-        const header = ['Title', 'Sessions', 'Engaged Sessions', 'Avg Session Duration', 'Bounce Rate', 'Active Users', 'Property', 'Page Number', 'Count'];
+        const header = ['Title', 'URL', 'Total Users', 'Avg Duration', 'Bounce Rate'];
     
         const rows = filteredData.map(item => [
-            item.title,
-            item.sessions,
-            item.engagedSessions,
-            item.averageSessionDuration,
-            item.bounceRate,
-            item.activeUsers,
-            item.property,
-            item.pageNumber,
-            item.count
+            item.title || 'Untitled',
+            item.fullUrl || item.url,
+            item.totalUsers,
+            item.avgDuration,
+            item.bounceRate
         ]);
     
         const csvContent = [header, ...rows]
@@ -100,10 +172,12 @@ const DigitalJournals = () => {
         document.body.removeChild(link);
     };
 
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+    const validData = filteredData.filter(item => item.title && item.title.toLowerCase() !== "title not found");
+    
+    const totalPages = Math.ceil(validData.length / rowsPerPage);
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-    const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
+    const currentRows = validData.slice(indexOfFirstRow, indexOfLastRow);
 
     const maxPageButtons = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
@@ -117,7 +191,7 @@ const DigitalJournals = () => {
                     <input
                         type="text"
                         className="digital-journals-search-box"
-                        placeholder="Search by Title"
+                        placeholder="Search by Title or URL"
                         value={search}
                         onChange={handleSearchChange}
                     />
@@ -143,29 +217,29 @@ const DigitalJournals = () => {
             <table>
                 <thead>
                     <tr>
-                        <th className="title-column">Title</th>
-                        <th>Sessions</th>
-                        <th>Engaged Sessions</th>
-                        <th>Avg Session Duration</th>
+                        <th className="journal-title-column">Title</th>
+                        <th>Total Users</th>
+                        <th>Avg Duration</th>
                         <th>Bounce Rate</th>
-                        <th>Active Users</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {currentRows
-                        .filter(item => item.title.toLowerCase() !== "title not found")
-                        .map((item, index) => (
+                    {currentRows.map((item, index) => (
                             <tr key={index}>
-                                <td className="title-cell">{formatTitle(item.title)}</td>
-                                <td>{item.sessions}</td>
-                                <td>{item.engagedSessions}</td>
-                                <td>{formatEngagement(item.averageSessionDuration)}</td>
-                                <td>{(item.bounceRate * 100).toFixed(2)}%</td>
-                                <td>{item.activeUsers}</td>
+                                <td 
+                                    className="title-cell journal-title"
+                                    onClick={() => handleJournalClick(item)}
+                                >
+                                    {formatTitle(item.title || item.url)}
+                                </td>
+                                <td>{formatNumber(item.totalUsers)}</td>
+                                <td>{formatEngagement(item.avgDuration)}</td>
+                                <td>{formatBounceRate(item.bounceRate)}</td>
                             </tr>
                         ))}
                 </tbody>
             </table>
+            
             <div className="pagination">
                 {currentPage > 1 && (
                     <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
@@ -183,11 +257,184 @@ const DigitalJournals = () => {
                     <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
                 )}
             </div>
+            
             <div className="export-button-container">
                 <button className="export-button" onClick={exportToCSV}>
                     Export CSV
                 </button>
             </div>
+            
+            {isModalOpen && selectedJournal && (
+                <div className="journal-modal-overlay">
+                    <div className="journal-modal" ref={modalRef}>
+                        <div className="journal-modal-header">
+                            <h3>{formatTitle(selectedJournal.title || selectedJournal.url)}</h3>
+                            <button 
+                                className="modal-close-button"
+                                onClick={() => setIsModalOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <div className="journal-modal-url">
+                            {selectedJournal.fullUrl || selectedJournal.url}
+                        </div>
+                        
+                        <div className="journal-modal-controls">
+                            <div className="timeframe-filter">
+                                <label htmlFor="timeframeFilter">Timeframe:</label>
+                                <select
+                                    id="timeframeFilter"
+                                    value={timeframeFilter}
+                                    onChange={handleTimeframeChange}
+                                >
+                                    <option value="all">All Time</option>
+                                    <option value="12">Last 12 Months</option>
+                                    <option value="6">Last 6 Months</option>
+                                    <option value="3">Last 3 Months</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div className="journal-modal-metrics">
+                            <div className="metric-card">
+                                <div className="metric-label">Total Users</div>
+                                <div className="metric-value">{formatNumber(selectedJournal.totalUsers)}</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">Avg Duration</div>
+                                <div className="metric-value">{formatEngagement(selectedJournal.avgDuration)}</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">Bounce Rate</div>
+                                <div className="metric-value">{formatBounceRate(selectedJournal.bounceRate)}</div>
+                            </div>
+                        </div>
+
+                        <div className="journal-modal-monthly">
+                            <h4>Monthly Performance</h4>
+                            
+                            {selectedJournal.timeData && Object.keys(selectedJournal.timeData).length > 0 ? (
+                                <>
+                                    <table className="detail-table monthly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Month</th>
+                                                <th>Users</th>
+                                                <th>Avg Duration</th>
+                                                <th>Bounce Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {getTimeframeData(selectedJournal).map((data, index) => (
+                                                <tr key={index}>
+                                                    <td>{data.month}</td>
+                                                    <td>{formatNumber(data.users)}</td>
+                                                    <td>{formatEngagement(data.avgDuration)}</td>
+                                                    <td>{data.bounceRate.toFixed(2)}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    
+                                    <div className="journal-chart-container">
+                                        <ResponsiveContainer width="100%" height={300}>
+                                            <LineChart
+                                                data={getTimeframeData(selectedJournal)}
+                                                margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="month" />
+                                                <YAxis yAxisId="left" />
+                                                <YAxis yAxisId="right" orientation="right" />
+                                                <Tooltip />
+                                                <Legend />
+                                                <Line 
+                                                    yAxisId="left"
+                                                    type="monotone" 
+                                                    dataKey="users" 
+                                                    stroke="#8884d8" 
+                                                    name="Users" 
+                                                    activeDot={{ r: 8 }}
+                                                />
+                                                <Line 
+                                                    yAxisId="right"
+                                                    type="monotone" 
+                                                    dataKey="avgDuration" 
+                                                    stroke="#82ca9d" 
+                                                    name="Avg Duration (sec)" 
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </>
+                            ) : (
+                                <p>No monthly data available</p>
+                            )}
+                        </div>
+                        
+                        <div className="journal-modal-details">
+                            <div className="device-breakdown">
+                                <h4>Device Breakdown</h4>
+                                {selectedJournal.devices && Object.entries(selectedJournal.devices).length > 0 ? (
+                                    <table className="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Device</th>
+                                                <th>Users</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {Object.entries(selectedJournal.devices)
+                                                .sort(([, a], [, b]) => b - a)
+                                                .map(([device, count], index) => (
+                                                    <tr key={index}>
+                                                        <td>{device.charAt(0).toUpperCase() + device.slice(1)}</td>
+                                                        <td>{formatNumber(count)}</td>
+                                                    </tr>
+                                                ))
+                                            }
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p>No device data available</p>
+                                )}
+                            </div>
+                            
+                            <div className="source-breakdown">
+                                <h4>Traffic Sources</h4>
+                                {selectedJournal.sources && Object.entries(selectedJournal.sources).length > 0 ? (
+                                    <table className="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Source</th>
+                                                <th>Sessions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {Object.entries(selectedJournal.sources)
+                                                .sort(([, a], [, b]) => b - a)
+                                                .slice(0, 10) 
+                                                .map(([source, count], index) => (
+                                                    <tr key={index}>
+                                                        <td>{source}</td>
+                                                        <td>{formatNumber(count)}</td>
+                                                    </tr>
+                                                ))
+                                            }
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p>No source data available</p>
+                                )}
+                            </div>
+                        </div>
+                        
+                        
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

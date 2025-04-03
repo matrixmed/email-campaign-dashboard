@@ -21,6 +21,10 @@ body.space-theme {
   pointer-events: none;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .star {
   position: absolute;
   background-color: white;
@@ -46,9 +50,9 @@ body.space-theme {
 }
 
 @keyframes shoot {
-  0% { transform: translateX(-100px) translateY(0) rotate(45deg); opacity: 1; }
+  0% { transform: translateX(-100px) translateY(0) rotate(30deg); opacity: 1; }
   70% { opacity: 1; }
-  100% { transform: translateX(calc(100vw + 100px)) translateY(calc(100vh + 100px)) rotate(45deg); opacity: 0; }
+  100% { transform: translateX(calc(100vw + 100px)) translateY(calc(100vh + 100px)) rotate(30deg); opacity: 0; }
 }
 
 /* Space theme header */
@@ -59,6 +63,8 @@ body.space-theme .dashboard-header {
   border-radius: 8px;
   margin-bottom: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 5;
 }
 
 body.space-theme h1 {
@@ -124,6 +130,311 @@ body.space-theme .chat-interface::before {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+}
+
+body.space-theme .sticky-header,
+body.space-theme .fixed-element {
+  z-index: 5;
+  position: relative;
+}
+
+body.space-theme .chart-container {
+  position: relative;
+  z-index: auto !important;
+}
+
+/* Force any fixed elements to appear below modal */
+body.space-theme .fixed-position-element {
+  z-index: 10 !important;
+}
+
+/* Space Theme Modal Styles - FIXED Z-INDEX */
+body.space-theme .campaign-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(5, 10, 31, 0.8);
+  animation: fadeIn 0.3s ease-out;
+  z-index: 99999 !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+body.space-theme .campaign-modal {
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 40, 0.9));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(100, 100, 255, 0.1);
+  position: relative;
+  max-height: 85vh;
+  width: 90%;
+  max-width: 1300px;
+  overflow-y: auto;
+  padding: 25px;
+  z-index: 100000 !important;
+  animation: slideIn 0.4s ease-out;
+}
+
+body.space-theme .campaign-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(135deg, #f44336, #9c27b0, #ff9800);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body.space-theme .campaign-modal-header {
+  border-bottom: 1px solid rgba(100, 100, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+}
+
+body.space-theme .campaign-modal-header h3 {
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  letter-spacing: 1px;
+  margin: 0;
+  font-size: 24px;
+  max-width: 90%;
+  word-break: break-word;
+}
+
+body.space-theme .modal-close-button {
+  background: none;
+  border: none;
+  color: #0ff;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.3s;
+}
+
+body.space-theme .modal-close-button:hover {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+  transform: scale(1.1);
+}
+
+/* Campaign Modal Info */
+body.space-theme .campaign-modal-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  color: #ccc;
+  font-size: 16px;
+}
+
+body.space-theme .campaign-date, 
+body.space-theme .deployment-info {
+  background-color: rgba(40, 40, 60, 0.5);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  border-radius: 4px;
+  padding: 10px 15px;
+}
+
+/* Metrics Cards */
+body.space-theme .campaign-modal-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+body.space-theme .metric-card {
+  background: rgba(40, 40, 60, 0.5);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s, box-shadow 0.3s;
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+}
+
+body.space-theme .metric-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 255, 0.2);
+  border-color: rgba(0, 255, 255, 0.3);
+}
+
+body.space-theme .metric-label {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+body.space-theme .metric-value {
+  color: #0ff;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Details Sections */
+body.space-theme .campaign-modal-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+body.space-theme .delivery-stats,
+body.space-theme .engagement-stats,
+body.space-theme .campaign-chart-section,
+body.space-theme .campaign-list,
+body.space-theme .comparison-charts,
+body.space-theme .comparison-table {
+  background: rgba(40, 40, 60, 0.5);
+  border: 1px solid rgba(80, 80, 100, 0.4);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+body.space-theme h4 {
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+/* Detail Tables */
+body.space-theme .detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+body.space-theme .detail-table th {
+  background-color: rgba(103, 58, 183, 0.5);
+  color: #0ff;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 1px;
+  border: none;
+  padding: 10px;
+  text-align: left;
+}
+
+body.space-theme .detail-table td {
+  border-bottom: 1px solid rgba(100, 100, 255, 0.2);
+  padding: 8px 10px;
+}
+
+body.space-theme .detail-table tr:last-child td {
+  border-bottom: none;
+}
+
+body.space-theme .metric-name {
+  color: #0ff;
+  font-weight: bold;
+}
+
+/* Chart Section */
+body.space-theme .campaign-chart-section {
+  background-color: rgba(40, 40, 60, 0.5);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+body.space-theme .campaign-chart {
+  margin-top: 20px;
+  height: 300px;
+}
+
+/* Campaign List */
+body.space-theme .campaign-list {
+  background-color: rgba(40, 40, 60, 0.5);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+body.space-theme .campaign-list ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+body.space-theme .campaign-list li {
+  background-color: rgba(40, 40, 60, 0.5);
+  border-left: 4px solid #0ff;
+  transition: all 0.3s;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+body.space-theme .campaign-list li:hover {
+  background-color: rgba(60, 60, 100, 0.5);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+body.space-theme .campaign-name {
+  color: #fff;
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+body.space-theme .campaign-details {
+  color: #999;
+  display: block;
+  font-size: 14px;
+}
+
+/* Scrollbar Styling - IMPROVED FOR MODAL */
+body.space-theme .campaign-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+body.space-theme .campaign-modal::-webkit-scrollbar-track {
+  background: rgba(30, 30, 50, 0.5);
+  border-radius: 4px;
+}
+
+body.space-theme .campaign-modal::-webkit-scrollbar-thumb {
+  background: rgba(103, 58, 183, 0.7);
+  border-radius: 4px;
+}
+
+body.space-theme .campaign-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(103, 58, 183, 0.9);
+}
+
+/* Deployment number */
+body.space-theme .deployment-number {
+  color: #999;
+  display: block;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* Animation Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* Space theme tables */
@@ -227,6 +538,7 @@ body.space-theme .dropdown {
   background-color: rgba(30, 30, 50, 0.95);
   border: 1px solid rgba(100, 100, 255, 0.3);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+  z-index: 100;
 }
 
 body.space-theme .dropdown-item:hover {
@@ -361,6 +673,17 @@ body.space-theme .tooltip-top::before {
   border-color: rgba(100, 100, 255, 0.3);
 }
 
+/* Fix for z-index issues with chart sections */
+body.space-theme .chart-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* Fix for sticky positioning in components under modal */
+body.space-theme .sticky-header {
+  z-index: 5;
+}
+
 /* Responsive adjustments for space theme */
 @media (max-width: 768px) {
   body.space-theme .dashboard-header {
@@ -372,5 +695,20 @@ body.space-theme .tooltip-top::before {
     margin-top: 15px;
     width: 100%;
     justify-content: center;
+  }
+  
+  body.space-theme .campaign-modal {
+    width: 95%;
+    padding: 15px;
+    max-height: 80vh;
+  }
+  
+  body.space-theme .campaign-modal-metrics,
+  body.space-theme .campaign-modal-details {
+    grid-template-columns: 1fr;
+  }
+  
+  body.space-theme .campaign-modal-header h3 {
+    font-size: 20px;
   }
 }

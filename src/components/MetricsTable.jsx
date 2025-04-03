@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { metricDisplayNames } from './metricDisplayNames';
+import CampaignModal from './CampaignModal';
 
 const MetricsTable = ({
     currentRows,
@@ -15,10 +16,14 @@ const MetricsTable = ({
     selectedDeployment,
     handleDeploymentChange,
 }) => {
-    const [activeDropdown, setActiveDropdown] = React.useState(null);
+    const [activeDropdown, setActiveDropdown] = useState(null);
     const [activeTooltipRow, setActiveTooltipRow] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState(null);
+    const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+    const [isCompareMode, setIsCompareMode] = useState(false);
     const tableContainerRef = useRef(null);
-
+    
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (!event.target.closest('th')) {
@@ -68,10 +73,24 @@ const MetricsTable = ({
         return Number(value).toFixed(2);
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString;
+        
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
     const exportToCSV = (fullData) => {
-        const header = ['Campaign', ...availableMetrics];
+        const header = ['Campaign', 'Send_Date', ...availableMetrics];
         const rows = fullData.map(item => [
             item.Campaign,
+            item.Send_Date || '',
             ...availableMetrics.map(metric => 
                 typeof item[metric] === 'number' ? formatValue(item[metric], metric) : (item[metric] ?? "")
             ),
@@ -92,6 +111,39 @@ const MetricsTable = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handleCampaignClick = (campaign) => {
+        setSelectedCampaign(campaign);
+        setIsModalOpen(true);
+        setIsCompareMode(false);
+    };
+    
+    const toggleCampaignSelection = (campaign, isSelected) => {
+        if (isSelected) {
+            // Remove from selection
+            setSelectedCampaigns(prev => prev.filter(c => c.Campaign !== campaign.Campaign));
+        } else {
+            // Add to selection (max 4)
+            if (selectedCampaigns.length < 4) {
+                setSelectedCampaigns(prev => [...prev, campaign]);
+            }
+        }
+    };
+    
+    const isCampaignSelected = (campaign) => {
+        return selectedCampaigns.some(c => c.Campaign === campaign.Campaign);
+    };
+    
+    const openCompareModal = () => {
+        if (selectedCampaigns.length > 0) {
+            setIsCompareMode(true);
+            setIsModalOpen(true);
+        }
+    };
+    
+    const closeModal = () => {
+        setIsModalOpen(false);
     };
 
     const maxPageButtons = 5;
@@ -142,6 +194,17 @@ const MetricsTable = ({
                             ))}
                         </select>
                     </div>
+                    
+                    {selectedCampaigns.length > 0 && (
+                        <div className="compare-control">
+                            <button 
+                                className="compare-button"
+                                onClick={openCompareModal}
+                            >
+                                Compare Selected ({selectedCampaigns.length})
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
             
@@ -149,7 +212,9 @@ const MetricsTable = ({
                 <table>
                     <thead>
                         <tr>
+                            
                             <th className="campaign-column">Campaign</th>
+                            <th className="date-column">Send Date</th>
                             {Object.entries(selectedColumn).map(([colKey, colValue]) => (
                                 <th 
                                     key={colKey}
@@ -195,7 +260,9 @@ const MetricsTable = ({
                                         </div>
                                     )}
                                 </th>
+                                
                             ))}
+                            <th className="select-column">Select</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -203,13 +270,16 @@ const MetricsTable = ({
                             const tooltipPosition = activeTooltipRow === index 
                                 ? getTooltipPosition(index) 
                                 : 'bottom';
+                            const isSelected = isCampaignSelected(item);
                                 
                             return (
-                                <tr key={index}>
+                                <tr key={index} className={isSelected ? 'selected-row' : ''}>
+                                    
                                     <td 
-                                        className="campaign-column-with-tooltip"
+                                        className="campaign-column-with-tooltip clickable"
                                         onMouseEnter={() => setActiveTooltipRow(index)}
                                         onMouseLeave={() => setActiveTooltipRow(null)}
+                                        onClick={() => handleCampaignClick(item)}
                                     >
                                         <div className="campaign-text">
                                             {item.Campaign}
@@ -221,11 +291,23 @@ const MetricsTable = ({
                                             </div>
                                         )}
                                     </td>
+                                    <td className="date-column">
+                                        {formatDate(item.Send_Date)}
+                                    </td>
                                     {Object.values(selectedColumn).map((col, colIndex) => (
                                         <td key={colIndex}>
                                             {formatValue(item[col], col)}
                                         </td>
                                     ))}
+                                    <td className="select-column">
+                                        <input 
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleCampaignSelection(item, isSelected)}
+                                            title={isSelected ? "Deselect for comparison" : "Select for comparison"}
+                                            disabled={!isSelected && selectedCampaigns.length >= 4}
+                                        />
+                                    </td>
                                 </tr>
                             );
                         })}
@@ -257,6 +339,16 @@ const MetricsTable = ({
                     Export CSV
                 </button>
             </div>
+            
+            {/* Campaign Modal */}
+            <CampaignModal 
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                campaign={selectedCampaign}
+                compareCampaigns={selectedCampaigns}
+                isCompareMode={isCompareMode}
+                metricDisplayNames={metricDisplayNames}
+            />
         </div>
     );
 };

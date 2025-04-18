@@ -11,25 +11,115 @@ const DigitalJournals = () => {
     
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedJournal, setSelectedJournal] = useState(null);
-    const [timeframeFilter, setTimeframeFilter] = useState('all');
+    const [timeframeFilter, setTimeframeFilter] = useState('12');
+    const [aggregateMetrics, setAggregateMetrics] = useState({
+        totalUsers: 0,
+        avgDuration: 0,
+        bounceRate: 0
+    });
     const modalRef = useRef(null);
 
     useEffect(() => {
         async function fetchUrlData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/url_data.json?sp=r&st=2025-04-02T17:55:58Z&se=2026-11-27T02:55:58Z&spr=https&sv=2024-11-04&sr=b&sig=Zyacd8fbn%2F1ScBI1xCegQsrPq1qYEziijSd3EA3461I%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/url_data.json?sp=r&st=2025-04-17T15:45:29Z&se=2026-05-16T23:45:29Z&spr=https&sv=2024-11-04&sr=b&sig=JAPRaNxToQbFGXbMjhy0zMrZoL0gm1aM23P8T21Q2kk%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
                 
-                const sortedData = jsonData.urls.sort((a, b) => b.totalUsers - a.totalUsers);
+                const processedData = jsonData.urls.map(item => {
+                    const latestMonthData = getLatestMonthData(item);
+                    return {
+                        ...item,
+                        latestMonth: latestMonthData.month,
+                        latestMonthUsers: latestMonthData.users
+                    };
+                });
+                
+                const sortedData = processedData.sort((a, b) => b.latestMonthUsers - a.latestMonthUsers);
                 setJournalsData(sortedData);
                 setFilteredData(sortedData);
+                
+                calculateAggregateMetrics(sortedData, timeframeFilter);
             } catch (error) {
                 console.error("Error fetching URL data:", error);
             }
         }
         fetchUrlData();
     }, []);
+
+    useEffect(() => {
+        calculateAggregateMetrics(filteredData, timeframeFilter);
+    }, [timeframeFilter, filteredData]);
+
+    function calculateJournalMetricsForTimeframe(journal) {
+        if (!journal || !journal.timeData) {
+            return { users: 0, avgDuration: 0, bounceRate: 0 };
+        }
+        
+        const timeData = getTimeframeData(journal);
+        
+        let totalUsers = 0;
+        let totalDuration = 0;
+        let totalBounces = 0;
+        
+        timeData.forEach(monthData => {
+            totalUsers += monthData.users || 0;
+            totalDuration += (monthData.avgDuration || 0) * (monthData.users || 0);
+            totalBounces += (monthData.bounceRate / 100 || 0) * (monthData.users || 0);
+        });
+        
+        const avgDuration = totalUsers > 0 ? totalDuration / totalUsers : 0;
+        const bounceRate = totalUsers > 0 ? totalBounces / totalUsers : 0;
+        
+        return {
+            users: totalUsers,
+            avgDuration,
+            bounceRate
+        };
+    }
+
+    const calculateAggregateMetrics = (data, timeframe) => {
+        let totalUsers = 0;
+        let totalDuration = 0;
+        let totalBounces = 0;
+        let totalSessions = 0;
+        
+        data.forEach(journal => {
+            if (!journal.timeData) return;
+            
+            const timeData = getTimeframeData(journal, timeframe);
+            
+            timeData.forEach(monthData => {
+                totalUsers += monthData.users || 0;
+                totalDuration += (monthData.avgDuration || 0) * (monthData.users || 0);
+                totalBounces += (monthData.bounceRate / 100 || 0) * (monthData.users || 0);
+                totalSessions += monthData.users || 0;
+            });
+        });
+        
+        const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
+        const avgBounceRate = totalSessions > 0 ? (totalBounces / totalSessions) : 0;
+        
+        setAggregateMetrics({
+            totalUsers,
+            avgDuration,
+            bounceRate: avgBounceRate
+        });
+    };
+
+    const getLatestMonthData = (journal) => {
+        if (!journal.timeData || Object.keys(journal.timeData).length === 0) {
+            return { month: "No Data", users: 0 };
+        }
+        
+        const months = Object.keys(journal.timeData).sort();
+        const latestMonth = months[months.length - 1];
+        
+        return { 
+            month: latestMonth, 
+            users: journal.timeData[latestMonth]?.users || 0 
+        };
+    };
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -53,7 +143,7 @@ const DigitalJournals = () => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
         
-        setFilteredData(journalsData.filter(item => {
+        const newFilteredData = journalsData.filter(item => {
             const titleMatch = item.title && searchValue.split(' ').every(word => 
                 item.title.toLowerCase().includes(word));
             const urlMatch = item.url && searchValue.split(' ').every(word => 
@@ -62,9 +152,12 @@ const DigitalJournals = () => {
                 item.fullUrl.toLowerCase().includes(word));
                 
             return titleMatch || urlMatch || fullUrlMatch;
-        }));
+        });
         
+        setFilteredData(newFilteredData);
         setCurrentPage(1);
+        
+        calculateAggregateMetrics(newFilteredData, timeframeFilter);
     };
 
     const handleRowsPerPageChange = (e) => {
@@ -79,10 +172,9 @@ const DigitalJournals = () => {
     const handleJournalClick = (journal) => {
         setSelectedJournal(journal);
         setIsModalOpen(true);
-        setTimeframeFilter('all');
     };
 
-    const handleTimeframeChange = (e) => {
+    const handleGlobalTimeframeChange = (e) => {
         setTimeframeFilter(e.target.value);
     };
 
@@ -124,7 +216,7 @@ const DigitalJournals = () => {
         return num.toLocaleString();
     };
     
-    const getTimeframeData = (journal) => {
+    const getTimeframeData = (journal, selectedTimeframe = timeframeFilter) => {
         if (!journal || !journal.timeData) return [];
         
         const timeDataArray = Object.entries(journal.timeData).map(([month, data]) => ({
@@ -136,10 +228,10 @@ const DigitalJournals = () => {
         
         timeDataArray.sort((a, b) => a.month.localeCompare(b.month));
         
-        if (timeframeFilter === 'all') {
+        if (selectedTimeframe === 'all') {
             return timeDataArray;
         } else {
-            const monthsToShow = parseInt(timeframeFilter, 10);
+            const monthsToShow = parseInt(selectedTimeframe, 10);
             return timeDataArray.slice(-monthsToShow);
         }
     };
@@ -232,9 +324,9 @@ const DigitalJournals = () => {
                                 >
                                     {formatTitle(item.title || item.url)}
                                 </td>
-                                <td>{formatNumber(item.totalUsers)}</td>
-                                <td>{formatEngagement(item.avgDuration)}</td>
-                                <td>{formatBounceRate(item.bounceRate)}</td>
+                                <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
+                                <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
+                                <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
                             </tr>
                         ))}
                 </tbody>
@@ -283,16 +375,17 @@ const DigitalJournals = () => {
                         
                         <div className="journal-modal-controls">
                             <div className="timeframe-filter">
-                                <label htmlFor="timeframeFilter">Timeframe:</label>
+                                <label htmlFor="modalTimeframeFilter">Timeframe:</label>
                                 <select
-                                    id="timeframeFilter"
+                                    id="modalTimeframeFilter"
                                     value={timeframeFilter}
-                                    onChange={handleTimeframeChange}
+                                    onChange={handleGlobalTimeframeChange}
                                 >
                                     <option value="all">All Time</option>
                                     <option value="12">Last 12 Months</option>
                                     <option value="6">Last 6 Months</option>
                                     <option value="3">Last 3 Months</option>
+                                    <option value="1">Last Month</option>
                                 </select>
                             </div>
                         </div>
@@ -300,15 +393,21 @@ const DigitalJournals = () => {
                         <div className="journal-modal-metrics">
                             <div className="metric-card">
                                 <div className="metric-label">Total Users</div>
-                                <div className="metric-value">{formatNumber(selectedJournal.totalUsers)}</div>
+                                <div className="metric-value">
+                                    {formatNumber(calculateJournalMetricsForTimeframe(selectedJournal).users)}
+                                </div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-label">Avg Duration</div>
-                                <div className="metric-value">{formatEngagement(selectedJournal.avgDuration)}</div>
+                                <div className="metric-value">
+                                    {formatEngagement(calculateJournalMetricsForTimeframe(selectedJournal).avgDuration)}
+                                </div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-label">Bounce Rate</div>
-                                <div className="metric-value">{formatBounceRate(selectedJournal.bounceRate)}</div>
+                                <div className="metric-value">
+                                    {formatBounceRate(calculateJournalMetricsForTimeframe(selectedJournal).bounceRate)}
+                                </div>
                             </div>
                         </div>
 
@@ -430,8 +529,6 @@ const DigitalJournals = () => {
                                 )}
                             </div>
                         </div>
-                        
-                        
                     </div>
                 </div>
             )}

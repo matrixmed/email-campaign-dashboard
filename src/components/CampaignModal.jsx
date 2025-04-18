@@ -314,6 +314,12 @@ const CampaignModal = ({
                                 <table className="detail-table">
                                     <tbody>
                                         <tr>
+                                            <td>Engagement Rate</td>
+                                            <td>{campaign.Unique_Opens !== undefined && campaign.Sent !== undefined && campaign.Sent !== 0
+                                                ? formatPercentage((campaign.Unique_Opens / campaign.Sent) * 100)
+                                                : 'N/A'}</td>
+                                        </tr>
+                                        <tr>
                                             <td>Unique Opens</td>
                                             <td>{campaign.Unique_Opens !== undefined ? formatNumber(campaign.Unique_Opens) : 'N/A'}</td>
                                         </tr>

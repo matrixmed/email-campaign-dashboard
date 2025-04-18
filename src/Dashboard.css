@@ -311,11 +311,18 @@ body.light .rows-control select {
 }
 
 .campaign-column-with-tooltip {
-  max-width: 500px;
-  width: 500px;
+  max-width: 600px;
+  width: 600px;
   position: relative;
   padding: 12px;
   cursor: default;
+}
+
+@media (min-width: 1800px) {
+  .campaign-column-with-tooltip {
+    max-width: 800px;
+    width: 800px;
+  }
 }
 
 .campaign-text {
@@ -404,6 +411,10 @@ body.light .rows-control select {
 .campaign-column-with-tooltip.clickable:hover .campaign-text {
   color: #0ff;
   text-decoration: none;
+}
+
+body.light .campaign-column-with-tooltip.clickable:hover .campaign-text {
+  color: #0066dd;
 }
 
 .selected-row {

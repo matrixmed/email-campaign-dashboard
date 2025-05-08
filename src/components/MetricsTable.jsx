@@ -74,10 +74,9 @@ const MetricsTable = ({
     };
 
     const formatDate = (dateString) => {
-        if (!dateString) return '';
-        
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return dateString;
+            if (!dateString) return '';
+            const date = new Date(`${dateString}T00:00:00`);
+            if (isNaN(date.getTime())) return dateString;
         
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -121,10 +120,8 @@ const MetricsTable = ({
     
     const toggleCampaignSelection = (campaign, isSelected) => {
         if (isSelected) {
-            // Remove from selection
             setSelectedCampaigns(prev => prev.filter(c => c.Campaign !== campaign.Campaign));
         } else {
-            // Add to selection (max 4)
             if (selectedCampaigns.length < 4) {
                 setSelectedCampaigns(prev => [...prev, campaign]);
             }

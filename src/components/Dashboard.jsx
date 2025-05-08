@@ -20,8 +20,6 @@ const Dashboard = () => {
     const [selectedDeployment, setSelectedDeployment] = useState('all'); 
     const [availableSubjects, setAvailableSubjects] = useState([]);
     const [dropdownOpen, setDropdownOpen] = useState({});
-    const [selectedMetric, setSelectedMetric] = useState('');
-    const [selectedChartType, setSelectedChartType] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSubjects, setSelectedSubjects] = useState(['']);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -300,10 +298,10 @@ const Dashboard = () => {
         return averageData;
     };
 
-    const reversedData = [...processedData].reverse();
-    const totalPages = Math.ceil(reversedData.length / rowsPerPage);
+    const sortedData = [...processedData].sort((a, b) => new Date(b.Send_Date) - new Date(a.Send_Date));
+    const totalPages = Math.ceil(sortedData.length / rowsPerPage);
     const startIndex = (currentPage - 1) * rowsPerPage;
-    const currentPageData = reversedData.slice(startIndex, startIndex + rowsPerPage);
+    const currentPageData = sortedData.slice(startIndex, startIndex + rowsPerPage);
 
     return (
         <div className={`dashboard-container ${currentTheme}`}>
@@ -353,8 +351,9 @@ const Dashboard = () => {
             <LiveCampaignMetrics />
             <DigitalJournals />
             <VideoMetrics />
+            {/*
             <ChatInterface />
-           {/*
+           
             <InsightsSection
                 availableSubjects={availableSubjects}
                 selectedSubjects={selectedSubjects}

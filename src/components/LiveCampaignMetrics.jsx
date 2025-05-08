@@ -23,7 +23,7 @@ const LiveCampaignMetrics = () => {
 
                 const groupedByBase = _.groupBy(data, item => getBaseName(item.Campaign));
                 const processedMetrics = Object.entries(groupedByBase).map(([baseName, campaigns]) => {
-                    const validDeployments = campaigns.filter(c => c.Sent > 0 && c.Delivered > 0 && c.Unique_Opens !== "NA");
+                    const validDeployments = campaigns.filter(c => c.Sent > 0 && c.Delivered > 20 && c.Unique_Opens !== "NA");
 
                     if (validDeployments.length === 0) return null;
 
@@ -75,8 +75,12 @@ const LiveCampaignMetrics = () => {
     const currentCampaigns = metrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
     const totalPages = Math.ceil(metrics.length / campaignsPerPage);
 
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    };
+
     const exportToCSV = () => {
-        // Define headers for CSV
         const headers = [
             'Campaign',
             'Send_Date',
@@ -150,7 +154,7 @@ const LiveCampaignMetrics = () => {
                     <div key={index} className="campaign-box">
                         <h3>{campaign.Campaign}</h3>
                         <p className="text-sm text-gray-600">
-                            Deployment date {new Date(campaign.Send_Date).toLocaleDateString()} ({campaign.DeploymentCount} deployment{campaign.DeploymentCount !== 1 ? 's' : ''})
+                            Deployment date {campaign.Send_Date} ({campaign.DeploymentCount} deployment{campaign.DeploymentCount !== 1 ? 's' : ''})
                         </p>
                         <table>
                             <tbody>

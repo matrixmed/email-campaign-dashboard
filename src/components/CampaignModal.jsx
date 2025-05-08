@@ -32,14 +32,14 @@ const CampaignModal = ({
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
-        
-        const date = new Date(dateString);
+    
+           const date = new Date(`${dateString}T00:00:00`);
         if (isNaN(date.getTime())) return dateString;
-        
+    
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
         });
     };
 
@@ -141,7 +141,6 @@ const CampaignModal = ({
                                             {formatCampaignName(camp.Campaign)}
                                         </span>
                                         <span className="campaign-details">
-                                            Deployment: {getDeploymentNumber(camp.Campaign)} | 
                                             Date: {formatDate(camp.Send_Date)}
                                         </span>
                                     </li>

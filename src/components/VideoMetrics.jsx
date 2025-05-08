@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { videoMetricDisplayNames } from './metricDisplayNames';
+import VideoModal from './VideoModal';
 
 const VideoMetrics = () => {
-    const [videosData, setVideosData] = useState([]);
+    const [videosData, setVideosData] = useState({});
+    const [videosList, setVideosList] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -11,9 +13,11 @@ const VideoMetrics = () => {
     const [selectedMetrics, setSelectedMetrics] = useState({
         col1: 'views',
         col2: 'impressions',
-        col3: 'finishes',
-        col4: 'mean_percent_watched'
+        col3: 'averageViewPercentage',
+        col4: 'watchTimeHours'
     });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedVideo, setSelectedVideo] = useState(null);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -30,13 +34,52 @@ const VideoMetrics = () => {
 
     useEffect(() => {
         async function fetchVideoMetricsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/video_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
-                const sortedData = jsonData.sort((a, b) => b.views - a.views);
-                setVideosData(sortedData);
-                setFilteredData(sortedData);
+                setVideosData(jsonData);
+                
+                // Transform videos object to array for table display
+                const videoIds = Object.keys(jsonData.videos || {});
+                const videos = videoIds.map(id => {
+                    const video = jsonData.videos[id];
+                    
+                    // Calculate recent performance (last 7 days)
+                    let recentViews = 0;
+                    const today = new Date();
+                    const history = video.history || {};
+                    
+                    // Get dates for the last 7 days
+                    const last7Days = [];
+                    for (let i = 0; i < 7; i++) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() - i);
+                        last7Days.push(date.toISOString().split('T')[0]);
+                    }
+                    
+                    // Sum views from the last 7 days
+                    last7Days.forEach(dateString => {
+                        if (history[dateString] && history[dateString].totals) {
+                            recentViews += history[dateString].totals.views || 0;
+                        }
+                    });
+                    
+                    return {
+                        id,
+                        title: video.snippet?.title || 'Untitled',
+                        thumbnail: video.snippet?.thumbnails?.medium?.url,
+                        publishedAt: video.snippet?.publishedAt,
+                        recentViews, // Add recent views as a sorting metric
+                        ...video.totals,
+                        history: history
+                    };
+                });
+                
+                // Sort by recent views (last 7 days)
+                const sortedVideos = videos.sort((a, b) => (b.recentViews || 0) - (a.recentViews || 0));
+                setVideosList(sortedVideos);
+                setFilteredData(sortedVideos);
             } catch (error) {
                 console.error("Error fetching video metrics data:", error);
             }
@@ -47,7 +90,7 @@ const VideoMetrics = () => {
     const handleSearchChange = (e) => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
-        setFilteredData(videosData.filter(item =>
+        setFilteredData(videosList.filter(item =>
             searchValue.split(' ').every(word => item.title.toLowerCase().includes(word))
         ));
         setCurrentPage(1);
@@ -69,6 +112,20 @@ const VideoMetrics = () => {
     const handleMetricChange = (colKey, newMetric) => {
         setSelectedMetrics(prev => ({ ...prev, [colKey]: newMetric }));
         setActiveDropdown(null);
+    };
+
+    const openVideoModal = (video) => {
+        // Get full video data from original source
+        const fullVideoData = videosData.videos[video.id];
+        setSelectedVideo({
+            ...video,
+            fullData: fullVideoData
+        });
+        setIsModalOpen(true);
+    };
+
+    const closeVideoModal = () => {
+        setIsModalOpen(false);
     };
 
     const exportToCSV = () => {
@@ -95,16 +152,26 @@ const VideoMetrics = () => {
         document.body.removeChild(link);
     };
 
+    // Available metrics based on your YouTube data structure
+    const availableMetrics = [
+        'views', 
+        'watchTimeHours', 
+        'estimatedMinutesWatched', 
+        'averageViewDuration', 
+        'averageViewPercentage',
+        'impressions', 
+        'impressionsCtr', 
+        'likes', 
+        'comments', 
+        'shares',
+        'subscribersGained', 
+        'subscribersLost'
+    ];
+
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
-
-    const availableMetrics = [
-        'views', 'impressions', 'finishes', 'downloads', 
-        'unique_impressions', 'unique_viewers', 'mean_percent_watched',
-        'mean_seconds_watched', 'total_seconds_watched', 'created'
-    ];
 
     const maxPageButtons = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
@@ -142,7 +209,8 @@ const VideoMetrics = () => {
             <table>
                 <thead>
                     <tr>
-                        <th>Title</th>
+                        <th className="title-column">Title</th>
+                        <th>Recent Views (7d)</th>
                         {Object.entries(selectedMetrics).map(([colKey, colValue]) => (
                             <th 
                                 key={colKey}
@@ -152,7 +220,7 @@ const VideoMetrics = () => {
                                     className="header-content cursor-pointer"
                                     onClick={() => toggleDropdown(colKey)}
                                 >
-                                    <span>{videoMetricDisplayNames[colValue]}</span>
+                                    <span>{videoMetricDisplayNames[colValue] || colValue}</span>
                                     <span className="dropdown-arrow">
                                         <svg 
                                             width="12" 
@@ -173,17 +241,14 @@ const VideoMetrics = () => {
                                     </span>
                                 </div>
                                 {activeDropdown === colKey && (
-                                    <div className="dropdown absolute right-0 mt-2 py-2 w-48 bg-white rounded-md shadow-lg z-10">
+                                    <div className="dropdown">
                                         {availableMetrics.map((metric) => (
                                             <div
                                                 key={metric}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleMetricChange(colKey, metric);
-                                                }}
-                                                className="dropdown-item px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                                onClick={() => handleMetricChange(colKey, metric)}
+                                                className="dropdown-item"
                                             >
-                                                {videoMetricDisplayNames[metric]}
+                                                {videoMetricDisplayNames[metric] || metric}
                                             </div>
                                         ))}
                                     </div>
@@ -195,11 +260,17 @@ const VideoMetrics = () => {
                 <tbody>
                     {currentRows.map((item, index) => (
                         <tr key={index}>
-                            <td>{item.title}</td>
+                            <td 
+                                className="journal-title"
+                                onClick={() => openVideoModal(item)}
+                            >
+                                {item.title}
+                            </td>
+                            <td>{item.recentViews.toLocaleString()}</td>
                             {Object.values(selectedMetrics).map((metric, idx) => (
                                 <td key={idx}>
                                     {typeof item[metric] === 'number' 
-                                        ? (metric.includes('percent') || metric.includes('watched') 
+                                        ? (metric.includes('percentage') || metric === 'impressionsCtr' 
                                             ? `${item[metric].toFixed(2)}%` 
                                             : item[metric].toLocaleString())
                                         : item[metric]}
@@ -232,6 +303,13 @@ const VideoMetrics = () => {
                     Export CSV
                 </button>
             </div>
+
+            {isModalOpen && selectedVideo && (
+                <VideoModal 
+                    video={selectedVideo} 
+                    onClose={closeVideoModal} 
+                />
+            )}
         </div>
     );
 };

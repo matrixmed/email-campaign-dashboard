@@ -1,10 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import '../video.css';
 
 const VideoModal = ({ video, onClose }) => {
-    const [timeframeFilter, setTimeframeFilter] = useState('12');
+    const [timeframeFilter, setTimeframeFilter] = useState('7'); // Default to 7 days
+    const [summaryMetrics, setSummaryMetrics] = useState({}); // Store all-time metrics
+    const [displayMetrics, setDisplayMetrics] = useState({}); // Metrics to display based on timeframe
     const modalRef = useRef(null);
+    const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
+
+    useEffect(() => {
+        // Determine if it's a YouTube video
+        const thumbnails = video.fullData?.snippet?.thumbnails;
+        const isVimeo = thumbnails && 
+                      (typeof thumbnails.default === 'string' || 
+                       thumbnails.default?.url?.includes('vumbnail.com'));
+        setIsYoutubeVideo(!isVimeo);
+        
+        // Set all-time metrics on initial load
+        if (video.totals) {
+            const allTimeMetrics = {
+                views: video.totals.views || 0,
+                impressions: video.totals.impressions || 0,
+                watchTimeHours: video.totals.watchTimeHours || 0,
+                averageViewDuration: video.totals.averageViewDuration || 0,
+                averageViewPercentage: video.totals.averageViewPercentage || 0
+            };
+            setSummaryMetrics(allTimeMetrics);
+            setDisplayMetrics(allTimeMetrics); // Initialize display metrics with all-time values
+        }
+    }, [video]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -19,11 +44,42 @@ const VideoModal = ({ video, onClose }) => {
         };
     }, [onClose]);
 
+    useEffect(() => {
+        // Update metrics based on timeframe filter
+        if (timeframeFilter === 'all') {
+            // Display all-time metrics
+            setDisplayMetrics(summaryMetrics);
+        } else if (video.history) {
+            const timeframeData = getTimeframeData();
+            
+            // Calculate metrics based on filtered timeframe
+            const views = timeframeData.reduce((sum, day) => sum + (day.views || 0), 0);
+            const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
+            const impressions = timeframeData.reduce((sum, day) => sum + (day.impressions || 0), 0);
+            
+            // Calculate averages
+            const avgViewDuration = views > 0 
+                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewDuration || 0) * (day.views || 0)), 0) / views 
+                : 0;
+            
+            const avgViewPercentage = views > 0 
+                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewPercentage || 0) * (day.views || 0)), 0) / views 
+                : 0;
+            
+            setDisplayMetrics({
+                views,
+                impressions,
+                watchTimeHours,
+                averageViewDuration: avgViewDuration,
+                averageViewPercentage: avgViewPercentage
+            });
+        }
+    }, [timeframeFilter, video.history, summaryMetrics]);
+
     const handleTimeframeChange = (e) => {
         setTimeframeFilter(e.target.value);
     };
 
-    // Format YouTube timestamp (ISO) to readable date
     const formatDate = (isoString) => {
         if (!isoString) return "Unknown";
         const date = new Date(isoString);
@@ -34,19 +90,16 @@ const VideoModal = ({ video, onClose }) => {
         });
     };
 
-    // Format numbers with comma separators
     const formatNumber = (num) => {
         if (num === undefined || isNaN(num)) return "0";
         return num.toLocaleString();
     };
 
-    // Format percent values
     const formatPercent = (value) => {
         if (value === undefined || isNaN(value)) return "0%";
         return value.toFixed(2) + '%';
     };
 
-    // Format time (seconds) to human-readable format
     const formatTime = (seconds) => {
         if (seconds === undefined || isNaN(seconds)) return "0:00";
         const minutes = Math.floor(seconds / 60);
@@ -54,7 +107,6 @@ const VideoModal = ({ video, onClose }) => {
         return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
-    // Format watch time (hours) to appropriate unit
     const formatWatchTime = (hours) => {
         if (hours === undefined || isNaN(hours)) return "0h";
         if (hours < 1) {
@@ -63,11 +115,9 @@ const VideoModal = ({ video, onClose }) => {
         return hours.toFixed(1) + 'h';
     };
 
-    // Format YouTube duration string (PT3M33S) to readable time
     const formatDuration = (ytDuration) => {
         if (!ytDuration) return "0:00";
         
-        // Extract hours, minutes, seconds from YouTube's PT3M33S format
         const hourMatch = ytDuration.match(/(\d+)H/);
         const minuteMatch = ytDuration.match(/(\d+)M/);
         const secondMatch = ytDuration.match(/(\d+)S/);
@@ -82,10 +132,11 @@ const VideoModal = ({ video, onClose }) => {
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
+    // Get data with all days filled in (including zeros for missing days)
     const getTimeframeData = () => {
         if (!video.history) return [];
         
-        // Convert history object to array, sorted by date
+        // Convert history object to array and sort by date
         const historyArray = Object.entries(video.history).map(([date, data]) => ({
             date,
             ...data.totals
@@ -94,17 +145,68 @@ const VideoModal = ({ video, onClose }) => {
         historyArray.sort((a, b) => a.date.localeCompare(b.date));
         
         if (timeframeFilter === 'all') {
-            return historyArray;
+            return fillMissingDates(historyArray);
         } else {
+            // Get the date range
             const daysToShow = parseInt(timeframeFilter, 10);
-            return historyArray.slice(-daysToShow);
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - daysToShow + 1);
+            
+            return fillMissingDates(historyArray, startDate, endDate);
         }
+    };
+    
+    // Fill in missing dates with zero values
+    const fillMissingDates = (dataArray, startDate, endDate) => {
+        // If no data, return empty array
+        if (dataArray.length === 0) return [];
+        
+        // Create a map of existing dates
+        const dateMap = {};
+        dataArray.forEach(item => {
+            dateMap[item.date] = item;
+        });
+        
+        // If no start/end dates provided, use min/max from data
+        if (!startDate || !endDate) {
+            const dates = dataArray.map(item => new Date(item.date));
+            startDate = startDate || new Date(Math.min(...dates));
+            endDate = endDate || new Date(Math.max(...dates));
+        }
+        
+        // Create array with all dates in range
+        const result = [];
+        const currentDate = new Date(startDate);
+        
+        while (currentDate <= endDate) {
+            const dateString = currentDate.toISOString().split('T')[0];
+            
+            if (dateMap[dateString]) {
+                result.push(dateMap[dateString]);
+            } else {
+                // Add zero values for missing dates
+                result.push({
+                    date: dateString,
+                    views: 0,
+                    watchTimeHours: 0,
+                    impressions: 0,
+                    averageViewDuration: 0,
+                    averageViewPercentage: 0,
+                    subscribersGained: 0,
+                    subscribersLost: 0
+                });
+            }
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        return result;
     };
 
     const getTrafficSourceData = () => {
         if (!video.history) return [];
         
-        // Aggregate traffic sources across dates
         const aggregatedSources = {};
         
         Object.values(video.history).forEach(dayData => {
@@ -115,7 +217,6 @@ const VideoModal = ({ video, onClose }) => {
             }
         });
         
-        // Map numeric source types to readable names
         const sourceNames = {
             "5": "YouTube Search",
             "7": "Suggested Videos",
@@ -131,7 +232,7 @@ const VideoModal = ({ video, onClose }) => {
             .map(([sourceType, views]) => ({
                 source: sourceNames[sourceType] || `Source ${sourceType}`,
                 views,
-                value: views // for PieChart
+                value: views
             }))
             .sort((a, b) => b.views - a.views);
     };
@@ -139,7 +240,6 @@ const VideoModal = ({ video, onClose }) => {
     const getLocationData = () => {
         if (!video.history) return [];
         
-        // Aggregate playback locations across dates
         const aggregatedLocations = {};
         
         Object.values(video.history).forEach(dayData => {
@@ -150,7 +250,6 @@ const VideoModal = ({ video, onClose }) => {
             }
         });
         
-        // Map numeric location types to readable names
         const locationNames = {
             "0": "Watch Page",
             "1": "Embedded Player",
@@ -163,7 +262,7 @@ const VideoModal = ({ video, onClose }) => {
             .map(([locationType, views]) => ({
                 location: locationNames[locationType] || `Location ${locationType}`,
                 views,
-                value: views // for PieChart
+                value: views 
             }))
             .sort((a, b) => b.views - a.views);
     };
@@ -172,11 +271,48 @@ const VideoModal = ({ video, onClose }) => {
     const trafficSourceData = getTrafficSourceData();
     const locationData = getLocationData();
 
-    // Colors for pie charts
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
-    // Check if the video has data
     const hasData = timeframeData.length > 0;
+    
+    const getThumbnailUrl = () => {
+        const thumbnails = video.fullData?.snippet?.thumbnails;
+        
+        if (thumbnails?.default && typeof thumbnails.default === 'string') {
+            return thumbnails.default;
+        }
+        
+        if (thumbnails) {
+            return thumbnails.maxres?.url || 
+                   thumbnails.standard?.url || 
+                   thumbnails.high?.url || 
+                   thumbnails.medium?.url || 
+                   thumbnails.default?.url || 
+                   video.thumbnail;
+        }
+        
+        return video.thumbnail || 'https://placehold.co/320x180?text=No+Thumbnail';
+    };
+    
+    const getVideoUrl = () => {
+        if (video.fullData?.snippet?.videoUrl) {
+            return video.fullData.snippet.videoUrl;
+        }
+        
+        return `https://www.youtube.com/watch?v=${video.id}`;
+    };
+    
+    const getMetricCardClass = (metricType) => {
+        if (isYoutubeVideo && metricType === 'impressions') {
+            return 'metric-card hidden';
+        }
+        
+        // Calculate width based on visible cards (5 by default, 4 if YouTube)
+        const baseClassName = 'metric-card';
+        const width = isYoutubeVideo ? 'youtube-width' : '';
+        
+        return width ? `${baseClassName} ${width}` : baseClassName;
+    };
 
     return (
         <div className="video-modal-overlay">
@@ -194,15 +330,14 @@ const VideoModal = ({ video, onClose }) => {
                 <div className="video-preview-container">
                     <div className="video-thumbnail-preview">
                         <img 
-                            src={video.fullData.snippet.thumbnails.maxres?.url || 
-                                 video.fullData.snippet.thumbnails.standard?.url || 
-                                 video.fullData.snippet.thumbnails.high?.url || 
-                                 video.thumbnail} 
+                            src={getThumbnailUrl()}
                             alt={video.title} 
                         />
-                        <div className="video-duration">
-                            {formatDuration(video.fullData.contentDetails.duration)}
-                        </div>
+                        {video.fullData?.contentDetails?.duration && (
+                            <div className="video-duration">
+                                {formatDuration(video.fullData.contentDetails.duration)}
+                            </div>
+                        )}
                     </div>
                     <div className="video-details">
                         <div className="video-details-row">
@@ -216,15 +351,15 @@ const VideoModal = ({ video, onClose }) => {
                         <div className="video-details-row">
                             <span className="detail-label">URL:</span>
                             <a 
-                                href={`https://www.youtube.com/watch?v=${video.id}`} 
+                                href={getVideoUrl()}
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="video-url"
                             >
-                                youtube.com/watch?v={video.id}
+                                {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : 'Vimeo Video'}
                             </a>
                         </div>
-                        {video.fullData.snippet.tags && (
+                        {video.fullData?.snippet?.tags && (
                             <div className="video-tags">
                                 {video.fullData.snippet.tags.slice(0, 5).map((tag, index) => (
                                     <span key={index} className="video-tag">{tag}</span>
@@ -246,6 +381,7 @@ const VideoModal = ({ video, onClose }) => {
                             onChange={handleTimeframeChange}
                         >
                             <option value="all">All Time</option>
+                            <option value="60">Last 60 Days</option>
                             <option value="30">Last 30 Days</option>
                             <option value="14">Last 14 Days</option>
                             <option value="7">Last 7 Days</option>
@@ -254,29 +390,25 @@ const VideoModal = ({ video, onClose }) => {
                 </div>
                 
                 <div className="video-modal-metrics">
-                    <div className="metric-card">
+                    <div className={getMetricCardClass('views')}>
                         <div className="metric-label">Views</div>
-                        <div className="metric-value">{formatNumber(video.views)}</div>
+                        <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
                     </div>
-                    <div className="metric-card">
+                    <div className={getMetricCardClass('impressions')}>
+                        <div className="metric-label">Impressions</div>
+                        <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
+                    </div>
+                    <div className={getMetricCardClass('watchTime')}>
                         <div className="metric-label">Watch Time</div>
-                        <div className="metric-value">{formatWatchTime(video.watchTimeHours)}</div>
+                        <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
                     </div>
-                    <div className="metric-card">
+                    <div className={getMetricCardClass('averageViewDuration')}>
                         <div className="metric-label">Avg. View Duration</div>
-                        <div className="metric-value">{formatTime(video.averageViewDuration)}</div>
+                        <div className="metric-value">{formatTime(displayMetrics.averageViewDuration)}</div>
                     </div>
-                    <div className="metric-card">
+                    <div className={getMetricCardClass('averageViewPercentage')}>
                         <div className="metric-label">Avg. View Percentage</div>
-                        <div className="metric-value">{formatPercent(video.averageViewPercentage)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Likes</div>
-                        <div className="metric-value">{formatNumber(video.likes)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Comments</div>
-                        <div className="metric-value">{formatNumber(video.comments)}</div>
+                        <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
                     </div>
                 </div>
 
@@ -298,7 +430,7 @@ const VideoModal = ({ video, onClose }) => {
                                                 return `${d.getMonth()+1}/${d.getDate()}`;
                                             }}
                                         />
-                                        <YAxis />
+                                        <YAxis allowDecimals={false} />
                                         <Tooltip 
                                             formatter={(value, name) => [formatNumber(value), name]}
                                             labelFormatter={(date) => new Date(date).toLocaleDateString()}
@@ -315,84 +447,6 @@ const VideoModal = ({ video, onClose }) => {
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
-                            
-                            <div className="charts-grid">
-                                <div className="chart-container half-width">
-                                    <h4>Traffic Sources</h4>
-                                    <div className="chart-with-legend">
-                                        <ResponsiveContainer width="100%" height={220}>
-                                            <PieChart>
-                                                <Pie
-                                                    data={trafficSourceData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    labelLine={false}
-                                                    outerRadius={80}
-                                                    fill="#8884d8"
-                                                    dataKey="value"
-                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                >
-                                                    {trafficSourceData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip 
-                                                    formatter={(value) => [formatNumber(value), "Views"]}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                        <div className="traffic-legend">
-                                            {trafficSourceData.map((entry, index) => (
-                                                <div key={index} className="legend-item">
-                                                    <div 
-                                                        className="color-box" 
-                                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                                    ></div>
-                                                    <div className="legend-label">{entry.source}: {formatNumber(entry.views)}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="chart-container half-width">
-                                    <h4>Playback Locations</h4>
-                                    <div className="chart-with-legend">
-                                        <ResponsiveContainer width="100%" height={220}>
-                                            <PieChart>
-                                                <Pie
-                                                    data={locationData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    labelLine={false}
-                                                    outerRadius={80}
-                                                    fill="#82ca9d"
-                                                    dataKey="value"
-                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                >
-                                                    {locationData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip 
-                                                    formatter={(value) => [formatNumber(value), "Views"]}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                        <div className="traffic-legend">
-                                            {locationData.map((entry, index) => (
-                                                <div key={index} className="legend-item">
-                                                    <div 
-                                                        className="color-box" 
-                                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                                    ></div>
-                                                    <div className="legend-label">{entry.location}: {formatNumber(entry.views)}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                         
                         <div className="video-modal-daily">
@@ -406,8 +460,6 @@ const VideoModal = ({ video, onClose }) => {
                                             <th>Watch Time</th>
                                             <th>Avg Duration</th>
                                             <th>Subscribers +/-</th>
-                                            <th>Impressions</th>
-                                            <th>CTR</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -432,8 +484,6 @@ const VideoModal = ({ video, onClose }) => {
                                                             </span>
                                                         ) : '-'}
                                                     </td>
-                                                    <td>{formatNumber(data.impressions)}</td>
-                                                    <td>{formatPercent(data.impressionsCtr)}</td>
                                                 </tr>
                                             ))}
                                     </tbody>
@@ -443,14 +493,14 @@ const VideoModal = ({ video, onClose }) => {
                     </>
                 ) : (
                     <div className="no-data-message">
-                        <p>No historical data available for this video. Analytics data may take 24-48 hours to appear after a video is published.</p>
+                        <p>No historical data available for this video. This is common for videos imported from Vimeo or recently published YouTube videos.</p>
                     </div>
                 )}
                 
                 <div className="video-modal-description">
                     <h4>Description</h4>
                     <div className="video-description-content">
-                        {video.fullData.snippet.description || "No description provided."}
+                        {video.fullData?.snippet?.description || "No description provided."}
                     </div>
                 </div>
             </div>

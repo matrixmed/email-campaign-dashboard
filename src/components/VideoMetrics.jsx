@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { videoMetricDisplayNames } from './metricDisplayNames';
 import VideoModal from './VideoModal';
+
+const metricDisplayNames = {
+  views: "Views",
+  impressions: "Impressions",
+  averageViewDuration: "Avg. Watch Time",
+  averageViewPercentage: "Avg. Completion %",
+  watchTimeHours: "Watch Time (hrs)",
+  likes: "Likes",
+  comments: "Comments",
+  shares: "Shares",
+  subscribersGained: "Subscribers Gained",
+  subscribersLost: "Subscribers Lost",
+  estimatedMinutesWatched: "Minutes Watched",
+  impressionsCtr: "Click-Through Rate"
+};
 
 const VideoMetrics = () => {
     const [videosData, setVideosData] = useState({});
@@ -9,75 +23,46 @@ const VideoMetrics = () => {
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [activeDropdown, setActiveDropdown] = useState(null);
-    const [selectedMetrics, setSelectedMetrics] = useState({
-        col1: 'views',
-        col2: 'impressions',
-        col3: 'averageViewPercentage',
-        col4: 'watchTimeHours'
-    });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVideo, setSelectedVideo] = useState(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (!event.target.closest('.sortable-header')) {
-                setActiveDropdown(null);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
+    const displayMetrics = [
+        'impressions',
+        'views',
+        'averageViewDuration'
+    ];
 
     useEffect(() => {
         async function fetchVideoMetricsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/video_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
                 setVideosData(jsonData);
                 
-                // Transform videos object to array for table display
                 const videoIds = Object.keys(jsonData.videos || {});
                 const videos = videoIds.map(id => {
                     const video = jsonData.videos[id];
                     
-                    // Calculate recent performance (last 7 days)
-                    let recentViews = 0;
-                    const today = new Date();
-                    const history = video.history || {};
-                    
-                    // Get dates for the last 7 days
-                    const last7Days = [];
-                    for (let i = 0; i < 7; i++) {
-                        const date = new Date(today);
-                        date.setDate(date.getDate() - i);
-                        last7Days.push(date.toISOString().split('T')[0]);
+                    let thumbnail;
+                    if (video.snippet?.thumbnails?.default && typeof video.snippet.thumbnails.default === 'string') {
+                        thumbnail = video.snippet.thumbnails.default;
+                    } else {
+                        thumbnail = video.snippet?.thumbnails?.medium?.url || 
+                                   video.snippet?.thumbnails?.default?.url;
                     }
-                    
-                    // Sum views from the last 7 days
-                    last7Days.forEach(dateString => {
-                        if (history[dateString] && history[dateString].totals) {
-                            recentViews += history[dateString].totals.views || 0;
-                        }
-                    });
                     
                     return {
                         id,
                         title: video.snippet?.title || 'Untitled',
-                        thumbnail: video.snippet?.thumbnails?.medium?.url,
+                        thumbnail: thumbnail,
                         publishedAt: video.snippet?.publishedAt,
-                        recentViews, // Add recent views as a sorting metric
                         ...video.totals,
-                        history: history
+                        history: video.history
                     };
                 });
                 
-                // Sort by recent views (last 7 days)
-                const sortedVideos = videos.sort((a, b) => (b.recentViews || 0) - (a.recentViews || 0));
+                const sortedVideos = videos.sort((a, b) => (b.views || 0) - (a.views || 0));
                 setVideosList(sortedVideos);
                 setFilteredData(sortedVideos);
             } catch (error) {
@@ -91,7 +76,9 @@ const VideoMetrics = () => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
         setFilteredData(videosList.filter(item =>
-            searchValue.split(' ').every(word => item.title.toLowerCase().includes(word))
+            searchValue.split(' ').every(word => 
+                item.title?.toLowerCase().includes(word) || false
+            )
         ));
         setCurrentPage(1);
     };
@@ -105,17 +92,7 @@ const VideoMetrics = () => {
         setCurrentPage(pageNumber);
     };
 
-    const toggleDropdown = (colKey) => {
-        setActiveDropdown(activeDropdown === colKey ? null : colKey);
-    };
-
-    const handleMetricChange = (colKey, newMetric) => {
-        setSelectedMetrics(prev => ({ ...prev, [colKey]: newMetric }));
-        setActiveDropdown(null);
-    };
-
     const openVideoModal = (video) => {
-        // Get full video data from original source
         const fullVideoData = videosData.videos[video.id];
         setSelectedVideo({
             ...video,
@@ -128,16 +105,74 @@ const VideoMetrics = () => {
         setIsModalOpen(false);
     };
 
+    const formatNumber = (num) => {
+        if (num === undefined || isNaN(num)) return "0";
+        return num.toLocaleString();
+    };
+
+    const formatPercent = (value) => {
+        if (value === undefined || isNaN(value)) return "0%";
+        return value.toFixed(1) + '%';
+    };
+
+    const formatTime = (seconds) => {
+        if (seconds === undefined || isNaN(seconds)) return "0:00";
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    };
+
+    const formatWatchTime = (hours) => {
+        if (hours === undefined || isNaN(hours)) return "0h";
+        if (hours < 1) {
+            return Math.round(hours * 60) + 'm';
+        }
+        return hours.toFixed(1) + 'h';
+    };
+
+    const formatMetric = (metric, value) => {
+        if (metric === 'averageViewPercentage' || metric === 'impressionsCtr') {
+            return formatPercent(value);
+        } else if (metric === 'averageViewDuration') {
+            return formatTime(value);
+        } else if (metric === 'watchTimeHours') {
+            return formatWatchTime(value);
+        } else {
+            return formatNumber(value);
+        }
+    };
+
+    const getSourceBadge = (video) => {
+        if (!video || !videosData.videos[video.id]) return null;
+        
+        const videoData = videosData.videos[video.id];
+        const thumbnails = videoData?.snippet?.thumbnails;
+        
+        const isVimeo = thumbnails && 
+                       (typeof thumbnails.default === 'string' || 
+                        thumbnails.default?.url?.includes('vumbnail.com'));
+        
+        return isVimeo ? (
+            <span className="source-badge vimeo">VIMEO</span>
+        ) : (
+            <span className="source-badge youtube">YOUTUBE</span>
+        );
+    };
+
     const exportToCSV = () => {
-        const header = ['Title', ...Object.values(selectedMetrics).map(metric => videoMetricDisplayNames[metric])];
-        const rows = filteredData.map(item => [
-            item.title,
-            ...Object.values(selectedMetrics).map(metric => item[metric] ?? "")
-        ]);
+        const header = ['Title', 'Source', ...displayMetrics.map(metric => metricDisplayNames[metric])];
+        const rows = filteredData.map(item => {
+            const source = videosData.videos[item.id]?.snippet?.videoUrl ? 'Vimeo' : 'YouTube';
+            return [
+                item.title,
+                source,
+                ...displayMetrics.map(metric => item[metric])
+            ];
+        });
 
         const csvContent = [header, ...rows]
             .map(row => row.map(field => 
-                `"${String(field).replace(/"/g, '""')}"`
+                `"${String(field || '').replace(/"/g, '""')}"`
             ).join(","))
             .join("\n");
 
@@ -152,22 +187,6 @@ const VideoMetrics = () => {
         document.body.removeChild(link);
     };
 
-    // Available metrics based on your YouTube data structure
-    const availableMetrics = [
-        'views', 
-        'watchTimeHours', 
-        'estimatedMinutesWatched', 
-        'averageViewDuration', 
-        'averageViewPercentage',
-        'impressions', 
-        'impressionsCtr', 
-        'likes', 
-        'comments', 
-        'shares',
-        'subscribersGained', 
-        'subscribersLost'
-    ];
-
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
@@ -180,7 +199,7 @@ const VideoMetrics = () => {
     return (
         <div className="table-section">
             <div className="digital-journals-header">
-                <h2>JCAD TV Metrics</h2>
+                <h2>Video Metrics</h2>
                 <div className="search-container">
                     <input
                         type="text"
@@ -206,53 +225,14 @@ const VideoMetrics = () => {
                 </div>
             </div>
 
-            <table>
+            <table className="video-metrics-table">
                 <thead>
                     <tr>
                         <th className="title-column">Title</th>
-                        <th>Recent Views (7d)</th>
-                        {Object.entries(selectedMetrics).map(([colKey, colValue]) => (
-                            <th 
-                                key={colKey}
-                                className="sortable-header relative"
-                            >
-                                <div 
-                                    className="header-content cursor-pointer"
-                                    onClick={() => toggleDropdown(colKey)}
-                                >
-                                    <span>{videoMetricDisplayNames[colValue] || colValue}</span>
-                                    <span className="dropdown-arrow">
-                                        <svg 
-                                            width="12" 
-                                            height="12" 
-                                            viewBox="0 0 24 24" 
-                                            fill="none" 
-                                            stroke="currentColor" 
-                                            strokeWidth="2"
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round"
-                                            style={{ 
-                                                transform: activeDropdown === colKey ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                transition: 'transform 0.2s'
-                                            }}
-                                        >
-                                            <polyline points="6 9 12 15 18 9"></polyline>
-                                        </svg>
-                                    </span>
-                                </div>
-                                {activeDropdown === colKey && (
-                                    <div className="dropdown">
-                                        {availableMetrics.map((metric) => (
-                                            <div
-                                                key={metric}
-                                                onClick={() => handleMetricChange(colKey, metric)}
-                                                className="dropdown-item"
-                                            >
-                                                {videoMetricDisplayNames[metric] || metric}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                        <th className="source-column">Source</th>
+                        {displayMetrics.map((metric) => (
+                            <th key={metric} className="metric-column">
+                                {metricDisplayNames[metric]}
                             </th>
                         ))}
                     </tr>
@@ -266,14 +246,10 @@ const VideoMetrics = () => {
                             >
                                 {item.title}
                             </td>
-                            <td>{item.recentViews.toLocaleString()}</td>
-                            {Object.values(selectedMetrics).map((metric, idx) => (
-                                <td key={idx}>
-                                    {typeof item[metric] === 'number' 
-                                        ? (metric.includes('percentage') || metric === 'impressionsCtr' 
-                                            ? `${item[metric].toFixed(2)}%` 
-                                            : item[metric].toLocaleString())
-                                        : item[metric]}
+                            <td className="source-column">{getSourceBadge(item)}</td>
+                            {displayMetrics.map((metric) => (
+                                <td key={metric} className="metric-column">
+                                    {formatMetric(metric, item[metric])}
                                 </td>
                             ))}
                         </tr>

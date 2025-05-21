@@ -6,6 +6,7 @@ import MetricsTable from './MetricsTable';
 // import InsightsSection from './InsightsSection';
 import DigitalJournals from './DigitalJournals';
 import VideoMetrics from './VideoMetrics';
+import SpecialtySection from './SpecialtySection';
 import ChatInterface from './ChatInterface';
 import { createStars } from '../themes/stars';
 import { createShootingStars } from '../themes/stars';
@@ -185,7 +186,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         async function fetchBlobData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-02-04T22:10:35Z&se=2025-08-13T05:10:35Z&spr=https&sv=2022-11-02&sr=b&sig=QtsT4dSLE2uZNhqJdIfRw%2FNgQNOZOwOXzmNZfEhyFGU%3D";
+            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D";
             try {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
@@ -351,6 +352,7 @@ const Dashboard = () => {
             <LiveCampaignMetrics />
             <DigitalJournals />
             <VideoMetrics />
+            <SpecialtySection />
             {/*
             <ChatInterface />
            

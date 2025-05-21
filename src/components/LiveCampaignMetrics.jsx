@@ -21,11 +21,19 @@ const LiveCampaignMetrics = () => {
                     return /deployment\s*(?:#?\s*1|one|1st|\bfirst\b)/i.test(campaignName);
                 };
 
-                const groupedByBase = _.groupBy(data, item => getBaseName(item.Campaign));
-                const processedMetrics = Object.entries(groupedByBase).map(([baseName, campaigns]) => {
+                // First group by base name to count deployments
+                const tempGrouped = _.groupBy(data, item => getBaseName(item.Campaign));
+                const processedMetrics = [];
+
+                Object.entries(tempGrouped).forEach(([baseName, campaigns]) => {
                     const validDeployments = campaigns.filter(c => c.Sent > 0 && c.Delivered > 20 && c.Unique_Opens !== "NA");
 
-                    if (validDeployments.length === 0) return null;
+                    if (validDeployments.length === 0) return;
+
+                    // Determine display name based on deployment count
+                    const displayName = validDeployments.length === 1 
+                        ? validDeployments[0].Campaign  // Keep full name with deployment info
+                        : baseName;                     // Use base name without deployment info
 
                     const deployment1 = validDeployments.find(c => isDeploymentOne(c.Campaign)) || validDeployments[0];
 
@@ -34,7 +42,7 @@ const LiveCampaignMetrics = () => {
                     };
 
                     const combined = {
-                        Campaign: baseName,
+                        Campaign: displayName,
                         Send_Date: _.maxBy(validDeployments, 'Send_Date').Send_Date,
                         Sent: deployment1.Sent,
                         Delivered: deployment1.Delivered,
@@ -56,8 +64,8 @@ const LiveCampaignMetrics = () => {
                     combined.Unique_Click_Rate = Number(((combined.Unique_Clicks / combined.Unique_Opens) * 100).toFixed(2));
                     combined.Total_Click_Rate = Number(((combined.Total_Clicks / combined.Total_Opens) * 100).toFixed(2));
 
-                    return combined;
-                }).filter(Boolean);
+                    processedMetrics.push(combined);
+                });
 
                 const sortedMetrics = _.orderBy(processedMetrics, ['Send_Date'], ['desc']);
                 setMetrics(sortedMetrics);

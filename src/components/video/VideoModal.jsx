@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import '../video.css';
+import '../../styles/video.css';
 
 const VideoModal = ({ video, onClose }) => {
     const [timeframeFilter, setTimeframeFilter] = useState('7'); // Default to 7 days

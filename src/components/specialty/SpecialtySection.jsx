@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import '../SpecialtySection.css';
+import '../../styles/SpecialtySection.css';
 
 const SpecialtySection = () => {
   const [specialtyData, setSpecialtyData] = useState(null);
@@ -167,7 +167,7 @@ const SpecialtySection = () => {
   return (
     <div className="specialty-section">
       <div className="specialty-section-header">
-        <h2>Specialty Metrics</h2>
+        <h2>Specialty Metrics <i>(Beta)</i></h2>
         <div className="specialty-bucket-toggles">
           {buckets.map((bucket) => (
             <button

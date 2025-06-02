@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import QueryEngine from '../backend/query-engine';
+import QueryEngine from '../../backend/query-engine';
 import DisplayComponents from './DisplayComponents';
-import QueryQuestions from './QueryQuestions';
+import QueryQuestions from '../utils/QueryQuestions';
 const { 
   TopUsersDisplay, 
   ContentPerformanceDisplay, 

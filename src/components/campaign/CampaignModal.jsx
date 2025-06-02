@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import '../CampaignModal.css';
+import '../../styles/CampaignModal.css';
 
 const CampaignModal = ({ 
     isOpen, 

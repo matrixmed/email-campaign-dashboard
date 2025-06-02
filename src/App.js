@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import MatrixSignIn from './components/MatrixSignIn';
-import './Dashboard.css';
-import './MatrixSignIn.css';
+import './styles/Dashboard.css';
+import './styles//MatrixSignIn.css';
 import './themes/SpaceTheme.css';
 import './themes/SpaceTheme.css';
 import './themes/MarbleTheme.css';

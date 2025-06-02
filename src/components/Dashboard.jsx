@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import { groupPublications } from '../groupPublications';
-import LiveCampaignMetrics from './LiveCampaignMetrics';
-import MetricsTable from './MetricsTable';
-// import InsightsSection from './InsightsSection';
-import DigitalJournals from './DigitalJournals';
-import VideoMetrics from './VideoMetrics';
-import SpecialtySection from './SpecialtySection';
-import ChatInterface from './ChatInterface';
+import LiveCampaignMetrics from './campaign/LiveCampaignMetrics';
+import MetricsTable from './campaign/MetricsTable';
+import InsightsSection from './insights/InsightsSection';
+import DigitalJournals from './journal/DigitalJournals';
+import VideoMetrics from './video/VideoMetrics';
+import SpecialtySection from './specialty/SpecialtySection';
+import ChatInterface from './chatbot/ChatInterface';
 import { createStars } from '../themes/stars';
 import { createShootingStars } from '../themes/stars';
 

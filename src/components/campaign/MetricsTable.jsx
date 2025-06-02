@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { metricDisplayNames } from './metricDisplayNames';
+import { metricDisplayNames } from '../utils/metricDisplayNames';
 import CampaignModal from './CampaignModal';
 
 const MetricsTable = ({

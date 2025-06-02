@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import '../journal.css';
+import '../../styles/journal.css';
 
 const DigitalJournals = () => {
     const [journalsData, setJournalsData] = useState([]);

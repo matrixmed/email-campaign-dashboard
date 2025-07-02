@@ -194,16 +194,15 @@ tr:nth-child(even) {
   padding: 10px;
   border: 1px solid #555;
   max-height: 650px;
-  overflow-y: auto;
-  z-index: 1000;
   margin-top: 7px;
   margin-left: -12px;
-  z-index: 1000 !important;
+  z-index: 9999 !important;
 }
  
 .dropdown-item {
   padding: 5px;
   cursor: pointer;
+  z-index: 9999;
 }
  
 .dropdown-item:hover {
@@ -259,8 +258,12 @@ tr:nth-child(even) {
 }
 
 .table-container {
-  overflow-x: auto;
+  position: relative;
   margin-bottom: 20px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
 }
 
 .rows-per-page {
@@ -531,15 +534,18 @@ body.light .sortable-header:hover {
 body.light .dropdown {
   background-color: #eeeeee;
   color: #333;
+  z-index: 9999;
 }
 
 body.light .dropdown-item:hover {
   background-color: #aaaaaa;
   color: #333;
+  z-index: 9999;
 }
 
 body.light .dropdown-arrow svg {
   color: #333;
+  z-index: 9999;
 }
  
 .pagination button {
@@ -1258,4 +1264,21 @@ body.light .metric-card-title {
 
 body.light .chart-container {
   background-color: #f3f3f3;
+}
+
+/* width */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  box-shadow: inset 0 0 5px grey;
+  border-radius: 10px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);;
+  border-radius: 10px;
 }

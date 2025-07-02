@@ -7,6 +7,8 @@ import InsightsSection from './insights/InsightsSection';
 import DigitalJournals from './journal/DigitalJournals';
 import VideoMetrics from './video/VideoMetrics';
 import SpecialtySection from './specialty/SpecialtySection';
+import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
+import Dash from './Dash';
 import ChatInterface from './chatbot/ChatInterface';
 import { createStars } from '../themes/stars';
 import { createShootingStars } from '../themes/stars';
@@ -366,7 +368,13 @@ const Dashboard = () => {
                 setSelectedChartType={setSelectedChartType}
                 averagedData={averagedData}
             />
+            
+            <Dash/>
             */}
+
+
+            <DashboardCanvas />
+
         </div>
     );
 };

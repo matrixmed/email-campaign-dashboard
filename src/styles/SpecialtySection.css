@@ -661,3 +661,256 @@ body.space-theme .specialty-open-rate {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
+
+/* Combine Sub-Specialties Toggle Styles */
+.specialty-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.specialty-combine-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #ddd;
+  user-select: none;
+}
+
+.specialty-combine-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.specialty-toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: #333;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.specialty-toggle-slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #666;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.specialty-combine-toggle input:checked + .specialty-toggle-slider {
+  background-color: #0ff;
+  border-color: #0ff;
+}
+
+.specialty-combine-toggle input:checked + .specialty-toggle-slider::before {
+  transform: translateX(20px);
+  background-color: #111;
+}
+
+.specialty-toggle-label {
+  font-weight: 500;
+}
+
+/* Grouped Specialty Card Styles */
+.specialty-grouped-card {
+  border-left: 3px solid #0ff;
+  background-color: #2a3a4a !important;
+}
+
+.specialty-sub-count {
+  opacity: 0.7;
+  font-size: 0.85em;
+  color: #0ff;
+  margin-left: 6px;
+  font-weight: normal;
+}
+
+/* Sub-Specialties in Modal */
+.specialty-layover-subspecialties {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #444;
+}
+
+.specialty-layover-subspecialties h4 {
+  color: #0ff;
+  margin: 0 0 15px 0;
+  font-size: 16px;
+}
+
+.specialty-subspecialty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.specialty-subspecialty-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  border-left: 2px solid #0ff;
+}
+
+.specialty-subspecialty-name {
+  color: #ddd;
+  font-size: 13px;
+  flex: 1;
+}
+
+.specialty-subspecialty-rate {
+  color: #0ff;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Light Theme - Toggle */
+body.light .specialty-combine-toggle {
+  color: #555;
+}
+
+body.light .specialty-toggle-slider {
+  background-color: #e4e4e4;
+  border-color: rgba(0, 119, 255, 0.3);
+}
+
+body.light .specialty-toggle-slider::before {
+  background-color: #999;
+}
+
+body.light .specialty-combine-toggle input:checked + .specialty-toggle-slider {
+  background-color: #0077ff;
+  border-color: #0077ff;
+}
+
+body.light .specialty-combine-toggle input:checked + .specialty-toggle-slider::before {
+  background-color: #fff;
+}
+
+body.light .specialty-grouped-card {
+  border-left-color: #0077ff;
+  background-color: #f0f8ff !important;
+}
+
+body.light .specialty-sub-count {
+  color: #0077ff;
+}
+
+body.light .specialty-layover-subspecialties {
+  border-top-color: #eee;
+}
+
+body.light .specialty-layover-subspecialties h4 {
+  color: #0077ff;
+}
+
+body.light .specialty-subspecialty-item {
+  background-color: #f5f5f5;
+  border-left-color: #0077ff;
+}
+
+body.light .specialty-subspecialty-name {
+  color: #555;
+}
+
+body.light .specialty-subspecialty-rate {
+  color: #0077ff;
+}
+
+/* Space Theme - Toggle */
+body.space-theme .specialty-combine-toggle {
+  color: #c5e9ff;
+}
+
+body.space-theme .specialty-toggle-slider {
+  background-color: rgba(30, 40, 60, 0.7);
+  border-color: rgba(101, 226, 255, 0.3);
+}
+
+body.space-theme .specialty-toggle-slider::before {
+  background-color: rgba(101, 226, 255, 0.5);
+}
+
+body.space-theme .specialty-combine-toggle input:checked + .specialty-toggle-slider {
+  background-color: rgba(101, 226, 255, 0.8);
+  border-color: #65e2ff;
+  box-shadow: 0 0 10px rgba(101, 226, 255, 0.5);
+}
+
+body.space-theme .specialty-combine-toggle input:checked + .specialty-toggle-slider::before {
+  background-color: rgba(10, 15, 30, 0.9);
+}
+
+body.space-theme .specialty-grouped-card {
+  border-left-color: #65e2ff;
+  background-color: rgba(0, 70, 100, 0.3) !important;
+  box-shadow: 0 0 10px rgba(101, 226, 255, 0.2);
+}
+
+body.space-theme .specialty-sub-count {
+  color: #65e2ff;
+  text-shadow: 0 0 3px rgba(101, 226, 255, 0.5);
+}
+
+body.space-theme .specialty-layover-subspecialties {
+  border-top-color: rgba(101, 226, 255, 0.2);
+}
+
+body.space-theme .specialty-layover-subspecialties h4 {
+  color: #65e2ff;
+  text-shadow: 0 0 5px rgba(101, 226, 255, 0.5);
+}
+
+body.space-theme .specialty-subspecialty-item {
+  background-color: rgba(20, 30, 50, 0.7);
+  border-left-color: #65e2ff;
+  border: 1px solid rgba(101, 226, 255, 0.2);
+}
+
+body.space-theme .specialty-subspecialty-name {
+  color: #c5e9ff;
+}
+
+body.space-theme .specialty-subspecialty-rate {
+  color: #65e2ff;
+  text-shadow: 0 0 3px rgba(101, 226, 255, 0.5);
+}
+
+/* Mobile Responsiveness for Toggle */
+@media (max-width: 768px) {
+  .specialty-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    width: 100%;
+  }
+  
+  .specialty-combine-toggle {
+    order: 2;
+    align-self: flex-end;
+  }
+  
+  .specialty-subspecialty-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .specialty-subspecialty-rate {
+    align-self: flex-end;
+  }
+}

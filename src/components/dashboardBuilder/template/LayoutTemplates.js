@@ -136,8 +136,17 @@ export const getThemeLogo = (theme) => {
 };
 
 
-export const getComponentStyle = ({ type, position, style = {}, theme }) => {
+export const getComponentStyle = ({ type, position, style = {}, theme, isMulti = false }) => {
   const colors = getThemeColors(theme);
+  
+  let padding = '12px 16px';
+  if (type === 'metric') {
+    padding = '6px 8px';
+  } else if (type === 'secondary' && isMulti) {
+    padding = '4px 6px';
+  } else if (type === 'hero' && isMulti) {
+    padding = '4px 6px';
+  }
   
   const baseStyle = {
     position: 'absolute',
@@ -146,11 +155,13 @@ export const getComponentStyle = ({ type, position, style = {}, theme }) => {
     width: position.width,
     height: position.height,
     borderRadius: '8px',
-    padding: '16px',
+    padding: padding,
     fontFamily: "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     transition: 'all 0.2s ease',
     display: 'flex',
     flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
     overflow: 'hidden'
   };
   
@@ -159,19 +170,18 @@ export const getComponentStyle = ({ type, position, style = {}, theme }) => {
       background: colors.heroGradient,
       color: '#ffffff',
       boxShadow: `0 4px 16px ${colors.secondary}33`,
-      border: 'none'
+      border: 'none',
     },
     secondary: {
       background: colors.cardGradient,
       color: colors.secondary,
       border: `1px solid ${colors.border}`,
-      borderTop: `4px solid ${colors.secondary}`
     },
     metric: {
       background: colors.cardGradient,
       color: colors.secondary,
       border: `1px solid ${colors.border}`,
-      borderTop: `3px solid ${colors.secondary}`
+      borderTop: `2px solid ${colors.secondary}`
     },
     specialty: {
       background: colors.specialtyGradient,
@@ -204,19 +214,29 @@ export const getComponentStyle = ({ type, position, style = {}, theme }) => {
 // Typography scale for consistent sizing
 export const TYPOGRAPHY_SCALE = {
   hero: {
-    title: { size: 26, weight: 700, color: 'rgba(255, 255, 255, 0.9)' },
-    value: { size: 48, weight: 800, color: '#ffffff' },
-    subtitle: { size: 13, weight: 600, color: 'rgba(255, 255, 255, 0.9)' }
+    title: { size: 16, weight: 600, color: 'rgba(255, 255, 255, 0.9)' },
+    value: { size: 33, weight: 800, color: '#ffffff' },
+    subtitle: { size: 14, weight: 600, color: 'rgba(255, 255, 255, 0.9)' }
+  },
+  'hero-multi': {
+    title: { size: 12, weight: 700, color: 'rgba(255, 255, 255, 0.9)' },
+    value: { size: 27, weight: 800, color: '#ffffff', padding: '10px' },
+    subtitle: { size: 9, weight: 600, color: 'rgba(255, 255, 255, 0.9)' }
   },
   secondary: {
-    title: { size: 11, weight: 700 },
+    title: { size: 14, weight: 700 },
     value: { size: 28, weight: 800 },
     subtitle: { size: 10, weight: 500 }
   },
-  metric: {
-    title: { size: 10, weight: 700 },
-    value: { size: 20, weight: 800 },
+  'secondary-multi': {
+    title: { size: 11, weight: 700 },
+    value: { size: 21, weight: 800 },
     subtitle: { size: 9, weight: 500 }
+  },
+  metric: {
+    title: { size: 11, weight: 700 },
+    value: { size: 20, weight: 800 },
+    subtitle: { size: 9.5, weight: 500 }
   },
   specialty: {
     title: { size: 11, weight: 700 },
@@ -235,12 +255,17 @@ export const TYPOGRAPHY_SCALE = {
 };
 
 // Get typography style based on component type and element
-export const getTypographyStyle = (componentType, element, theme) => {
+export const getTypographyStyle = (componentType, element, theme, isMulti = false) => {
   const colors = getThemeColors(theme);
-  const scale = TYPOGRAPHY_SCALE[componentType] || TYPOGRAPHY_SCALE.metric;
+  
+  let scaleKey = componentType;
+  if (isMulti && (componentType === 'hero' || componentType === 'secondary')) {
+    scaleKey = `${componentType}-multi`;
+  }
+  
+  const scale = TYPOGRAPHY_SCALE[scaleKey] || TYPOGRAPHY_SCALE.metric;
   const elementStyle = scale[element] || scale.title;
   
-  // Apply theme-specific colors for text elements
   let textColor = elementStyle.color;
   if (!textColor || textColor === 'inherit') {
     if (componentType === 'hero') {
@@ -396,8 +421,12 @@ export const formatMetricValue = (value, type = 'number') => {
 };
 
 // Merge subspecialties (remove "- " suffixes and combine)
-export const mergeSpecialties = (specialtyData) => {
+export const mergeSpecialties = (specialtyData, shouldMerge = true) => {
   if (!specialtyData || typeof specialtyData !== 'object') return {};
+  
+  if (!shouldMerge) {
+    return specialtyData;
+  }
   
   const merged = {};
   
@@ -419,7 +448,6 @@ export const mergeSpecialties = (specialtyData) => {
     merged[baseName].count += 1;
   });
   
-  // Calculate averages
   Object.values(merged).forEach(data => {
     data.unique_open_rate = data.audience_total > 0 ? (data.unique_opens / data.audience_total) * 100 : 0;
     data.performance_delta = data.performance_delta / data.count;

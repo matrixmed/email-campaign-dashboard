@@ -3,10 +3,7 @@
 import { 
   TEMPLATE_TYPES, 
   getThemeColors, 
-  getThemeLogo,
-  TABLE_TYPES,
-  getMetricValue,
-  formatMetricValue 
+  mergeSpecialties 
 } from './LayoutTemplates';
 
 // ============================================================================
@@ -20,7 +17,7 @@ import {
  * Second row: Healthcare professionals reached, unique professional engagements, unique click rate
  * Bottom: Audience breakdown (full width)
  */
-export const generateSingleNoneTemplate = (campaign, theme) => {
+export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -43,7 +40,7 @@ export const generateSingleNoneTemplate = (campaign, theme) => {
     title: 'UNIQUE ENGAGEMENT RATE',
     value: `${campaign.core_metrics?.unique_open_rate?.toFixed(1) || '31.2'}%`,
     subtitle: `+${campaign.core_metrics?.performance_vs_industry?.toFixed(1) || '31.2'}% above industry`,
-    position: { x: 30, y: 95, width: 200, height: 90 },
+    position: { x: 30, y: 95, width: 200, height: 88 },
     style: {
       background: themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)',
       color: '#ffffff',
@@ -114,7 +111,7 @@ export const generateSingleNoneTemplate = (campaign, theme) => {
       id: 'one-hour-open-rate',
       title: 'ONE HOUR OPEN RATE',
       value: `${campaign.core_metrics?.['1_hour_open_rate']?.toFixed(1)}%`,
-      subtitle: '% of Opens within the First Hour of Deployment',
+      subtitle: 'Immediate Engagement',
       x: 605
     }    
   ];
@@ -139,12 +136,21 @@ export const generateSingleNoneTemplate = (campaign, theme) => {
   components.push({
     id: 'audience-breakdown',
     type: 'specialty-strips',
-    title: 'Audience Breakdown',
-    specialties: getTopSpecialties(campaign.specialty_performance),
-    position: { x: 30, y: 350, width: 679, height: 170 },
+    title: 'AUDIENCE BREAKDOWN',
+    specialties: mergeSubspecialties ? 
+      getTopSpecialties(campaign.specialty_performance, true) : 
+      Object.entries(campaign.specialty_performance)
+        .filter(([name, data]) => {
+          return data.audience_total >= 100 && 
+                !name.toLowerCase().includes('unknown') &&
+                !name.toLowerCase().includes('staff') &&
+                data.unique_open_rate > 0;
+        })
+        .sort((a, b) => b[1].audience_percentage - a[1].audience_percentage)
+        .slice(0, 4),
+    position: { x: 23, y: 350, width: 718, height: 190 },
     style: { background: 'transparent' }
   });
-
   return components;
 };
 
@@ -159,7 +165,7 @@ export const generateSingleOneTemplate = (campaign, theme) => {
   // Adjust audience breakdown to half width
   const audienceComponent = components.find(c => c.id === 'audience-breakdown');
   if (audienceComponent) {
-    audienceComponent.position = { x: 30, y: 350, width: 393, height: 170 };
+    audienceComponent.position = { x: 23, y: 350, width: 433, height: 190 };
   }
 
   // Add table next to audience breakdown
@@ -175,7 +181,7 @@ export const generateSingleOneTemplate = (campaign, theme) => {
       ],
       headers: ['Platform', 'Value']
     },
-    position: { x: 464, y: 350, width: 245, height: 170 },
+    position: { x: 463, y: 360, width: 261, height: 154 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -195,9 +201,14 @@ export const generateSingleTwoTemplate = (campaign, theme) => {
   const components = generateSingleOneTemplate(campaign, theme);
   const themeColors = getThemeColors(theme);
 
+  const audienceComponent = components.find(c => c.id === 'audience-breakdown');
+  if (audienceComponent) {
+    audienceComponent.position = { x: 23, y: 350, width: 433, height: 212 };
+  }
+
   const firstTable = components.find(c => c.id === 'additional-table-1');
   if (firstTable) {
-    firstTable.position = { ...firstTable.position, height: 125, y: 395 }; 
+    firstTable.position = { ...firstTable.position, height: 140, y: 395 }; 
   }
 
   // remove those cards and replace with tables
@@ -218,7 +229,7 @@ export const generateSingleTwoTemplate = (campaign, theme) => {
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 464, y: 228, width: 245, height: 125 },
+    position: { x: 464, y: 228, width: 261, height: 140 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -250,7 +261,7 @@ export const generateSingleThreeTemplate = (campaign, theme) => {
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 752, y: 395, width: 210, height: 125 },
+    position: { x: 752, y: 395, width: 225, height: 140 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -271,10 +282,10 @@ export const generateSingleThreeTemplate = (campaign, theme) => {
  * Center: Campaign comparison table (9 columns, rows = campaigns + header)
  * Bottom: Aggregated audience breakdown
  */
-export const generateMultiNoneTemplate = (campaigns, theme) => {
+export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
-  const aggregatedData = aggregateMultiCampaignData(campaigns);
+  const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
   
   // Campaign Title
   const campaignNames = campaigns.map(c => c.campaign_name).slice(0, 3).join(' + ');
@@ -284,7 +295,7 @@ export const generateMultiNoneTemplate = (campaigns, theme) => {
     id: 'multi-campaign-title',
     type: 'title',
     title: `Multi-Campaign Analysis: ${titleText}`,
-    position: { x: 20, y: -17, width: 1000, height: 100 },
+    position: { x: 5, y: -5, width: 800, height: 70 },
     style: {
       background: 'transparent',
       color: themeColors.darkGray || '#1f2937'
@@ -330,7 +341,8 @@ export const generateMultiNoneTemplate = (campaigns, theme) => {
       title: card.title,
       value: card.value,
       subtitle: card.subtitle,
-      position: { x: card.x, y: 95, width: 150, height: 60 },
+      position: { x: card.x, y: 90, width: 150, height: 58 },
+      isMulti: true,
       style: {
         background: index === 0 ? (themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)') : (themeColors.cardGradient || '#f8fafc'),
         color: index === 0 ? '#ffffff' : (themeColors.text || '#1f2937'),
@@ -354,7 +366,7 @@ export const generateMultiNoneTemplate = (campaigns, theme) => {
         'Unique Click Rate', 'Total Click Rate'
       ]
     },
-    position: { x: 15, y: 200, width: 720, height: 160 },
+    position: { x: 15, y: 190, width: 748, height: 207 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -366,9 +378,9 @@ export const generateMultiNoneTemplate = (campaigns, theme) => {
   components.push({
     id: 'aggregated-audience-breakdown',
     type: 'specialty-strips',
-    title: 'COMBINED AUDIENCE BREAKDOWN BY SPECIALTY',
-    specialties: getTopSpecialties(aggregatedData.specialty_performance),
-    position: { x: 15, y: 400, width: 720, height: 130 },
+    title: 'AUDIENCE BREAKDOWN',
+    specialties: getTopSpecialties(aggregatedData.specialty_performance, mergeSubspecialties),
+    position: { x: 10, y: 400, width: 762, height: 170 },
     style: { background: 'transparent' }
   });
 
@@ -386,23 +398,23 @@ export const generateMultiOneTemplate = (campaigns, theme) => {
   // Adjust audience breakdown to smaller width
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
   if (audienceComponent) {
-    audienceComponent.position = { x: 15, y: 400, width: 418, height: 130 };
+    audienceComponent.position = { x: 10, y: 400, width: 457, height: 170 };
   }
 
   // Add additional table
   components.push({
     id: 'additional-table-1',
     type: 'table',
-    title: 'Digital Metrics Summary',
+    title: 'Social Media Metrics',
     config: { 
       customData: [
-        ['Total Email CTR', '2.8%'],
-        ['Combined Reach', '125K'],
-        ['Avg Engagement', '4.2min']
+        ['Linkedin CTR', '%'],
+        ['Linkedin Engagement Rate', '%'],
+        ['Linkedin Impressions', '#']
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 472, y: 400, width: 263, height: 130 },
+    position: { x: 472, y: 415, width: 278, height: 125 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -424,23 +436,23 @@ export const generateMultiTwoTemplate = (campaigns, theme) => {
   // Adjust first table width
   const firstTable = components.find(c => c.id === 'additional-table-1');
   if (firstTable) {
-    firstTable.position = { x: 472, y: 400, width: 263, height: 130 };
+    firstTable.position = { x: 472, y: 415, width: 244, height: 125 };
   }
 
   // Add second table
   components.push({
     id: 'additional-table-2',
     type: 'table',
-    title: 'Performance Summary',
+    title: 'Video Metrics',
     config: { 
       customData: [
-        ['ROI', '285%'],
-        ['Cost Efficiency', '+15%'],
-        ['Quality Score', '8.9/10']
+        ['Views', '#'],
+        ['Avg Time Watched', '#'],
+        ['Impressions', '#']
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 775, y: 400, width: 200, height: 130 },
+    position: { x: 741, y: 415, width: 244, height: 125 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -462,7 +474,7 @@ export const generateMultiThreeTemplate = (campaigns, theme) => {
   // Adjust second table to bottom half
   const secondTable = components.find(c => c.id === 'additional-table-2');
   if (secondTable) {
-    secondTable.position = { x: 775, y: 420, width: 200, height: 110 };
+    secondTable.position = { x: 741, y: 415, width: 244, height: 125 };
   }
 
   // Add third table stacked above
@@ -477,7 +489,7 @@ export const generateMultiThreeTemplate = (campaigns, theme) => {
       ],
       headers: ['Stat', 'Value']
     },
-    position: { x: 775, y: 270, width: 200, height: 110 },
+    position: { x: 775, y: 294, width: 210, height: 90 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -495,42 +507,44 @@ export const generateMultiThreeTemplate = (campaigns, theme) => {
 /**
  * Get top 4 specialties with merged subspecialties (remove "- " suffixes)
  */
-function getTopSpecialties(specialtyPerformance) {
+function getTopSpecialties(specialtyPerformance, mergeSubspecialties = false) {
   if (!specialtyPerformance) return [];
   
-  // Merge subspecialties by removing "- " suffixes
-  const mergedSpecialties = {};
+  let processedSpecialties = specialtyPerformance;
   
-  Object.entries(specialtyPerformance).forEach(([name, data]) => {
-    // Remove everything after " - " to merge subspecialties
-    const baseName = name.split(' - ')[0];
+  if (mergeSubspecialties) {
+    const mergedSpecialties = {};
     
-    if (!mergedSpecialties[baseName]) {
-      mergedSpecialties[baseName] = {
-        audience_total: 0,
-        unique_opens: 0,
-        performance_delta: 0,
-        count: 0
-      };
-    }
+    Object.entries(specialtyPerformance).forEach(([name, data]) => {
+      const baseName = name.split(' - ')[0];
+      
+      if (!mergedSpecialties[baseName]) {
+        mergedSpecialties[baseName] = {
+          audience_total: 0,
+          unique_opens: 0,
+          performance_delta: 0,
+          count: 0
+        };
+      }
+      
+      mergedSpecialties[baseName].audience_total += data.audience_total || 0;
+      mergedSpecialties[baseName].unique_opens += data.unique_opens || 0;
+      mergedSpecialties[baseName].performance_delta += data.performance_delta || 0;
+      mergedSpecialties[baseName].count += 1;
+    });
     
-    mergedSpecialties[baseName].audience_total += data.audience_total || 0;
-    mergedSpecialties[baseName].unique_opens += data.unique_opens || 0;
-    mergedSpecialties[baseName].performance_delta += data.performance_delta || 0;
-    mergedSpecialties[baseName].count += 1;
-  });
+    const totalAudience = Object.values(mergedSpecialties).reduce((sum, data) => sum + data.audience_total, 0);
+    
+    Object.values(mergedSpecialties).forEach(data => {
+      data.unique_open_rate = data.audience_total > 0 ? (data.unique_opens / data.audience_total) * 100 : 0;
+      data.performance_delta = data.performance_delta / data.count;
+      data.audience_percentage = totalAudience > 0 ? (data.audience_total / totalAudience) * 100 : 0;
+    });
+    
+    processedSpecialties = mergedSpecialties;
+  }
   
-  // Calculate averages and percentages
-  const totalAudience = Object.values(mergedSpecialties).reduce((sum, data) => sum + data.audience_total, 0);
-  
-  Object.values(mergedSpecialties).forEach(data => {
-    data.unique_open_rate = data.audience_total > 0 ? (data.unique_opens / data.audience_total) * 100 : 0;
-    data.performance_delta = data.performance_delta / data.count;
-    data.audience_percentage = totalAudience > 0 ? (data.audience_total / totalAudience) * 100 : 0;
-  });
-  
-  // Return top 4 by audience percentage
-  return Object.entries(mergedSpecialties)
+  return Object.entries(processedSpecialties)
     .filter(([name, data]) => {
       return data.audience_total >= 500 && 
              data.audience_percentage >= 1.0 &&
@@ -544,7 +558,7 @@ function getTopSpecialties(specialtyPerformance) {
 /**
  * Aggregate data from multiple campaigns - FIXED IMPLEMENTATION
  */
-function aggregateMultiCampaignData(campaigns) {
+function aggregateMultiCampaignData(campaigns, mergeSubspecialties = false) {
   const aggregated = {
     core_metrics: {},
     volume_metrics: {},
@@ -552,19 +566,16 @@ function aggregateMultiCampaignData(campaigns) {
     specialty_performance: {}
   };
 
-  // Sum totals
   const totalDelivered = campaigns.reduce((sum, c) => sum + (c.volume_metrics?.delivered || 0), 0);
   const totalOpens = campaigns.reduce((sum, c) => sum + (c.volume_metrics?.unique_opens || 0), 0);
   const totalClicks = campaigns.reduce((sum, c) => sum + (c.volume_metrics?.unique_clicks || 0), 0);
   const totalSent = campaigns.reduce((sum, c) => sum + (c.volume_metrics?.sent || 0), 0);
   const totalPatientImpact = campaigns.reduce((sum, c) => sum + (c.cost_metrics?.estimated_patient_impact || 0), 0);
 
-  // Calculate aggregated rates
   aggregated.core_metrics.unique_open_rate = totalDelivered > 0 ? (totalOpens / totalDelivered) * 100 : 0;
   aggregated.core_metrics.unique_click_rate = totalDelivered > 0 ? (totalClicks / totalDelivered) * 100 : 0;
   aggregated.core_metrics.delivery_rate = totalSent > 0 ? (totalDelivered / totalSent) * 100 : 0;
 
-  // Aggregate volume metrics
   aggregated.volume_metrics = {
     sent: totalSent,
     delivered: totalDelivered,
@@ -572,36 +583,32 @@ function aggregateMultiCampaignData(campaigns) {
     unique_clicks: totalClicks
   };
 
-  // Aggregate cost metrics
   aggregated.cost_metrics = {
     estimated_patient_impact: totalPatientImpact
   };
 
-  // Aggregate and merge specialty performance
   const allSpecialties = {};
   campaigns.forEach(campaign => {
     if (campaign.specialty_performance) {
       Object.entries(campaign.specialty_performance).forEach(([specialty, data]) => {
-        // Merge subspecialties
-        const baseName = specialty.split(' - ')[0];
+        const specialtyKey = mergeSubspecialties ? specialty.split(' - ')[0] : specialty;
         
-        if (!allSpecialties[baseName]) {
-          allSpecialties[baseName] = {
+        if (!allSpecialties[specialtyKey]) {
+          allSpecialties[specialtyKey] = {
             audience_total: 0,
             unique_opens: 0,
             performance_delta: 0,
             count: 0
           };
         }
-        allSpecialties[baseName].audience_total += data.audience_total || 0;
-        allSpecialties[baseName].unique_opens += data.unique_opens || 0;
-        allSpecialties[baseName].performance_delta += data.performance_delta || 0;
-        allSpecialties[baseName].count += 1;
+        allSpecialties[specialtyKey].audience_total += data.audience_total || 0;
+        allSpecialties[specialtyKey].unique_opens += data.unique_opens || 0;
+        allSpecialties[specialtyKey].performance_delta += data.performance_delta || 0;
+        allSpecialties[specialtyKey].count += 1;
       });
     }
   });
 
-  // Calculate averages for specialty performance
   const totalAudience = Object.values(allSpecialties).reduce((sum, data) => sum + data.audience_total, 0);
   Object.values(allSpecialties).forEach(data => {
     data.unique_open_rate = data.audience_total > 0 ? (data.unique_opens / data.audience_total) * 100 : 0;
@@ -651,7 +658,7 @@ export const TEMPLATE_GENERATORS = {
  * Generate template based on configuration
  */
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
   
   if (!generator) {
@@ -659,9 +666,9 @@ export const generateTemplate = (config) => {
   }
   
   if (type === 'single') {
-    return generator(campaigns[0], theme);
+    return generator(campaigns[0], theme, mergeSubspecialties);
   } else {
-    return generator(campaigns, theme);
+    return generator(campaigns, theme, mergeSubspecialties);
   }
 };
 

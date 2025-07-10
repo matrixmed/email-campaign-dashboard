@@ -15,7 +15,7 @@ import { calculateAlignmentGuides, AlignmentGuides } from './template/AlignmentG
 import { createGroup, ungroupComponents, getComponentsInRect, SelectionBox, MultiSelectToolbar } from './template/ComponentGrouping';
 import TemplateSelectionModal from './TemplateSelectionModal';
 import { generateTemplate } from './template/TemplateLibrary';
-import { getThemeLogo } from './template/LayoutTemplates';
+import { getThemeLogo, getMetricValue } from './template/LayoutTemplates';
 
 const DashboardCanvasContent = () => {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -102,7 +102,10 @@ const DashboardCanvasContent = () => {
 
   const handleTemplateSelection = useCallback((templateConfig) => {
     try {
-      const generatedComponents = generateTemplate(templateConfig);
+      const generatedComponents = generateTemplate({
+        ...templateConfig,
+        mergeSubspecialties: specialtyMergeMode
+      });
       setCards(generatedComponents);
       setCurrentTheme(templateConfig.theme);
       setDeletedCards([]);
@@ -113,6 +116,26 @@ const DashboardCanvasContent = () => {
       }
     } catch (error) {
       console.error('Template generation failed:', error);
+    }
+  }, [specialtyMergeMode]);
+
+  const handleThemeChange = useCallback((newTheme) => {
+    setCurrentTheme(newTheme);
+    setCards(prev => prev.map(card => ({
+      ...card,
+      themeUpdateTimestamp: Date.now()
+    })));
+  }, []);
+
+  const handleCampaignChange = useCallback((newCampaign) => {
+    setSelectedCampaign(newCampaign);
+    if (newCampaign) {
+      setCards(prev => prev.map(card => {
+        if (card.type === 'metric' && card.originalKey) {
+          return { ...card, value: getMetricValue(newCampaign, card.originalKey) };
+        }
+        return card;
+      }));
     }
   }, []);
 
@@ -319,14 +342,24 @@ const DashboardCanvasContent = () => {
   const handleSpecialtyMergeToggle = useCallback(() => {
     setSpecialtyMergeMode(prev => {
       const newMode = !prev;
-      if (selectedCampaign) {
-        setCards(prev => prev.filter(card => card.section !== 'specialty'));
-        const specialtyCards = generateSpecialtySection(selectedCampaign);
-        setCards(prev => [...prev, ...specialtyCards]);
+      if (selectedCampaign && cards.length > 0) {
+        const templateConfig = {
+          type: 'single',
+          campaigns: [selectedCampaign],
+          theme: currentTheme,
+          mergeSubspecialties: newMode
+        };
+        
+        try {
+          const generatedComponents = generateTemplate(templateConfig);
+          setCards(generatedComponents);
+        } catch (error) {
+          console.error('Template regeneration failed:', error);
+        }
       }
       return newMode;
     });
-  }, [selectedCampaign, generateSpecialtySection]);
+  }, [selectedCampaign, currentTheme, cards.length]);
 
   const handleImageUpload = useCallback((imageData, position = null) => {
     const newImage = {
@@ -414,6 +447,7 @@ const DashboardCanvasContent = () => {
         justifyContent: 'center',
         fontFamily: "'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         color: 'white',
+        borderRadius: '8px',
         fontSize: '18px'
       }}>
         Loading campaigns...
@@ -431,6 +465,7 @@ const DashboardCanvasContent = () => {
         justifyContent: 'center',
         fontFamily: "'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         color: 'white',
+        borderRadius: '8px',
         fontSize: '18px'
       }}>
         Error: {error}
@@ -517,13 +552,14 @@ const DashboardCanvasContent = () => {
           <ComponentSidebar
             isOpen={sidebarOpen}
             onToggle={() => setSidebarOpen(!sidebarOpen)}
-            availableMetrics={availableMetrics}
-            deletedCards={deletedCards}
-            onRestoreCard={handleRestoreCard}
+            campaigns={campaigns}
+            selectedCampaign={selectedCampaign}
+            currentTheme={currentTheme}
             specialtyMergeMode={specialtyMergeMode}
+            onThemeChange={handleThemeChange}
+            onCampaignChange={handleCampaignChange}
             onToggleSpecialtyMerge={handleSpecialtyMergeToggle}
-            createDraggableMetric={createDraggableMetric}
-            onAddCard={handleAddCard}
+            onAddComponent={handleAddMetric}
           />
         </div>
 
@@ -609,6 +645,7 @@ const DashboardCanvasContent = () => {
                         <GroupComponent
                           key={card.id}
                           {...card}
+                          currentTheme={currentTheme}
                           onEdit={handleCardEdit}
                           onDelete={handleCardDelete}
                           onMove={handleCardMove}
@@ -627,6 +664,7 @@ const DashboardCanvasContent = () => {
                         <TitleComponent
                           key={card.id}
                           {...card}
+                          currentTheme={currentTheme}
                           onEdit={handleCardEdit}
                           onDelete={handleCardDelete}
                           onMove={handleCardMove}
@@ -644,6 +682,7 @@ const DashboardCanvasContent = () => {
                         <TableComponent
                           key={card.id}
                           {...card}
+                          currentTheme={currentTheme}
                           onEdit={handleCardEdit}
                           onDelete={handleCardDelete}
                           onMove={handleCardMove}
@@ -662,6 +701,7 @@ const DashboardCanvasContent = () => {
                         <SpecialtyKPIStrips
                           key={card.id}
                           {...card}
+                          currentTheme={currentTheme}
                           onEdit={handleCardEdit}
                           onDelete={handleCardDelete}
                           onMove={handleCardMove}
@@ -675,6 +715,7 @@ const DashboardCanvasContent = () => {
                       <MetricCard
                         key={card.id}
                         {...card}
+                        currentTheme={currentTheme}
                         onEdit={handleCardEdit}
                         onDelete={handleCardDelete}
                         onMove={handleCardMove}

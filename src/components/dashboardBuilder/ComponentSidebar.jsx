@@ -337,9 +337,6 @@ const ComponentSidebar = ({
                     </option>
                   ))}
                 </select>
-                <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginTop: '4px' }}>
-                  Changes colors and logo only - layout stays the same
-                </div>
               </div>
 
               <div style={{ marginBottom: '24px' }}>
@@ -404,28 +401,6 @@ const ComponentSidebar = ({
 
           {activeSection === 'add-components' && (
             <div className="dc-sidebar-section">
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600' }}>
-                  Add Components
-                </h3>
-                
-                <input
-                  type="text"
-                  placeholder="Search metrics..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '90%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '14px',
-                    marginBottom: '16px'
-                  }}
-                />
-              </div>
 
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>

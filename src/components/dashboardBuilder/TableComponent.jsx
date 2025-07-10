@@ -38,7 +38,15 @@ const TableComponent = ({
       if (config.customData.headers && config.customData.rows) {
         setTableData([config.customData.headers, ...config.customData.rows]);
       } else if (Array.isArray(config.customData)) {
-        setTableData(config.customData);
+        // For campaign comparison table, add headers if they're missing
+        if (isCampaignComparisonTable && config.headers && !Array.isArray(config.customData[0])) {
+          setTableData([config.headers, ...config.customData]);
+        } else if (isCampaignComparisonTable && config.headers && config.customData.length > 0 && 
+                   config.customData[0].length > 0 && config.customData[0][0] !== 'Campaign Name') {
+          setTableData([config.headers, ...config.customData]);
+        } else {
+          setTableData(config.customData);
+        }
       }
     } else if (config.dataType === 'specialty' && campaign?.specialty_performance) {
       const specialties = Object.entries(campaign.specialty_performance)
@@ -194,7 +202,7 @@ const TableComponent = ({
       document.addEventListener('mousemove', handleResizeMove);
       document.addEventListener('mouseup', handleResizeEnd);
       document.body.style.cursor = 'se-resize';
-      document.body.style.userSelect = 'none';
+      document.body.style.userSelect = '';
       
       return () => {
         document.removeEventListener('mousemove', handleResizeMove);
@@ -272,6 +280,9 @@ const TableComponent = ({
     return `${baseClass} ${selectedClass} ${draggingClass} ${resizingClass}`.trim();
   };
 
+  // FIXED: Minimal padding, proper campaign comparison table detection
+  const isCampaignComparisonTable = id === 'campaign-comparison-table';
+  
   const tableStyle = {
     position: 'absolute',
     left: position.x,
@@ -290,7 +301,8 @@ const TableComponent = ({
     background: style.background || '#ffffff',
     cursor: isDragging ? 'move' : 'pointer',
     transition: isDragging || isResizing ? 'none' : 'all 0.2s ease',
-    padding: '16px',
+    // FIXED: Minimal padding for campaign comparison table
+    padding: isCampaignComparisonTable ? '2px' : '8px',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column'
@@ -300,30 +312,53 @@ const TableComponent = ({
     fontSize: Math.max(12, Math.min(18, position.width / 25)),
     fontWeight: '700',
     color: style.color || '#2c3e50',
-    marginBottom: '12px',
-    textAlign: 'left',
+    marginBottom: isCampaignComparisonTable ? '2px' : '9px',
+    textAlign: 'center',
     cursor: 'pointer'
   };
 
+  // FIXED: Minimal padding for campaign comparison table
   const tableContainerStyle = {
     flex: 1,
     overflow: 'auto',
     border: '1px solid #e0e0e0',
     borderRadius: '4px',
-    background: '#ffffff'
+    background: '#ffffff',
+    // Remove extra margin/padding for campaign comparison table
+    margin: isCampaignComparisonTable ? '0' : '0',
+    padding: '0'
   };
 
   const actualTableStyle = {
     width: '100%',
     height: '100%',
     borderCollapse: 'collapse',
-    fontSize: Math.max(10, Math.min(14, position.width / 35))
+    fontSize: Math.max(10, Math.min(14, position.width / 35)),
+    tableLayout: 'fixed'
+  };
+
+  // FIXED: Make campaign name column narrower
+  const getColumnWidth = (colIndex) => {
+    if (isCampaignComparisonTable && colIndex === 0) {
+      return '17%'; // Campaign name column - much narrower
+    }
+    return 'auto';
+  };
+
+  const getCellStyle = (rowIndex, colIndex) => {
+    const isHeader = rowIndex === 0;
+    return {
+      ...dataCellStyle,
+      backgroundColor: rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff',
+      width: getColumnWidth(colIndex),
+      fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal'
+    };
   };
 
   const dataCellStyle = {
     border: '1px solid #e0e0e0',
-    padding: '4px 6px',
-    textAlign: 'left',
+    padding: isCampaignComparisonTable ? '2px 4px' : '4px 6px',
+    textAlign: isCampaignComparisonTable ? 'center' : 'left',
     verticalAlign: 'middle',
     fontSize: 'inherit',
     color: '#111'
@@ -419,11 +454,9 @@ const TableComponent = ({
                   return (
                     <td 
                       key={colIndex} 
-                      style={{
-                        ...dataCellStyle,
-                        backgroundColor: rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'
-                      }}
-                      onDoubleClick={() => !isHeader && handleCellDoubleClick(rowIndex, colIndex)}
+                      style={getCellStyle(rowIndex, colIndex)}
+                      // FIXED: Make ALL cells editable, including headers
+                      onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
                     >
                       {isEditingThisCell ? (
                         <input
@@ -443,8 +476,8 @@ const TableComponent = ({
                         />
                       ) : (
                         <span 
-                          title={!isHeader ? "Double-click to edit" : undefined}
-                          style={{ cursor: !isHeader ? 'pointer' : 'default' }}
+                          title="Double-click to edit"
+                          style={{ cursor: 'pointer' }}
                         >
                           {cell}
                         </span>

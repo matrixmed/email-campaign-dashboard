@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useDrag } from 'react-dnd';
-import { getComponentStyle, getTypographyStyle, MATRIX_COLORS } from './template/LayoutTemplates';
+import { getComponentStyle, getTypographyStyle, MATRIX_COLORS, TYPOGRAPHY_SCALE } from './template/LayoutTemplates';
 
 const MetricCard = ({ 
   id, 
@@ -10,6 +10,8 @@ const MetricCard = ({
   type = 'metric', 
   position = { x: 0, y: 0, width: 200, height: 100 },
   style = {},
+  currentTheme = 'matrix',
+  isMulti = false,
   onEdit, 
   onDelete,
   onResize,
@@ -19,12 +21,10 @@ const MetricCard = ({
   setIsEditing,
   isSelected = false
 }) => {
-  // Local state for editing
   const [localTitle, setLocalTitle] = useState(title);
   const [localValue, setLocalValue] = useState(value);
   const [localSubtitle, setLocalSubtitle] = useState(subtitle);
   
-  // Drag and resize state
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState(null);
@@ -35,14 +35,12 @@ const MetricCard = ({
   const valueInputRef = useRef(null);
   const subtitleInputRef = useRef(null);
 
-  // Update local state when props change
   useEffect(() => {
     setLocalTitle(title);
     setLocalValue(value);
     setLocalSubtitle(subtitle);
   }, [title, value, subtitle]);
 
-  // Focus input when editing starts
   useEffect(() => {
     if (isEditing === id && titleInputRef.current) {
       titleInputRef.current.focus();
@@ -50,7 +48,66 @@ const MetricCard = ({
     }
   }, [isEditing, id]);
 
-  // React DnD integration
+  const handleTitleBlur = useCallback(() => {
+    onEdit?.(id, { 
+      title: localTitle, 
+      value: localValue, 
+      subtitle: localSubtitle 
+    });
+    setIsEditing(null);
+  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  
+  const handleValueBlur = useCallback(() => {
+    onEdit?.(id, { 
+      title: localTitle, 
+      value: localValue, 
+      subtitle: localSubtitle 
+    });
+    setIsEditing(null);
+  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  
+  const handleSubtitleBlur = useCallback(() => {
+    onEdit?.(id, { 
+      title: localTitle, 
+      value: localValue, 
+      subtitle: localSubtitle 
+    });
+    setIsEditing(null);
+  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  
+  const handleTitleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      handleTitleBlur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setLocalTitle(title);
+      setIsEditing(null);
+    }
+  }, [handleTitleBlur, title, setIsEditing]);
+  
+  const handleValueKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      handleValueBlur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setLocalValue(value);
+      setIsEditing(null);
+    }
+  }, [handleValueBlur, value, setIsEditing]);
+  
+  const handleSubtitleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      handleSubtitleBlur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setLocalSubtitle(subtitle);
+      setIsEditing(null);
+    }
+  }, [handleSubtitleBlur, subtitle, setIsEditing]);
+
   const [{ isDragMonitor }, drag] = useDrag(() => ({
     type: 'card',
     item: { id, type, position },
@@ -59,12 +116,7 @@ const MetricCard = ({
     }),
   }), [id, position]);
 
-  // ============================================================================
-  // DRAG HANDLERS
-  // ============================================================================
-
   const handleMouseDown = useCallback((e) => {
-    // Prevent drag if clicking on interactive elements
     if (e.target.closest('.dashboard-canvas-delete-btn') || 
         e.target.closest('.dashboard-canvas-resize-handle') ||
         e.target.tagName === 'INPUT' ||
@@ -89,11 +141,9 @@ const MetricCard = ({
     const rawX = e.clientX - dragStart.x;
     const rawY = e.clientY - dragStart.y;
     
-    // Snap to 8px grid for precision
     const newX = Math.max(0, Math.round(rawX / 8) * 8);
     const newY = Math.max(0, Math.round(rawY / 8) * 8);
     
-    // Constrain to canvas bounds (1024x576)
     const maxX = 1024 - position.width;
     const maxY = 576 - position.height;
     
@@ -107,10 +157,6 @@ const MetricCard = ({
     setIsDragging(false);
     setDragStart(null);
   }, []);
-
-  // ============================================================================
-  // RESIZE HANDLERS
-  // ============================================================================
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -131,7 +177,6 @@ const MetricCard = ({
     const deltaX = e.clientX - resizeStart.startX;
     const deltaY = e.clientY - resizeStart.startY;
     
-    // Calculate new dimensions with constraints
     const newWidth = Math.max(120, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
     const newHeight = Math.max(60, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
     
@@ -142,10 +187,6 @@ const MetricCard = ({
     setIsResizing(false);
     setResizeStart(null);
   }, []);
-
-  // ============================================================================
-  // GLOBAL MOUSE EVENTS
-  // ============================================================================
 
   useEffect(() => {
     if (isDragging) {
@@ -179,10 +220,6 @@ const MetricCard = ({
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
-  // ============================================================================
-  // EDIT HANDLERS
-  // ============================================================================
-
   const handleEdit = useCallback(() => {
     setIsEditing(id);
   }, [id, setIsEditing]);
@@ -212,7 +249,6 @@ const MetricCard = ({
       handleCancel();
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      // Move focus to next input
       if (e.target === titleInputRef.current) {
         valueInputRef.current?.focus();
       } else if (e.target === valueInputRef.current) {
@@ -227,10 +263,6 @@ const MetricCard = ({
     e.stopPropagation();
     onDelete?.(id);
   }, [id, onDelete]);
-
-  // ============================================================================
-  // CLICK HANDLERS
-  // ============================================================================
 
   const handleClick = useCallback((e) => {
     if (e.target.closest('.dashboard-canvas-delete-btn') || 
@@ -247,10 +279,6 @@ const MetricCard = ({
       handleEdit();
     }
   }, [handleEdit]);
-
-  // ============================================================================
-  // STYLING
-  // ============================================================================
 
   const getCardClass = () => {
     const baseClass = 'dashboard-canvas-card';
@@ -269,8 +297,9 @@ const MetricCard = ({
     top: position.y,
     width: position.width,
     height: position.height,
+    theme: currentTheme,
     ...getComponentStyle({ type, position, style }),
-    ...style, // Apply any custom styles from template
+    ...style,
     zIndex: isSelected ? 100 : isDragging ? 90 : 1,
     opacity: isDragging ? 0.8 : 1,
     border: isSelected ? `2px solid ${MATRIX_COLORS.primary || '#007bff'}` : style.border || '1px solid rgba(0, 0, 0, 0.08)',
@@ -289,15 +318,30 @@ const MetricCard = ({
   };
   
   const getResponsiveFontSizes = () => {
-    const baseWidth = 200;
-    const baseHeight = 100;
-    const scale = Math.min(position.width / baseWidth, position.height / baseHeight);
-    
-    return {
-      title: Math.max(11, Math.min(20, 12 * scale)),
-      value: Math.max(20, Math.min(48, 28 * scale)),
-      subtitle: Math.max(9, Math.min(14, 10 * scale))
-    };
+    if (type === 'hero') {
+      const typographyKey = isMulti ? 'hero-multi' : 'hero';
+      const scale = TYPOGRAPHY_SCALE[typographyKey];
+      return {
+        title: scale.title.size,
+        value: scale.value.size,
+        subtitle: scale.subtitle.size
+      };
+    } else if (type === 'secondary') {
+      const typographyKey = isMulti ? 'secondary-multi' : 'secondary';
+      const scale = TYPOGRAPHY_SCALE[typographyKey];
+      return {
+        title: scale.title.size,
+        value: scale.value.size,
+        subtitle: scale.subtitle.size
+      };
+    } else {
+      const scale = TYPOGRAPHY_SCALE.metric;
+      return {
+        title: scale.title.size,
+        value: scale.value.size,
+        subtitle: scale.subtitle.size
+      };
+    }
   };
   
   const fontSizes = getResponsiveFontSizes();
@@ -319,11 +363,12 @@ const MetricCard = ({
     ...getTypographyStyle(type, 'value'),
     fontSize: `${fontSizes.value}px`,
     fontWeight: type === 'hero' ? '800' : '700',
-    marginBottom: '4px',
+    marginBottom: (type === 'hero' || type === 'secondary') ? '4px' : '4px',
+    marginTop: (type === 'hero' || type === 'secondary') ? '0px' : '0px',
     lineHeight: '1.1',
     cursor: 'pointer',
     color: style.color || (type === 'hero' ? '#ffffff' : MATRIX_COLORS.primary || '#007bff')
-  };
+   };
   
   const subtitleStyle = {
     ...getTypographyStyle(type, 'subtitle'),
@@ -337,10 +382,6 @@ const MetricCard = ({
 
   const editing = isEditing === id;
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
-
   return (
     <div 
       ref={(node) => {
@@ -353,7 +394,6 @@ const MetricCard = ({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
     >
-      {/* Delete Button */}
       <button 
         className="dashboard-canvas-delete-btn"
         onClick={handleDelete}
@@ -383,104 +423,81 @@ const MetricCard = ({
         ×
       </button>
       
-      {/* Card Content */}
-      <div className="dashboard-canvas-card-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="dashboard-canvas-card-content" style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        textAlign: 'left',
+        height: '100%'
+      }}>
         {editing ? (
           <>
-            {/* Editing Mode */}
             <input
               ref={titleInputRef}
-              className="dashboard-canvas-title-input"
+              type="text"
               value={localTitle}
               onChange={(e) => setLocalTitle(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleSave}
-              placeholder="Card title"
+              onBlur={handleTitleBlur}
+              onKeyDown={handleTitleKeyDown}
               style={{
                 ...titleStyle,
-                background: 'rgba(255, 255, 255, 0.95)',
-                border: '2px solid rgba(0, 123, 255, 0.5)',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '4px',
-                padding: '6px 8px',
+                padding: '4px',
                 width: '100%',
-                marginBottom: '8px',
-                outline: 'none'
+                marginBottom: '4px'
               }}
             />
             <input
-              ref={valueInputRef}
-              className="dashboard-canvas-value-input"
+              type="text"
               value={localValue}
               onChange={(e) => setLocalValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleSave}
-              placeholder="Value"
+              onBlur={handleValueBlur}
+              onKeyDown={handleValueKeyDown}
               style={{
                 ...valueStyle,
-                background: 'rgba(255, 255, 255, 0.95)',
-                border: '2px solid rgba(0, 123, 255, 0.5)',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '4px',
-                padding: '6px 8px',
+                padding: '4px',
                 width: '100%',
-                marginBottom: '8px',
-                outline: 'none'
+                marginBottom: '4px'
               }}
             />
-            {subtitle && (
-              <input
-                ref={subtitleInputRef}
-                className="dashboard-canvas-subtitle-input"
-                value={localSubtitle}
-                onChange={(e) => setLocalSubtitle(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleSave}
-                placeholder="Subtitle"
-                style={{
-                  ...subtitleStyle,
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  border: '2px solid rgba(0, 123, 255, 0.5)',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  width: '100%',
-                  outline: 'none'
-                }}
-              />
-            )}
+            <input
+              type="text"
+              value={localSubtitle}
+              onChange={(e) => setLocalSubtitle(e.target.value)}
+              onBlur={handleSubtitleBlur}
+              onKeyDown={handleSubtitleKeyDown}
+              style={{
+                ...subtitleStyle,
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '4px',
+                padding: '4px',
+                width: '100%'
+              }}
+            />
           </>
         ) : (
           <>
-            {/* Display Mode */}
-            <div 
-              className="dashboard-canvas-card-title" 
-              style={titleStyle} 
-              onDoubleClick={handleEdit}
-              title="Double-click to edit"
-            >
+            <div className="dashboard-canvas-card-title" style={{...titleStyle, margin: '0'}}>
               {title}
             </div>
-            <div 
-              className="dashboard-canvas-card-value" 
-              style={valueStyle} 
-              onDoubleClick={handleEdit}
-              title="Double-click to edit"
-            >
+            <div className="dashboard-canvas-card-value" style={{...valueStyle, margin: '2px 0'}}>
               {value}
             </div>
-            {subtitle && (
-              <div 
-                className="dashboard-canvas-card-subtitle" 
-                style={subtitleStyle} 
-                onDoubleClick={handleEdit}
-                title="Double-click to edit"
-              >
-                {subtitle}
-              </div>
-            )}
+            <div className="dashboard-canvas-card-subtitle" style={{...subtitleStyle, margin: '0'}}>
+              {subtitle}
+            </div>
           </>
         )}
       </div>
       
-      {/* Resize Handle */}
       <div 
         className="dashboard-canvas-resize-handle"
         onMouseDown={handleResizeStart}

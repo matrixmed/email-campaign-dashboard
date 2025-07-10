@@ -9,6 +9,7 @@ const SpecialtyKPIStrips = ({
   specialties = [],
   position = { x: 0, y: 0, width: 460, height: 70 },
   style = {},
+  currentTheme = 'matrix',
   onEdit, 
   onDelete,
   onMove,
@@ -47,27 +48,11 @@ const SpecialtyKPIStrips = ({
 
   const getTopSpecialties = useCallback(() => {
     if (Array.isArray(specialties) && specialties.length > 0) {
-      return specialties.slice(0, 4);
-    }
-    
-    if (campaign?.specialty_performance) {
-      return Object.entries(campaign.specialty_performance)
-        .filter(([name, data]) => {
-          return data.audience_total >= 100 && 
-                 !name.toLowerCase().includes('unknown') &&
-                 !name.toLowerCase().includes('staff') &&
-                 data.unique_open_rate > 0;
-        })
-        .sort((a, b) => b[1].audience_percentage - a[1].audience_percentage)
-        .slice(0, 4);
-    }
-    
-    if (typeof specialties === 'object' && specialties !== null) {
-      return Object.entries(specialties).slice(0, 4);
+      return specialties;
     }
     
     return [];
-  }, [campaign, specialties]);
+  }, [specialties]);
 
   const topSpecialties = getTopSpecialties();
 
@@ -218,8 +203,7 @@ const SpecialtyKPIStrips = ({
   }, [handleEdit]);
 
   const formatSpecialtyName = (name) => {
-    const cleanName = name.split(' - ')[0];
-    return cleanName.length > 20 ? cleanName.substring(0, 20) + '...' : cleanName;
+    return name.length > 40 ? name.substring(0, 40) + '...' : name;
   };
 
   const getTrendIcon = (delta) => {
@@ -249,57 +233,53 @@ const SpecialtyKPIStrips = ({
     return `${baseClass} ${selectedClass} ${draggingClass} ${resizingClass}`.trim();
   };
 
+  const isMultiTemplate = (id) => {
+    return id && id.includes('aggregated-audience-breakdown');
+  };
+
   const containerStyle = {
-    position: 'absolute',
-    left: position.x,
-    top: position.y,
-    width: position.width,
-    height: position.height,
-    ...getComponentStyle({ type: 'specialty-strips', position, style }),
-    ...style,
+    ...getComponentStyle({ type: 'specialty-strips', position, style, theme: currentTheme }),
     zIndex: isSelected ? 100 : isDragging ? 90 : 1,
     opacity: isDragging ? 0.8 : 1,
-    border: isSelected ? `2px solid ${MATRIX_COLORS.primary || '#007bff'}` : style.border || '1px solid rgba(0, 0, 0, 0.05)',
-    boxShadow: isSelected 
-      ? `0 0 0 3px rgba(0, 123, 255, 0.2), 0 4px 16px rgba(0, 0, 0, 0.15)` 
-      : style.boxShadow || '0 2px 8px rgba(0, 0, 0, 0.05)',
-    borderRadius: style.borderRadius || '8px',
-    background: style.background || 'transparent',
-    cursor: isDragging ? 'move' : 'pointer',
+    border: isSelected ? `2px solid ${MATRIX_COLORS.primary || '#007bff'}` : 'none',
     transition: isDragging || isResizing ? 'none' : 'all 0.2s ease',
-    padding: '16px'
+    padding: '0px'
   };
 
   const headerStyle = {
-    fontSize: Math.max(9, Math.min(12, position.width / 30)),
+    fontSize: isMultiTemplate(id) ? Math.max(7, Math.min(9, position.width / 40)) : Math.max(9, Math.min(12, position.width / 30)),
     fontWeight: '700',
     color: style.color || MATRIX_COLORS.darkGray || '#2c3e50',
-    marginBottom: '10px',
-    marginTop: '-6px',
+    marginBottom: isMultiTemplate(id) ? '4px' : '8px',
+    marginTop: '8px',
+    marginLeft: '8px',
+    marginRight: '8px',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     cursor: 'pointer'
   };
-
+  
   const gridContainerStyle = {
     display: 'grid',
-    gridTemplateColumns: topSpecialties.length <= 2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)',
-    gridTemplateRows: topSpecialties.length <= 2 ? '1fr' : 'repeat(2, 1fr)',
-    gap: '12px',
-    height: 'calc(100% - 40px)'
+    gridTemplateColumns: `${Math.floor((position.width - 16) / 2)}px ${Math.floor((position.width - 16) / 2)}px`,
+    gridTemplateRows: 'repeat(2, 1fr)',
+    gap: isMultiTemplate(id) ? '4px' : '8px',
+    height: 'calc(100% - 40px)',
+    width: '100%',
+    padding: '0px 8px 8px 8px'
   };
-
+  
   const pillStyle = {
     background: 'linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%)',
     border: '1px solid #e2e8f0',
-    borderRadius: '8px',
-    padding: '12px',
+    borderRadius: '6px',
+    padding: isMultiTemplate(id) ? '4px 6px' : '8px 10px',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    minHeight: '40px',
+    justifyContent: 'center',
     transition: 'all 0.2s ease',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    overflow: 'hidden'
   };
 
   const editing = isEditing === id;
@@ -489,18 +469,28 @@ const SpecialtyKPIStrips = ({
                 marginBottom: '8px'
               }}>
                 <div style={{ 
-                  fontSize: Math.max(10, Math.min(12, position.width / 40)),
+                  fontSize: (() => {
+                    if (name.length > 35) {
+                      const reduction = Math.floor((name.length - 35) / 5);
+                      const baseSize = isMultiTemplate(id) ? 7 : 10;
+                      return Math.max(baseSize - 2, baseSize - reduction);
+                    }
+                    return isMultiTemplate(id) ? Math.max(10, Math.min(11, position.width / 40)) : Math.max(10, Math.min(12, position.width / 40));
+                  })(),
                   fontWeight: '700',
                   color: MATRIX_COLORS.darkGray || '#2c3e50',
-                  lineHeight: '1.2',
+                  lineHeight: '1.1',
                   flex: '1',
-                  marginRight: '8px'
+                  marginRight: '4px',
+                  overflow: 'visible',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word'
                 }}>
                   {cleanName}
                 </div>
                 
                 <div style={{ 
-                  fontSize: Math.max(8, Math.min(10, position.width / 50)),
+                  fontSize: Math.max(9, Math.min(10, position.width / 50)),
                   fontWeight: '600',
                   color: MATRIX_COLORS.gray || '#6c757d',
                   whiteSpace: 'nowrap'
@@ -515,7 +505,7 @@ const SpecialtyKPIStrips = ({
                 alignItems: 'flex-end'
               }}>
                 <div style={{ 
-                  fontSize: Math.max(14, Math.min(16, position.width / 30)),
+                  fontSize: isMultiTemplate(id) ? Math.max(11, Math.min(12, position.width / 50)) : Math.max(12, Math.min(14, position.width / 35)),
                   fontWeight: '800',
                   color: MATRIX_COLORS.darkGray || '#2c3e50'
                 }}>
@@ -527,7 +517,7 @@ const SpecialtyKPIStrips = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '2px',
-                    fontSize: Math.max(9, Math.min(11, position.width / 45)),
+                    fontSize: Math.max(8, Math.min(10, position.width / 45)),
                     fontWeight: '700',
                     color: trendColor,
                     marginLeft: '8px'
@@ -538,12 +528,12 @@ const SpecialtyKPIStrips = ({
                 )}
                 
                 <div style={{ 
-                  fontSize: Math.max(7, Math.min(9, position.width / 55)),
+                  fontSize: isMultiTemplate(id) ? Math.max(8, Math.min(9, position.width / 70)) : Math.max(7, Math.min(9, position.width / 55)),
                   fontWeight: '600',
                   color: MATRIX_COLORS.gray || '#6c757d',
                   textAlign: 'right',
                   whiteSpace: 'nowrap',
-                  marginLeft: '8px'
+                  marginLeft: '4px'
                 }}>
                   {engagedCount.toLocaleString()} engaged
                 </div>

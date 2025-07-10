@@ -9,6 +9,7 @@ const GroupComponent = ({
   title = 'Component Group',
   children = [],
   position = { x: 0, y: 0, width: 400, height: 300 },
+  currentTheme = 'matrix',
   onEdit, 
   onDelete,
   onResize,
@@ -261,11 +262,11 @@ const GroupComponent = ({
           };
 
           if (child.type === 'table') {
-            return <TableComponent {...commonProps} campaign={campaign} />;
+            return <TableComponent {...commonProps} currentTheme={currentTheme} campaign={campaign} />;
           } else if (child.type === 'title') {
-            return <TitleComponent {...commonProps} />;
+            return <TitleComponent {...commonProps} currentTheme={currentTheme} />;
           } else {
-            return <MetricCard {...commonProps} />;
+            return <MetricCard {...commonProps} currentTheme={currentTheme} />;
           }
         })}
       </div>

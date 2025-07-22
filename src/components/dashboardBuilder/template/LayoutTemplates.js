@@ -117,7 +117,6 @@ export const THEME_INFO = {
   }
 };
 
-// Get colors based on theme - FIXED TO ENSURE PROPER THEME APPLICATION
 export const getThemeColors = (theme) => {
   switch (theme) {
     case THEMES.JCAD:
@@ -211,7 +210,6 @@ export const getComponentStyle = ({ type, position, style = {}, theme, isMulti =
   };
 };
 
-// Typography scale for consistent sizing
 export const TYPOGRAPHY_SCALE = {
   hero: {
     title: { size: 16, weight: 600, color: 'rgba(255, 255, 255, 0.9)' },
@@ -254,7 +252,6 @@ export const TYPOGRAPHY_SCALE = {
   }
 };
 
-// Get typography style based on component type and element
 export const getTypographyStyle = (componentType, element, theme, isMulti = false) => {
   const colors = getThemeColors(theme);
   
@@ -420,7 +417,6 @@ export const formatMetricValue = (value, type = 'number') => {
   }
 };
 
-// Merge subspecialties (remove "- " suffixes and combine)
 export const mergeSpecialties = (specialtyData, shouldMerge = true) => {
   if (!specialtyData || typeof specialtyData !== 'object') return {};
   

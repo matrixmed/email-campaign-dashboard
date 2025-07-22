@@ -45,7 +45,6 @@ function getAvailableGrid() {
     Array(CANVAS_CONFIG.grid.columns).fill(true)
   );
 
-  // Mark reserved zones as unavailable
   Object.values(CANVAS_CONFIG.reserved).forEach(zone => {
     const { row, col, span } = zone;
     for (let r = row - 1; r < row - 1 + span.rows; r++) {
@@ -94,7 +93,6 @@ function findPosition(grid, cardType) {
   const layout = CARD_LAYOUTS[cardType] || CARD_LAYOUTS.performance;
   const { span } = layout;
 
-  // Try positions row by row, left to right
   for (let row = 0; row <= CANVAS_CONFIG.grid.rows - span.rows; row++) {
     for (let col = 0; col <= CANVAS_CONFIG.grid.columns - span.cols; col++) {
       if (canFitAt(grid, row, col, span)) {
@@ -103,7 +101,6 @@ function findPosition(grid, cardType) {
     }
   }
 
-  // Fallback: try smaller span if original doesn't fit
   if (span.cols > 1 || span.rows > 1) {
     const fallbackSpan = { 
       cols: Math.max(1, span.cols - 1), 
@@ -139,7 +136,6 @@ export function calculateAutoLayout(cards) {
   const grid = getAvailableGrid();
   const positioned = [];
 
-  // Sort cards by priority (hero first, specialty last)
   const sortedCards = [...cards].sort((a, b) => {
     const priorityA = CARD_LAYOUTS[a.type]?.priority || 999;
     const priorityB = CARD_LAYOUTS[b.type]?.priority || 999;
@@ -159,7 +155,6 @@ export function calculateAutoLayout(cards) {
         }
       });
     } else {
-      // Card doesn't fit - place in overflow area or skip
       positioned.push({
         ...card,
         position: {
@@ -181,7 +176,6 @@ export function recalculateLayout(remainingCards) {
 export function validatePosition(cards, newCard, targetPosition) {
   const grid = getAvailableGrid();
   
-  // Mark existing cards as occupied
   cards.forEach(card => {
     if (card.position && card.position.row !== 'auto') {
       const span = card.position.span || { cols: 1, rows: 1 };
@@ -228,7 +222,6 @@ export function getGridStats(cards) {
 }
 
 export function optimizeLayout(cards) {
-  // Sort by position (top-left first)
   const sortedCards = [...cards].sort((a, b) => {
     if (!a.position || !b.position) return 0;
     if (a.position.row !== b.position.row) {

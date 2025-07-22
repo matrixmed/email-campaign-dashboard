@@ -7,8 +7,10 @@ const ComponentSidebar = ({
   campaigns = [],
   selectedCampaign,
   currentTheme,
+  costComparisonMode,
   specialtyMergeMode,
   onThemeChange,
+  onCostModeChange,
   onCampaignChange,
   onToggleSpecialtyMerge,
   onAddComponent
@@ -312,6 +314,41 @@ const ComponentSidebar = ({
                     </div>
                   </div>
                 </label>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                  Cost Comparison Model
+                </label>
+                <select 
+                  value={costComparisonMode} 
+                  onChange={(e) => onCostModeChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="none" style={{ background: '#1e293b', color: 'white' }}>
+                    None
+                  </option>
+                  <option value="side-by-side" style={{ background: '#1e293b', color: 'white' }}>
+                    Side-by-Side
+                  </option>
+                  <option value="gauge" style={{ background: '#1e293b', color: 'white' }}>
+                    Progress Gauge
+                  </option>
+                  <option value="stacked" style={{ background: '#1e293b', color: 'white' }}>
+                    Compact Stacked
+                  </option>
+                  <option value="percentage" style={{ background: '#1e293b', color: 'white' }}>
+                    Percentage Focus
+                  </option>
+                </select>
               </div>
 
               <div style={{ marginBottom: '24px' }}>

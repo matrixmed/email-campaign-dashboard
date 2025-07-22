@@ -28,9 +28,8 @@ const TemplateSelectionModal = ({
       description: 'Clean layout with full-width audience breakdown',
       image: 'single-none.png',
       features: [
-        '6 core metrics: engagement, impact, cost, professionals, clicks',
-        'Full-width specialty performance breakdown',
-        'Maximum space for images on the right'
+        '8 core metric cards',
+        'Full-width Audience breakdown'
       ]
     },
     {
@@ -39,9 +38,9 @@ const TemplateSelectionModal = ({
       description: 'Audience breakdown + one data table',
       image: 'single-one.png',
       features: [
-        'Same 6 core metrics as no tables',
-        'Audience breakdown (half width)',
-        'One customizable table (social/digital metrics)'
+        '8 core metric cards',
+        'Audience breakdown',
+        'One customizable table'
       ]
     },
     {
@@ -50,7 +49,7 @@ const TemplateSelectionModal = ({
       description: 'Removes 2 metric cards, adds 2 tables',
       image: 'single-two.png',
       features: [
-        '4 core metrics (removes total click rate & 24hr open)',
+        '6 core metric cards',
         'Audience breakdown + first table',
         'Second table replaces removed metric cards'
       ]
@@ -58,11 +57,10 @@ const TemplateSelectionModal = ({
     {
       id: TEMPLATE_TYPES.SINGLE_THREE,
       name: 'Three Tables',
-      description: 'Maximum data density with image space table',
+      description: 'Maximum data density',
       image: 'single-three.png',
       features: [
         'Same as two tables layout',
-        'Third table in image space (right side)',
         'Minimal image space, maximum data focus'
       ]
     }
@@ -77,8 +75,7 @@ const TemplateSelectionModal = ({
       features: [
         '4 aggregated hero metrics across campaigns',
         '9-column comparison table (all selected campaigns)',
-        'Combined audience breakdown with merged specialties',
-        'Support for up to 8 campaigns'
+        'Combined audience breakdown with merged specialties'
       ]
     },
     {
@@ -99,19 +96,17 @@ const TemplateSelectionModal = ({
       image: 'multi-two.png',
       features: [
         'Same core multi-campaign structure',
-        'Two additional tables side by side',
-        'Dense layout maximizing data display'
+        'Two additional tables side by side'
       ]
     },
     {
       id: TEMPLATE_TYPES.MULTI_THREE,
       name: 'Multi + Three Tables',
-      description: 'Ultra-dense layout with stacked third table',
+      description: 'Dense layout with stacked third table',
       image: 'multi-three.png',
       features: [
         'Same as multi two tables',
-        'Third table stacked above second table',
-        'Minimal image space, maximum data density'
+        'Third table stacked above second table'
       ]
     }
   ];
@@ -346,26 +341,12 @@ const TemplateSelectionModal = ({
                     textAlign: 'center'
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
                     Single Campaign
                   </h4>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                  <p style={{ margin: '30px 0 16px 0', fontSize: '16px', color: '#6b7280', lineHeight: '1.5' }}>
                     Focus on one campaign with detailed metrics and specialty breakdowns
                   </p>
-                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', textAlign: 'left' }}>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      6 core engagement metrics
-                    </li>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      Detailed specialty performance
-                    </li>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      Optional data tables
-                    </li>
-                  </ul>
                 </div>
 
                 <div
@@ -380,26 +361,12 @@ const TemplateSelectionModal = ({
                     textAlign: 'center'
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
                     Multi Campaign
                   </h4>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                  <p style={{ margin: '30px 0 16px 0', fontSize: '16px', color: '#6b7280', lineHeight: '1.5' }}>
                     Compare multiple campaigns with aggregated metrics and performance tables
                   </p>
-                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', textAlign: 'left' }}>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      4 aggregated hero metrics
-                    </li>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      Campaign comparison table
-                    </li>
-                    <li style={{ fontSize: '12px', color: '#666', marginBottom: '4px', paddingLeft: '16px', position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
-                      Combined audience analysis
-                    </li>
-                  </ul>
                 </div>
               </div>
             </div>

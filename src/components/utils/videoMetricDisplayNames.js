@@ -1,4 +1,3 @@
-// YouTube metric display names for more readable UI
 export const videoMetricDisplayNames = {
     // Basic stats
     views: 'Total Views',

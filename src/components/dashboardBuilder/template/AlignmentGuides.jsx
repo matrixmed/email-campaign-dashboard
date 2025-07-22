@@ -24,10 +24,8 @@ export const calculateAlignmentGuides = (draggedComponent, allComponents, canvas
     centerY: draggedComponent.position.y + draggedComponent.position.height / 2
   };
 
-  // Filter out the dragged component
   const otherComponents = allComponents.filter(comp => comp.id !== draggedComponent.id);
 
-  // Check alignment with other components
   otherComponents.forEach(component => {
     const compBounds = {
       left: component.position.x,
@@ -38,7 +36,6 @@ export const calculateAlignmentGuides = (draggedComponent, allComponents, canvas
       centerY: component.position.y + component.position.height / 2
     };
 
-    // Vertical alignment guides
     const verticalAlignments = [
       { type: 'left', dragValue: dragBounds.left, compValue: compBounds.left, offset: 0 },
       { type: 'right', dragValue: dragBounds.right, compValue: compBounds.right, offset: -draggedComponent.position.width },
@@ -48,7 +45,6 @@ export const calculateAlignmentGuides = (draggedComponent, allComponents, canvas
     verticalAlignments.forEach(({ type, dragValue, compValue, offset }) => {
       const distance = Math.abs(dragValue - compValue);
       if (distance <= SNAP_THRESHOLD) {
-        // Create guide line
         guides.push({
           id: `${type}-${component.id}`,
           type: 'vertical',
@@ -57,13 +53,11 @@ export const calculateAlignmentGuides = (draggedComponent, allComponents, canvas
           height: Math.max(dragBounds.bottom, compBounds.bottom) - Math.min(dragBounds.top, compBounds.top) + 40
         });
 
-        // Set snap position
         if (!snapPosition) snapPosition = {};
         snapPosition.x = compValue + offset;
       }
     });
 
-    // Horizontal alignment guides
     const horizontalAlignments = [
       { type: 'top', dragValue: dragBounds.top, compValue: compBounds.top, offset: 0 },
       { type: 'bottom', dragValue: dragBounds.bottom, compValue: compBounds.bottom, offset: -draggedComponent.position.height },
@@ -87,7 +81,6 @@ export const calculateAlignmentGuides = (draggedComponent, allComponents, canvas
     });
   });
 
-  // Canvas edge alignment
   const canvasAlignments = [
     { type: 'canvas-left', value: 0, offset: 0, axis: 'x' },
     { type: 'canvas-right', value: canvasBounds.width, offset: -draggedComponent.position.width, axis: 'x' },

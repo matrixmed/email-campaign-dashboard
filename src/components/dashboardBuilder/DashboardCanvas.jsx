@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import MetricCard from './MetricCard';
+import CostComparisonCard from './CostComparisonCard';
 import ComponentSidebar from './ComponentSidebar';
 import useDashboardData from './hooks/useDashboardData';
 import DraggableImage from './template/DraggableImage';
@@ -32,6 +33,7 @@ const DashboardCanvasContent = () => {
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [costComparisonMode, setCostComparisonMode] = useState('side-by-side');
   const [currentTheme, setCurrentTheme] = useState('matrix');
   const canvasRef = useRef(null);
 
@@ -43,10 +45,6 @@ const DashboardCanvasContent = () => {
     getGeographicData,
     getAuthorityMetrics
   } = useDashboardData();
-
-  const generateSpecialtySection = useCallback((campaign) => {
-    return [];
-  }, []);
 
   const handleCardEdit = useCallback((cardId, newData) => {
     setCards(prev => prev.map(card => 
@@ -252,6 +250,10 @@ const DashboardCanvasContent = () => {
       setSelectedComponents([]);
     }
   }, [cards]);
+
+  const handleCostModeChange = useCallback((mode) => {
+    setCostComparisonMode(mode);
+  }, []);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
     const newCard = {
@@ -555,8 +557,10 @@ const DashboardCanvasContent = () => {
             campaigns={campaigns}
             selectedCampaign={selectedCampaign}
             currentTheme={currentTheme}
+            costComparisonMode={costComparisonMode}
             specialtyMergeMode={specialtyMergeMode}
             onThemeChange={handleThemeChange}
+            onCostModeChange={handleCostModeChange}
             onCampaignChange={handleCampaignChange}
             onToggleSpecialtyMerge={handleSpecialtyMergeToggle}
             onAddComponent={handleAddMetric}
@@ -692,6 +696,27 @@ const DashboardCanvasContent = () => {
                           isSelected={selectedElement === card.id || isComponentSelected}
                           onSelect={(e) => handleComponentClick(card.id, e || {})}
                           campaign={selectedCampaign}
+                        />
+                      );
+                    }
+
+                    if (card.type === 'cost-comparison') {
+                      return (
+                        <CostComparisonCard
+                          key={card.id}
+                          id={card.id}
+                          mode={costComparisonMode}
+                          contractedCost={card.contractedCost || 10.42}
+                          actualCost={card.actualCost || 5.96}
+                          position={card.position}
+                          style={card.style}
+                          theme={currentTheme}
+                          onEdit={handleCardEdit}
+                          onDelete={handleCardDelete}
+                          onResize={handleCardResize}
+                          onMove={handleCardMove}
+                          onSelect={() => handleComponentClick(card.id, { ctrlKey: false })}
+                          isSelected={selectedElement === card.id || isComponentSelected}
                         />
                       );
                     }

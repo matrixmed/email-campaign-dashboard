@@ -2,20 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
 import CampaignModal from './CampaignModal';
 
-const MetricsTable = ({
-    currentRows,
-    processedFullData,
-    selectedColumn,
-    handleColumnChange,
-    currentPage,
-    rowsPerPage,
-    handlePagination,
-    availableMetrics,
-    totalPages,
-    handleRowsPerPageChange,
-    selectedDeployment,
-    handleDeploymentChange,
-}) => {
+const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleColumnChange, currentPage, rowsPerPage, handlePagination, availableMetrics, totalPages, handleRowsPerPageChange, selectedDeployment, handleDeploymentChange }) => {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [activeTooltipRow, setActiveTooltipRow] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -337,7 +324,6 @@ const MetricsTable = ({
                 </button>
             </div>
             
-            {/* Campaign Modal */}
             <CampaignModal 
                 isOpen={isModalOpen}
                 onClose={closeModal}

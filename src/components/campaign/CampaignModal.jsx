@@ -1,15 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import '../../styles/CampaignModal.css';
 
-const CampaignModal = ({ 
-    isOpen, 
-    onClose, 
-    campaign, 
-    compareCampaigns, 
-    isCompareMode,
-    metricDisplayNames 
-}) => {
+const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareMode, metricDisplayNames }) => {
     const modalRef = useRef(null);
 
     useEffect(() => {
@@ -49,13 +42,10 @@ const CampaignModal = ({
     };
 
     const formatPercentage = (value) => {
-        // Check if value is a string that can be converted to a number
         const numValue = typeof value === 'string' ? parseFloat(value) : value;
         
-        // If value is not a number or is NaN after conversion, return '0.00%'
         if (typeof numValue !== 'number' || isNaN(numValue)) return '0.00%';
         
-        // Format the percentage with 2 decimal places
         return `${numValue.toFixed(2)}%`;
     };
 
@@ -68,7 +58,6 @@ const CampaignModal = ({
         return match ? (match[1] || match[2]) : 'N/A';
     };
 
-    // Generate comparison data for charts
     const generateComparisonData = (metrics) => {
         if (isCompareMode) {
             return metrics.map(metric => {
@@ -88,25 +77,19 @@ const CampaignModal = ({
         return [];
     };
 
-    // Key metrics to show in the top cards
     const keyMetrics = ['Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate'];
-    
-    // Detailed metrics for the tables
     const detailedMetrics = [
         'Sent', 'Hard_Bounces', 'Soft_Bounces', 'Total_Bounces', 'Delivered', 'Delivery_Rate',
         'Unique_Opens', 'Unique_Open_Rate', 'Total_Opens', 'Total_Open_Rate',
         'Unique_Clicks', 'Unique_Click_Rate', 'Total_Clicks', 'Total_Click_Rate',
         'Filtered_Bot_Clicks'
     ];
-    
-    // For comparison charts
     const compareMetrics = [
         'Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate'
     ];
     
     const comparisonData = generateComparisonData(compareMetrics);
     
-    // Get random colors for the bars in comparison mode
     const getComparisonColors = () => {
         const baseColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
         return compareCampaigns.map((_, index) => baseColors[index % baseColors.length]);
@@ -120,7 +103,6 @@ const CampaignModal = ({
         <div className="campaign-modal-overlay">
             <div className="campaign-modal" ref={modalRef}>
                 {isCompareMode ? (
-                    // COMPARISON MODE VIEW
                     <>
                         <div className="campaign-modal-header">
                             <h3>Campaign Comparison</h3>
@@ -213,9 +195,7 @@ const CampaignModal = ({
                                             <tr key={idx}>
                                                 <td className="metric-name">{metricDisplayNames[metric] || metric}</td>
                                                 {compareCampaigns.map((camp, index) => {
-                                                    // For Rate metrics, ensure we format as percentage
                                                     const isRateMetric = metric.includes('Rate');
-                                                    // Check if the value exists
                                                     const hasValue = camp[metric] !== undefined && camp[metric] !== null;
                                                     
                                                     return (
@@ -236,7 +216,6 @@ const CampaignModal = ({
                         </div>
                     </>
                 ) : (
-                    // SINGLE CAMPAIGN VIEW
                     <>
                         <div className="campaign-modal-header">
                             <h3>{campaign.Campaign}</h3>

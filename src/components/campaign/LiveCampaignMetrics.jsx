@@ -21,7 +21,6 @@ const LiveCampaignMetrics = () => {
                     return /deployment\s*(?:#?\s*1|one|1st|\bfirst\b)/i.test(campaignName);
                 };
 
-                // First group by base name to count deployments
                 const tempGrouped = _.groupBy(data, item => getBaseName(item.Campaign));
                 const processedMetrics = [];
 
@@ -30,10 +29,9 @@ const LiveCampaignMetrics = () => {
 
                     if (validDeployments.length === 0) return;
 
-                    // Determine display name based on deployment count
                     const displayName = validDeployments.length === 1 
-                        ? validDeployments[0].Campaign  // Keep full name with deployment info
-                        : baseName;                     // Use base name without deployment info
+                        ? validDeployments[0].Campaign
+                        : baseName;
 
                     const deployment1 = validDeployments.find(c => isDeploymentOne(c.Campaign)) || validDeployments[0];
 
@@ -43,7 +41,10 @@ const LiveCampaignMetrics = () => {
 
                     const combined = {
                         Campaign: displayName,
-                        Send_Date: _.maxBy(validDeployments, 'Send_Date').Send_Date,
+                        Send_Date:
+                            validDeployments.length === 1
+                                ? validDeployments[0].Send_Date
+                                : (deployment1?.Send_Date || _.minBy(validDeployments, 'Send_Date').Send_Date),
                         Sent: deployment1.Sent,
                         Delivered: deployment1.Delivered,
                         Total_Bounces: sumMetric('Total_Bounces'),
@@ -83,11 +84,6 @@ const LiveCampaignMetrics = () => {
     const currentCampaigns = metrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
     const totalPages = Math.ceil(metrics.length / campaignsPerPage);
 
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString();
-    };
-
     const exportToCSV = () => {
         const headers = [
             'Campaign',
@@ -110,7 +106,6 @@ const LiveCampaignMetrics = () => {
             'DeploymentCount'
         ];
 
-        // Format data rows
         const rows = metrics.map(item => [
             item.Campaign,
             item.Send_Date || '',
@@ -132,7 +127,6 @@ const LiveCampaignMetrics = () => {
             item.DeploymentCount
         ]);
         
-        // Create CSV content
         const csvContent = [
             headers.map(h => `"${h}"`).join(','),
             ...rows.map(row => 
@@ -142,7 +136,6 @@ const LiveCampaignMetrics = () => {
             )
         ].join('\n');
         
-        // Create and trigger download
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');

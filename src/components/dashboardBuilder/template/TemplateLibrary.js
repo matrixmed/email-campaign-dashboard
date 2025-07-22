@@ -1,27 +1,14 @@
-// TemplateLibrary.js - Fixed layouts to match exact mockup specifications
-
-import { 
-  TEMPLATE_TYPES, 
-  getThemeColors, 
-  mergeSpecialties 
-} from './LayoutTemplates';
+import { TEMPLATE_TYPES, getThemeColors } from './LayoutTemplates';
 
 // ============================================================================
 // SINGLE CAMPAIGN TEMPLATES
 // ============================================================================
 
-/**
- * SINGLE NO TABLES
- * Top: Title + Logo
- * Hero row: Unique engagement rate, potential patient impact, cost per engaged professional
- * Second row: Healthcare professionals reached, unique professional engagements, unique click rate
- * Bottom: Audience breakdown (full width)
- */
 export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
-  // 1. Campaign Title - top left
+  // 1. Campaign Title
   components.push({
     id: 'campaign-title',
     type: 'title',
@@ -33,7 +20,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     }
   });
 
-  // 3. HERO ROW - 3 main cards (always the same for single campaigns)
+  // 3. HERO ROW - 3 main cards
   components.push({
     id: 'hero-unique-engagement',
     type: 'hero',
@@ -64,20 +51,14 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
   });
 
   components.push({
-    id: 'hero-cost-per-engaged',
-    type: 'secondary',
-    title: 'COST PER ENGAGED PROFESSIONAL',
-    value: '$0.00',
-    subtitle: '',
-    position: { x: 510, y: 95, width: 200, height: 88 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '8px'
-    }
+    id: 'cost-comparison',
+    type: 'cost-comparison',
+    contractedCost: 10,
+    actualCost: 5,
+    position: { x: 510, y: 95, width: 200, height: 88 }
   });
 
-  // 4. SECOND ROW - 3 cards (consistent across all single templates)
+  // 4. SECOND ROW - 5 cards
   const secondRowCards = [
     {
       id: 'healthcare-professionals-reached',
@@ -132,7 +113,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     });
   });
 
-  // 5. Audience Breakdown - full width at bottom
+  // 5. Audience Breakdown
   components.push({
     id: 'audience-breakdown',
     type: 'specialty-strips',
@@ -154,10 +135,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
   return components;
 };
 
-/**
- * SINGLE ONE TABLE
- * Same as no tables + audience breakdown gives space + table next to it
- */
+
 export const generateSingleOneTemplate = (campaign, theme) => {
   const components = generateSingleNoneTemplate(campaign, theme);
   const themeColors = getThemeColors(theme);
@@ -192,11 +170,7 @@ export const generateSingleOneTemplate = (campaign, theme) => {
   return components;
 };
 
-/**
- * SINGLE TWO TABLES
- * Remove total click rate and 24 hour open rate cards, add two tables in their place
- * Audience breakdown and first table remain same size
- */
+
 export const generateSingleTwoTemplate = (campaign, theme) => {
   const components = generateSingleOneTemplate(campaign, theme);
   const themeColors = getThemeColors(theme);
@@ -211,7 +185,7 @@ export const generateSingleTwoTemplate = (campaign, theme) => {
     firstTable.position = { ...firstTable.position, height: 140, y: 395 }; 
   }
 
-  // remove those cards and replace with tables
+  // remove those cards and replace with table
   const filteredComponents = components.filter(c => 
     c.id !== 'total-click-rate' && c.id !== 'one-hour-open-rate'
   );
@@ -240,15 +214,12 @@ export const generateSingleTwoTemplate = (campaign, theme) => {
   return filteredComponents;
 };
 
-/**
- * SINGLE THREE TABLES
- * Same as two tables + third table takes up image space at bottom
- */
+
 export const generateSingleThreeTemplate = (campaign, theme) => {
   const components = generateSingleTwoTemplate(campaign, theme);
   const themeColors = getThemeColors(theme);
 
-  // Add third table in image space (bottom row)
+  // Add third table in image space
   components.push({
     id: 'additional-table-3',
     type: 'table',
@@ -276,12 +247,6 @@ export const generateSingleThreeTemplate = (campaign, theme) => {
 // MULTI CAMPAIGN TEMPLATES
 // ============================================================================
 
-/**
- * MULTI NO TABLES
- * Top: 4 smaller hero cards (same metrics for all multi templates)
- * Center: Campaign comparison table (9 columns, rows = campaigns + header)
- * Bottom: Aggregated audience breakdown
- */
 export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
@@ -302,7 +267,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     }
   });
 
-  // 4 smaller hero cards (same for all multi templates)
+  // 4 smaller hero cards
   const multiHeroCards = [
     {
       id: 'multi-unique-engagement',
@@ -319,10 +284,10 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
       x: 205
     },
     {
-      id: 'multi-cost-per-engaged',
-      title: 'COST PER ENGAGED PROFESSIONAL',
-      value: '$0.00',
-      subtitle: 'Manual calculation required',
+      id: 'multi-cost-comparison',
+      type: 'cost-comparison',
+      contractedCost: 10,
+      actualCost: 5,
       x: 395
     },
     {
@@ -335,24 +300,34 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   ];
 
   multiHeroCards.forEach((card, index) => {
-    components.push({
-      id: card.id,
-      type: index === 0 ? 'hero' : 'secondary',
-      title: card.title,
-      value: card.value,
-      subtitle: card.subtitle,
-      position: { x: card.x, y: 90, width: 150, height: 58 },
-      isMulti: true,
-      style: {
-        background: index === 0 ? (themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)') : (themeColors.cardGradient || '#f8fafc'),
-        color: index === 0 ? '#ffffff' : (themeColors.text || '#1f2937'),
-        border: index === 0 ? 'none' : `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
+    if (card.type === 'cost-comparison') {
+      components.push({
+        id: card.id,
+        type: 'cost-comparison',
+        contractedCost: card.contractedCost,
+        actualCost: card.actualCost,
+        position: { x: card.x, y: 90, width: 150, height: 58 }
+      });
+    } else {
+      components.push({
+        id: card.id,
+        type: index === 0 ? 'hero' : 'secondary',
+        title: card.title,
+        value: card.value,
+        subtitle: card.subtitle,
+        position: { x: card.x, y: 90, width: 150, height: 58 },
+        isMulti: true,
+        style: {
+          background: index === 0 ? (themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)') : (themeColors.cardGradient || '#f8fafc'),
+          color: index === 0 ? '#ffffff' : (themeColors.text || '#1f2937'),
+          border: index === 0 ? 'none' : `1px solid ${themeColors.border || '#e2e8f0'}`,
+          borderRadius: '6px'
+        }
+      });
+    }
   });
 
-  // Campaign Comparison Table (9 columns)
+  // Campaign Comparison Table
   const tableData = generateMultiCampaignTableData(campaigns);
   components.push({
     id: 'campaign-comparison-table',
@@ -387,10 +362,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   return components;
 };
 
-/**
- * MULTI ONE TABLE
- * Same as multi none + audience breakdown smaller + table next to it
- */
+
 export const generateMultiOneTemplate = (campaigns, theme) => {
   const components = generateMultiNoneTemplate(campaigns, theme);
   const themeColors = getThemeColors(theme);
@@ -425,10 +397,7 @@ export const generateMultiOneTemplate = (campaigns, theme) => {
   return components;
 };
 
-/**
- * MULTI TWO TABLES
- * Same as multi one + second table takes some image space
- */
+
 export const generateMultiTwoTemplate = (campaigns, theme) => {
   const components = generateMultiOneTemplate(campaigns, theme);
   const themeColors = getThemeColors(theme);
@@ -463,10 +432,7 @@ export const generateMultiTwoTemplate = (campaigns, theme) => {
   return components;
 };
 
-/**
- * MULTI THREE TABLES
- * Same as multi two + third table stacked on top of second
- */
+
 export const generateMultiThreeTemplate = (campaigns, theme) => {
   const components = generateMultiTwoTemplate(campaigns, theme);
   const themeColors = getThemeColors(theme);
@@ -477,7 +443,7 @@ export const generateMultiThreeTemplate = (campaigns, theme) => {
     secondTable.position = { x: 741, y: 415, width: 244, height: 125 };
   }
 
-  // Add third table stacked above
+  // Add third table
   components.push({
     id: 'additional-table-3',
     type: 'table',
@@ -504,9 +470,6 @@ export const generateMultiThreeTemplate = (campaigns, theme) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * Get top 4 specialties with merged subspecialties (remove "- " suffixes)
- */
 function getTopSpecialties(specialtyPerformance, mergeSubspecialties = false) {
   if (!specialtyPerformance) return [];
   
@@ -555,9 +518,6 @@ function getTopSpecialties(specialtyPerformance, mergeSubspecialties = false) {
     .slice(0, 4);
 }
 
-/**
- * Aggregate data from multiple campaigns - FIXED IMPLEMENTATION
- */
 function aggregateMultiCampaignData(campaigns, mergeSubspecialties = false) {
   const aggregated = {
     core_metrics: {},
@@ -620,9 +580,6 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties = false) {
   return aggregated;
 }
 
-/**
- * Generate table data for multi-campaign comparison (9 columns)
- */
 function generateMultiCampaignTableData(campaigns) {
   const rows = campaigns.map(campaign => [
     campaign.campaign_name || 'Unknown',
@@ -654,9 +611,6 @@ export const TEMPLATE_GENERATORS = {
   [TEMPLATE_TYPES.MULTI_THREE]: generateMultiThreeTemplate
 };
 
-/**
- * Generate template based on configuration
- */
 export const generateTemplate = (config) => {
   const { template, campaigns, theme, type, mergeSubspecialties = false } = config;
   const generator = TEMPLATE_GENERATORS[template.id];

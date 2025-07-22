@@ -129,7 +129,6 @@ const SpecialtySection = () => {
     const specialties = specialtyData[activeBucket][topic].Specialties;
     
     if (!combineSubSpecialties) {
-      // Return original specialties
       return Object.entries(specialties)
         .map(([name, data]) => ({
           name,
@@ -139,7 +138,6 @@ const SpecialtySection = () => {
         .sort((a, b) => b.openRate - a.openRate);
     }
     
-    // Combine subspecialties
     const grouped = {};
     
     Object.entries(specialties).forEach(([name, data]) => {
@@ -166,7 +164,6 @@ const SpecialtySection = () => {
       });
     });
     
-    // Calculate open rates for grouped specialties
     Object.values(grouped).forEach(group => {
       group.openRate = group.Delivered > 0 ? (group.Unique_Opens / group.Delivered) * 100 : 0;
     });

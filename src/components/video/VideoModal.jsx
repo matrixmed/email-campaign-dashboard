@@ -3,21 +3,19 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import '../../styles/video.css';
 
 const VideoModal = ({ video, onClose }) => {
-    const [timeframeFilter, setTimeframeFilter] = useState('7'); // Default to 7 days
-    const [summaryMetrics, setSummaryMetrics] = useState({}); // Store all-time metrics
-    const [displayMetrics, setDisplayMetrics] = useState({}); // Metrics to display based on timeframe
+    const [timeframeFilter, setTimeframeFilter] = useState('7');
+    const [summaryMetrics, setSummaryMetrics] = useState({});
+    const [displayMetrics, setDisplayMetrics] = useState({});
     const modalRef = useRef(null);
     const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
 
     useEffect(() => {
-        // Determine if it's a YouTube video
         const thumbnails = video.fullData?.snippet?.thumbnails;
         const isVimeo = thumbnails && 
                       (typeof thumbnails.default === 'string' || 
                        thumbnails.default?.url?.includes('vumbnail.com'));
         setIsYoutubeVideo(!isVimeo);
         
-        // Set all-time metrics on initial load
         if (video.totals) {
             const allTimeMetrics = {
                 views: video.totals.views || 0,
@@ -27,7 +25,7 @@ const VideoModal = ({ video, onClose }) => {
                 averageViewPercentage: video.totals.averageViewPercentage || 0
             };
             setSummaryMetrics(allTimeMetrics);
-            setDisplayMetrics(allTimeMetrics); // Initialize display metrics with all-time values
+            setDisplayMetrics(allTimeMetrics);
         }
     }, [video]);
 
@@ -45,19 +43,15 @@ const VideoModal = ({ video, onClose }) => {
     }, [onClose]);
 
     useEffect(() => {
-        // Update metrics based on timeframe filter
         if (timeframeFilter === 'all') {
-            // Display all-time metrics
             setDisplayMetrics(summaryMetrics);
         } else if (video.history) {
             const timeframeData = getTimeframeData();
             
-            // Calculate metrics based on filtered timeframe
             const views = timeframeData.reduce((sum, day) => sum + (day.views || 0), 0);
             const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
             const impressions = timeframeData.reduce((sum, day) => sum + (day.impressions || 0), 0);
             
-            // Calculate averages
             const avgViewDuration = views > 0 
                 ? timeframeData.reduce((sum, day) => sum + ((day.averageViewDuration || 0) * (day.views || 0)), 0) / views 
                 : 0;
@@ -132,11 +126,9 @@ const VideoModal = ({ video, onClose }) => {
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    // Get data with all days filled in (including zeros for missing days)
     const getTimeframeData = () => {
         if (!video.history) return [];
         
-        // Convert history object to array and sort by date
         const historyArray = Object.entries(video.history).map(([date, data]) => ({
             date,
             ...data.totals
@@ -147,7 +139,6 @@ const VideoModal = ({ video, onClose }) => {
         if (timeframeFilter === 'all') {
             return fillMissingDates(historyArray);
         } else {
-            // Get the date range
             const daysToShow = parseInt(timeframeFilter, 10);
             const endDate = new Date();
             const startDate = new Date();
@@ -157,25 +148,20 @@ const VideoModal = ({ video, onClose }) => {
         }
     };
     
-    // Fill in missing dates with zero values
     const fillMissingDates = (dataArray, startDate, endDate) => {
-        // If no data, return empty array
         if (dataArray.length === 0) return [];
         
-        // Create a map of existing dates
         const dateMap = {};
         dataArray.forEach(item => {
             dateMap[item.date] = item;
         });
         
-        // If no start/end dates provided, use min/max from data
         if (!startDate || !endDate) {
             const dates = dataArray.map(item => new Date(item.date));
             startDate = startDate || new Date(Math.min(...dates));
             endDate = endDate || new Date(Math.max(...dates));
         }
         
-        // Create array with all dates in range
         const result = [];
         const currentDate = new Date(startDate);
         
@@ -185,7 +171,6 @@ const VideoModal = ({ video, onClose }) => {
             if (dateMap[dateString]) {
                 result.push(dateMap[dateString]);
             } else {
-                // Add zero values for missing dates
                 result.push({
                     date: dateString,
                     views: 0,
@@ -307,7 +292,6 @@ const VideoModal = ({ video, onClose }) => {
             return 'metric-card hidden';
         }
         
-        // Calculate width based on visible cards (5 by default, 4 if YouTube)
         const baseClassName = 'metric-card';
         const width = isYoutubeVideo ? 'youtube-width' : '';
         

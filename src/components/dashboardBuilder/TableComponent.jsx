@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useDrag } from 'react-dnd';
-import { getComponentStyle, getTypographyStyle, MATRIX_COLORS } from './template/LayoutTemplates';
+import { getComponentStyle, MATRIX_COLORS } from './template/LayoutTemplates';
 
 const TableComponent = ({ 
   id, 
@@ -38,7 +38,6 @@ const TableComponent = ({
       if (config.customData.headers && config.customData.rows) {
         setTableData([config.customData.headers, ...config.customData.rows]);
       } else if (Array.isArray(config.customData)) {
-        // For campaign comparison table, add headers if they're missing
         if (isCampaignComparisonTable && config.headers && !Array.isArray(config.customData[0])) {
           setTableData([config.headers, ...config.customData]);
         } else if (isCampaignComparisonTable && config.headers && config.customData.length > 0 && 
@@ -280,7 +279,6 @@ const TableComponent = ({
     return `${baseClass} ${selectedClass} ${draggingClass} ${resizingClass}`.trim();
   };
 
-  // FIXED: Minimal padding, proper campaign comparison table detection
   const isCampaignComparisonTable = id === 'campaign-comparison-table';
   
   const tableStyle = {
@@ -301,7 +299,6 @@ const TableComponent = ({
     background: style.background || '#ffffff',
     cursor: isDragging ? 'move' : 'pointer',
     transition: isDragging || isResizing ? 'none' : 'all 0.2s ease',
-    // FIXED: Minimal padding for campaign comparison table
     padding: isCampaignComparisonTable ? '2px' : '8px',
     overflow: 'hidden',
     display: 'flex',
@@ -317,14 +314,12 @@ const TableComponent = ({
     cursor: 'pointer'
   };
 
-  // FIXED: Minimal padding for campaign comparison table
   const tableContainerStyle = {
     flex: 1,
     overflow: 'auto',
     border: '1px solid #e0e0e0',
     borderRadius: '4px',
     background: '#ffffff',
-    // Remove extra margin/padding for campaign comparison table
     margin: isCampaignComparisonTable ? '0' : '0',
     padding: '0'
   };
@@ -337,10 +332,9 @@ const TableComponent = ({
     tableLayout: 'fixed'
   };
 
-  // FIXED: Make campaign name column narrower
   const getColumnWidth = (colIndex) => {
     if (isCampaignComparisonTable && colIndex === 0) {
-      return '17%'; // Campaign name column - much narrower
+      return '17%';
     }
     return 'auto';
   };
@@ -455,7 +449,6 @@ const TableComponent = ({
                     <td 
                       key={colIndex} 
                       style={getCellStyle(rowIndex, colIndex)}
-                      // FIXED: Make ALL cells editable, including headers
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
                     >
                       {isEditingThisCell ? (

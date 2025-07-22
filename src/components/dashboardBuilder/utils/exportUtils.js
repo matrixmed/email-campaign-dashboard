@@ -1,4 +1,3 @@
-// exportUtils.js
 const EXPORT_CONFIG = {
   width: 1280,
   height: 720,
@@ -18,11 +17,9 @@ const ERROR_MESSAGES = {
 
 async function loadHtml2Canvas() {
   try {
-    // Try to import html2canvas dynamically
     const html2canvas = await import('html2canvas');
     return html2canvas.default || html2canvas;
   } catch (error) {
-    // Fallback: try to use global html2canvas if available
     if (typeof window !== 'undefined' && window.html2canvas) {
       return window.html2canvas;
     }

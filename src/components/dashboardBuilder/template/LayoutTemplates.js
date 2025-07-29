@@ -222,9 +222,9 @@ export const TYPOGRAPHY_SCALE = {
     subtitle: { size: 9, weight: 600, color: 'rgba(255, 255, 255, 0.9)' }
   },
   secondary: {
-    title: { size: 14, weight: 700 },
-    value: { size: 28, weight: 800 },
-    subtitle: { size: 10, weight: 500 }
+    title: { size: 11, weight: 700 },
+    value: { size: 20, weight: 800 },
+    subtitle: { size: 9, weight: 500 }
   },
   'secondary-multi': {
     title: { size: 11, weight: 700 },
@@ -232,9 +232,9 @@ export const TYPOGRAPHY_SCALE = {
     subtitle: { size: 9, weight: 500 }
   },
   metric: {
-    title: { size: 11, weight: 700 },
-    value: { size: 20, weight: 800 },
-    subtitle: { size: 9.5, weight: 500 }
+    title: { size: 14, weight: 700 },
+    value: { size: 28, weight: 800 },
+    subtitle: { size: 10, weight: 500 }
   },
   specialty: {
     title: { size: 11, weight: 700 },

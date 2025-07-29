@@ -459,7 +459,7 @@ const ComponentSidebar = ({
                     marginBottom: '8px'
                   }}
                 >
-                  ➕ Add Generic Card
+                  Add Card
                 </button>
               </div>
 
@@ -508,7 +508,7 @@ const ComponentSidebar = ({
                       textAlign: 'left'
                     }}
                   >
-                    👨‍⚕️ Authority Metrics
+                    Authority Metrics
                   </button>
                   <button
                     onClick={handleAddGeographicDistribution}
@@ -523,7 +523,7 @@ const ComponentSidebar = ({
                       textAlign: 'left'
                     }}
                   >
-                    🗺️ Regional Geographic Distribution
+                    Regional Geographic Distribution
                   </button>
                 </div>
               </div>
@@ -548,7 +548,7 @@ const ComponentSidebar = ({
                         textAlign: 'left'
                       }}
                     >
-                      📊 {config.title}
+                      {config.title}
                     </button>
                   ))}
                 </div>

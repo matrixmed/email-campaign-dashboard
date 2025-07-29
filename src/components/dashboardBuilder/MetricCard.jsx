@@ -364,7 +364,7 @@ const MetricCard = ({
     fontSize: `${fontSizes.value}px`,
     fontWeight: type === 'hero' ? '800' : '700',
     marginBottom: (type === 'hero' || type === 'secondary') ? '4px' : '4px',
-    marginTop: (type === 'hero' || type === 'secondary') ? '0px' : '0px',
+    marginTop: (type === 'hero' || type === 'secondary') ? '6px' : '4px',
     lineHeight: '1.1',
     cursor: 'pointer',
     color: style.color || (type === 'hero' ? '#ffffff' : MATRIX_COLORS.primary || '#007bff')

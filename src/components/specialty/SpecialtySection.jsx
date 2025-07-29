@@ -32,7 +32,12 @@ const SpecialtySection = () => {
         }
         
         const jsonData = await response.json();
-        setSpecialtyData(jsonData);
+        console.log("Raw JSON data:", jsonData);
+        
+        // Use the corrected transformation
+        const transformedData = transformNewFormatData(jsonData);
+        console.log("Transformed data:", transformedData);
+        setSpecialtyData(transformedData);
       } catch (error) {
         console.error("Error fetching specialty data:", error);
         setError("Failed to load specialty metrics data. Please try again later.");
@@ -43,6 +48,72 @@ const SpecialtySection = () => {
     
     fetchSpecialtyData();
   }, []);
+
+  // CORRECTED transformation function
+  const transformNewFormatData = (rawData) => {
+    console.log("Starting correct transformation with:", rawData);
+    
+    if (!rawData || typeof rawData !== 'object') {
+      console.log("Invalid raw data");
+      return {};
+    }
+    
+    const transformed = {};
+    
+    Object.keys(rawData).forEach(bucket => {
+      console.log(`Processing bucket: ${bucket}`);
+      transformed[bucket] = {};
+      
+      Object.keys(rawData[bucket]).forEach(topic => {
+        console.log(`Processing topic: ${topic}`);
+        const topicData = rawData[bucket][topic];
+        
+        // Check if this topic has the new format (campaigns + aggregate)
+        if (topicData && topicData.aggregate && topicData.aggregate.specialties) {
+          console.log(`Using aggregate data for ${bucket}/${topic}`);
+          
+          // Use the aggregate data directly - it's already properly calculated
+          const aggregate = topicData.aggregate;
+          
+          transformed[bucket][topic] = {
+            Aggregate: {
+              Sent: aggregate.total_sent || 0,
+              Bounced: aggregate.total_bounced || 0,
+              Delivered: aggregate.total_delivered || 0,
+              Unique_Opens: aggregate.total_opens || 0,
+              Unique_Open_Rate: aggregate.average_open_rate || 0
+            },
+            Specialties: {}
+          };
+          
+          // Convert aggregate specialties to old format
+          Object.keys(aggregate.specialties).forEach(specialty => {
+            const specData = aggregate.specialties[specialty];
+            
+            transformed[bucket][topic].Specialties[specialty] = {
+              Sent: specData.total_sent || 0,
+              Delivered: specData.total_delivered || 0,
+              Unique_Opens: specData.total_opens || 0,
+              Unique_Open_Rate: specData.average_open_rate || 0
+            };
+          });
+          
+          console.log(`Transformed ${bucket}/${topic} using aggregate:`, transformed[bucket][topic]);
+        }
+        // Handle old format or missing aggregate
+        else if (topicData && (topicData.Aggregate || topicData.Specialties)) {
+          console.log(`Using existing format for ${bucket}/${topic}`);
+          transformed[bucket][topic] = topicData;
+        }
+        else {
+          console.log(`No valid data for ${bucket}/${topic}`);
+        }
+      });
+    });
+    
+    console.log("Final transformed data:", transformed);
+    return transformed;
+  };
 
   const formatNumber = (num) => {
     if (num === undefined || isNaN(num)) return "0";
@@ -72,7 +143,27 @@ const SpecialtySection = () => {
   };
 
   const getTopicTotals = (bucketData, topic) => {
-    if (!bucketData || !bucketData[topic] || !bucketData[topic].Specialties) {
+    if (!bucketData || !bucketData[topic]) {
+      return {
+        Sent: 0,
+        Delivered: 0,
+        Unique_Opens: 0,
+        Unique_Open_Rate: 0
+      };
+    }
+
+    // Use the aggregate data directly if available
+    if (bucketData[topic].Aggregate) {
+      return {
+        Sent: bucketData[topic].Aggregate.Sent || 0,
+        Delivered: bucketData[topic].Aggregate.Delivered || 0,
+        Unique_Opens: bucketData[topic].Aggregate.Unique_Opens || 0,
+        Unique_Open_Rate: bucketData[topic].Aggregate.Unique_Open_Rate || 0
+      };
+    }
+
+    // Fallback to calculating from specialties
+    if (!bucketData[topic].Specialties) {
       return {
         Sent: 0,
         Delivered: 0,
@@ -85,7 +176,21 @@ const SpecialtySection = () => {
     const totalSent = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Sent || 0), 0);
     const totalDelivered = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Delivered || 0), 0);
     const totalOpens = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Unique_Opens || 0), 0);
-    const openRate = totalDelivered > 0 ? (totalOpens / totalDelivered) * 100 : 0;
+    
+    // Calculate weighted average rate based on delivered volumes
+    let weightedRateSum = 0;
+    let totalWeight = 0;
+    
+    Object.values(specialties).forEach(specialty => {
+      const delivered = specialty.Delivered || 0;
+      const rate = specialty.Unique_Open_Rate || 0;
+      if (delivered > 0) {
+        weightedRateSum += rate * delivered;
+        totalWeight += delivered;
+      }
+    });
+    
+    const openRate = totalWeight > 0 ? weightedRateSum / totalWeight : 0;
 
     return {
       Sent: totalSent,
@@ -103,15 +208,24 @@ const SpecialtySection = () => {
     let totalSent = 0;
     let totalDelivered = 0;
     let totalOpens = 0;
+    let weightedRateSum = 0;
+    let totalWeight = 0;
     
     topics.forEach(topic => {
       const topicMetrics = getTopicTotals(bucketData, topic);
       totalSent += topicMetrics.Sent;
       totalDelivered += topicMetrics.Delivered;
       totalOpens += topicMetrics.Unique_Opens;
+      
+      // Weight topic rates by their delivered volume
+      if (topicMetrics.Delivered > 0) {
+        weightedRateSum += topicMetrics.Unique_Open_Rate * topicMetrics.Delivered;
+        totalWeight += topicMetrics.Delivered;
+      }
     });
     
-    const openRate = totalDelivered > 0 ? (totalOpens / totalDelivered) * 100 : 0;
+    // Calculate weighted average open rate
+    const openRate = totalWeight > 0 ? weightedRateSum / totalWeight : 0;
     
     return {
       Sent: totalSent,
@@ -149,7 +263,8 @@ const SpecialtySection = () => {
           Sent: 0,
           Delivered: 0,
           Unique_Opens: 0,
-          openRate: 0,
+          weightedRateSum: 0,
+          totalWeight: 0,
           subSpecialties: []
         };
       }
@@ -157,6 +272,15 @@ const SpecialtySection = () => {
       grouped[groupName].Sent += data.Sent || 0;
       grouped[groupName].Delivered += data.Delivered || 0;
       grouped[groupName].Unique_Opens += data.Unique_Opens || 0;
+      
+      // Weight by delivered volume for accurate averaging
+      const delivered = data.Delivered || 0;
+      const rate = data.Unique_Open_Rate || 0;
+      if (delivered > 0) {
+        grouped[groupName].weightedRateSum += rate * delivered;
+        grouped[groupName].totalWeight += delivered;
+      }
+      
       grouped[groupName].subSpecialties.push({
         name,
         ...data,
@@ -164,8 +288,10 @@ const SpecialtySection = () => {
       });
     });
     
+    // Calculate weighted average rate for each group
     Object.values(grouped).forEach(group => {
-      group.openRate = group.Delivered > 0 ? (group.Unique_Opens / group.Delivered) * 100 : 0;
+      group.openRate = group.totalWeight > 0 ? 
+        group.weightedRateSum / group.totalWeight : 0;
     });
     
     return Object.values(grouped).sort((a, b) => b.openRate - a.openRate);

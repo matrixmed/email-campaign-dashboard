@@ -265,6 +265,7 @@ const MetricCard = ({
   }, [id, onDelete]);
 
   const handleClick = useCallback((e) => {
+    e.stopPropagation();
     if (e.target.closest('.dashboard-canvas-delete-btn') || 
         e.target.closest('.dashboard-canvas-resize-handle')) {
       return;
@@ -308,7 +309,6 @@ const MetricCard = ({
       : style.boxShadow || '0 2px 8px rgba(0, 0, 0, 0.1)',
     borderRadius: style.borderRadius || '8px',
     background: style.background || MATRIX_COLORS.cardGradient || '#ffffff',
-    color: style.color || MATRIX_COLORS.text || '#1f2937',
     cursor: isDragging ? 'move' : 'pointer',
     transition: isDragging || isResizing ? 'none' : 'all 0.2s ease',
     display: 'flex',
@@ -356,7 +356,6 @@ const MetricCard = ({
     marginTop: '-5px',
     lineHeight: '1.2',
     cursor: 'pointer',
-    color: style.color || (type === 'hero' ? '#ffffff' : MATRIX_COLORS.text || '#1f2937')
   };
   
   const valueStyle = {
@@ -367,7 +366,6 @@ const MetricCard = ({
     marginTop: (type === 'hero' || type === 'secondary') ? '6px' : '4px',
     lineHeight: '1.1',
     cursor: 'pointer',
-    color: style.color || (type === 'hero' ? '#ffffff' : MATRIX_COLORS.primary || '#007bff')
    };
   
   const subtitleStyle = {
@@ -377,7 +375,6 @@ const MetricCard = ({
     lineHeight: '1.4',
     opacity: 0.9,
     cursor: 'pointer',
-    color: style.color || (type === 'hero' ? '#ffffff' : MATRIX_COLORS.textSecondary || '#6b7280')
   };
 
   const editing = isEditing === id;

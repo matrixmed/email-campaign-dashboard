@@ -91,11 +91,43 @@ export const NPPA_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #f3f1f7 0%, #faf9fc 100%)'
 };
 
+export const ICNS_COLORS = {
+  primary: '#1a365d',      // Deep navy blue
+  primaryDark: '#102a44',  // Darker navy
+  secondary: '#2b77ad',    // Medium blue  
+  secondaryLight: '#4299e1', // Light blue
+  accent: '#6366f1',       // Indigo accent
+  
+  // Neutrals
+  white: '#ffffff',
+  lightGray: '#f7fafc',
+  gray: '#718096',
+  darkGray: '#2d3748',
+  text: '#1a202c',
+  textSecondary: '#4a5568',
+  border: '#e2e8f0',
+  surface: '#edf2f7',
+  onSurface: '#1a202c',
+  
+  // Status colors
+  success: '#059669',
+  warning: '#ed8936',
+  info: '#4299e1',
+  
+  // Gradients
+  primaryGradient: 'linear-gradient(135deg, #1a365d 0%, #102a44 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #2b77ad 0%, #4299e1 100%)',
+  heroGradient: 'linear-gradient(135deg, #4299e1 0%, #1a365d 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f7fafc 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
+};
+
 // Theme configuration
 export const THEMES = {
   MATRIX: 'matrix',
-  JCAD: 'jcad',
-  NPPA: 'nppa'
+  JCAD: 'jcad', 
+  NPPA: 'nppa',
+  ICNS: 'icns'
 };
 
 // Theme metadata for UI display
@@ -114,6 +146,11 @@ export const THEME_INFO = {
     name: 'NPPA',
     colors: ['#543378', '#008378', '#69727d'],
     logo: 'nppa.png',
+  },
+  [THEMES.ICNS]: {
+    name: 'ICNS',
+    colors: ['#1a365d', '#2b77ad', '#4299e1'],
+    logo: 'icns.png',
   }
 };
 
@@ -123,6 +160,8 @@ export const getThemeColors = (theme) => {
       return JCAD_COLORS;
     case THEMES.NPPA:
       return NPPA_COLORS;
+    case THEMES.ICNS:
+      return ICNS_COLORS;
     case THEMES.MATRIX:
     default:
       return MATRIX_COLORS;
@@ -180,7 +219,6 @@ export const getComponentStyle = ({ type, position, style = {}, theme, isMulti =
       background: colors.cardGradient,
       color: colors.secondary,
       border: `1px solid ${colors.border}`,
-      borderTop: `2px solid ${colors.secondary}`
     },
     specialty: {
       background: colors.specialtyGradient,
@@ -333,7 +371,6 @@ export const AVAILABLE_METRICS = [
   'delivered',
   'sent',
   'bounces',
-  'cost_per_engaged_professional',
   'estimated_patient_impact'
 ];
 
@@ -372,16 +409,16 @@ export const TABLE_TYPES = {
       ['Engagement', '4.2min', '3.1min avg']
     ]
   },
-  CUSTOM: {
-    title: 'Custom Table',
-    columns: 3,
-    rows: 5,
+  PERFORMANCE_BREAKDOWN: {
+    title: 'Performance Breakdown',
+    columns: 4,
+    rows: 6,
     defaultData: [
-      ['Header 1', 'Header 2', 'Header 3'],
-      ['Row 1 Col 1', 'Row 1 Col 2', 'Row 1 Col 3'],
-      ['Row 2 Col 1', 'Row 2 Col 2', 'Row 2 Col 3'],
-      ['Row 3 Col 1', 'Row 3 Col 2', 'Row 3 Col 3'],
-      ['Row 4 Col 1', 'Row 4 Col 2', 'Row 4 Col 3']
+      ['Metric', 'Q1', 'Q2', 'Q3'],
+      ['Opens', '12.5K', '15.2K', '18.1K'],
+      ['Clicks', '1.8K', '2.1K', '2.7K'],
+      ['Conversions', '145', '168', '201'],
+      ['Revenue', '$28.5K', '$31.2K', '$39.8K']
     ]
   }
 };

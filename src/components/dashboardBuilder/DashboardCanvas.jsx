@@ -23,8 +23,9 @@ const DashboardCanvasContent = () => {
   const [cards, setCards] = useState([]);
   const [deletedCards, setDeletedCards] = useState([]);
   const [isEditing, setIsEditing] = useState(null);
+  const [currentTemplate, setCurrentTemplate] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [specialtyMergeMode, setSpecialtyMergeMode] = useState(true);
+  const [specialtyMergeMode, setSpecialtyMergeMode] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [alignmentGuides, setAlignmentGuides] = useState([]);
@@ -33,8 +34,11 @@ const DashboardCanvasContent = () => {
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [costComparisonMode, setCostComparisonMode] = useState('side-by-side');
+  const [budgetedCost, setBudgetedCost] = useState(10.00);
+  const [actualCost, setActualCost] = useState(5.00);
+  const [costComparisonMode, setCostComparisonMode] = useState('none');
   const [currentTheme, setCurrentTheme] = useState('matrix');
+  const [userModifications, setUserModifications] = useState(new Map());
   const canvasRef = useRef(null);
 
   const {
@@ -46,11 +50,86 @@ const DashboardCanvasContent = () => {
     getAuthorityMetrics
   } = useDashboardData();
 
+  useEffect(() => {
+    if (cards.length > 0 && selectedCampaign && currentTemplate) {
+      const templateConfig = {
+        template: currentTemplate,
+        campaigns: [selectedCampaign],
+        theme: currentTheme,
+        type: 'single',
+        mergeSubspecialties: specialtyMergeMode,
+        costComparisonMode: costComparisonMode
+      };
+      
+      try {
+        const regeneratedComponents = generateTemplate(templateConfig);
+        setCards(regeneratedComponents);
+      } catch (error) {
+        console.error('Template regeneration failed:', error);
+      }
+    }
+  }, [specialtyMergeMode, costComparisonMode, currentTheme, selectedCampaign, currentTemplate]);
+  
+  const handleBudgetedCostChange = useCallback((value) => {
+    setBudgetedCost(value);
+  }, []);
+  
+  const handleActualCostChange = useCallback((value) => {
+    setActualCost(value);
+  }, []);
+
   const handleCardEdit = useCallback((cardId, newData) => {
+    const modifications = userModifications.get(cardId) || new Set();
+    
+    if (newData.title !== undefined) modifications.add('title');
+    if (newData.value !== undefined) modifications.add('value');
+    if (newData.subtitle !== undefined) modifications.add('subtitle');
+    if (newData.config?.customData !== undefined) modifications.add('tableData');
+    
+    setUserModifications(prev => new Map(prev.set(cardId, modifications)));
+    
     setCards(prev => prev.map(card => 
       card.id === cardId ? { ...card, ...newData } : card
     ));
+  }, [userModifications]);
+
+  const handleGlobalClick = useCallback((e) => {
+    const isClickOutsideCards = !e.target.closest('.dashboard-canvas-card') &&
+                               !e.target.closest('.dashboard-canvas-table') &&
+                               !e.target.closest('.dashboard-canvas-title') &&
+                               !e.target.closest('.cost-comparison-card') &&
+                               !e.target.closest('.specialty-strips') &&
+                               !e.target.closest('.draggable-image') &&
+                               !e.target.closest('.dc-sidebar') &&
+                               !e.target.closest('.template-modal') &&
+                               !e.target.closest('button') &&
+                               !e.target.closest('input') &&
+                               !e.target.closest('select');
+  
+    if (isClickOutsideCards) {
+      setSelectedElement(null);
+      setSelectedComponents([]);
+      setIsEditing(null);
+    }
   }, []);
+
+  const handleGlobalKeyDown = useCallback((e) => {
+    if (e.key === 'Escape') {
+      setSelectedElement(null);
+      setSelectedComponents([]);
+      setIsEditing(null);
+    }
+  }, []);
+  
+  useEffect(() => {
+    document.addEventListener('click', handleGlobalClick, true);
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    
+    return () => {
+      document.removeEventListener('click', handleGlobalClick, true);
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [handleGlobalClick, handleGlobalKeyDown]);
 
   const handleCardDelete = useCallback((cardId) => {
     const cardToDelete = cards.find(card => card.id === cardId);
@@ -102,10 +181,12 @@ const DashboardCanvasContent = () => {
     try {
       const generatedComponents = generateTemplate({
         ...templateConfig,
-        mergeSubspecialties: specialtyMergeMode
+        mergeSubspecialties: specialtyMergeMode,
+        costComparisonMode: costComparisonMode
       });
       setCards(generatedComponents);
       setCurrentTheme(templateConfig.theme);
+      setCurrentTemplate(templateConfig.template);
       setDeletedCards([]);
       setUploadedImages([]);
       
@@ -115,7 +196,7 @@ const DashboardCanvasContent = () => {
     } catch (error) {
       console.error('Template generation failed:', error);
     }
-  }, [specialtyMergeMode]);
+  }, [specialtyMergeMode, costComparisonMode]);
 
   const handleThemeChange = useCallback((newTheme) => {
     setCurrentTheme(newTheme);
@@ -138,7 +219,7 @@ const DashboardCanvasContent = () => {
   }, []);
 
   const handleCanvasMouseDown = useCallback((e) => {
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget || e.target.classList.contains('dashboard-canvas-background')) {
       if (!e.ctrlKey && !e.metaKey) {
         setSelectedComponents([]);
         setSelectedElement(null);
@@ -235,7 +316,9 @@ const DashboardCanvasContent = () => {
   }, [selectedComponents]);
   
   const handleComponentClick = useCallback((componentId, e) => {
-    if (e.ctrlKey || e.metaKey) {
+    e?.stopPropagation?.();
+    
+    if (e?.ctrlKey || e?.metaKey) {
       setSelectedComponents(prev => {
         const exists = prev.find(comp => comp.id === componentId);
         if (exists) {
@@ -253,7 +336,28 @@ const DashboardCanvasContent = () => {
 
   const handleCostModeChange = useCallback((mode) => {
     setCostComparisonMode(mode);
-  }, []);
+    
+    if (mode === 'none') {
+      setCards(prev => prev.filter(card => card.type !== 'cost-comparison'));
+    } else {
+      const hasCostCard = cards.some(card => card.type === 'cost-comparison');
+      if (!hasCostCard) {
+        const newCostCard = {
+          id: `cost-comparison-${Date.now()}`,
+          type: 'cost-comparison',
+          mode: mode,
+          position: { x: 750, y: 50, width: 250, height: 120 }
+        };
+        setCards(prev => [...prev, newCostCard]);
+      } else {
+        setCards(prev => prev.map(card => 
+          card.type === 'cost-comparison' 
+            ? { ...card, mode: mode }
+            : card
+        ));
+      }
+    }
+  }, [cards]);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
     const newCard = {
@@ -275,6 +379,11 @@ const DashboardCanvasContent = () => {
   }, [cards.length]);
 
   const handleAddMetric = useCallback((item) => {
+    if (item.id && item.type && item.position) {
+      setCards(prev => [...prev, item]);
+      return;
+    }
+
     if (item.type === 'table') {
       const newTable = {
         id: `table-${Date.now()}`,
@@ -337,31 +446,9 @@ const DashboardCanvasContent = () => {
   }, [selectedCampaign, getGeographicData, getAuthorityMetrics, handleAddCard, cards.length]);
 
   const handleRestoreCard = useCallback((card) => {
-    setCards(prev => [...prev, { ...card, id: `${card.id}-restored-${Date.now()}` }]);
-    setDeletedCards(prev => prev.filter(c => c !== card));
+    setCards(prev => [...prev, card]);
+    setDeletedCards(prev => prev.filter(c => c.id !== card.id));
   }, []);
-
-  const handleSpecialtyMergeToggle = useCallback(() => {
-    setSpecialtyMergeMode(prev => {
-      const newMode = !prev;
-      if (selectedCampaign && cards.length > 0) {
-        const templateConfig = {
-          type: 'single',
-          campaigns: [selectedCampaign],
-          theme: currentTheme,
-          mergeSubspecialties: newMode
-        };
-        
-        try {
-          const generatedComponents = generateTemplate(templateConfig);
-          setCards(generatedComponents);
-        } catch (error) {
-          console.error('Template regeneration failed:', error);
-        }
-      }
-      return newMode;
-    });
-  }, [selectedCampaign, currentTheme, cards.length]);
 
   const handleImageUpload = useCallback((imageData, position = null) => {
     const newImage = {
@@ -562,8 +649,14 @@ const DashboardCanvasContent = () => {
             onThemeChange={handleThemeChange}
             onCostModeChange={handleCostModeChange}
             onCampaignChange={handleCampaignChange}
-            onToggleSpecialtyMerge={handleSpecialtyMergeToggle}
+            onToggleSpecialtyMerge={() => setSpecialtyMergeMode(!specialtyMergeMode)}
             onAddComponent={handleAddMetric}
+            budgetedCost={budgetedCost}
+            actualCost={actualCost}
+            onBudgetedCostChange={handleBudgetedCostChange}
+            onActualCostChange={handleActualCostChange}
+            deletedCards={deletedCards}
+            onRestoreCard={handleRestoreCard}
           />
         </div>
 
@@ -706,17 +799,19 @@ const DashboardCanvasContent = () => {
                           key={card.id}
                           id={card.id}
                           mode={costComparisonMode}
-                          contractedCost={card.contractedCost || 10.42}
-                          actualCost={card.actualCost || 5.96}
+                          contractedCost={budgetedCost}
+                          currentTheme={currentTheme}
+                          actualCost={actualCost}
                           position={card.position}
                           style={card.style}
                           theme={currentTheme}
                           onEdit={handleCardEdit}
                           onDelete={handleCardDelete}
                           onResize={handleCardResize}
-                          onMove={handleCardMove}
-                          onSelect={() => handleComponentClick(card.id, { ctrlKey: false })}
+                          isEditing={isEditing}
+                          setIsEditing={setIsEditing}
                           isSelected={selectedElement === card.id || isComponentSelected}
+                          onSelect={(e) => handleComponentClick(card.id, e || {})}
                         />
                       );
                     }

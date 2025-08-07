@@ -257,6 +257,7 @@ const TableComponent = ({
   }, [setIsEditing, title]);
 
   const handleClick = useCallback((e) => {
+    e.stopPropagation();
     if (e.target.closest('.table-delete-btn') || 
         e.target.closest('.table-resize-handle')) {
       return;
@@ -328,15 +329,18 @@ const TableComponent = ({
     width: '100%',
     height: '100%',
     borderCollapse: 'collapse',
-    fontSize: Math.max(10, Math.min(14, position.width / 35)),
+    fontSize: Math.max(8, Math.min(14, position.width / (data[0]?.length * 8 || 35))),
     tableLayout: 'fixed'
   };
 
-  const getColumnWidth = (colIndex) => {
+  const getColumnWidth = (colIndex, totalCols) => {
     if (isCampaignComparisonTable && colIndex === 0) {
       return '17%';
     }
-    return 'auto';
+    
+    if (totalCols <= 3) return 'auto';
+    if (totalCols <= 5) return `${100 / totalCols}%`;
+    return `${Math.max(12, 100 / totalCols)}%`;
   };
 
   const getCellStyle = (rowIndex, colIndex) => {

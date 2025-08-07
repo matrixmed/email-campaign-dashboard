@@ -193,6 +193,7 @@ const TitleComponent = ({
   }, [id, onDelete]);
 
   const handleClick = useCallback((e) => {
+    e.stopPropagation();
     if (e.target.closest('.title-delete-btn') || 
         e.target.closest('.title-resize-handle')) {
       return;

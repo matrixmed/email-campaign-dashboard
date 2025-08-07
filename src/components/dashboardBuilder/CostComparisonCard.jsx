@@ -1,73 +1,55 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { getComponentStyle, getThemeColors } from './template/LayoutTemplates';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { getThemeColors } from './template/LayoutTemplates';
+import { useDrag } from 'react-dnd';
 
-const CostComparisonCard = ({ 
-  id, 
-  mode = 'none',
-  contractedCost = 10,
-  actualCost = 5,
-  position = { x: 0, y: 0, width: 280, height: 120 },
-  style = {},
-  theme = 'matrix',
-  onEdit, 
-  onDelete,
-  onResize,
+const CostComparisonCard = ({
+  id,
+  contractedCost = 0,
+  actualCost = 0,
+  position,
+  mode = 'side-by-side',
   onMove,
+  onResize,
+  onDelete,
   onSelect,
-  isSelected = false,
-  isDragging = false,
-  isResizing = false
+  isSelected,
+  currentTheme,
+  style = {}
 }) => {
   const [isDragState, setIsDragState] = useState(false);
   const [isResizeState, setIsResizeState] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
   const cardRef = useRef(null);
+  const themeColors = getThemeColors(currentTheme);
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: 'component',
+    item: { id, type: 'cost-comparison' },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  }), [id]);
 
-  const themeColors = getThemeColors(theme);
-  const savings = contractedCost - actualCost;
-  const savingsPercentage = Math.round((savings / contractedCost) * 100);
+  useEffect(() => {
+    if (cardRef.current) {
+      drag(cardRef.current);
+    }
+  }, [drag]);
 
   const handleMouseDown = useCallback((e) => {
-    if (e.target.closest('.cost-delete-btn') || 
-        e.target.closest('.cost-resize-handle')) {
-      return;
-    }
-    
-    e.preventDefault();
     e.stopPropagation();
-    
     onSelect?.(id);
-    
-    setIsDragState(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  }, [position, onSelect, id]);
+  }, [id, onSelect]);
 
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragState || !dragStart) return;
+  const handleClick = useCallback((e) => {
+    e.stopPropagation();
+    onSelect?.(e);
+  }, [onSelect]);
 
-    const rawX = e.clientX - dragStart.x;
-    const rawY = e.clientY - dragStart.y;
-    
-    const newX = Math.max(0, Math.round(rawX / 8) * 8);
-    const newY = Math.max(0, Math.round(rawY / 8) * 8);
-    
-    const maxX = 1024 - position.width;
-    const maxY = 576 - position.height;
-    
-    onMove?.(id, {
-      x: Math.min(newX, maxX),
-      y: Math.min(newY, maxY)
-    });
-  }, [isDragState, dragStart, position.width, position.height, onMove, id]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragState(false);
-    setDragStart(null);
-  }, []);
+  const handleDelete = useCallback((e) => {
+    e.stopPropagation();
+    onDelete?.(id);
+  }, [id, onDelete]);
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -88,61 +70,32 @@ const CostComparisonCard = ({
     const deltaX = e.clientX - resizeStart.startX;
     const deltaY = e.clientY - resizeStart.startY;
     
-    const newWidth = Math.max(200, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
-    const newHeight = Math.max(100, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
+    const newWidth = Math.max(150, resizeStart.startWidth + deltaX);
+    const newHeight = Math.max(80, resizeStart.startHeight + deltaY);
     
     onResize?.(id, { width: newWidth, height: newHeight });
-  }, [isResizeState, resizeStart, position.x, position.y, onResize, id]);
-
+  }, [isResizeState, resizeStart, onResize, id]);
+  
   const handleResizeEnd = useCallback(() => {
     setIsResizeState(false);
     setResizeStart(null);
   }, []);
 
   useEffect(() => {
-    if (isDragState) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'move';
-      document.body.style.userSelect = 'none';
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-    }
-  }, [isDragState, handleMouseMove, handleMouseUp]);
-
-  useEffect(() => {
     if (isResizeState) {
       document.addEventListener('mousemove', handleResizeMove);
       document.addEventListener('mouseup', handleResizeEnd);
-      document.body.style.cursor = 'se-resize';
-      document.body.style.userSelect = 'none';
       
       return () => {
         document.removeEventListener('mousemove', handleResizeMove);
         document.removeEventListener('mouseup', handleResizeEnd);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
       };
     }
   }, [isResizeState, handleResizeMove, handleResizeEnd]);
 
-  const handleDelete = useCallback((e) => {
-    e.stopPropagation();
-    onDelete?.(id);
-  }, [id, onDelete]);
-
-  const handleClick = useCallback((e) => {
-    if (e.target.closest('.cost-delete-btn') || 
-        e.target.closest('.cost-resize-handle')) {
-      return;
-    }
-    onSelect?.(id);
-  }, [onSelect, id]);
+  const savings = contractedCost - actualCost;
+  const efficiency = contractedCost > 0 ? ((actualCost / contractedCost) * 100) : 0;
+  const savingsPercentage = contractedCost > 0 ? ((savings / contractedCost) * 100) : 0;
 
   const cardStyle = {
     position: 'absolute',
@@ -150,16 +103,18 @@ const CostComparisonCard = ({
     top: position.y,
     width: position.width,
     height: position.height,
-    ...getComponentStyle({ type: 'secondary', position, style }),
-    ...style,
     zIndex: isSelected ? 100 : isDragState ? 90 : 1,
     opacity: isDragState ? 0.8 : 1,
-    border: isSelected ? `2px solid ${themeColors.primary}` : style.border || `1px solid ${themeColors.border}`,
+    
+    border: isSelected 
+      ? `2px solid ${themeColors.primary}` 
+      : `1px solid ${themeColors.border}`,
     boxShadow: isSelected 
       ? `0 0 0 3px ${themeColors.primary}33, 0 8px 32px ${themeColors.secondary}33` 
-      : style.boxShadow || `0 2px 8px rgba(0, 0, 0, 0.1)`,
-    borderRadius: style.borderRadius || '8px',
+      : '0 2px 8px rgba(0, 0, 0, 0.1)',
+    borderRadius: '8px',
     background: themeColors.cardGradient,
+    
     cursor: isDragState ? 'move' : 'pointer',
     transition: isDragState || isResizeState ? 'none' : 'all 0.2s ease',
     padding: '16px',
@@ -193,7 +148,7 @@ const CostComparisonCard = ({
         alignItems: 'center',
         flex: 1,
         gap: '16px',
-        margin: '0 8px'
+        margin: '2px 8px'
       }}>
         <div style={{ textAlign: 'center', flex: 1 }}>
           <div style={{ 
@@ -204,7 +159,7 @@ const CostComparisonCard = ({
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            CONTRACTED
+            BUDGETED
           </div>
           <div style={{ 
             fontSize: getFontSize(24, 18, 32),
@@ -246,9 +201,9 @@ const CostComparisonCard = ({
       </div>
       
       <div style={{ 
-        background: themeColors.primary + '15' || 'rgba(102, 126, 234, 0.1)',
+        background: `${themeColors.primary || '#3b82f6'}15`,
         borderRadius: '6px',
-        padding: '10px 16px',
+        padding: '9px 16px',
         textAlign: 'center'
       }}>
         <div style={{ 
@@ -263,87 +218,89 @@ const CostComparisonCard = ({
     </>
   );
 
-  const renderGauge = () => (
+  const renderPercentage = () => (
     <>
       <div style={{ 
-        fontSize: getFontSize(14, 11, 18),
+        fontSize: getFontSize(12, 10, 16),
         fontWeight: '700',
         color: themeColors.text || '#1f2937',
         textAlign: 'center',
-        letterSpacing: '0.5px'
+        letterSpacing: '0.5px',
+        marginBottom: getFontSize(14, 0, 8),
       }}>
         COST EFFICIENCY
       </div>
       
       <div style={{ 
-        textAlign: 'center'
+        textAlign: 'center',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '0 4px'
       }}>
         <div style={{ 
-          fontSize: getFontSize(11, 9, 14),
+          fontSize: getFontSize(48, 32, 56),
+          fontWeight: '700',
+          color: savingsPercentage > 0 ? '#10b981' : '#ef4444',
+          lineHeight: '0.9'
+        }}>
+          {Math.abs(savingsPercentage).toFixed(0)}%
+        </div>
+        <div style={{ 
+          fontSize: getFontSize(11, 6, 11),
           opacity: 0.7,
           color: themeColors.textSecondary || '#6b7280',
           textTransform: 'uppercase',
           letterSpacing: '0.5px'
         }}>
-          ACTUAL VS CONTRACTED COST
-        </div>
-      </div>
-      
-      <div style={{ 
-        position: 'relative'
-      }}>
-        <div style={{ 
-          width: '100%',
-          height: '12px',
-          background: themeColors.border || '#e2e8f0',
-          borderRadius: '6px',
-          position: 'relative',
-          opacity: 0.3
-        }}>
-          <div style={{ 
-            height: '100%',
-            background: themeColors.primary || '#667eea',
-            borderRadius: '6px',
-            width: `${(actualCost / contractedCost) * 100}%`,
-            position: 'relative',
-            minWidth: '8px'
-          }}>
-            <div style={{ 
-              position: 'absolute',
-              top: '-8px',
-              right: '-4px',
-              width: '0',
-              height: '0',
-              borderLeft: '4px solid transparent',
-              borderRight: '4px solid transparent',
-              borderBottom: '8px solid ' + (themeColors.primary || '#667eea')
-            }} />
-          </div>
+          UNDER BUDGET
         </div>
         
         <div style={{ 
           display: 'flex',
           justifyContent: 'space-between',
-          fontSize: getFontSize(10, 8, 12),
-          marginTop: '8px',
-          color: themeColors.textSecondary || '#6b7280'
+          alignItems: 'flex-end',
+          fontSize: getFontSize(9, 7, 12),
+          color: themeColors.textSecondary || '#6b7280',
+          gap: '8px'
         }}>
-          <span>$0</span>
-          <span style={{ fontWeight: '600' }}>${actualCost.toFixed(2)}</span>
-          <span>${contractedCost.toFixed(2)}</span>
-        </div>
-      </div>
-      
-      <div style={{ 
-        textAlign: 'center'
-      }}>
-        <div style={{ 
-          fontSize: getFontSize(12, 10, 16),
-          fontWeight: '600',
-          color: themeColors.text || '#1f2937',
-          lineHeight: '1.3'
-        }}>
-          Saved ${savings.toFixed(2)} per engagement
+          <div style={{ 
+            textAlign: 'left',
+            flex: 1
+          }}>
+            <div style={{ 
+              fontWeight: '600',
+              fontSize: getFontSize(24, 9, 14),
+              color: themeColors.text || '#1f2937'
+            }}>
+              ${actualCost.toFixed(2)}
+            </div>
+            <div style={{ 
+              opacity: 0.7,
+              fontSize: getFontSize(16, 6, 10)
+            }}>
+              Actual
+            </div>
+          </div>
+          <div style={{ 
+            textAlign: 'right',
+            flex: 1
+          }}>
+            <div style={{ 
+              fontWeight: '600',
+              fontSize: getFontSize(24, 9, 14),
+              color: themeColors.text || '#1f2937'
+            }}>
+              ${contractedCost.toFixed(2)}
+            </div>
+            <div style={{ 
+              opacity: 0.7,
+              fontSize: getFontSize(16, 6, 10)
+            }}>
+              Budget
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -352,33 +309,34 @@ const CostComparisonCard = ({
   const renderStacked = () => (
     <>
       <div style={{ 
-        fontSize: getFontSize(14, 11, 18),
+        fontSize: getFontSize(12, 10, 16),
         fontWeight: '700',
         color: themeColors.text || '#1f2937',
         textAlign: 'center',
-        letterSpacing: '0.5px'
+        letterSpacing: '0.5px',
+        marginBottom: getFontSize(0, 3, 6)
       }}>
-        COST COMPARISON
+        COST ANALYSIS
       </div>
       
-      <div>
+      <div style={{ flex: 1 }}>
         <div style={{ 
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '12px'
+          marginBottom: getFontSize(8, 4, 12)
         }}>
           <span style={{ 
             color: themeColors.textSecondary || '#6b7280',
-            fontSize: getFontSize(12, 10, 16),
+            fontSize: getFontSize(10, 8, 14),
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            CONTRACTED:
+            BUDGETED:
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(20, 16, 26),
+            fontSize: getFontSize(16, 14, 20),
             color: themeColors.text || '#1f2937'
           }}>
             ${contractedCost.toFixed(2)}
@@ -389,11 +347,11 @@ const CostComparisonCard = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px'
+          marginBottom: getFontSize(0, 3, 7)
         }}>
           <span style={{ 
             color: themeColors.textSecondary || '#6b7280',
-            fontSize: getFontSize(12, 10, 16),
+            fontSize: getFontSize(10, 8, 14),
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
@@ -401,7 +359,7 @@ const CostComparisonCard = ({
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(20, 16, 26),
+            fontSize: getFontSize(16, 14, 20),
             color: themeColors.text || '#1f2937'
           }}>
             ${actualCost.toFixed(2)}
@@ -411,137 +369,118 @@ const CostComparisonCard = ({
         <div style={{ 
           height: '1px',
           background: themeColors.border || '#e2e8f0',
-          margin: '16px 0',
+          margin: `${getFontSize(8, 4, 12)}px 0`,
           opacity: 0.6
         }} />
-      </div>
-      
-      <div>
+        
         <div style={{ 
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '8px'
+          alignItems: 'center'
         }}>
           <span style={{ 
             color: themeColors.textSecondary || '#6b7280',
-            fontSize: getFontSize(12, 10, 16),
+            fontSize: getFontSize(10, 8, 14),
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: '0.5px',
+            fontWeight: '600'
           }}>
             SAVINGS:
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(22, 18, 28),
-            color: themeColors.text || '#1f2937'
+            fontSize: getFontSize(18, 16, 22),
+            color: savings > 0 ? '#10b981' : '#ef4444'
           }}>
-            ${savings.toFixed(2)}
+            ${Math.abs(savings).toFixed(2)}
           </span>
-        </div>
-        
-        <div style={{ 
-          textAlign: 'right',
-          fontSize: getFontSize(10, 8, 12),
-          opacity: 0.7,
-          color: themeColors.textSecondary || '#6b7280'
-        }}>
-          per engagement
         </div>
       </div>
     </>
   );
 
-  const renderPercentage = () => (
-    <>
-      <div style={{ 
-        fontSize: getFontSize(14, 11, 18),
-        fontWeight: '700',
-        color: themeColors.text || '#1f2937',
-        textAlign: 'center',
-        letterSpacing: '0.5px'
-      }}>
-        COST EFFICIENCY
-      </div>
-      
-      <div style={{ 
-        textAlign: 'center'
-      }}>
-        <div style={{ 
-          fontSize: getFontSize(40, 28, 56),
-          fontWeight: '700',
-          color: themeColors.text || '#1f2937',
-          lineHeight: '1'
-        }}>
-          {savingsPercentage}%
-        </div>
+  const renderGauge = () => {
+    const gaugePercentage = Math.min(100, Math.max(0, 100 - efficiency));
+    
+    return (
+      <>
         <div style={{ 
           fontSize: getFontSize(12, 10, 16),
-          opacity: 0.7,
-          color: themeColors.textSecondary || '#6b7280',
-          marginTop: '4px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px'
+          fontWeight: '700',
+          color: themeColors.text || '#1f2937',
+          textAlign: 'center',
+          letterSpacing: '0.5px',
+          marginBottom: getFontSize(4, 2, 8)
         }}>
-          UNDER BUDGET
-        </div>
-      </div>
-      
-      <div>
-        <div style={{ 
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginBottom: '16px'
-        }}>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ 
-              fontSize: getFontSize(10, 8, 12),
-              opacity: 0.7,
-              color: themeColors.textSecondary || '#6b7280',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              ACTUAL
-            </div>
-            <div style={{ 
-              fontSize: getFontSize(16, 14, 22),
-              fontWeight: '700',
-              color: themeColors.text || '#1f2937'
-            }}>
-              ${actualCost.toFixed(2)}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ 
-              fontSize: getFontSize(10, 8, 12),
-              opacity: 0.7,
-              color: themeColors.textSecondary || '#6b7280',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              BUDGETED
-            </div>
-            <div style={{ 
-              fontSize: getFontSize(16, 14, 22),
-              fontWeight: '700',
-              color: themeColors.text || '#1f2937'
-            }}>
-              ${contractedCost.toFixed(2)}
-            </div>
-          </div>
+          COST EFFICIENCY
         </div>
         
         <div style={{ 
-          textAlign: 'center',
-          fontSize: getFontSize(11, 9, 14),
-          opacity: 0.8,
-          color: themeColors.textSecondary || '#6b7280'
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: '0 4px'
         }}>
-          Saved ${savings.toFixed(2)} per engagement
+          <div style={{ 
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              fontSize: getFontSize(10, 6, 11),
+              opacity: 0.7,
+              color: themeColors.textSecondary || '#6b7280',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              ACTUAL VS BUDGET
+            </div>
+          </div>
+          
+          <div style={{ 
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              fontSize: getFontSize(45, 24, 44),
+              fontWeight: '700',
+              color: savings > 0 ? '#10b981' : '#ef4444',
+              lineHeight: '0.9',
+              marginBottom: getFontSize(2, 4, 10)
+            }}>
+              {gaugePercentage.toFixed(0)}%
+            </div>
+            <div style={{ 
+              fontSize: getFontSize(14, 5, 10),
+              opacity: 0.7,
+              color: themeColors.textSecondary || '#6b7280'
+            }}>
+              {savings > 0 ? 'Under Budget' : 'Over Budget'}
+            </div>
+          </div>
+          
+          <div style={{ 
+            position: 'relative'
+          }}>
+            <div style={{ 
+              width: '100%',
+              height: getFontSize(14, 6, 12),
+              background: themeColors.border || '#e2e8f0',
+              borderRadius: getFontSize(4, 3, 6),
+              position: 'relative',
+              opacity: 0.3
+            }}>
+              <div style={{ 
+                height: '100%',
+                background: savings > 0 ? '#10b981' : '#ef4444',
+                borderRadius: getFontSize(14, 3, 6),
+                width: `${gaugePercentage}%`,
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   const renderContent = () => {
     switch (mode) {
@@ -560,6 +499,7 @@ const CostComparisonCard = ({
   return (
     <div 
       ref={cardRef}
+      className="cost-comparison-card"
       style={cardStyle}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
@@ -605,17 +545,12 @@ const CostComparisonCard = ({
           right: '0px',
           width: '16px',
           height: '16px',
-          opacity: isSelected ? 1 : 0,
-          transition: 'opacity 0.2s ease',
           cursor: 'se-resize',
-          background: 'transparent'
+          background: `linear-gradient(-45deg, transparent 30%, ${themeColors.primary}33 30%, ${themeColors.primary}33 70%, transparent 70%)`,
+          opacity: isSelected ? 1 : 0,
+          transition: 'opacity 0.2s ease'
         }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M16 0L16 16L0 16" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
-          <path d="M10 6L10 10L6 10" stroke="rgba(255,255,255,0.6)" strokeWidth="1"/>
-        </svg>
-      </div>
+      />
     </div>
   );
 };

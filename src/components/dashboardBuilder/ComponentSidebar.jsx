@@ -13,10 +13,18 @@ const ComponentSidebar = ({
   onCostModeChange,
   onCampaignChange,
   onToggleSpecialtyMerge,
-  onAddComponent
+  onAddComponent,
+  deletedCards = [],
+  onRestoreCard,
+  budgetedCost,
+  actualCost, 
+  onBudgetedCostChange,
+  onActualCostChange
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
+  const [customTableRows, setCustomTableRows] = useState(3);
+  const [customTableCols, setCustomTableCols] = useState(3);
 
   const sections = [
     {
@@ -35,7 +43,7 @@ const ComponentSidebar = ({
       id: 'restore',
       label: 'Restore',
       icon: '♻️',
-      count: 0 
+      count: deletedCards.length
     }
   ];
 
@@ -59,16 +67,17 @@ const ComponentSidebar = ({
       'delivered': 'Delivered',
       'sent': 'Sent',
       'bounces': 'Bounces',
-      'cost_per_engaged_professional': 'Cost Per Engaged Professional',
       'estimated_patient_impact': 'Estimated Patient Impact'
     };
-
+  
+    const displayTitle = metricDisplayNames[metricKey];
+    
     const component = {
       id: `${metricKey}-${Date.now()}`,
       type: 'metric',
-      title: metricDisplayNames[metricKey] || metricKey.replace(/_/g, ' ').toUpperCase(),
+      title: displayTitle,
       value: selectedCampaign ? getMetricValue(selectedCampaign, metricKey) : 'N/A',
-      subtitle: 'Custom metric',
+      originalKey: metricKey,
       position: { 
         x: 100 + Math.random() * 200, 
         y: 100 + Math.random() * 200, 
@@ -76,8 +85,7 @@ const ComponentSidebar = ({
         height: 100 
       }
     };
-
-    onAddComponent?.(component);
+      onAddComponent?.(component);
   }, [selectedCampaign, onAddComponent]);
 
   const handleAddTable = useCallback((tableType) => {
@@ -101,6 +109,44 @@ const ComponentSidebar = ({
 
     onAddComponent?.(component);
   }, [onAddComponent]);
+
+  const handleAddCustomTable = useCallback(() => {
+    const rows = Math.max(2, Math.min(10, customTableRows)); 
+    const cols = Math.max(2, Math.min(8, customTableCols)); 
+    
+    const tableData = [];
+    for (let i = 0; i < rows; i++) {
+      const row = [];
+      for (let j = 0; j < cols; j++) {
+        if (i === 0) {
+          row.push(`Header ${j + 1}`);
+        } else {
+          row.push(`Row ${i} Col ${j + 1}`);
+        }
+      }
+      tableData.push(row);
+    }
+    
+    const component = {
+      id: `custom-table-${rows}x${cols}-${Date.now()}`,
+      type: 'table',
+      title: `Custom Table (${rows}x${cols})`,
+      config: {
+        customData: tableData,
+        headers: tableData[0],
+        dataType: 'custom',
+        dimensions: { rows, cols }
+      },
+      position: { 
+        x: 100 + Math.random() * 200, 
+        y: 100 + Math.random() * 200, 
+        width: Math.max(280, cols * 80), 
+        height: Math.max(180, rows * 35) 
+      }
+    };
+
+    onAddComponent?.(component);
+  }, [customTableRows, customTableCols, onAddComponent]);
 
   const handleAddGenericCard = useCallback(() => {
     const component = {
@@ -173,25 +219,32 @@ const ComponentSidebar = ({
   }, [onAddComponent]);
 
   const getMetricValue = (campaign, metricKey) => {
-    const keys = metricKey.split('.');
-    let value = campaign;
+    if (!campaign) return 'N/A';
     
-    for (const key of keys) {
-      if (value && typeof value === 'object') {
-        value = value[key];
-      } else {
-        return 'N/A';
-      }
-    }
-    
-    if (typeof value === 'number') {
-      if (metricKey.includes('rate') || metricKey.includes('percentage')) {
-        return `${value.toFixed(1)}%`;
-      }
-      return value.toLocaleString();
-    }
-    
-    return value || 'N/A';
+    const metricMap = {
+      'unique_open_rate': () => `${campaign.core_metrics?.unique_open_rate?.toFixed(1) || 0}%`,
+      'total_open_rate': () => `${campaign.core_metrics?.total_open_rate?.toFixed(1) || 0}%`,
+      'unique_click_rate': () => `${campaign.core_metrics?.unique_click_rate?.toFixed(1) || 0}%`,
+      'total_click_rate': () => `${campaign.core_metrics?.total_click_rate?.toFixed(1) || 0}%`,
+      'delivery_rate': () => `${campaign.core_metrics?.delivery_rate?.toFixed(1) || 0}%`,
+      '1_hour_open_rate': () => `${campaign.core_metrics?.['1_hour_open_rate']?.toFixed(1) || 0}%`,
+      '6_hour_open_rate': () => `${campaign.core_metrics?.['6_hour_open_rate']?.toFixed(1) || 0}%`,
+      '12_hour_open_rate': () => `${campaign.core_metrics?.['12_hour_open_rate']?.toFixed(1) || 0}%`,
+      '24_hour_open_rate': () => `${campaign.core_metrics?.['24_hour_open_rate']?.toFixed(1) || 0}%`,
+      'mobile_engagement_rate': () => `${campaign.core_metrics?.mobile_engagement_rate?.toFixed(1) || 0}%`,
+      'average_time_to_open_hours': () => `${campaign.core_metrics?.average_time_to_open_hours?.toFixed(1) || 0}h`,
+      'unique_opens': () => (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
+      'total_opens': () => (campaign.volume_metrics?.total_opens || 0).toLocaleString(),
+      'unique_clicks': () => (campaign.volume_metrics?.unique_clicks || 0).toLocaleString(),
+      'total_clicks': () => (campaign.volume_metrics?.total_clicks || 0).toLocaleString(),
+      'delivered': () => (campaign.volume_metrics?.delivered || 0).toLocaleString(),
+      'sent': () => (campaign.volume_metrics?.sent || 0).toLocaleString(),
+      'bounces': () => (campaign.volume_metrics?.bounces || 0).toLocaleString(),
+      'estimated_patient_impact': () => (campaign.cost_metrics?.estimated_patient_impact || 0).toLocaleString()
+    };
+  
+    const getValue = metricMap[metricKey];
+    return getValue ? getValue() : 'N/A';
   };
 
   const filteredMetrics = AVAILABLE_METRICS.filter(metric =>
@@ -218,7 +271,7 @@ const ComponentSidebar = ({
       position: 'relative',
       background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
       width: 'auto',
-      height: '79vh',
+      height: '81vh',
       transition: 'width 0.3s ease',
       boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)',
       zIndex: 150,
@@ -318,6 +371,31 @@ const ComponentSidebar = ({
 
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                  Color Theme
+                </label>
+                <select 
+                  value={currentTheme} 
+                  onChange={(e) => onThemeChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                >
+                  {Object.entries(THEME_INFO).map(([key, info]) => (
+                    <option key={key} value={key} style={{ background: '#1e293b', color: 'white' }}>
+                      {info.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                   Cost Comparison Model
                 </label>
                 <select 
@@ -351,15 +429,19 @@ const ComponentSidebar = ({
                 </select>
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-                  Color Theme
+                  Budgeted Cost ($)
                 </label>
-                <select 
-                  value={currentTheme} 
-                  onChange={(e) => onThemeChange(e.target.value)}
+                <input
+                  type="number"
+                  value={budgetedCost}
+                  onChange={(e) => onBudgetedCostChange(parseFloat(e.target.value) || 0)}
+                  placeholder="Enter budgeted amount"
+                  step="0.01"
+                  min=""
                   style={{
-                    width: '100%',
+                    width: '90%',
                     padding: '12px',
                     borderRadius: '6px',
                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -367,13 +449,30 @@ const ComponentSidebar = ({
                     color: 'white',
                     fontSize: '14px'
                   }}
-                >
-                  {Object.entries(THEME_INFO).map(([key, info]) => (
-                    <option key={key} value={key} style={{ background: '#1e293b', color: 'white' }}>
-                      {info.name}
-                    </option>
-                  ))}
-                </select>
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                  Actual Cost ($)
+                </label>
+                <input
+                  type="number"
+                  value={actualCost}
+                  onChange={(e) => onActualCostChange(parseFloat(e.target.value) || 0)}
+                  placeholder="Enter actual amount"
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '90%',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                />
               </div>
 
               <div style={{ marginBottom: '24px' }}>
@@ -528,11 +627,11 @@ const ComponentSidebar = ({
                 </div>
               </div>
 
-              <div>
+              <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-                  Tables
+                  Preset Tables
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
                   {Object.entries(TABLE_TYPES).map(([key, config]) => (
                     <button
                       key={key}
@@ -548,9 +647,77 @@ const ComponentSidebar = ({
                         textAlign: 'left'
                       }}
                     >
-                      {config.title}
+                      {config.title} ({config.columns}x{config.rows})
                     </button>
                   ))}
+                </div>
+
+                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+                  Custom Table Builder
+                </h4>
+                <div style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  padding: '12px', 
+                  borderRadius: '6px',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                      Rows (2-10):
+                    </label>
+                    <input
+                      type="range"
+                      min="2"
+                      max="10"
+                      value={customTableRows}
+                      onChange={(e) => setCustomTableRows(parseInt(e.target.value))}
+                      style={{
+                        width: '100%',
+                        marginBottom: '4px'
+                      }}
+                    />
+                    <div style={{ color: 'white', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
+                      {customTableRows} rows
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                      Columns (2-8):
+                    </label>
+                    <input
+                      type="range"
+                      min="2"
+                      max="8"
+                      value={customTableCols}
+                      onChange={(e) => setCustomTableCols(parseInt(e.target.value))}
+                      style={{
+                        width: '100%',
+                        marginBottom: '4px'
+                      }}
+                    />
+                    <div style={{ color: 'white', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
+                      {customTableCols} columns
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={handleAddCustomTable}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Create {customTableRows}×{customTableCols} Table
+                  </button>
                 </div>
               </div>
             </div>
@@ -563,20 +730,58 @@ const ComponentSidebar = ({
                   Restore Components
                 </h3>
                 <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', margin: '0 0 16px 0' }}>
-                  Restore previously deleted components
+                  Click to restore deleted components
                 </p>
               </div>
               
-              <div style={{ 
-                padding: '20px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '6px',
-                textAlign: 'center'
-              }}>
-                <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
-                  No deleted components to restore
+              {deletedCards.length === 0 ? (
+                <div style={{ 
+                  padding: '20px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
+                    No deleted components to restore
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {deletedCards.map((card, index) => (
+                    <button
+                      key={`${card.id}-${index}`}
+                      onClick={() => onRestoreCard?.(card)}
+                      style={{
+                        padding: '12px',
+                        background: 'rgba(34, 197, 94, 0.1)',
+                        color: 'white',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.target.style.background = 'rgba(34, 197, 94, 0.2)';
+                        e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.target.style.background = 'rgba(34, 197, 94, 0.1)';
+                        e.target.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                        {card.title || 'Untitled Component'}
+                      </div>
+                      <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                        {card.type} • {card.value || 'No value'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -20,7 +20,6 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     type: 'hero',
     title: 'UNIQUE ENGAGEMENT RATE',
     value: `${campaign.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-    subtitle: `+${campaign.core_metrics?.performance_vs_industry?.toFixed(1)}% above industry`,
     position: { x: 30, y: 95, width: 200, height: 88 },
     style: {
       background: themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)',
@@ -35,7 +34,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     type: 'metric',
     title: 'POTENTIAL PATIENT IMPACT',
     value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Calculated using verified patient panel sizes',
+    subtitle: 'Estimated patient panel sizes',
     position: { x: 270, y: 95, width: 200, height: 88 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
@@ -52,6 +51,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
       position: { x: 510, y: 95, width: 200, height: 88 },
+      currentTheme: theme,
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -62,6 +62,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
+      currentTheme: theme,
       contractedCost: 10,
       actualCost: 5,
       position: { x: 510, y: 95, width: 200, height: 88 }
@@ -85,23 +86,23 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
         x: 176
       },
       {
-        id: 'unique-click-rate',
-        title: 'UNIQUE CLICK RATE',
-        value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
+        id: 'total-click-rate',
+        title: 'TOTAL CLICK RATE',
+        value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
         subtitle: undefined,
         x: 319
       },
       {
-        id: 'total-click-rate',
-        title: 'TOTAL CLICK RATE',
-        value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
+        id: 'unique-click-rate',
+        title: 'UNIQUE CLICK RATE',
+        value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
         subtitle: undefined,
         x: 462
       },
       {
         id: 'one-hour-open-rate',
         title: 'ONE HOUR OPEN RATE',
-        value: `${campaign.core_metrics?.one_hour_open_rate?.toFixed(1)}%`,
+        value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
         subtitle: 'Immediate Engagement',
         x: 605
       }
@@ -155,7 +156,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
       {
         id: 'one-hour-open-rate',
         title: 'ONE HOUR OPEN RATE',
-        value: `${campaign.core_metrics?.one_hour_open_rate?.toFixed(1)}%`,
+        value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
         subtitle: 'Immediate Engagement',
         x: 605
       }
@@ -212,12 +213,12 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
   components.push({
     id: 'additional-table-1',
     type: 'table',
-    title: 'Social Media Metrics',
+    title: 'Online Journal Metrics',
     config: { 
       customData: [
-        ['LinkedIn CTR', '2.1%'],
-        ['Facebook Reach', '12.5K'],
-        ['Social Shares', '247']
+        ['Avg Time in Issue', '3m 19s'],
+        ['Total Page Views', '2,778'],
+        ['Total Issue Visits', '439']
       ],
       headers: ['Platform', 'Value']
     },
@@ -239,6 +240,12 @@ function getTopSpecialties(specialtyData, mergeSubspecialties) {
   
   if (mergeSubspecialties) {
     const merged = {};
+    let totalAudience = 0;
+    
+    processedData.forEach(([name, data]) => {
+      totalAudience += data.audience_total || 0;
+    });
+    
     processedData.forEach(([name, data]) => {
       const baseSpecialty = name.split(' - ')[0];
       if (!merged[baseSpecialty]) {
@@ -247,6 +254,7 @@ function getTopSpecialties(specialtyData, mergeSubspecialties) {
           unique_opens: 0,
           total_opens: 0,
           unique_open_rate: 0,
+          audience_percentage: 0,
           count: 0
         };
       }
@@ -260,9 +268,18 @@ function getTopSpecialties(specialtyData, mergeSubspecialties) {
       const data = merged[specialty];
       data.unique_open_rate = data.audience_total > 0 ? 
         (data.unique_opens / data.audience_total) * 100 : 0;
+      data.audience_percentage = totalAudience > 0 ? 
+        (data.audience_total / totalAudience) * 100 : 0;
     });
     
     processedData = Object.entries(merged);
+  } else {
+    const totalAudience = processedData.reduce((sum, [, data]) => sum + (data.audience_total || 0), 0);
+    processedData.forEach(([name, data]) => {
+      if (!data.audience_percentage && totalAudience > 0) {
+        data.audience_percentage = (data.audience_total / totalAudience) * 100;
+      }
+    });
   }
   
   return processedData
@@ -388,7 +405,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     type: 'secondary',
     title: 'POTENTIAL PATIENT IMPACT',
     value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Calculated using verified patient panel sizes',
+    subtitle: 'Estimated patient panel sizes',
     position: { x: 270, y: 95, width: 200, height: 88 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
@@ -405,6 +422,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
       position: { x: 510, y: 95, width: 200, height: 88 },
+      currentTheme: theme,
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -418,7 +436,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
       value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
       subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 30, y: 228, width: 225, height: 88 },
+      position: { x: 30, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -432,7 +450,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       title: 'UNIQUE CLICK RATE',
       value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
       subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 285, y: 228, width: 135, height: 88 },
+      position: { x: 176, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -444,9 +462,9 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       id: 'unique-click-rate',
       type: 'secondary',
       title: 'ONE HOUR OPEN RATE',
-      value: `${campaign.core_metrics?.one_hour_open_rate?.toFixed(1)}%`,
+      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
       subtitle: 'Immediate Engagement',
-      position: { x: 450, y: 228, width: 135, height: 88 },
+      position: { x: 319, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -457,6 +475,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
+      currentTheme: theme,
       contractedCost: 10,
       actualCost: 5,
       position: { x: 510, y: 95, width: 200, height: 88 }
@@ -468,7 +487,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 30, y: 228, width: 225, height: 88 },
+      position: { x: 30, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -482,7 +501,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
       value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
       subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 285, y: 228, width: 135, height: 88 },
+      position: { x: 176, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -496,7 +515,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       title: 'UNIQUE CLICK RATE',
       value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
       subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 450, y: 228, width: 135, height: 88 },
+      position: { x: 319, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -602,7 +621,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
     type: 'secondary',
     title: 'POTENTIAL PATIENT IMPACT',
     value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Calculated using verified patient panel sizes',
+    subtitle: 'Estimated patient panel sizes',
     position: { x: 270, y: 95, width: 200, height: 88 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
@@ -619,6 +638,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
       position: { x: 510, y: 95, width: 200, height: 88 },
+      currentTheme: theme,
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -632,7 +652,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
       value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
       subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 30, y: 228, width: 225, height: 88 },
+      position: { x: 30, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -646,7 +666,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       title: 'UNIQUE CLICK RATE',
       value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
       subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 285, y: 228, width: 135, height: 88 },
+      position: { x: 176, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -658,9 +678,9 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       id: 'unique-click-rate',
       type: 'secondary',
       title: 'ONE HOUR OPEN RATE',
-      value: `${campaign.core_metrics?.one_hour_open_rate?.toFixed(1)}%`,
+      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
       subtitle: 'Immediate Engagement',
-      position: { x: 450, y: 228, width: 135, height: 88 },
+      position: { x: 319, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -671,6 +691,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
+      currentTheme: theme,
       contractedCost: 10,
       actualCost: 5,
       position: { x: 510, y: 95, width: 200, height: 88 }
@@ -682,7 +703,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 30, y: 228, width: 225, height: 88 },
+      position: { x: 30, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -696,7 +717,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
       value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
       subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 285, y: 228, width: 135, height: 88 },
+      position: { x: 176, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -710,7 +731,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
       title: 'UNIQUE CLICK RATE',
       value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
       subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 450, y: 228, width: 135, height: 88 },
+      position: { x: 319, y: 228, width: 104, height: 75 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -857,6 +878,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
       components.push({
         id: card.id,
         type: 'cost-comparison',
+        currentTheme: theme,
         contractedCost: card.contractedCost,
         actualCost: card.actualCost,
         position: { x: card.x, y: 90, width: 150, height: 58 }

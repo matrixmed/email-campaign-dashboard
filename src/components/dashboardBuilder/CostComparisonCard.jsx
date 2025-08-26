@@ -97,6 +97,8 @@ const CostComparisonCard = ({
   const efficiency = contractedCost > 0 ? ((actualCost / contractedCost) * 100) : 0;
   const savingsPercentage = contractedCost > 0 ? ((savings / contractedCost) * 100) : 0;
 
+  const isMultiCard = position.width <= 150 && position.height <= 58;
+
   const cardStyle = {
     position: 'absolute',
     left: position.x,
@@ -126,8 +128,15 @@ const CostComparisonCard = ({
   };
 
   const getFontSize = (base, min, max) => {
-    const scale = Math.min(position.width / 280, position.height / 120);
-    return Math.max(min, Math.min(max, base * scale));
+    const isMultiCard = position.width <= 150 && position.height <= 58;
+    
+    if (isMultiCard) {
+      const scale = Math.min(position.width / 110, position.height / 58);
+      return Math.max(min, Math.min(max - 1, (base - 10) * scale));
+    } else {
+      const scale = Math.min(position.width / 280, position.height / 120);
+      return Math.max(min, Math.min(max, base * scale));
+    }
   };
 
   const renderSideBySide = () => (
@@ -137,7 +146,8 @@ const CostComparisonCard = ({
         fontWeight: '700',
         color: themeColors.text || '#1f2937',
         textAlign: 'center',
-        letterSpacing: '0.5px'
+        letterSpacing: '0.5px',
+        marginTop: isMultiCard ? '-8px' : '0px'
       }}>
         COST COMPARISON
       </div>
@@ -147,17 +157,17 @@ const CostComparisonCard = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         flex: 1,
-        gap: '16px',
-        margin: '2px 8px'
+        gap: isMultiCard ? '0px' : '16px',
+        margin: isMultiCard ? '-3px' : '2px 8px'
       }}>
         <div style={{ textAlign: 'center', flex: 1 }}>
           <div style={{ 
             fontSize: getFontSize(11, 9, 14),
             opacity: 0.7,
-            marginBottom: '6px',
+            marginBottom: isMultiCard ? '0px' : '6px',
             color: themeColors.textSecondary || '#6b7280',
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: isMultiCard ? '0.3px' : '0.5px'
           }}>
             BUDGETED
           </div>
@@ -182,10 +192,10 @@ const CostComparisonCard = ({
           <div style={{ 
             fontSize: getFontSize(11, 9, 14),
             opacity: 0.7,
-            marginBottom: '6px',
+            marginBottom: isMultiCard ? '0px' : '6px',
             color: themeColors.textSecondary || '#6b7280',
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: isMultiCard ? '0.3px' : '0.5px'
           }}>
             ACTUAL
           </div>
@@ -203,7 +213,7 @@ const CostComparisonCard = ({
       <div style={{ 
         background: `${themeColors.primary || '#3b82f6'}15`,
         borderRadius: '6px',
-        padding: '9px 16px',
+        padding: isMultiCard ? '1px 2px' : '9px 16px',
         textAlign: 'center'
       }}>
         <div style={{ 
@@ -212,7 +222,7 @@ const CostComparisonCard = ({
           color: themeColors.text || '#1f2937',
           lineHeight: '1.3'
         }}>
-          SAVINGS: ${savings.toFixed(2)} per engagement
+          SAVINGS: ${savings.toFixed(2)}{isMultiCard ? '' : ' per engagement'}
         </div>
       </div>
     </>
@@ -227,6 +237,7 @@ const CostComparisonCard = ({
         textAlign: 'center',
         letterSpacing: '0.5px',
         marginBottom: getFontSize(14, 0, 8),
+        marginTop: isMultiCard ? '-8px' : '0px'
       }}>
         COST EFFICIENCY
       </div>
@@ -240,7 +251,7 @@ const CostComparisonCard = ({
         padding: '0 4px'
       }}>
         <div style={{ 
-          fontSize: getFontSize(48, 32, 56),
+          fontSize: isMultiCard ? getFontSize(40, 30, 50) : getFontSize(48, 32, 56),
           fontWeight: '700',
           color: savingsPercentage > 0 ? '#10b981' : '#ef4444',
           lineHeight: '0.9'
@@ -314,6 +325,7 @@ const CostComparisonCard = ({
         color: themeColors.text || '#1f2937',
         textAlign: 'center',
         letterSpacing: '0.5px',
+        marginTop: isMultiCard ? '-8px' : '0px',
         marginBottom: getFontSize(0, 3, 6)
       }}>
         COST ANALYSIS
@@ -324,7 +336,7 @@ const CostComparisonCard = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: getFontSize(8, 4, 12)
+          marginBottom: isMultiCard ? getFontSize(4, 2, 6) : getFontSize(8, 4, 12)
         }}>
           <span style={{ 
             color: themeColors.textSecondary || '#6b7280',
@@ -336,7 +348,7 @@ const CostComparisonCard = ({
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(16, 14, 20),
+            fontSize: isMultiCard ? getFontSize(14, 12, 16) : getFontSize(16, 14, 20),
             color: themeColors.text || '#1f2937'
           }}>
             ${contractedCost.toFixed(2)}
@@ -347,7 +359,7 @@ const CostComparisonCard = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: getFontSize(0, 3, 7)
+          marginBottom: isMultiCard ? getFontSize(0, 1, 3) : getFontSize(0, 3, 7)
         }}>
           <span style={{ 
             color: themeColors.textSecondary || '#6b7280',
@@ -359,7 +371,7 @@ const CostComparisonCard = ({
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(16, 14, 20),
+            fontSize: isMultiCard ? getFontSize(14, 12, 16) : getFontSize(16, 14, 20),
             color: themeColors.text || '#1f2937'
           }}>
             ${actualCost.toFixed(2)}
@@ -369,7 +381,7 @@ const CostComparisonCard = ({
         <div style={{ 
           height: '1px',
           background: themeColors.border || '#e2e8f0',
-          margin: `${getFontSize(8, 4, 12)}px 0`,
+          margin: isMultiCard ? `${getFontSize(4, 2, 6)}px 0` : `${getFontSize(8, 4, 12)}px 0`,
           opacity: 0.6
         }} />
         
@@ -389,7 +401,7 @@ const CostComparisonCard = ({
           </span>
           <span style={{ 
             fontWeight: '700',
-            fontSize: getFontSize(18, 16, 22),
+            fontSize: isMultiCard ? getFontSize(16, 14, 18) : getFontSize(18, 16, 22),
             color: savings > 0 ? '#10b981' : '#ef4444'
           }}>
             ${Math.abs(savings).toFixed(2)}
@@ -410,6 +422,7 @@ const CostComparisonCard = ({
           color: themeColors.text || '#1f2937',
           textAlign: 'center',
           letterSpacing: '0.5px',
+          marginTop: isMultiCard ? '-8px' : '0px',
           marginBottom: getFontSize(4, 2, 8)
         }}>
           COST EFFICIENCY
@@ -440,7 +453,7 @@ const CostComparisonCard = ({
             textAlign: 'center'
           }}>
             <div style={{ 
-              fontSize: getFontSize(45, 24, 44),
+              fontSize: isMultiCard ? getFontSize(35, 20, 35) : getFontSize(45, 24, 44),
               fontWeight: '700',
               color: savings > 0 ? '#10b981' : '#ef4444',
               lineHeight: '0.9',

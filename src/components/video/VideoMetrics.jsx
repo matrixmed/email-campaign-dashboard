@@ -66,7 +66,6 @@ const VideoMetrics = () => {
                 setVideosList(sortedVideos);
                 setFilteredData(sortedVideos);
             } catch (error) {
-                console.error("Error fetching video metrics data:", error);
             }
         }
         fetchVideoMetricsData();
@@ -105,6 +104,19 @@ const VideoMetrics = () => {
         setIsModalOpen(false);
     };
 
+    const isYouTubeVideo = (video) => {
+        if (!video || !videosData.videos[video.id]) return false;
+        
+        const videoData = videosData.videos[video.id];
+        const thumbnails = videoData?.snippet?.thumbnails;
+        
+        const isVimeo = thumbnails && 
+                       (typeof thumbnails.default === 'string' || 
+                        thumbnails.default?.url?.includes('vumbnail.com'));
+        
+        return !isVimeo;
+    };
+
     const formatNumber = (num) => {
         if (num === undefined || isNaN(num)) return "0";
         return num.toLocaleString();
@@ -130,7 +142,11 @@ const VideoMetrics = () => {
         return hours.toFixed(1) + 'h';
     };
 
-    const formatMetric = (metric, value) => {
+    const formatMetric = (metric, value, video) => {
+        if (metric === 'impressions' && isYouTubeVideo(video)) {
+            return "N/A";
+        }
+        
         if (metric === 'averageViewPercentage' || metric === 'impressionsCtr') {
             return formatPercent(value);
         } else if (metric === 'averageViewDuration') {
@@ -145,28 +161,26 @@ const VideoMetrics = () => {
     const getSourceBadge = (video) => {
         if (!video || !videosData.videos[video.id]) return null;
         
-        const videoData = videosData.videos[video.id];
-        const thumbnails = videoData?.snippet?.thumbnails;
-        
-        const isVimeo = thumbnails && 
-                       (typeof thumbnails.default === 'string' || 
-                        thumbnails.default?.url?.includes('vumbnail.com'));
-        
-        return isVimeo ? (
-            <span className="source-badge vimeo">VIMEO</span>
-        ) : (
+        return isYouTubeVideo(video) ? (
             <span className="source-badge youtube">YOUTUBE</span>
+        ) : (
+            <span className="source-badge vimeo">VIMEO</span>
         );
     };
 
     const exportToCSV = () => {
         const header = ['Title', 'Source', ...displayMetrics.map(metric => metricDisplayNames[metric])];
         const rows = filteredData.map(item => {
-            const source = videosData.videos[item.id]?.snippet?.videoUrl ? 'Vimeo' : 'YouTube';
+            const source = isYouTubeVideo(item) ? 'YouTube' : 'Vimeo';
             return [
                 item.title,
                 source,
-                ...displayMetrics.map(metric => item[metric])
+                ...displayMetrics.map(metric => {
+                    if (metric === 'impressions' && isYouTubeVideo(item)) {
+                        return 'N/A';
+                    }
+                    return item[metric];
+                })
             ];
         });
 
@@ -249,7 +263,7 @@ const VideoMetrics = () => {
                             <td className="source-column">{getSourceBadge(item)}</td>
                             {displayMetrics.map((metric) => (
                                 <td key={metric} className="metric-column">
-                                    {formatMetric(metric, item[metric])}
+                                    {formatMetric(metric, item[metric], item)}
                                 </td>
                             ))}
                         </tr>

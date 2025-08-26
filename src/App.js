@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard';
 import MatrixSignIn from './components/MatrixSignIn';
 import './styles/Dashboard.css';
 import './styles//MatrixSignIn.css';
+import './styles//ReportsManager.css';
 import './themes/SpaceTheme.css';
 import './themes/SpaceTheme.css';
 import './themes/MarbleTheme.css';

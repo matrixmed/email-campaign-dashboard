@@ -4,7 +4,7 @@ import '../../styles/video.css';
 
 const VideoModal = ({ video, onClose }) => {
     const [timeframeFilter, setTimeframeFilter] = useState('7');
-    const [summaryMetrics, setSummaryMetrics] = useState({});
+    const [lifetimeMetrics, setLifetimeMetrics] = useState({});
     const [displayMetrics, setDisplayMetrics] = useState({});
     const modalRef = useRef(null);
     const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
@@ -24,27 +24,20 @@ const VideoModal = ({ video, onClose }) => {
                 averageViewDuration: video.totals.averageViewDuration || 0,
                 averageViewPercentage: video.totals.averageViewPercentage || 0
             };
-            setSummaryMetrics(allTimeMetrics);
+            setLifetimeMetrics(allTimeMetrics);
             setDisplayMetrics(allTimeMetrics);
         }
     }, [video]);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (modalRef.current && !modalRef.current.contains(event.target)) {
-                onClose();
-            }
-        };
-        
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [onClose]);
-
-    useEffect(() => {
         if (timeframeFilter === 'all') {
-            setDisplayMetrics(summaryMetrics);
+            setDisplayMetrics({
+                views: video.views || 0,
+                impressions: video.impressions || 0,
+                watchTimeHours: video.watchTimeHours || 0,
+                averageViewDuration: video.averageViewDuration || 0,
+                averageViewPercentage: video.averageViewPercentage || 0
+            });
         } else if (video.history) {
             const timeframeData = getTimeframeData();
             
@@ -68,7 +61,21 @@ const VideoModal = ({ video, onClose }) => {
                 averageViewPercentage: avgViewPercentage
             });
         }
-    }, [timeframeFilter, video.history, summaryMetrics]);
+    }, [timeframeFilter, video.history, video]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [onClose]);
+
 
     const handleTimeframeChange = (e) => {
         setTimeframeFilter(e.target.value);
@@ -137,7 +144,7 @@ const VideoModal = ({ video, onClose }) => {
         historyArray.sort((a, b) => a.date.localeCompare(b.date));
         
         if (timeframeFilter === 'all') {
-            return fillMissingDates(historyArray);
+            return getAggregatedData(historyArray);
         } else {
             const daysToShow = parseInt(timeframeFilter, 10);
             const endDate = new Date();
@@ -146,6 +153,127 @@ const VideoModal = ({ video, onClose }) => {
             
             return fillMissingDates(historyArray, startDate, endDate);
         }
+    };
+    
+    const getAggregatedData = (dataArray) => {
+        if (dataArray.length === 0) return [];
+        
+        const dates = dataArray.map(item => new Date(item.date));
+        const startDate = new Date(Math.min(...dates));
+        const endDate = new Date(Math.max(...dates));
+        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff <= 60) {
+            return fillMissingDates(dataArray, startDate, endDate);
+        } else if (daysDiff <= 365) {
+            return aggregateByWeeks(dataArray, startDate, endDate);
+        } else {
+            return aggregateByMonths(dataArray, startDate, endDate);
+        }
+    };
+    
+    const aggregateByWeeks = (dataArray, startDate, endDate) => {
+        const weeklyData = {};
+        const dateMap = {};
+        
+        dataArray.forEach(item => {
+            dateMap[item.date] = item;
+        });
+        
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+            const weekStart = new Date(currentDate);
+            weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+            const weekKey = weekStart.toISOString().split('T')[0];
+            
+            if (!weeklyData[weekKey]) {
+                weeklyData[weekKey] = {
+                    date: weekKey,
+                    views: 0,
+                    watchTimeHours: 0,
+                    impressions: 0,
+                    averageViewDuration: 0,
+                    averageViewPercentage: 0,
+                    subscribersGained: 0,
+                    subscribersLost: 0,
+                    totalDays: 0
+                };
+            }
+            
+            const dateString = currentDate.toISOString().split('T')[0];
+            if (dateMap[dateString]) {
+                const dayData = dateMap[dateString];
+                weeklyData[weekKey].views += dayData.views || 0;
+                weeklyData[weekKey].watchTimeHours += dayData.watchTimeHours || 0;
+                weeklyData[weekKey].impressions += dayData.impressions || 0;
+                weeklyData[weekKey].subscribersGained += dayData.subscribersGained || 0;
+                weeklyData[weekKey].subscribersLost += dayData.subscribersLost || 0;
+                
+                if (dayData.views > 0) {
+                    weeklyData[weekKey].averageViewDuration += (dayData.averageViewDuration || 0) * dayData.views;
+                    weeklyData[weekKey].averageViewPercentage += (dayData.averageViewPercentage || 0) * dayData.views;
+                }
+                weeklyData[weekKey].totalDays++;
+            }
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        return Object.values(weeklyData).map(week => ({
+            ...week,
+            averageViewDuration: week.views > 0 ? week.averageViewDuration / week.views : 0,
+            averageViewPercentage: week.views > 0 ? week.averageViewPercentage / week.views : 0
+        })).sort((a, b) => a.date.localeCompare(b.date));
+    };
+    
+    const aggregateByMonths = (dataArray, startDate, endDate) => {
+        const monthlyData = {};
+        const dateMap = {};
+        
+        dataArray.forEach(item => {
+            dateMap[item.date] = item;
+        });
+        
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+            const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+            
+            if (!monthlyData[monthKey]) {
+                monthlyData[monthKey] = {
+                    date: monthKey,
+                    views: 0,
+                    watchTimeHours: 0,
+                    impressions: 0,
+                    averageViewDuration: 0,
+                    averageViewPercentage: 0,
+                    subscribersGained: 0,
+                    subscribersLost: 0
+                };
+            }
+            
+            const dateString = currentDate.toISOString().split('T')[0];
+            if (dateMap[dateString]) {
+                const dayData = dateMap[dateString];
+                monthlyData[monthKey].views += dayData.views || 0;
+                monthlyData[monthKey].watchTimeHours += dayData.watchTimeHours || 0;
+                monthlyData[monthKey].impressions += dayData.impressions || 0;
+                monthlyData[monthKey].subscribersGained += dayData.subscribersGained || 0;
+                monthlyData[monthKey].subscribersLost += dayData.subscribersLost || 0;
+                
+                if (dayData.views > 0) {
+                    monthlyData[monthKey].averageViewDuration += (dayData.averageViewDuration || 0) * dayData.views;
+                    monthlyData[monthKey].averageViewPercentage += (dayData.averageViewPercentage || 0) * dayData.views;
+                }
+            }
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        return Object.values(monthlyData).map(month => ({
+            ...month,
+            averageViewDuration: month.views > 0 ? month.averageViewDuration / month.views : 0,
+            averageViewPercentage: month.views > 0 ? month.averageViewPercentage / month.views : 0
+        })).sort((a, b) => a.date.localeCompare(b.date));
     };
     
     const fillMissingDates = (dataArray, startDate, endDate) => {
@@ -380,7 +508,7 @@ const VideoModal = ({ video, onClose }) => {
                     </div>
                     <div className={getMetricCardClass('impressions')}>
                         <div className="metric-label">Impressions</div>
-                        <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
+                        <div className="metric-value">{isYoutubeVideo ? "N/A" : formatNumber(displayMetrics.impressions)}</div>
                     </div>
                     <div className={getMetricCardClass('watchTime')}>
                         <div className="metric-label">Watch Time</div>
@@ -411,6 +539,17 @@ const VideoModal = ({ video, onClose }) => {
                                             dataKey="date" 
                                             tickFormatter={(date) => {
                                                 const d = new Date(date);
+                                                if (timeframeFilter === 'all') {
+                                                    const daysDiff = timeframeData.length > 0 
+                                                        ? Math.ceil((new Date(timeframeData[timeframeData.length - 1].date) - new Date(timeframeData[0].date)) / (1000 * 60 * 60 * 24))
+                                                        : 0;
+                                                    
+                                                    if (daysDiff > 365) {
+                                                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                                    } else if (daysDiff > 60) {
+                                                        return `${d.getMonth() + 1}/${d.getDate()}`;
+                                                    }
+                                                }
                                                 return `${d.getMonth()+1}/${d.getDate()}`;
                                             }}
                                         />

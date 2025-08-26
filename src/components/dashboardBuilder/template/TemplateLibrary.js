@@ -75,7 +75,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
         id: 'healthcare-professionals-reached',
         title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
         value: (campaign.volume_metrics?.total_opens).toLocaleString(),
-        subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total opens`,
+        subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
         x: 30
       },
       {
@@ -103,7 +103,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
         id: 'one-hour-open-rate',
         title: 'ONE HOUR OPEN RATE',
         value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-        subtitle: 'Immediate Engagement',
+        subtitle: 'Percent of opens in the first hour',
         x: 605
       }
     ];
@@ -302,9 +302,6 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties) {
   };
 
   campaigns.forEach(campaign => {
-    Object.keys(aggregated.core_metrics).forEach(key => {
-      aggregated.core_metrics[key] += campaign.core_metrics?.[key] || 0;
-    });
     
     Object.keys(aggregated.volume_metrics).forEach(key => {
       aggregated.volume_metrics[key] += campaign.volume_metrics?.[key] || 0;
@@ -336,9 +333,26 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties) {
     }
   });
 
-  Object.keys(aggregated.core_metrics).forEach(key => {
-    aggregated.core_metrics[key] /= campaigns.length;
+  aggregated.core_metrics.unique_open_rate = aggregated.volume_metrics.delivered > 0 ?
+    (aggregated.volume_metrics.unique_opens / aggregated.volume_metrics.delivered) * 100 : 0;
+  aggregated.core_metrics.total_open_rate = aggregated.volume_metrics.delivered > 0 ?
+    (aggregated.volume_metrics.total_opens / aggregated.volume_metrics.delivered) * 100 : 0;
+  
+  let totalUniqueClicks = 0;
+  let totalClicks = 0;
+  campaigns.forEach(campaign => {
+    const uniqueClickRate = campaign.core_metrics?.unique_click_rate || 0;
+    const totalClickRate = campaign.core_metrics?.total_click_rate || 0;
+    const delivered = campaign.volume_metrics?.delivered || 0;
+    
+    totalUniqueClicks += (uniqueClickRate / 100) * delivered;
+    totalClicks += (totalClickRate / 100) * delivered;
   });
+  
+  aggregated.core_metrics.unique_click_rate = aggregated.volume_metrics.delivered > 0 ?
+    (totalUniqueClicks / aggregated.volume_metrics.delivered) * 100 : 0;
+  aggregated.core_metrics.total_click_rate = aggregated.volume_metrics.delivered > 0 ?
+    (totalClicks / aggregated.volume_metrics.delivered) * 100 : 0;
 
   const totalAudience = Object.values(aggregated.specialty_performance)
     .reduce((sum, data) => sum + data.audience_total, 0);
@@ -346,11 +360,10 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties) {
   Object.values(aggregated.specialty_performance).forEach(data => {
     data.unique_open_rate = data.audience_total > 0 ? 
       (data.unique_opens / data.audience_total) * 100 : 0;
-    data.performance_delta = data.performance_delta / data.count;
+    data.performance_delta = data.count > 0 ? data.performance_delta / data.count : 0;
     data.audience_percentage = totalAudience > 0 ? (data.audience_total / totalAudience) * 100 : 0;
   });
 
-  aggregated.specialty_performance = aggregated.specialty_performance;
   return aggregated;
 }
 
@@ -402,7 +415,6 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
 
   components.push({
     id: 'hero-patient-impact',
-    type: 'secondary',
     title: 'POTENTIAL PATIENT IMPACT',
     value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
     subtitle: 'Estimated patient panel sizes',
@@ -417,7 +429,6 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
   if (costComparisonMode === 'none') {
     components.push({
       id: 'cost-comparison',
-      type: 'secondary',
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
@@ -618,7 +629,6 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
 
   components.push({
     id: 'hero-patient-impact',
-    type: 'secondary',
     title: 'POTENTIAL PATIENT IMPACT',
     value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
     subtitle: 'Estimated patient panel sizes',
@@ -633,7 +643,6 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   if (costComparisonMode === 'none') {
     components.push({
       id: 'cost-comparison',
-      type: 'secondary',
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
@@ -822,7 +831,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   return components;
 };
 
-export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false) => {
+export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
   const components = [];
   const themeColors = getThemeColors(theme);
   const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
@@ -859,9 +868,9 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     },
     {
       id: 'multi-cost-comparison',
-      type: 'cost-comparison',
-      contractedCost: 10,
-      actualCost: 5,
+      title: 'HEALTHCARE PROFESSIONALS REACHED',
+      value: (aggregatedData.volume_metrics?.delivered).toLocaleString(),
+      subtitle: `${((aggregatedData.volume_metrics?.delivered / aggregatedData.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
       x: 395
     },
     {
@@ -874,13 +883,13 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   ];
 
   multiHeroCards.forEach((card, index) => {
-    if (card.type === 'cost-comparison') {
+    if (costComparisonMode !== 'none' && card.id === 'multi-professional-engagements') {
       components.push({
-        id: card.id,
+        id: 'cost-comparison',
         type: 'cost-comparison',
         currentTheme: theme,
-        contractedCost: card.contractedCost,
-        actualCost: card.actualCost,
+        contractedCost: 10,
+        actualCost: 5,
         position: { x: card.x, y: 90, width: 150, height: 58 }
       });
     } else {
@@ -935,8 +944,8 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateMultiOneTemplate = (campaigns, theme) => {
-  const components = generateMultiNoneTemplate(campaigns, theme);
+export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
   const themeColors = getThemeColors(theme);
   
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
@@ -967,8 +976,8 @@ export const generateMultiOneTemplate = (campaigns, theme) => {
   return components;
 };
 
-export const generateMultiTwoTemplate = (campaigns, theme) => {
-  const components = generateMultiOneTemplate(campaigns, theme);
+export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
   const themeColors = getThemeColors(theme);
   
   const firstTable = components.find(c => c.id === 'additional-table-1');
@@ -999,8 +1008,8 @@ export const generateMultiTwoTemplate = (campaigns, theme) => {
   return components;
 };
 
-export const generateMultiThreeTemplate = (campaigns, theme) => {
-  const components = generateMultiTwoTemplate(campaigns, theme);
+export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
   const themeColors = getThemeColors(theme);
   
   const secondTable = components.find(c => c.id === 'additional-table-2');
@@ -1053,7 +1062,7 @@ export const generateTemplate = (config) => {
   if (type === 'single') {
     return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode);
   } else {
-    return generator(campaigns, theme, mergeSubspecialties);
+    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode);
   }
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import QueryEngine from '../../backend/query-engine';
 import DisplayComponents from './DisplayComponents';
 import QueryQuestions from '../utils/QueryQuestions';
+import '../../styles/ChatInterface.css';
 const { 
   TopUsersDisplay, 
   ContentPerformanceDisplay, 
@@ -23,6 +24,8 @@ const ChatInterface = () => {
   const [suggestions, setSuggestions] = useState([]);
   const resultsEndRef = useRef(null);
   const queryEngineRef = useRef(null);
+  const chatInterfaceRef = useRef(null);
+  const queryFormRef = useRef(null);
   
   if (!queryEngineRef.current) {
     queryEngineRef.current = new QueryEngine();
@@ -40,7 +43,6 @@ const ChatInterface = () => {
         setResults(JSON.parse(savedResults));
       }
     } catch (e) {
-      console.log('Error loading from localStorage:', e);
     }
   }, []);
   
@@ -49,7 +51,6 @@ const ChatInterface = () => {
       localStorage.setItem('queryHistory', JSON.stringify(queryHistory));
       localStorage.setItem('results', JSON.stringify(results));
     } catch (e) {
-      console.log('Error saving to localStorage:', e);
     }
   }, [queryHistory, results]);
 
@@ -67,6 +68,41 @@ const ChatInterface = () => {
     
     setSuggestions(selectedQuestions);
   }, []);
+
+  useEffect(() => {
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          if (!chatInterfaceRef.current || !queryFormRef.current) {
+            ticking = false;
+            return;
+          }
+
+          const chatInterface = chatInterfaceRef.current;
+          const queryForm = queryFormRef.current;
+          const chatRect = chatInterface.getBoundingClientRect();
+          const formOutOfView = chatRect.top < -80;
+          const componentStillVisible = chatRect.bottom > window.innerHeight;
+          const shouldStick = formOutOfView && componentStillVisible;
+          const isCurrentlySticky = queryForm.classList.contains('sticky');
+          
+          if (shouldStick && !isCurrentlySticky) {
+            queryForm.classList.add('sticky');
+          } else if (!shouldStick && isCurrentlySticky) {
+            queryForm.classList.remove('sticky');
+          }
+          
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   const handleSuggestionClick = (suggestion) => {
     setQuery(suggestion);
@@ -83,6 +119,9 @@ const ChatInterface = () => {
     if (!query.trim()) {
       return;
     }
+    
+    const currentScrollY = window.scrollY;
+    const isFormSticky = queryFormRef.current?.classList.contains('sticky');
     
     try {
       setLoading(true);
@@ -103,11 +142,32 @@ const ChatInterface = () => {
       
       setQuery('');
       
-      if (resultsEndRef.current) {
-        resultsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      setTimeout(() => {
+        if (results.length === 0) {
+          if (resultsEndRef.current) {
+            resultsEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        } else {
+          const resultContainer = document.querySelector('.result-list');
+          if (resultContainer && resultContainer.firstChild) {
+            if (isFormSticky) {
+              resultContainer.firstChild.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest' 
+              });
+            } else {
+              resultContainer.firstChild.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest',
+                inline: 'nearest' 
+              });
+            }
+          }
+        }
+      }, 100);
+      
     } catch (err) {
-      console.error('Error processing query:', err);
       setError(`Failed to process query: ${err.message}`);
     } finally {
       setLoading(false);
@@ -118,7 +178,6 @@ const ChatInterface = () => {
     try {
       return component;
     } catch (err) {
-      console.error("Error rendering component:", err);
       return (
         <div className="error-message">
           <h3>Error Rendering Results</h3>
@@ -199,15 +258,15 @@ const ChatInterface = () => {
   };
   
   return (
-    <div className="chat-interface">
+    <div className="chat-interface" ref={chatInterfaceRef}>
       <h2>Metric Intelligence</h2>
       
-      <form onSubmit={handleSubmit} className="query-form">
+      <form onSubmit={handleSubmit} className="query-form" ref={queryFormRef}>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask about audience"
+          placeholder="Ask about your audience metrics..."
           className="query-input"
           disabled={loading}
         />

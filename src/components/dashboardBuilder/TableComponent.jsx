@@ -23,6 +23,7 @@ const TableComponent = ({
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
+  const [editValue, setEditValue] = useState('');
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState(title);
   const [isEditingCell, setIsEditingCell] = useState(null);
@@ -329,7 +330,7 @@ const TableComponent = ({
     width: '100%',
     height: '100%',
     borderCollapse: 'collapse',
-    fontSize: Math.max(8, Math.min(14, position.width / (data[0]?.length * 8 || 35))),
+    fontSize: 12,
     tableLayout: 'fixed'
   };
 
@@ -453,13 +454,19 @@ const TableComponent = ({
                     <td 
                       key={colIndex} 
                       style={getCellStyle(rowIndex, colIndex)}
-                      onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
+                      onDoubleClick={() => {
+                        setEditValue(cell);
+                        handleCellDoubleClick(rowIndex, colIndex);
+                      }}
                     >
                       {isEditingThisCell ? (
                         <input
-                          value={cell}
-                          onChange={(e) => handleCellEdit(rowIndex, colIndex, e.target.value)}
-                          onBlur={() => setIsEditingCell(null)}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => {
+                            handleCellEdit(rowIndex, colIndex, editValue);
+                            setIsEditingCell(null);
+                          }}
                           onKeyDown={(e) => handleCellKeyDown(e, rowIndex, colIndex)}
                           style={{
                             border: 'none',

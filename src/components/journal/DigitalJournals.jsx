@@ -12,6 +12,7 @@ const DigitalJournals = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedJournal, setSelectedJournal] = useState(null);
     const [timeframeFilter, setTimeframeFilter] = useState('12');
+    const [showUrls, setShowUrls] = useState(false);
     const [aggregateMetrics, setAggregateMetrics] = useState({
         totalUsers: 0,
         avgDuration: 0,
@@ -41,7 +42,6 @@ const DigitalJournals = () => {
                 
                 calculateAggregateMetrics(sortedData, timeframeFilter);
             } catch (error) {
-                console.error("Error fetching URL data:", error);
             }
         }
         fetchUrlData();
@@ -144,14 +144,8 @@ const DigitalJournals = () => {
         setSearch(searchValue);
         
         const newFilteredData = journalsData.filter(item => {
-            const titleMatch = item.title && searchValue.split(' ').every(word => 
-                item.title.toLowerCase().includes(word));
-            const urlMatch = item.url && searchValue.split(' ').every(word => 
-                item.url.toLowerCase().includes(word));
-            const fullUrlMatch = item.fullUrl && searchValue.split(' ').every(word => 
-                item.fullUrl.toLowerCase().includes(word));
-                
-            return titleMatch || urlMatch || fullUrlMatch;
+            const displayText = getDisplayTitle(item).toLowerCase();
+            return searchValue.split(' ').every(word => displayText.includes(word));
         });
         
         setFilteredData(newFilteredData);
@@ -176,6 +170,20 @@ const DigitalJournals = () => {
 
     const handleGlobalTimeframeChange = (e) => {
         setTimeframeFilter(e.target.value);
+    };
+
+    const getDisplayTitle = (item) => {
+        if (!showUrls && item.title && item.title.trim() && item.title.toLowerCase() !== "title not found") {
+            return formatTitle(item.title);
+        }
+        if (showUrls) {
+            const title = item.title && item.title.trim() && item.title.toLowerCase() !== "title not found" 
+                ? formatTitle(item.title) 
+                : "";
+            const url = item.fullUrl || item.url || "";
+            return title ? `${title} - ${url}` : url;
+        }
+        return item.fullUrl || item.url || "No URL";
     };
 
     const formatTitle = (title) => {
@@ -240,7 +248,7 @@ const DigitalJournals = () => {
         const header = ['Title', 'URL', 'Total Users', 'Avg Duration', 'Bounce Rate'];
     
         const rows = filteredData.map(item => [
-            item.title || 'Untitled',
+            getDisplayTitle(item),
             item.fullUrl || item.url,
             item.totalUsers,
             item.avgDuration,
@@ -264,9 +272,20 @@ const DigitalJournals = () => {
         document.body.removeChild(link);
     };
 
-    const validData = filteredData.filter(item => item.title && item.title.toLowerCase() !== "title not found");
+    const totalPages = Math.ceil(filteredData.filter(item => {
+        if (!showUrls) {
+            return item.title && item.title.trim() && item.title.toLowerCase() !== "title not found";
+        }
+        return true;
+    }).length / rowsPerPage);
     
-    const totalPages = Math.ceil(validData.length / rowsPerPage);
+    const validData = filteredData.filter(item => {
+        if (!showUrls) {
+            return item.title && item.title.trim() && item.title.toLowerCase() !== "title not found";
+        }
+        return true;
+    });
+    
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = validData.slice(indexOfFirstRow, indexOfLastRow);
@@ -289,6 +308,16 @@ const DigitalJournals = () => {
                     />
                 </div>
                 <div className="digital-journals-controls">
+                    <div className="specialty-combine-toggle">
+                        <input
+                            type="checkbox"
+                            id="showUrlsToggle"
+                            checked={showUrls}
+                            onChange={(e) => setShowUrls(e.target.checked)}
+                        />
+                        <label htmlFor="showUrlsToggle" className="specialty-toggle-slider"></label>
+                        <span className="specialty-toggle-label">Show URLs</span>
+                    </div>
                     <div className="digital-ed-rows-per-page">
                         <label htmlFor="rowsPerPage">Rows per page:</label>
                         <select
@@ -317,18 +346,18 @@ const DigitalJournals = () => {
                 </thead>
                 <tbody>
                     {currentRows.map((item, index) => (
-                            <tr key={index}>
-                                <td 
-                                    className="title-cell journal-title"
-                                    onClick={() => handleJournalClick(item)}
-                                >
-                                    {formatTitle(item.title || item.url)}
-                                </td>
-                                <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
-                                <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
-                                <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
-                            </tr>
-                        ))}
+                        <tr key={index}>
+                            <td 
+                                className="title-cell journal-title"
+                                onClick={() => handleJournalClick(item)}
+                            >
+                                {getDisplayTitle(item)}
+                            </td>
+                            <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
+                            <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
+                            <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
             
@@ -360,7 +389,7 @@ const DigitalJournals = () => {
                 <div className="journal-modal-overlay">
                     <div className="journal-modal" ref={modalRef}>
                         <div className="journal-modal-header">
-                            <h3>{formatTitle(selectedJournal.title || selectedJournal.url)}</h3>
+                            <h3>{getDisplayTitle(selectedJournal)}</h3>
                             <button 
                                 className="modal-close-button"
                                 onClick={() => setIsModalOpen(false)}

@@ -49,31 +49,19 @@ const MetricCard = ({
   }, [isEditing, id]);
 
   const handleTitleBlur = useCallback(() => {
-    onEdit?.(id, { 
-      title: localTitle, 
-      value: localValue, 
-      subtitle: localSubtitle 
-    });
+    onEdit?.(id, { title: localTitle });
     setIsEditing(null);
-  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  }, [id, localTitle, onEdit, setIsEditing]);
   
   const handleValueBlur = useCallback(() => {
-    onEdit?.(id, { 
-      title: localTitle, 
-      value: localValue, 
-      subtitle: localSubtitle 
-    });
+    onEdit?.(id, { value: localValue });
     setIsEditing(null);
-  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  }, [id, localValue, onEdit, setIsEditing]);
   
   const handleSubtitleBlur = useCallback(() => {
-    onEdit?.(id, { 
-      title: localTitle, 
-      value: localValue, 
-      subtitle: localSubtitle 
-    });
+    onEdit?.(id, { subtitle: localSubtitle });
     setIsEditing(null);
-  }, [id, localTitle, localValue, localSubtitle, onEdit, setIsEditing]);
+  }, [id, localSubtitle, onEdit, setIsEditing]);
   
   const handleTitleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' || e.key === 'Tab') {

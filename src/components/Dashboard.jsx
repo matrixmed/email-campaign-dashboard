@@ -3,6 +3,7 @@ import _ from 'lodash';
 import { groupPublications } from '../groupPublications';
 import LiveCampaignMetrics from './campaign/LiveCampaignMetrics';
 import MetricsTable from './campaign/MetricsTable';
+import ReportsManager from './reports/ReportsManager'
 import InsightsSection from './insights/InsightsSection';
 import DigitalJournals from './journal/DigitalJournals';
 import VideoMetrics from './video/VideoMetrics';
@@ -195,7 +196,6 @@ const Dashboard = () => {
                 setMetricsData(jsonData);
                 setRawFilteredData(jsonData);
             } catch (error) {
-                console.error("Error fetching blob data:", error);
             }
         }
         fetchBlobData();
@@ -352,6 +352,7 @@ const Dashboard = () => {
                 handleDeploymentChange={handleDeploymentChange}
             />
             <LiveCampaignMetrics />
+            <ReportsManager/>
             <DigitalJournals />
             <VideoMetrics />
             <SpecialtySection />

@@ -20,6 +20,7 @@ import { getThemeLogo, getMetricValue } from './template/LayoutTemplates';
 
 const DashboardCanvasContent = () => {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [selectedMultiCampaigns, setSelectedMultiCampaigns] = useState([]);
   const [cards, setCards] = useState([]);
   const [deletedCards, setDeletedCards] = useState([]);
   const [isEditing, setIsEditing] = useState(null);
@@ -39,6 +40,10 @@ const DashboardCanvasContent = () => {
   const [costComparisonMode, setCostComparisonMode] = useState('none');
   const [currentTheme, setCurrentTheme] = useState('matrix');
   const [userModifications, setUserModifications] = useState(new Map());
+  const [userEdits, setUserEdits] = useState(() => {
+    const saved = localStorage.getItem('dashboard-user-edits');
+    return saved ? JSON.parse(saved) : {};
+  });
   const canvasRef = useRef(null);
 
   const {
@@ -49,26 +54,6 @@ const DashboardCanvasContent = () => {
     getGeographicData,
     getAuthorityMetrics
   } = useDashboardData();
-
-  useEffect(() => {
-    if (cards.length > 0 && selectedCampaign && currentTemplate) {
-      const templateConfig = {
-        template: currentTemplate,
-        campaigns: [selectedCampaign],
-        theme: currentTheme,
-        type: 'single',
-        mergeSubspecialties: specialtyMergeMode,
-        costComparisonMode: costComparisonMode
-      };
-      
-      try {
-        const regeneratedComponents = generateTemplate(templateConfig);
-        setCards(regeneratedComponents);
-      } catch (error) {
-        console.error('Template regeneration failed:', error);
-      }
-    }
-  }, [specialtyMergeMode, costComparisonMode, currentTheme, selectedCampaign, currentTemplate]);
   
   const handleBudgetedCostChange = useCallback((value) => {
     setBudgetedCost(value);
@@ -78,7 +63,75 @@ const DashboardCanvasContent = () => {
     setActualCost(value);
   }, []);
 
+  const preserveEdit = useCallback((componentId, editData) => {
+    setUserEdits(prev => ({
+      ...prev,
+      [componentId]: {
+        ...prev[componentId],
+        ...editData,
+        timestamp: Date.now()
+      }
+    }));
+  }, []);
+  
+  const applyPreservedEdits = useCallback((components) => {
+    return components.map(component => {
+      const edits = userEdits[component.id];
+      if (edits) {
+        return {
+          ...component,
+          title: edits.title !== undefined ? edits.title : component.title,
+          value: edits.value !== undefined ? edits.value : component.value,
+          subtitle: edits.subtitle !== undefined ? edits.subtitle : component.subtitle,
+          data: edits.data ? { ...component.data, ...edits.data } : component.data
+        };
+      }
+      return component;
+    });
+  }, [userEdits]);
+
+  useEffect(() => {
+    localStorage.setItem('dashboard-user-edits', JSON.stringify(userEdits));
+  }, [userEdits]);
+
+  useEffect(() => {
+    if (cards.length > 0 && currentTemplate) {
+      let templateConfig;
+      
+      if (selectedCampaign) {
+        templateConfig = {
+          template: currentTemplate,
+          campaigns: [selectedCampaign],
+          theme: currentTheme,
+          type: 'single',
+          mergeSubspecialties: specialtyMergeMode,
+          costComparisonMode: costComparisonMode
+        };
+      } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
+        templateConfig = {
+          template: currentTemplate,
+          campaigns: selectedMultiCampaigns,
+          theme: currentTheme,
+          type: 'multi',
+          mergeSubspecialties: specialtyMergeMode,
+          costComparisonMode: costComparisonMode
+        };
+      }
+      
+      if (templateConfig) {
+        try {
+          const regeneratedComponents = generateTemplate(templateConfig);
+          const preservedComponents = applyPreservedEdits(regeneratedComponents);
+          setCards(preservedComponents);
+        } catch (error) {
+        }
+      }
+    }
+  }, [specialtyMergeMode, costComparisonMode, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits]);
+
   const handleCardEdit = useCallback((cardId, newData) => {
+    preserveEdit(cardId, newData);
+    
     const modifications = userModifications.get(cardId) || new Set();
     
     if (newData.title !== undefined) modifications.add('title');
@@ -91,7 +144,12 @@ const DashboardCanvasContent = () => {
     setCards(prev => prev.map(card => 
       card.id === cardId ? { ...card, ...newData } : card
     ));
-  }, [userModifications]);
+  }, [preserveEdit, userModifications]);
+
+  const clearAllEdits = () => {
+    setUserEdits({});
+    localStorage.removeItem('dashboard-user-edits');
+  };
 
   const handleGlobalClick = useCallback((e) => {
     const isClickOutsideCards = !e.target.closest('.dashboard-canvas-card') &&
@@ -178,6 +236,8 @@ const DashboardCanvasContent = () => {
   }, []);
 
   const handleTemplateSelection = useCallback((templateConfig) => {
+    clearAllEdits();
+
     try {
       const generatedComponents = generateTemplate({
         ...templateConfig,
@@ -192,9 +252,12 @@ const DashboardCanvasContent = () => {
       
       if (templateConfig.type === 'single' && templateConfig.campaigns.length > 0) {
         setSelectedCampaign(templateConfig.campaigns[0]);
+        setSelectedMultiCampaigns([]);
+      } else if (templateConfig.type === 'multi' && templateConfig.campaigns.length > 0) {
+        setSelectedCampaign(null);
+        setSelectedMultiCampaigns(templateConfig.campaigns);
       }
     } catch (error) {
-      console.error('Template generation failed:', error);
     }
   }, [specialtyMergeMode, costComparisonMode]);
 
@@ -336,28 +399,7 @@ const DashboardCanvasContent = () => {
 
   const handleCostModeChange = useCallback((mode) => {
     setCostComparisonMode(mode);
-    
-    if (mode === 'none') {
-      setCards(prev => prev.filter(card => card.type !== 'cost-comparison'));
-    } else {
-      const hasCostCard = cards.some(card => card.type === 'cost-comparison');
-      if (!hasCostCard) {
-        const newCostCard = {
-          id: `cost-comparison-${Date.now()}`,
-          type: 'cost-comparison',
-          mode: mode,
-          position: { x: 750, y: 50, width: 250, height: 120 }
-        };
-        setCards(prev => [...prev, newCostCard]);
-      } else {
-        setCards(prev => prev.map(card => 
-          card.type === 'cost-comparison' 
-            ? { ...card, mode: mode }
-            : card
-        ));
-      }
-    }
-  }, [cards]);
+  }, []);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
     const newCard = {
@@ -507,14 +549,24 @@ const DashboardCanvasContent = () => {
   }, [handleImageUpload]);
 
   const handleExportScreenshot = useCallback(async () => {
-    if (!canvasRef.current || !selectedCampaign) return;
+    if (!canvasRef.current) return;
     
-    const result = await exportDashboard(canvasRef, selectedCampaign.campaign_name);
+    let dashboardName;
+    if (selectedCampaign) {
+      dashboardName = selectedCampaign.campaign_name;
+    } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
+      const campaignNames = selectedMultiCampaigns.map(c => c.campaign_name).slice(0, 2).join(' + ');
+      dashboardName = selectedMultiCampaigns.length > 2 ? 
+        `${campaignNames} + ${selectedMultiCampaigns.length - 2} more` : campaignNames;
+    } else {
+      return;
+    }
+    
+    const result = await exportDashboard(canvasRef, dashboardName);
     
     if (!result.success) {
-      console.error('Export failed:', result.error);
     }
-  }, [selectedCampaign]);
+  }, [selectedCampaign, selectedMultiCampaigns]);
 
   const { drop, isOver, canDrop, getDropZoneStyles, createDraggableMetric } = useDragDrop(
     cards,
@@ -612,19 +664,19 @@ const DashboardCanvasContent = () => {
         
         <button 
           onClick={handleExportScreenshot}
-          disabled={!selectedCampaign}
+          disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
           style={{
             padding: '12px 24px',
             border: 'none',
             borderRadius: '8px',
-            cursor: selectedCampaign ? 'pointer' : 'not-allowed',
+            cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
             fontSize: '14px',
             fontWeight: '600',
             fontFamily: 'inherit',
             transition: 'all 0.2s ease',
-            background: selectedCampaign ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : '#e2e8f0',
-            color: selectedCampaign ? 'white' : '#94a3b8',
-            boxShadow: selectedCampaign ? '0 2px 8px rgba(79, 70, 229, 0.3)' : 'none'
+            background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : '#e2e8f0',
+            color: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'white' : '#94a3b8',
+            boxShadow: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '0 2px 8px rgba(79, 70, 229, 0.3)' : 'none'
           }}
         >
           Export
@@ -716,7 +768,7 @@ const DashboardCanvasContent = () => {
                 position: 'relative'
               }}
             >
-              {selectedCampaign ? (
+              {selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) ? (
                 <>
                 <div style={{
                     position: 'absolute',

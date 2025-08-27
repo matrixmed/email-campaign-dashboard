@@ -116,8 +116,8 @@ const SpecialtyKPIStrips = ({
     const deltaX = e.clientX - resizeStart.startX;
     const deltaY = e.clientY - resizeStart.startY;
     
-    const newWidth = Math.max(300, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
-    const newHeight = Math.max(120, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
+    const newWidth = Math.max(100, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
+    const newHeight = Math.max(50, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
     
     onResize?.(id, { width: newWidth, height: newHeight });
   }, [isResizing, resizeStart, position.x, position.y, onResize, id]);

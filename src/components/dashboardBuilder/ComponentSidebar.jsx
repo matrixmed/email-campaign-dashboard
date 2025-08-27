@@ -8,9 +8,11 @@ const ComponentSidebar = ({
   selectedCampaign,
   currentTheme,
   costComparisonMode,
+  showPatientImpact,
   specialtyMergeMode,
   onThemeChange,
   onCostModeChange,
+  onPatientImpactToggle,
   onCampaignChange,
   onToggleSpecialtyMerge,
   onAddComponent,
@@ -76,7 +78,7 @@ const ComponentSidebar = ({
       id: `${metricKey}-${Date.now()}`,
       type: 'metric',
       title: displayTitle,
-      value: selectedCampaign ? getMetricValue(selectedCampaign, metricKey) : 'N/A',
+      value: (selectedCampaign || campaigns[0]) ? getMetricValue(selectedCampaign || campaigns[0], metricKey) : 'N/A',
       originalKey: metricKey,
       position: { 
         x: 100 + Math.random() * 200, 
@@ -86,29 +88,7 @@ const ComponentSidebar = ({
       }
     };
       onAddComponent?.(component);
-  }, [selectedCampaign, onAddComponent]);
-
-  const handleAddTable = useCallback((tableType) => {
-    const tableConfig = TABLE_TYPES[tableType];
-    const component = {
-      id: `table-${tableType.toLowerCase()}-${Date.now()}`,
-      type: 'table',
-      title: tableConfig.title,
-      config: {
-        customData: tableConfig.defaultData,
-        headers: tableConfig.defaultData[0],
-        dataType: tableType.toLowerCase()
-      },
-      position: { 
-        x: 100 + Math.random() * 200, 
-        y: 100 + Math.random() * 200, 
-        width: 400, 
-        height: 250 
-      }
-    };
-
-    onAddComponent?.(component);
-  }, [onAddComponent]);
+  }, [selectedCampaign, campaigns, onAddComponent]);
 
   const handleAddCustomTable = useCallback(() => {
     const rows = Math.max(2, Math.min(10, customTableRows)); 
@@ -364,6 +344,30 @@ const ComponentSidebar = ({
                   <div style={{ flex: 1 }}>
                     <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
                       Merge Subspecialties
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showPatientImpact}
+                    onChange={onPatientImpactToggle}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Show Patient Impact
                     </div>
                   </div>
                 </label>
@@ -628,30 +632,6 @@ const ComponentSidebar = ({
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-                  Preset Tables
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
-                  {Object.entries(TABLE_TYPES).map(([key, config]) => (
-                    <button
-                      key={key}
-                      onClick={() => handleAddTable(key)}
-                      style={{
-                        padding: '8px 12px',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      {config.title} ({config.columns}x{config.rows})
-                    </button>
-                  ))}
-                </div>
-
                 <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
                   Custom Table Builder
                 </h4>

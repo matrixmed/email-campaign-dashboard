@@ -170,8 +170,8 @@ const TableComponent = ({
     const deltaX = e.clientX - resizeStart.startX;
     const deltaY = e.clientY - resizeStart.startY;
     
-    const newWidth = Math.max(200, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
-    const newHeight = Math.max(150, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
+    const newWidth = Math.max(50, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
+    const newHeight = Math.max(40, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
     
     onResize?.(id, { width: newWidth, height: newHeight });
   }, [isResizing, resizeStart, position.x, position.y, onResize, id]);

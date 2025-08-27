@@ -5,7 +5,6 @@ import { getComponentStyle, getTypographyStyle, MATRIX_COLORS } from './template
 const TitleComponent = ({ 
   id, 
   title = 'Campaign Title',
-  subtitle = '',
   position = { x: 0, y: 0, width: 600, height: 80 },
   style = {},
   currentTheme = 'matrix',
@@ -23,15 +22,12 @@ const TitleComponent = ({
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
   const [localTitle, setLocalTitle] = useState(title);
-  const [localSubtitle, setLocalSubtitle] = useState(subtitle);
   const titleRef = useRef(null);
   const titleInputRef = useRef(null);
-  const subtitleInputRef = useRef(null);
 
   useEffect(() => {
     setLocalTitle(title);
-    setLocalSubtitle(subtitle);
-  }, [title, subtitle]);
+  }, [title]);
 
   useEffect(() => {
     if (isEditing === id && titleInputRef.current) {
@@ -109,8 +105,8 @@ const TitleComponent = ({
     const deltaX = e.clientX - resizeStart.startX;
     const deltaY = e.clientY - resizeStart.startY;
     
-    const newWidth = Math.max(300, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
-    const newHeight = Math.max(60, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
+    const newWidth = Math.max(50, Math.min(resizeStart.startWidth + deltaX, 1024 - position.x));
+    const newHeight = Math.max(20, Math.min(resizeStart.startHeight + deltaY, 576 - position.y));
     
     onResize?.(id, { width: newWidth, height: newHeight });
   }, [isResizing, resizeStart, position.x, position.y, onResize, id]);
@@ -158,17 +154,15 @@ const TitleComponent = ({
 
   const handleSave = useCallback(() => {
     onEdit?.(id, { 
-      title: localTitle, 
-      subtitle: localSubtitle 
+      title: localTitle
     });
     setIsEditing(null);
-  }, [id, localTitle, localSubtitle, onEdit, setIsEditing]);
+  }, [id, localTitle, onEdit, setIsEditing]);
 
   const handleCancel = useCallback(() => {
     setLocalTitle(title);
-    setLocalSubtitle(subtitle);
     setIsEditing(null);
-  }, [title, subtitle, setIsEditing]);
+  }, [title, setIsEditing]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -177,13 +171,6 @@ const TitleComponent = ({
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handleCancel();
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      if (e.target === titleInputRef.current && subtitleInputRef.current) {
-        subtitleInputRef.current.focus();
-      } else {
-        handleSave();
-      }
     }
   }, [handleSave, handleCancel]);
 
@@ -203,8 +190,7 @@ const TitleComponent = ({
 
   const handleDoubleClick = useCallback((e) => {
     if (e.target.closest('.title-content') || 
-        e.target.closest('.title-text') ||
-        e.target.closest('.subtitle-text')) {
+        e.target.closest('.title-text')) {
       handleEdit();
     }
   }, [handleEdit]);
@@ -245,45 +231,29 @@ const TitleComponent = ({
     justifyContent: 'center'
   };
 
-  const getResponsiveFontSizes = () => {
+  const getResponsiveFontSize = () => {
     const baseWidth = 600;
     const baseHeight = 80;
     const scale = Math.min(position.width / baseWidth, position.height / baseHeight);
     
-    return {
-      title: Math.max(18, Math.min(32, 24 * scale)),
-      subtitle: Math.max(12, Math.min(16, 14 * scale))
-    };
+    return Math.max(18, Math.min(32, 24 * scale));
   };
 
-  const fontSizes = getResponsiveFontSizes();
+  const fontSize = getResponsiveFontSize();
 
   const titleStyle = {
     ...getTypographyStyle('title', 'value'),
-    fontSize: `${fontSizes.title}px`,
+    fontSize: `${fontSize}px`,
     fontWeight: '800',
     color: style.color || MATRIX_COLORS.darkGray || '#1f2937',
     background: style.textGradient ? `linear-gradient(135deg, ${MATRIX_COLORS.secondary || '#6366f1'} 0%, ${MATRIX_COLORS.primary || '#007bff'} 100%)` : 'none',
     WebkitBackgroundClip: style.textGradient ? 'text' : 'unset',
     WebkitTextFillColor: style.textGradient ? 'transparent' : 'unset',
     backgroundClip: style.textGradient ? 'text' : 'unset',
-    margin: '0 0 8px 0',
+    margin: '0',
     letterSpacing: '-0.5px',
     lineHeight: '1.2',
     cursor: 'pointer'
-  };
-
-  const subtitleStyle = {
-    ...getTypographyStyle('title', 'subtitle'),
-    fontSize: `${fontSizes.subtitle}px`,
-    fontWeight: '600',
-    color: style.color || MATRIX_COLORS.gray || '#6b7280',
-    margin: '0',
-    textTransform: subtitle ? 'uppercase' : 'none',
-    letterSpacing: '0.5px',
-    lineHeight: '1.4',
-    cursor: 'pointer',
-    opacity: 0.9
   };
 
   const editing = isEditing === id;
@@ -331,73 +301,37 @@ const TitleComponent = ({
 
       <div className="title-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         {editing ? (
-          <>
-            <input
-              ref={titleInputRef}
-              className="title-input"
-              value={localTitle}
-              onChange={(e) => setLocalTitle(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleSave}
-              placeholder="Campaign Title"
-              style={{
-                ...titleStyle,
-                background: 'rgba(255, 255, 255, 0.95)',
-                border: '2px solid rgba(0, 123, 255, 0.5)',
-                borderRadius: '4px',
-                padding: '8px 12px',
-                width: '100%',
-                marginBottom: '8px',
-                outline: 'none',
-                WebkitBackgroundClip: 'unset',
-                WebkitTextFillColor: 'unset',
-                backgroundClip: 'unset'
-              }}
-              autoFocus
-            />
-            {subtitle !== undefined && (
-              <input
-                ref={subtitleInputRef}
-                className="subtitle-input"
-                value={localSubtitle}
-                onChange={(e) => setLocalSubtitle(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleSave}
-                placeholder="Subtitle (optional)"
-                style={{
-                  ...subtitleStyle,
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  border: '2px solid rgba(0, 123, 255, 0.5)',
-                  borderRadius: '4px',
-                  padding: '6px 12px',
-                  width: '100%',
-                  outline: 'none',
-                  textTransform: 'none'
-                }}
-              />
-            )}
-          </>
+          <input
+            ref={titleInputRef}
+            className="title-input"
+            value={localTitle}
+            onChange={(e) => setLocalTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            placeholder="Campaign Title"
+            style={{
+              ...titleStyle,
+              background: 'rgba(255, 255, 255, 0.95)',
+              border: '2px solid rgba(0, 123, 255, 0.5)',
+              borderRadius: '4px',
+              padding: '8px 12px',
+              width: '100%',
+              outline: 'none',
+              WebkitBackgroundClip: 'unset',
+              WebkitTextFillColor: 'unset',
+              backgroundClip: 'unset'
+            }}
+            autoFocus
+          />
         ) : (
-          <>
-            <h1 
-              className="title-text" 
-              style={titleStyle}
-              onDoubleClick={handleEdit}
-              title="Double-click to edit"
-            >
-              {title}
-            </h1>
-            {subtitle && (
-              <h2 
-                className="subtitle-text" 
-                style={subtitleStyle}
-                onDoubleClick={handleEdit}
-                title="Double-click to edit"
-              >
-                {subtitle}
-              </h2>
-            )}
-          </>
+          <h1 
+            className="title-text" 
+            style={titleStyle}
+            onDoubleClick={handleEdit}
+            title="Double-click to edit"
+          >
+            {title}
+          </h1>
         )}
       </div>
 

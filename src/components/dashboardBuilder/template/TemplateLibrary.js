@@ -1,6 +1,6 @@
 import { TEMPLATE_TYPES, getThemeColors } from './LayoutTemplates';
 
-export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -15,12 +15,29 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     }
   });
 
+  const hasPatientImpact = showPatientImpact;
+  const hasCostComparison = costComparisonMode !== 'none';
+  
+  const topRowCards = hasPatientImpact && hasCostComparison ? 3 : 
+                     (hasPatientImpact || hasCostComparison ? 3 : 2);
+  
+  let cardWidth, cardSpacing, startX;
+  if (topRowCards === 2) {
+    cardWidth = 319;
+    cardSpacing = 41; 
+    startX = 30;
+  } else if (topRowCards === 3) {
+    cardWidth = 200;
+    cardSpacing = 40;
+    startX = 30;
+  }
+
   components.push({
     id: 'hero-unique-engagement',
     type: 'hero',
     title: 'UNIQUE ENGAGEMENT RATE',
     value: `${campaign.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-    position: { x: 30, y: 95, width: 200, height: 88 },
+    position: { x: startX, y: 95, width: cardWidth, height: 88 },
     style: {
       background: themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)',
       color: '#ffffff',
@@ -29,28 +46,15 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     }
   });
 
-  components.push({
-    id: 'hero-patient-impact',
-    type: 'metric',
-    title: 'POTENTIAL PATIENT IMPACT',
-    value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Estimated patient panel sizes',
-    position: { x: 270, y: 95, width: 200, height: 88 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '8px'
-    }
-  });
-
-  if (costComparisonMode === 'none') {
+  if (!(hasPatientImpact && hasCostComparison)) {
+    const healthcareX = startX + cardWidth + cardSpacing;
     components.push({
-      id: 'cost-comparison',
+      id: 'healthcare-professionals-reached',
       type: 'metric',
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 510, y: 95, width: 200, height: 88 },
+      position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
       currentTheme: theme,
       style: {
         background: themeColors.cardGradient || '#f8fafc',
@@ -58,126 +62,114 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
         borderRadius: '8px'
       }
     });
-  } else {
+  }
+
+  if (hasPatientImpact) {
+    let patientImpactX;
+    if (hasPatientImpact && hasCostComparison) {
+      patientImpactX = startX + cardWidth + cardSpacing; 
+    } else {
+      patientImpactX = startX + (2 * (cardWidth + cardSpacing));
+    }
+      
+    components.push({
+      id: 'hero-patient-impact',
+      type: 'metric',
+      title: 'POTENTIAL PATIENT IMPACT',
+      value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
+      subtitle: 'Estimated patient panel sizes',
+      position: { x: patientImpactX, y: 95, width: cardWidth, height: 88 },
+      style: {
+        background: themeColors.cardGradient || '#f8fafc',
+        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '8px'
+      }
+    });
+  }
+
+  if (hasCostComparison) {
+    let costComparisonX;
+    if (hasPatientImpact && hasCostComparison) {
+      costComparisonX = startX + (2 * (cardWidth + cardSpacing)); 
+    } else {
+      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
+    }
+      
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
       currentTheme: theme,
       contractedCost: 10,
       actualCost: 5,
-      position: { x: 510, y: 95, width: 200, height: 88 }
+      position: { x: costComparisonX, y: 95, width: cardWidth, height: 88 }
     });
   }
 
-  if (costComparisonMode === 'none') {
-    const secondRowCards = [
-      {
-        id: 'healthcare-professionals-reached',
-        title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
-        value: (campaign.volume_metrics?.total_opens).toLocaleString(),
-        subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
-        x: 30
-      },
-      {
-        id: 'unique-professional-engagements',
-        title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-        value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-        subtitle: undefined,
-        x: 176
-      },
-      {
-        id: 'total-click-rate',
-        title: 'TOTAL CLICK RATE',
-        value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
-        subtitle: undefined,
-        x: 319
-      },
-      {
-        id: 'unique-click-rate',
-        title: 'UNIQUE CLICK RATE',
-        value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-        subtitle: undefined,
-        x: 462
-      },
-      {
-        id: 'one-hour-open-rate',
-        title: 'ONE HOUR OPEN RATE',
-        value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-        subtitle: 'Percent of opens in the first hour',
-        x: 605
-      }
-    ];
-
-    secondRowCards.forEach(card => {
-      components.push({
-        id: card.id,
-        type: 'secondary',
-        title: card.title,
-        value: card.value,
-        subtitle: card.subtitle,
-        position: { x: card.x, y: 228, width: 104, height: 75 },
-        style: {
-          background: themeColors.cardGradient || '#f8fafc',
-          border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-          borderRadius: '6px'
-        }
-      });
+  const secondRowCards = [];
+  
+  if (hasPatientImpact && hasCostComparison) {
+    secondRowCards.push({
+      id: 'healthcare-professionals-second-row',
+      title: 'HEALTHCARE PROFESSIONALS REACHED',
+      value: (campaign.volume_metrics?.delivered).toLocaleString(),
+      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
+      x: 30
     });
   } else {
-    const secondRowCards = [
-      {
-        id: 'healthcare-professionals-reached',
-        title: 'HEALTHCARE PROFESSIONALS REACHED',
-        value: (campaign.volume_metrics?.delivered).toLocaleString(),
-        subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-        x: 30
-      },
-      {
-        id: 'unique-professional-engagements',
-        title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-        value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-        subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-        x: 176
-      },
-      {
-        id: 'total-click-rate',
-        title: 'TOTAL CLICK RATE',
-        value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
-        subtitle: undefined,
-        x: 319
-      },
-      {
-        id: 'unique-click-rate',
-        title: 'UNIQUE CLICK RATE',
-        value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-        subtitle: undefined,
-        x: 462
-      },
-      {
-        id: 'one-hour-open-rate',
-        title: 'ONE HOUR OPEN RATE',
-        value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-        subtitle: 'Immediate Engagement',
-        x: 605
-      }
-    ];
-
-    secondRowCards.forEach(card => {
-      components.push({
-        id: card.id,
-        type: 'secondary',
-        title: card.title,
-        value: card.value,
-        subtitle: card.subtitle,
-        position: { x: card.x, y: 228, width: 104, height: 75 },
-        style: {
-          background: themeColors.cardGradient || '#f8fafc',
-          border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-          borderRadius: '6px'
-        }
-      });
+    secondRowCards.push({
+      id: 'total-professional-engagements',
+      title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
+      value: (campaign.volume_metrics?.total_opens).toLocaleString(),
+      subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
+      x: 30
     });
   }
+
+  secondRowCards.push(
+    {
+      id: 'unique-professional-engagements',
+      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
+      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
+      subtitle: undefined,
+      x: 176
+    },
+    {
+      id: 'total-click-rate',
+      title: 'TOTAL CLICK RATE',
+      value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
+      x: 319
+    },
+    {
+      id: 'unique-click-rate',
+      title: 'UNIQUE CLICK RATE',
+      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
+      subtitle: undefined,
+      x: 462
+    },
+    {
+      id: 'one-hour-open-rate',
+      title: 'ONE HOUR OPEN RATE',
+      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
+      subtitle: 'Percent of opens in the first hour',
+      x: 605
+    }
+  );
+
+  secondRowCards.forEach(card => {
+    components.push({
+      id: card.id,
+      type: 'secondary',
+      title: card.title,
+      value: card.value,
+      subtitle: card.subtitle,
+      position: { x: card.x, y: 228, width: 104, height: 75 },
+      style: {
+        background: themeColors.cardGradient || '#f8fafc',
+        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '6px'
+      }
+    });
+  });
 
   components.push({
     id: 'audience-breakdown',
@@ -201,8 +193,8 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
-  const components = generateSingleNoneTemplate(campaign, theme, mergeSubspecialties, costComparisonMode);
+export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+  const components = generateSingleNoneTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
   
   const audienceComponent = components.find(c => c.id === 'audience-breakdown');
@@ -383,7 +375,7 @@ function generateMultiCampaignTableData(campaigns) {
   return rows;
 }
 
-export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -398,13 +390,29 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
+  const hasPatientImpact = showPatientImpact;
+  const hasCostComparison = costComparisonMode !== 'none';
+  
+  const topRowCards = hasPatientImpact && hasCostComparison ? 3 : 
+                     (hasPatientImpact || hasCostComparison ? 3 : 2);
+  
+  let cardWidth, cardSpacing, startX;
+  if (topRowCards === 2) {
+    cardWidth = 319; 
+    cardSpacing = 41;
+    startX = 30;
+  } else if (topRowCards === 3) {
+    cardWidth = 200;
+    cardSpacing = 40;
+    startX = 30;
+  }
+
   components.push({
     id: 'hero-unique-engagement',
     type: 'hero',
     title: 'UNIQUE ENGAGEMENT RATE',
     value: `${campaign.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-    subtitle: `+${campaign.core_metrics?.performance_vs_industry?.toFixed(1)}% above industry`,
-    position: { x: 30, y: 95, width: 200, height: 88 },
+    position: { x: startX, y: 95, width: cardWidth, height: 88 },
     style: {
       background: themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)',
       color: '#ffffff',
@@ -413,26 +421,15 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
-  components.push({
-    id: 'hero-patient-impact',
-    title: 'POTENTIAL PATIENT IMPACT',
-    value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Estimated patient panel sizes',
-    position: { x: 270, y: 95, width: 200, height: 88 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '8px'
-    }
-  });
-
-  if (costComparisonMode === 'none') {
+  if (!(hasPatientImpact && hasCostComparison)) {
+    const healthcareX = startX + cardWidth + cardSpacing;
     components.push({
-      id: 'cost-comparison',
+      id: 'healthcare-professionals-reached',
+      type: 'metric',
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 510, y: 95, width: 200, height: 88 },
+      position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
       currentTheme: theme,
       style: {
         background: themeColors.cardGradient || '#f8fafc',
@@ -440,100 +437,115 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
         borderRadius: '8px'
       }
     });
+  }
 
+  if (hasPatientImpact) {
+    let patientImpactX;
+    if (hasPatientImpact && hasCostComparison) {
+      patientImpactX = startX + cardWidth + cardSpacing;
+    } else {
+      patientImpactX = startX + (2 * (cardWidth + cardSpacing));
+    }
+      
     components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'secondary',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 30, y: 228, width: 104, height: 75 },
+      id: 'hero-patient-impact',
+      type: 'metric',
+      title: 'POTENTIAL PATIENT IMPACT',
+      value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
+      subtitle: 'Estimated patient panel sizes',
+      position: { x: patientImpactX, y: 95, width: cardWidth, height: 88 },
       style: {
         background: themeColors.cardGradient || '#f8fafc',
         border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
+        borderRadius: '8px'
       }
     });
+  }
 
-    components.push({
-      id: 'unique-professional-engagements',
-      type: 'secondary',
-      title: 'UNIQUE CLICK RATE',
-      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-      subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 176, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-click-rate',
-      type: 'secondary',
-      title: 'ONE HOUR OPEN RATE',
-      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-      subtitle: 'Immediate Engagement',
-      position: { x: 319, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-  } else {
+  if (hasCostComparison) {
+    let costComparisonX;
+    if (hasPatientImpact && hasCostComparison) {
+      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
+    } else {
+      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
+    }
+      
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
       currentTheme: theme,
       contractedCost: 10,
       actualCost: 5,
-      position: { x: 510, y: 95, width: 200, height: 88 }
+      position: { x: costComparisonX, y: 95, width: cardWidth, height: 88 }
     });
+  }
 
-    components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'secondary',
+  const secondRowCards = [];
+  
+  if (hasPatientImpact && hasCostComparison) {
+    secondRowCards.push({
+      id: 'healthcare-professionals-second-row',
       title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (campaign.volume_metrics?.delivered).toLocaleString(),
       subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 30, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
+      x: 30
     });
-
-    components.push({
-      id: 'unique-professional-engagements',
-      type: 'secondary',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 176, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-click-rate',
-      type: 'secondary',
-      title: 'UNIQUE CLICK RATE',
-      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-      subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 319, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
+  } else {
+    secondRowCards.push({
+      id: 'total-professional-engagements',
+      title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
+      value: (campaign.volume_metrics?.total_opens).toLocaleString(),
+      subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
+      x: 30
     });
   }
+
+  secondRowCards.push(
+    {
+      id: 'unique-professional-engagements',
+      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
+      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
+      subtitle: undefined,
+      x: 176
+    },
+    {
+      id: 'total-click-rate',
+      title: 'TOTAL CLICK RATE',
+      value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
+      subtitle: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}% unique click rate`,
+      x: 319
+    },
+    {
+      id: 'unique-click-rate',
+      title: 'UNIQUE CLICK RATE',
+      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
+      subtitle: undefined,
+      x: 462
+    },
+    {
+      id: 'one-hour-open-rate',
+      title: 'ONE HOUR OPEN RATE',
+      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
+      subtitle: 'Percent of opens in the first hour',
+      x: 605
+    }
+  );
+
+  secondRowCards.forEach(card => {
+    components.push({
+      id: card.id,
+      type: 'secondary',
+      title: card.title,
+      value: card.value,
+      subtitle: card.subtitle,
+      position: { x: card.x, y: 228, width: 104, height: 75 },
+      style: {
+        background: themeColors.cardGradient || '#f8fafc',
+        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '6px'
+      }
+    });
+  });
 
   components.push({
     id: 'audience-breakdown',
@@ -556,271 +568,37 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
 
   components.push({
     id: 'additional-table-1',
-    type: 'table',
-    title: 'Social Media Metrics',
-    config: { 
-      customData: [
-        ['LinkedIn CTR', '2.1%'],
-        ['Facebook Reach', '12.5K'],
-        ['Social Shares', '247']
-      ],
-      headers: ['Platform', 'Value']
-    },
-    position: { x: 463, y: 395, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
-
-  components.push({
-    id: 'additional-table-2',
-    type: 'table',
-    title: 'Digital Metrics',
-    config: { 
-      customData: [
-        ['Email CTR', '3.2%'],
-        ['Website Visits', '15.7K'],
-        ['Conversion Rate', '2.8%']
-      ],
-      headers: ['Metric', 'Value']
-    },
-    position: { x: 464, y: 228, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
-
-  return components;
-};
-
-export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
-  const components = [];
-  const themeColors = getThemeColors(theme);
-
-  components.push({
-    id: 'campaign-title',
-    type: 'title',
-    title: campaign.campaign_name || 'Campaign Analysis',
-    position: { x: 20, y: -15, width: 1000, height: 100 },
-    style: {
-      background: 'transparent',
-      color: themeColors.darkGray || '#1f2937'
-    }
-  });
-
-  components.push({
-    id: 'hero-unique-engagement',
-    type: 'hero',
-    title: 'UNIQUE ENGAGEMENT RATE',
-    value: `${campaign.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-    subtitle: `+${campaign.core_metrics?.performance_vs_industry?.toFixed(1)}% above industry`,
-    position: { x: 30, y: 95, width: 200, height: 88 },
-    style: {
-      background: themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)',
-      color: '#ffffff',
-      font: '20px',
-      borderRadius: '8px'
-    }
-  });
-
-  components.push({
-    id: 'hero-patient-impact',
-    title: 'POTENTIAL PATIENT IMPACT',
-    value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-    subtitle: 'Estimated patient panel sizes',
-    position: { x: 270, y: 95, width: 200, height: 88 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '8px'
-    }
-  });
-
-  if (costComparisonMode === 'none') {
-    components.push({
-      id: 'cost-comparison',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 510, y: 95, width: 200, height: 88 },
-      currentTheme: theme,
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '8px'
-      }
-    });
-
-    components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'secondary',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 30, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-professional-engagements',
-      type: 'secondary',
-      title: 'UNIQUE CLICK RATE',
-      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-      subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 176, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-click-rate',
-      type: 'secondary',
-      title: 'ONE HOUR OPEN RATE',
-      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-      subtitle: 'Immediate Engagement',
-      position: { x: 319, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-  } else {
-    components.push({
-      id: 'cost-comparison',
-      type: 'cost-comparison',
-      currentTheme: theme,
-      contractedCost: 10,
-      actualCost: 5,
-      position: { x: 510, y: 95, width: 200, height: 88 }
-    });
-
-    components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'secondary',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: 30, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-professional-engagements',
-      type: 'secondary',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: `${(campaign.volume_metrics?.total_opens).toLocaleString()} total opens`,
-      position: { x: 176, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-
-    components.push({
-      id: 'unique-click-rate',
-      type: 'secondary',
-      title: 'UNIQUE CLICK RATE',
-      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-      subtitle: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}% total click rate`,
-      position: { x: 319, y: 228, width: 104, height: 75 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '6px'
-      }
-    });
-  }
-
-  components.push({
-    id: 'audience-breakdown',
-    type: 'specialty-strips',
-    title: 'AUDIENCE BREAKDOWN',
-    specialties: mergeSubspecialties ? 
-      getTopSpecialties(campaign.specialty_performance, true) : 
-      Object.entries(campaign.specialty_performance)
-        .filter(([name, data]) => {
-          return data.audience_total >= 100 && 
-                !name.toLowerCase().includes('unknown') &&
-                !name.toLowerCase().includes('staff') &&
-                data.unique_open_rate > 0;
-        })
-        .sort((a, b) => b[1].audience_percentage - a[1].audience_percentage)
-        .slice(0, 4),
-    position: { x: 23, y: 350, width: 433, height: 212 },
-    style: { background: 'transparent' }
-  });
-
-  components.push({
-    id: 'additional-table-1',
-    type: 'table',
-    title: 'Social Media Metrics',
-    config: { 
-      customData: [
-        ['LinkedIn CTR', '2.1%'],
-        ['Facebook Reach', '12.5K'],
-        ['Social Shares', '247']
-      ],
-      headers: ['Platform', 'Value']
-    },
-    position: { x: 463, y: 395, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
-
-  components.push({
-    id: 'additional-table-2',
-    type: 'table',
-    title: 'Digital Metrics',
-    config: { 
-      customData: [
-        ['Email CTR', '3.2%'],
-        ['Website Visits', '15.7K'],
-        ['Conversion Rate', '2.8%']
-      ],
-      headers: ['Metric', 'Value']
-    },
-    position: { x: 464, y: 228, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
-
-  components.push({
-    id: 'additional-table-3',
     type: 'table',
     title: 'Video Metrics',
     config: { 
       customData: [
-        ['Video Views', '22.1K'],
-        ['Completion Rate', '78%'],
-        ['Engagement Time', '4.2min']
+        ['Total Time Watched', '24h 27m 6s'],
+        ['Avg Time Watched', '52.7%'],
+        ['Total Impressions', '1,812']
+      ],
+      headers: ['Platform', 'Value']
+    },
+    position: { x: 463, y: 395, width: 261, height: 140 },
+    style: {
+      background: themeColors.cardGradient || '#f8fafc',
+      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+      borderRadius: '6px'
+    }
+  });
+
+  components.push({
+    id: 'additional-table-2',
+    type: 'table',
+    title: 'Online Journal Metrics',
+    config: { 
+      customData: [
+        ['Avg Time in Issue', '3m 19s'],
+        ['Total Page Views', '2,778'],
+        ['Total Issue Visits', '439']
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 752, y: 395, width: 225, height: 140 },
+    position: { x: 464, y: 228, width: 261, height: 140 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -831,7 +609,34 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   return components;
 };
 
-export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
+export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+  const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+  const themeColors = getThemeColors(theme);
+  
+  components.push({
+    id: 'additional-table-3',
+    type: 'table',
+    title: 'Social Media Metrics',
+    config: { 
+      customData: [
+        ['Impressions', '1,000'],
+        ['Engagement Rate', '12%'],
+        ['CTR', '5%']
+      ],
+      headers: ['Metric', 'Value']
+    },
+    position: { x: 752, y: 431, width: 225, height: 104 },
+    style: {
+      background: themeColors.cardGradient || '#f8fafc',
+      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+      borderRadius: '6px'
+    }
+  });
+
+  return components;
+};
+
+export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
   const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
@@ -843,7 +648,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   components.push({
     id: 'multi-campaign-title',
     type: 'title',
-    title: `Multi-Campaign Analysis: ${titleText}`,
+    title: titleText,
     position: { x: 5, y: -5, width: 800, height: 70 },
     style: {
       background: 'transparent',
@@ -851,65 +656,86 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     }
   });
 
-  const multiHeroCards = [
+  const baseCards = [
     {
       id: 'multi-unique-engagement',
       title: 'UNIQUE ENGAGEMENT RATE',
       value: `${aggregatedData.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-      subtitle: 'Aggregated across campaigns',
-      x: 15
+      subtitle: 'Aggregated across campaigns'
     },
     {
-      id: 'multi-patient-impact',
-      title: 'POTENTIAL PATIENT IMPACT',
-      value: `${((aggregatedData.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-      subtitle: 'Combined impact potential',
-      x: 205
-    },
-    {
-      id: 'multi-cost-comparison',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
+      id: 'multi-healthcare-professionals',
+      title: 'HEALTHCARE PROFESSIONALS REACHED', 
       value: (aggregatedData.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((aggregatedData.volume_metrics?.delivered / aggregatedData.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      x: 395
-    },
-    {
-      id: 'multi-professional-engagements',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (aggregatedData.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: 'Total unique professionals',
-      x: 585
+      subtitle: `${((aggregatedData.volume_metrics?.delivered / aggregatedData.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`
     }
   ];
 
-  multiHeroCards.forEach((card, index) => {
-    if (costComparisonMode !== 'none' && card.id === 'multi-professional-engagements') {
-      components.push({
-        id: 'cost-comparison',
-        type: 'cost-comparison',
-        currentTheme: theme,
-        contractedCost: 10,
-        actualCost: 5,
-        position: { x: card.x, y: 90, width: 150, height: 58 }
-      });
-    } else {
-      components.push({
-        id: card.id,
-        type: index === 0 ? 'hero' : 'secondary',
-        title: card.title,
-        value: card.value,
-        subtitle: card.subtitle,
-        position: { x: card.x, y: 90, width: 150, height: 58 },
-        isMulti: true,
-        style: {
-          background: index === 0 ? (themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)') : (themeColors.cardGradient || '#f8fafc'),
-          color: index === 0 ? '#ffffff' : (themeColors.text || '#1f2937'),
-          border: index === 0 ? 'none' : `1px solid ${themeColors.border || '#e2e8f0'}`,
-          borderRadius: '6px'
-        }
-      });
-    }
+  const conditionalCards = [];
+  
+  if (!(showPatientImpact && costComparisonMode !== 'none')) {
+    conditionalCards.push({
+      id: 'multi-professional-engagements',
+      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
+      value: (aggregatedData.volume_metrics?.unique_opens).toLocaleString(),
+      subtitle: 'Total unique professionals'
+    });
+  }
+
+  if (showPatientImpact) {
+    conditionalCards.push({
+      id: 'multi-patient-impact',
+      title: 'POTENTIAL PATIENT IMPACT',
+      value: `${((aggregatedData.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
+      subtitle: 'Combined impact potential'
+    });
+  }
+
+  const allCards = [...baseCards, ...conditionalCards];
+  const totalCards = allCards.length + (costComparisonMode !== 'none' ? 1 : 0);
+  
+  let cardWidth, startX;
+  if (totalCards === 3) {
+    cardWidth = 212;
+    startX = 17;
+  } else {
+    cardWidth = 150;
+    startX = 17;
+  }
+  
+  const cardSpacing = totalCards === 3 ? 41 : 39;
+  
+  allCards.forEach((card, index) => {
+    const x = startX + (index * (cardWidth + cardSpacing));
+    
+    components.push({
+      id: card.id,
+      type: index === 0 ? 'hero' : 'secondary',
+      title: card.title,
+      value: card.value,
+      subtitle: card.subtitle,
+      position: { x, y: 90, width: cardWidth, height: 58 },
+      isMulti: true,
+      style: {
+        background: index === 0 ? (themeColors.heroGradient || 'linear-gradient(135deg, #1e40af, #3b82f6)') : (themeColors.cardGradient || '#f8fafc'),
+        color: index === 0 ? '#ffffff' : (themeColors.text || '#1f2937'),
+        border: index === 0 ? 'none' : `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '6px'
+      }
+    });
   });
+
+  if (costComparisonMode !== 'none') {
+    const costCardX = startX + (allCards.length * (cardWidth + cardSpacing));
+    components.push({
+      id: 'cost-comparison',
+      type: 'cost-comparison',
+      currentTheme: theme,
+      contractedCost: 10,
+      actualCost: 5,
+      position: { x: costCardX, y: 90, width: cardWidth, height: 58 }
+    });
+  }
 
   const tableData = generateMultiCampaignTableData(campaigns);
   components.push({
@@ -924,7 +750,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
         'Unique Click Rate', 'Total Click Rate'
       ]
     },
-    position: { x: 15, y: 190, width: 748, height: 207 },
+    position: { x: 15, y: 188, width: 748, height: 210 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -944,8 +770,8 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
-  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
+export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
   
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
@@ -956,12 +782,12 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
   components.push({
     id: 'additional-table-1',
     type: 'table',
-    title: 'Social Media Metrics',
+    title: 'Online Journal Metrics',
     config: { 
       customData: [
-        ['LinkedIn CTR', '%'],
-        ['Linkedin Engagement Rate', '%'],
-        ['Linkedin Impressions', '#']
+        ['Avg Time in Issue', '3m 19s'],
+        ['Total Page Views', '2,778'],
+        ['Total Issue Visits', '439']
       ],
       headers: ['Metric', 'Value']
     },
@@ -976,8 +802,8 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
-  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
+export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
   
   const firstTable = components.find(c => c.id === 'additional-table-1');
@@ -991,9 +817,9 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
     title: 'Video Metrics',
     config: { 
       customData: [
-        ['Views', '#'],
-        ['Avg Time Watched', '#'],
-        ['Impressions', '#']
+        ['Total Time Watched', '24h 27m 6s'],
+        ['Avg Time Watched', '52.7%'],
+        ['Total Impressions', '1,812']
       ],
       headers: ['Metric', 'Value']
     },
@@ -1008,8 +834,8 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none') => {
-  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode);
+export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
   
   const secondTable = components.find(c => c.id === 'additional-table-2');
@@ -1020,16 +846,15 @@ export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties
   components.push({
     id: 'additional-table-3',
     type: 'table',
-    title: 'Performance Metrics',
+    title: 'Landing Page Impressions',
     config: { 
       customData: [
-        ['CTR', '%'],
-        ['Conversions', '#'],
-        ['ROI', '%']
+        ['300x250', '2,000'],
+        ['728x90', '2,000']
       ],
       headers: ['Metric', 'Value']
     },
-    position: { x: 741, y: 290, width: 244, height: 120 },
+    position: { x: 775, y: 297, width: 208, height: 88 },
     style: {
       background: themeColors.cardGradient || '#f8fafc',
       border: `1px solid ${themeColors.border || '#e2e8f0'}`,
@@ -1052,7 +877,7 @@ export const TEMPLATE_GENERATORS = {
 };
 
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none' } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
   
   if (!generator) {
@@ -1060,9 +885,9 @@ export const generateTemplate = (config) => {
   }
   
   if (type === 'single') {
-    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode);
+    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   } else {
-    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode);
+    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   }
 };
 

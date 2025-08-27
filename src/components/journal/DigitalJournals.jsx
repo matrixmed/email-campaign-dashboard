@@ -9,10 +9,74 @@ const DigitalJournals = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     
+    const BANNED_TITLES = [
+        'no title',
+        'title not found',
+        'untitled',
+        ''
+    ];
+
+    const isTitleBanned = (title) => {
+        if (!title || typeof title !== 'string') return true;
+        const normalizedTitle = title.toLowerCase().trim();
+        return BANNED_TITLES.includes(normalizedTitle);
+    };
+
+    const groupJournalsByTitle = (journals) => {
+        if (!groupByTitle) return journals;
+        
+        const grouped = {};
+        
+        journals.forEach(journal => {
+            const title = journal.title?.trim();
+            if (!title || isTitleBanned(title)) return;
+            
+            if (!grouped[title]) {
+                grouped[title] = {
+                    ...journal,
+                    combinedUrls: [journal.fullUrl || journal.url],
+                    originalJournals: [journal],
+                    timeData: { ...journal.timeData }
+                };
+            } else {
+                grouped[title].combinedUrls.push(journal.fullUrl || journal.url);
+                grouped[title].originalJournals.push(journal);
+                
+                if (journal.timeData) {
+                    Object.keys(journal.timeData).forEach(month => {
+                        if (!grouped[title].timeData[month]) {
+                            grouped[title].timeData[month] = { ...journal.timeData[month] };
+                        } else {
+                            const existing = grouped[title].timeData[month];
+                            const current = journal.timeData[month];
+                            
+                            const totalUsers = (existing.users || 0) + (current.users || 0);
+                            const totalDuration = ((existing.avgDuration || 0) * (existing.users || 0)) + 
+                                                ((current.avgDuration || 0) * (current.users || 0));
+                            const totalBounces = ((existing.bounceRate || 0) * (existing.users || 0)) + 
+                                               ((current.bounceRate || 0) * (current.users || 0));
+                            
+                            existing.users = totalUsers;
+                            existing.avgDuration = totalUsers > 0 ? totalDuration / totalUsers : 0;
+                            existing.bounceRate = totalUsers > 0 ? totalBounces / totalUsers : 0;
+                        }
+                    });
+                }
+                
+                const latestMonthData = getLatestMonthData(grouped[title]);
+                grouped[title].latestMonth = latestMonthData.month;
+                grouped[title].latestMonthUsers = latestMonthData.users;
+            }
+        });
+        
+        return Object.values(grouped);
+    };
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedJournal, setSelectedJournal] = useState(null);
     const [timeframeFilter, setTimeframeFilter] = useState('12');
     const [showUrls, setShowUrls] = useState(false);
+    const [groupByTitle, setGroupByTitle] = useState(true);
     const [aggregateMetrics, setAggregateMetrics] = useState({
         totalUsers: 0,
         avgDuration: 0,
@@ -27,16 +91,19 @@ const DigitalJournals = () => {
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
                 
-                const processedData = jsonData.urls.map(item => {
-                    const latestMonthData = getLatestMonthData(item);
-                    return {
-                        ...item,
-                        latestMonth: latestMonthData.month,
-                        latestMonthUsers: latestMonthData.users
-                    };
-                });
+                const processedData = jsonData.urls
+                    .filter(item => !isTitleBanned(item.title))
+                    .map(item => {
+                        const latestMonthData = getLatestMonthData(item);
+                        return {
+                            ...item,
+                            latestMonth: latestMonthData.month,
+                            latestMonthUsers: latestMonthData.users
+                        };
+                    });
                 
-                const sortedData = processedData.sort((a, b) => b.latestMonthUsers - a.latestMonthUsers);
+                const groupedData = groupJournalsByTitle(processedData);
+                const sortedData = groupedData.sort((a, b) => b.latestMonthUsers - a.latestMonthUsers);
                 setJournalsData(sortedData);
                 setFilteredData(sortedData);
                 
@@ -50,6 +117,38 @@ const DigitalJournals = () => {
     useEffect(() => {
         calculateAggregateMetrics(filteredData, timeframeFilter);
     }, [timeframeFilter, filteredData]);
+
+    useEffect(() => {
+        if (journalsData.length > 0) {
+            const reprocessData = async () => {
+                const blobUrl = "https://emaildash.blob.core.windows.net/json-data/url_data.json?sp=r&st=2025-04-17T15:45:29Z&se=2026-05-16T23:45:29Z&spr=https&sv=2024-11-04&sr=b&sig=JAPRaNxToQbFGXbMjhy0zMrZoL0gm1aM23P8T21Q2kk%3D";
+                try {
+                    const response = await fetch(blobUrl);
+                    const jsonData = await response.json();
+                    
+                    const processedData = jsonData.urls
+                        .filter(item => !isTitleBanned(item.title))
+                        .map(item => {
+                            const latestMonthData = getLatestMonthData(item);
+                            return {
+                                ...item,
+                                latestMonth: latestMonthData.month,
+                                latestMonthUsers: latestMonthData.users
+                            };
+                        });
+                    
+                    const groupedData = groupJournalsByTitle(processedData);
+                    const sortedData = groupedData.sort((a, b) => b.latestMonthUsers - a.latestMonthUsers);
+                    setJournalsData(sortedData);
+                    setFilteredData(sortedData);
+                    
+                    calculateAggregateMetrics(sortedData, timeframeFilter);
+                } catch (error) {
+                }
+            };
+            reprocessData();
+        }
+    }, [groupByTitle]);
 
     function calculateJournalMetricsForTimeframe(journal) {
         if (!journal || !journal.timeData) {
@@ -144,6 +243,7 @@ const DigitalJournals = () => {
         setSearch(searchValue);
         
         const newFilteredData = journalsData.filter(item => {
+            if (isTitleBanned(item.title)) return false;
             const displayText = getDisplayTitle(item).toLowerCase();
             return searchValue.split(' ').every(word => displayText.includes(word));
         });
@@ -173,11 +273,11 @@ const DigitalJournals = () => {
     };
 
     const getDisplayTitle = (item) => {
-        if (!showUrls && item.title && item.title.trim() && item.title.toLowerCase() !== "title not found") {
+        if (!showUrls && item.title && item.title.trim() && !isTitleBanned(item.title)) {
             return formatTitle(item.title);
         }
         if (showUrls) {
-            const title = item.title && item.title.trim() && item.title.toLowerCase() !== "title not found" 
+            const title = item.title && item.title.trim() && !isTitleBanned(item.title) 
                 ? formatTitle(item.title) 
                 : "";
             const url = item.fullUrl || item.url || "";
@@ -273,15 +373,17 @@ const DigitalJournals = () => {
     };
 
     const totalPages = Math.ceil(filteredData.filter(item => {
+        if (isTitleBanned(item.title)) return false;
         if (!showUrls) {
-            return item.title && item.title.trim() && item.title.toLowerCase() !== "title not found";
+            return item.title && item.title.trim();
         }
         return true;
     }).length / rowsPerPage);
     
     const validData = filteredData.filter(item => {
+        if (isTitleBanned(item.title)) return false;
         if (!showUrls) {
-            return item.title && item.title.trim() && item.title.toLowerCase() !== "title not found";
+            return item.title && item.title.trim();
         }
         return true;
     });
@@ -308,6 +410,16 @@ const DigitalJournals = () => {
                     />
                 </div>
                 <div className="digital-journals-controls">
+                    <div className="specialty-combine-toggle">
+                        <input
+                            type="checkbox"
+                            id="groupByTitleToggle"
+                            checked={groupByTitle}
+                            onChange={(e) => setGroupByTitle(e.target.checked)}
+                        />
+                        <label htmlFor="groupByTitleToggle" className="specialty-toggle-slider"></label>
+                        <span className="specialty-toggle-label">Group by Title</span>
+                    </div>
                     <div className="specialty-combine-toggle">
                         <input
                             type="checkbox"
@@ -558,6 +670,38 @@ const DigitalJournals = () => {
                                 )}
                             </div>
                         </div>
+
+                        {groupByTitle && selectedJournal.combinedUrls && selectedJournal.combinedUrls.length > 1 && (
+                            <div className="journal-modal-combined-urls">
+                                <h4>Combined Pages ({selectedJournal.combinedUrls.length} URLs)</h4>
+                                <div className="combined-urls-grid">
+                                    {selectedJournal.combinedUrls
+                                        .sort((a, b) => {
+                                            const getPageNumber = (url) => {
+                                                const lastPart = url.split('/').pop();
+                                                if (lastPart?.match(/^Page\s+(\d+)$/i)) {
+                                                    return parseInt(lastPart.match(/(\d+)/)[1]);
+                                                }
+                                                if (lastPart?.match(/^S-(\d+)$/i)) {
+                                                    return parseInt(lastPart.match(/(\d+)/)[1]);
+                                                }
+                                                return 999;
+                                            };
+                                            return getPageNumber(a) - getPageNumber(b);
+                                        })
+                                        .map((url, index) => {
+                                            const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+                                            return (
+                                                <div key={index} className="combined-url-card">
+                                                    <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="url-card-link">
+                                                        {url.split('/').pop() || `URL ${index + 1}`}
+                                                    </a>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -38,6 +38,7 @@ const DashboardCanvasContent = () => {
   const [budgetedCost, setBudgetedCost] = useState(10.00);
   const [actualCost, setActualCost] = useState(5.00);
   const [costComparisonMode, setCostComparisonMode] = useState('none');
+  const [showPatientImpact, setShowPatientImpact] = useState(false);
   const [currentTheme, setCurrentTheme] = useState('matrix');
   const [userModifications, setUserModifications] = useState(new Map());
   const [userEdits, setUserEdits] = useState(() => {
@@ -78,13 +79,22 @@ const DashboardCanvasContent = () => {
     return components.map(component => {
       const edits = userEdits[component.id];
       if (edits) {
-        return {
+        const updatedComponent = {
           ...component,
           title: edits.title !== undefined ? edits.title : component.title,
           value: edits.value !== undefined ? edits.value : component.value,
           subtitle: edits.subtitle !== undefined ? edits.subtitle : component.subtitle,
           data: edits.data ? { ...component.data, ...edits.data } : component.data
         };
+        
+        if (edits.data && component.config) {
+          updatedComponent.config = {
+            ...component.config,
+            customData: edits.data
+          };
+        }
+        
+        return updatedComponent;
       }
       return component;
     });
@@ -105,7 +115,8 @@ const DashboardCanvasContent = () => {
           theme: currentTheme,
           type: 'single',
           mergeSubspecialties: specialtyMergeMode,
-          costComparisonMode: costComparisonMode
+          costComparisonMode: costComparisonMode,
+          showPatientImpact: showPatientImpact
         };
       } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
         templateConfig = {
@@ -114,7 +125,8 @@ const DashboardCanvasContent = () => {
           theme: currentTheme,
           type: 'multi',
           mergeSubspecialties: specialtyMergeMode,
-          costComparisonMode: costComparisonMode
+          costComparisonMode: costComparisonMode,
+          showPatientImpact: showPatientImpact
         };
       }
       
@@ -127,7 +139,7 @@ const DashboardCanvasContent = () => {
         }
       }
     }
-  }, [specialtyMergeMode, costComparisonMode, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits]);
+  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
     preserveEdit(cardId, newData);
@@ -242,7 +254,8 @@ const DashboardCanvasContent = () => {
       const generatedComponents = generateTemplate({
         ...templateConfig,
         mergeSubspecialties: specialtyMergeMode,
-        costComparisonMode: costComparisonMode
+        costComparisonMode: costComparisonMode,
+        showPatientImpact: showPatientImpact
       });
       setCards(generatedComponents);
       setCurrentTheme(templateConfig.theme);
@@ -400,6 +413,10 @@ const DashboardCanvasContent = () => {
   const handleCostModeChange = useCallback((mode) => {
     setCostComparisonMode(mode);
   }, []);
+
+  const handlePatientImpactToggle = useCallback(() => {
+    setShowPatientImpact(!showPatientImpact);
+  }, [showPatientImpact]);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
     const newCard = {
@@ -697,9 +714,11 @@ const DashboardCanvasContent = () => {
             selectedCampaign={selectedCampaign}
             currentTheme={currentTheme}
             costComparisonMode={costComparisonMode}
+            showPatientImpact={showPatientImpact}
             specialtyMergeMode={specialtyMergeMode}
             onThemeChange={handleThemeChange}
             onCostModeChange={handleCostModeChange}
+            onPatientImpactToggle={handlePatientImpactToggle}
             onCampaignChange={handleCampaignChange}
             onToggleSpecialtyMerge={() => setSpecialtyMergeMode(!specialtyMergeMode)}
             onAddComponent={handleAddMetric}

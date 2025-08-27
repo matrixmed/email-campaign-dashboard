@@ -352,7 +352,6 @@ const Dashboard = () => {
                 handleDeploymentChange={handleDeploymentChange}
             />
             <LiveCampaignMetrics />
-            <ReportsManager/>
             <DigitalJournals />
             <VideoMetrics />
             <SpecialtySection />
@@ -372,7 +371,6 @@ const Dashboard = () => {
             
             <Dash/>
             */}
-
 
             <DashboardCanvas />
 

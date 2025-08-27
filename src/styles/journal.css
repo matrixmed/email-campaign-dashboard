@@ -343,3 +343,104 @@ body.light .journal-modal::-webkit-scrollbar-track {
     font-size: 24px;
   }
 }
+
+/* Combined URLs Section */
+.journal-modal-combined-urls {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-top: 25px;
+}
+
+.journal-modal-combined-urls h4 {
+  color: #0ff;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.combined-urls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.combined-url-card {
+  background-color: #333;
+  border-radius: 6px;
+  padding: 15px;
+  border: 1px solid #444;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.combined-url-card:hover {
+  border-color: #0ff;
+  box-shadow: 0 2px 8px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+
+.url-card-link {
+  color: #0ff;
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+  word-break: break-all;
+  line-height: 1.4;
+  display: block;
+  transition: color 0.2s ease;
+}
+
+.url-card-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.url-card-link::after {
+  content: "↗";
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+
+/* Light theme for combined URLs */
+body.light .journal-modal-combined-urls {
+  background-color: #f5f5f5;
+}
+
+body.light .journal-modal-combined-urls h4 {
+  color: #0077ff;
+}
+
+body.light .combined-url-card {
+  background-color: #fff;
+  border-color: #e0e0e0;
+}
+
+body.light .combined-url-card:hover {
+  border-color: #0077ff;
+  box-shadow: 0 2px 8px rgba(0, 119, 255, 0.2);
+}
+
+
+body.light .url-card-link {
+  color: #0077ff;
+}
+
+body.light .url-card-link:hover {
+  color: #0056b3;
+}
+
+/* Responsive adjustments for combined URLs */
+@media (max-width: 768px) {
+  .combined-urls-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .journal-modal-combined-urls {
+    padding: 15px;
+  }
+}

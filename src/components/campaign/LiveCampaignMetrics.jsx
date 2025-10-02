@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
+import CampaignModal from './CampaignModal';
+import { metricDisplayNames } from '../utils/metricDisplayNames';
 
 const LiveCampaignMetrics = () => {
     const [metrics, setMetrics] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState(null);
     const campaignsPerPage = 2;
 
     useEffect(() => {
@@ -84,6 +88,25 @@ const LiveCampaignMetrics = () => {
     const currentCampaigns = metrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
     const totalPages = Math.ceil(metrics.length / campaignsPerPage);
 
+    const handleCampaignClick = (campaign) => {
+        setSelectedCampaign(campaign);
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedCampaign(null);
+    };
+
+    const handleModalNavigate = (direction) => {
+        const currentIndex = metrics.findIndex(c => c.Campaign === selectedCampaign.Campaign);
+        if (direction === 'next' && currentIndex < metrics.length - 1) {
+            setSelectedCampaign(metrics[currentIndex + 1]);
+        } else if (direction === 'prev' && currentIndex > 0) {
+            setSelectedCampaign(metrics[currentIndex - 1]);
+        }
+    };
+
     const exportToCSV = () => {
         const headers = [
             'Campaign',
@@ -153,7 +176,12 @@ const LiveCampaignMetrics = () => {
             <div className="campaign-grid">
                 {currentCampaigns.map((campaign, index) => (
                     <div key={index} className="campaign-box">
-                        <h3>{campaign.Campaign}</h3>
+                        <h3 
+                            className="campaign-name-clickable" 
+                            onClick={() => handleCampaignClick(campaign)}
+                        >
+                            {campaign.Campaign}
+                        </h3>
                         <p className="text-sm text-gray-600">
                             Deployment date {campaign.Send_Date} ({campaign.DeploymentCount} deployment{campaign.DeploymentCount !== 1 ? 's' : ''})
                         </p>
@@ -226,6 +254,17 @@ const LiveCampaignMetrics = () => {
                     Export CSV
                 </button>
             </div>
+
+            <CampaignModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                campaign={selectedCampaign}
+                compareCampaigns={[]}
+                isCompareMode={false}
+                metricDisplayNames={metricDisplayNames}
+                allCampaigns={metrics}
+                onNavigate={handleModalNavigate}
+            />
         </div>
     );
 };

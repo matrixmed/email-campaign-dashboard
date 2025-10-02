@@ -607,6 +607,16 @@ body.light .dropdown-arrow svg {
   margin-bottom: 10px;
   color: #0ff;
 }
+
+.campaign-name-clickable {
+  cursor: pointer;
+  color: #0ff !important;
+  transition: color 0.2s ease;
+}
+
+.campaign-name-clickable:hover {
+  color: #fff !important;
+}
  
 .campaign-box table {
   width: 100%;
@@ -845,6 +855,14 @@ body.light .live-campaign-metrics h3 {
 body.light .live-campaign-metrics .campaign-box {
   background-color: #f9f9f9 !important; 
   border-color: #ddd;
+}
+
+body.light .campaign-name-clickable {
+  color: #0077ff !important;
+}
+
+body.light .campaign-name-clickable:hover {
+  color: #333 !important;
 }
 
 body.light .live-campaign-metrics table tr:nth-child(odd) {

@@ -16,7 +16,7 @@ import { calculateAlignmentGuides, AlignmentGuides } from './template/AlignmentG
 import { createGroup, ungroupComponents, getComponentsInRect, SelectionBox, MultiSelectToolbar } from './template/ComponentGrouping';
 import TemplateSelectionModal from './TemplateSelectionModal';
 import { generateTemplate } from './template/TemplateLibrary';
-import { getThemeLogo, getMetricValue } from './template/LayoutTemplates';
+import { getThemeLogo, getMetricValue, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS, getSmartTableSelection } from './template/LayoutTemplates';
 
 const DashboardCanvasContent = () => {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -44,6 +44,14 @@ const DashboardCanvasContent = () => {
   const [userEdits, setUserEdits] = useState(() => {
     const saved = localStorage.getItem('dashboard-user-edits');
     return saved ? JSON.parse(saved) : {};
+  });
+  const [deletedCardIds, setDeletedCardIds] = useState(new Set());
+  
+  // Table selection state
+  const [selectedTableTypes, setSelectedTableTypes] = useState({
+    table1: TABLE_TYPES.ONLINE_JOURNAL,
+    table2: TABLE_TYPES.VIDEO_METRICS, 
+    table3: TABLE_TYPES.SOCIAL_MEDIA
   });
   const canvasRef = useRef(null);
 
@@ -83,11 +91,17 @@ const DashboardCanvasContent = () => {
           ...component,
           title: edits.title !== undefined ? edits.title : component.title,
           value: edits.value !== undefined ? edits.value : component.value,
-          subtitle: edits.subtitle !== undefined ? edits.subtitle : component.subtitle,
-          data: edits.data ? { ...component.data, ...edits.data } : component.data
+          subtitle: edits.subtitle !== undefined ? edits.subtitle : component.subtitle
         };
         
-        if (edits.data && component.config) {
+        // Handle table data preservation
+        if (edits.config?.customData) {
+          updatedComponent.config = {
+            ...component.config,
+            customData: edits.config.customData
+          };
+        } else if (edits.data) {
+          // Legacy support for old data format
           updatedComponent.config = {
             ...component.config,
             customData: edits.data
@@ -104,8 +118,15 @@ const DashboardCanvasContent = () => {
     localStorage.setItem('dashboard-user-edits', JSON.stringify(userEdits));
   }, [userEdits]);
 
+  // Template regeneration should only happen for specific triggers, not card edits
+  const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
+
   useEffect(() => {
-    if (cards.length > 0 && currentTemplate) {
+    const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showPatientImpact}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
+    
+    
+    // Only regenerate if this is a new trigger, not just a card edit
+    if (triggerKey !== lastRegenerationTrigger && cards.length > 0 && currentTemplate) {
       let templateConfig;
       
       if (selectedCampaign) {
@@ -116,7 +137,8 @@ const DashboardCanvasContent = () => {
           type: 'single',
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
-          showPatientImpact: showPatientImpact
+          showPatientImpact: showPatientImpact,
+          selectedTableTypes: selectedTableTypes
         };
       } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
         templateConfig = {
@@ -126,35 +148,108 @@ const DashboardCanvasContent = () => {
           type: 'multi',
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
-          showPatientImpact: showPatientImpact
+          showPatientImpact: showPatientImpact,
+          selectedTableTypes: selectedTableTypes
         };
       }
       
       if (templateConfig) {
         try {
+          // Get existing custom components BEFORE regeneration
+          const existingCards = [...cards];
+          
+          // Identify custom components by ID pattern (section property gets lost during card operations)
+          const isCustomComponent = (comp) => {
+            return (comp.id.startsWith('table-') || 
+                    comp.id.startsWith('chart-') || 
+                    comp.id.startsWith('custom-') ||
+                    comp.id.startsWith('authority-') ||
+                    comp.id.startsWith('geographic-')) && 
+                   !deletedCardIds.has(comp.id);
+          };
+          
+          const customComponents = existingCards.filter(isCustomComponent);
+          
+          // Apply current theme to custom components
+          const themeColors = getThemeColors(currentTheme);
+          const themedCustomComponents = customComponents.map(comp => ({
+            ...comp,
+            style: {
+              ...comp.style,
+              background: themeColors.cardGradient || '#ffffff',
+              border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+              color: themeColors.text || '#1f2937'
+            }
+          }));
+          
           const regeneratedComponents = generateTemplate(templateConfig);
           const preservedComponents = applyPreservedEdits(regeneratedComponents);
-          setCards(preservedComponents);
+          
+          // Preserve user deletions - filter out deleted components from template
+          const filteredComponents = preservedComponents.filter(comp => 
+            !deletedCardIds.has(comp.id)
+          );
+          
+          // Only preserve positions if the template layout hasn't fundamentally changed
+          // (i.e., only theme changes, not structural changes like patient impact/cost)
+          const structuralChangeKeys = ['costComparisonMode', 'showPatientImpact'];
+          const currentStructuralState = `${costComparisonMode}-${showPatientImpact}`;
+          const lastStructuralState = lastRegenerationTrigger.split('-').slice(1, 3).join('-');
+          const isStructuralChange = currentStructuralState !== lastStructuralState;
+          
+          const updatedCards = filteredComponents.map(newComp => {
+            const existingComp = existingCards.find(existing => existing.id === newComp.id);
+            if (existingComp && !isStructuralChange) {
+              // Only preserve position for theme-only changes, not structural changes
+              return {
+                ...newComp,
+                position: existingComp.position, // Preserve position
+                // Update only theme-related style properties
+                style: {
+                  ...existingComp.style,
+                  background: newComp.style?.background || existingComp.style?.background,
+                  color: newComp.style?.color || existingComp.style?.color,
+                  border: newComp.style?.border || existingComp.style?.border
+                }
+              };
+            }
+            return newComp; // Use new position for structural changes or new components
+          });
+          
+          const finalCards = [...updatedCards, ...themedCustomComponents];
+          setCards(finalCards);
+          setLastRegenerationTrigger(triggerKey);
         } catch (error) {
+          console.error('Template regeneration failed:', error);
         }
       }
     }
-  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits]);
+  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
-    preserveEdit(cardId, newData);
+    // Normalize table data format - convert data to config.customData if needed
+    const normalizedData = { ...newData };
+    if (newData.data && !newData.config) {
+      normalizedData.config = { customData: newData.data };
+      delete normalizedData.data;
+    } else if (newData.data && newData.config) {
+      normalizedData.config = { ...newData.config, customData: newData.data };
+      delete normalizedData.data;
+    }
+    
+    preserveEdit(cardId, normalizedData);
     
     const modifications = userModifications.get(cardId) || new Set();
     
-    if (newData.title !== undefined) modifications.add('title');
-    if (newData.value !== undefined) modifications.add('value');
-    if (newData.subtitle !== undefined) modifications.add('subtitle');
-    if (newData.config?.customData !== undefined) modifications.add('tableData');
+    if (normalizedData.title !== undefined) modifications.add('title');
+    if (normalizedData.value !== undefined) modifications.add('value');
+    if (normalizedData.subtitle !== undefined) modifications.add('subtitle');
+    if (normalizedData.config?.customData !== undefined || newData.data !== undefined) modifications.add('tableData');
     
     setUserModifications(prev => new Map(prev.set(cardId, modifications)));
     
     setCards(prev => prev.map(card => 
-      card.id === cardId ? { ...card, ...newData } : card
+      card.id === cardId ? { ...card, ...normalizedData } : card
     ));
   }, [preserveEdit, userModifications]);
 
@@ -174,14 +269,16 @@ const DashboardCanvasContent = () => {
                                !e.target.closest('.template-modal') &&
                                !e.target.closest('button') &&
                                !e.target.closest('input') &&
-                               !e.target.closest('select');
+                               !e.target.closest('select') &&
+                               !e.target.closest('td') &&
+                               !e.target.closest('th');
   
-    if (isClickOutsideCards) {
+  
+    if (isClickOutsideCards && !isEditing) {
       setSelectedElement(null);
       setSelectedComponents([]);
-      setIsEditing(null);
     }
-  }, []);
+  }, [isEditing]);
 
   const handleGlobalKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
@@ -205,6 +302,7 @@ const DashboardCanvasContent = () => {
     const cardToDelete = cards.find(card => card.id === cardId);
     if (cardToDelete) {
       setDeletedCards(prev => [...prev, cardToDelete]);
+      setDeletedCardIds(prev => new Set([...prev, cardId])); // Track deleted IDs permanently
       setCards(prev => prev.filter(card => card.id !== cardId));
     }
   }, [cards]);
@@ -255,12 +353,14 @@ const DashboardCanvasContent = () => {
         ...templateConfig,
         mergeSubspecialties: specialtyMergeMode,
         costComparisonMode: costComparisonMode,
-        showPatientImpact: showPatientImpact
+        showPatientImpact: showPatientImpact,
+        selectedTableTypes: selectedTableTypes
       });
       setCards(generatedComponents);
       setCurrentTheme(templateConfig.theme);
       setCurrentTemplate(templateConfig.template);
       setDeletedCards([]);
+      setDeletedCardIds(new Set()); // Reset deleted card tracking
       setUploadedImages([]);
       
       if (templateConfig.type === 'single' && templateConfig.campaigns.length > 0) {
@@ -271,19 +371,28 @@ const DashboardCanvasContent = () => {
         setSelectedMultiCampaigns(templateConfig.campaigns);
       }
     } catch (error) {
+      console.error('Template selection failed:', error);
     }
-  }, [specialtyMergeMode, costComparisonMode]);
+  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, selectedTableTypes]);
 
   const handleThemeChange = useCallback((newTheme) => {
     setCurrentTheme(newTheme);
-    setCards(prev => prev.map(card => ({
-      ...card,
-      themeUpdateTimestamp: Date.now()
-    })));
+    // Template regeneration useEffect will handle updating the cards with new theme
   }, []);
 
   const handleCampaignChange = useCallback((newCampaign) => {
     setSelectedCampaign(newCampaign);
+    
+    // Smart table selection based on campaign title
+    if (newCampaign?.campaign_name) {
+      const smartOrder = getSmartTableSelection(newCampaign.campaign_name);
+      setSelectedTableTypes({
+        table1: smartOrder[0] || TABLE_TYPES.ONLINE_JOURNAL,
+        table2: smartOrder[1] || TABLE_TYPES.VIDEO_METRICS,
+        table3: smartOrder[2] || TABLE_TYPES.SOCIAL_MEDIA
+      });
+    }
+    
     if (newCampaign) {
       setCards(prev => prev.map(card => {
         if (card.type === 'metric' && card.originalKey) {
@@ -292,6 +401,13 @@ const DashboardCanvasContent = () => {
         return card;
       }));
     }
+  }, []);
+
+  const handleTableTypeChange = useCallback((tablePosition, newType) => {
+    setSelectedTableTypes(prev => ({
+      ...prev,
+      [tablePosition]: newType
+    }));
   }, []);
 
   const handleCanvasMouseDown = useCallback((e) => {
@@ -419,6 +535,7 @@ const DashboardCanvasContent = () => {
   }, [showPatientImpact]);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
+    const themeColors = getThemeColors(currentTheme);
     const newCard = {
       id: `custom-${Date.now()}`,
       type: cardType,
@@ -431,11 +548,17 @@ const DashboardCanvasContent = () => {
         width: 200, 
         height: 100 
       },
+      style: {
+        background: themeColors.cardGradient || '#ffffff',
+        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '8px',
+        color: themeColors.text || '#1f2937'
+      },
       section: 'custom'
     };
     
     setCards(prev => [...prev, newCard]);
-  }, [cards.length]);
+  }, [cards.length, currentTheme]);
 
   const handleAddMetric = useCallback((item) => {
     if (item.id && item.type && item.position) {
@@ -444,6 +567,7 @@ const DashboardCanvasContent = () => {
     }
 
     if (item.type === 'table') {
+      const themeColors = getThemeColors(currentTheme);
       const newTable = {
         id: `table-${Date.now()}`,
         type: 'table',
@@ -455,10 +579,17 @@ const DashboardCanvasContent = () => {
           width: 400, 
           height: 300 
         },
+        style: {
+          background: themeColors.cardGradient || '#ffffff',
+          border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+          borderRadius: '8px',
+          color: themeColors.text || '#1f2937'
+        },
         section: 'custom'
       };
       setCards(prev => [...prev, newTable]);
     } else if (item.type === 'chart') {
+      const themeColors = getThemeColors(currentTheme);
       const newChart = {
         id: `chart-${Date.now()}`,
         type: 'chart',
@@ -469,6 +600,12 @@ const DashboardCanvasContent = () => {
           y: 100 + (cards.length * 20), 
           width: 350, 
           height: 250 
+        },
+        style: {
+          background: themeColors.cardGradient || '#ffffff',
+          border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+          borderRadius: '8px',
+          color: themeColors.text || '#1f2937'
         },
         section: 'custom'
       };
@@ -507,6 +644,11 @@ const DashboardCanvasContent = () => {
   const handleRestoreCard = useCallback((card) => {
     setCards(prev => [...prev, card]);
     setDeletedCards(prev => prev.filter(c => c.id !== card.id));
+    setDeletedCardIds(prev => {
+      const newSet = new Set([...prev]);
+      newSet.delete(card.id);
+      return newSet;
+    });
   }, []);
 
   const handleImageUpload = useCallback((imageData, position = null) => {
@@ -728,6 +870,9 @@ const DashboardCanvasContent = () => {
             onActualCostChange={handleActualCostChange}
             deletedCards={deletedCards}
             onRestoreCard={handleRestoreCard}
+            currentTemplate={currentTemplate?.id || 'single'}
+            selectedTableTypes={selectedTableTypes}
+            onTableTypeChange={handleTableTypeChange}
           />
         </div>
 
@@ -901,7 +1046,12 @@ const DashboardCanvasContent = () => {
                         />
                       );
                     }
-                    
+
+                    // Skip rendering image types here - they're rendered separately below
+                    if (card.type === 'image') {
+                      return null;
+                    }
+
                     return (
                       <MetricCard
                         key={card.id}
@@ -928,6 +1078,25 @@ const DashboardCanvasContent = () => {
                       onDelete={handleImageDelete}
                       isSelected={selectedElement === image.id}
                       onSelect={() => setSelectedElement(image.id)}
+                    />
+                  ))}
+
+                  {/* Render logo images from template */}
+                  {cards.filter(card => card.type === 'image').map(image => (
+                    <img
+                      key={image.id}
+                      src={image.src}
+                      alt="Matrix Logo"
+                      style={{
+                        position: 'absolute',
+                        left: `${image.position.x}px`,
+                        top: `${image.position.y}px`,
+                        width: `${image.position.width}px`,
+                        height: `${image.position.height}px`,
+                        objectFit: 'contain',
+                        pointerEvents: 'none',
+                        zIndex: 5
+                      }}
                     />
                   ))}
 

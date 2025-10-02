@@ -1,27 +1,85 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import '../../styles/CampaignModal.css';
 
-const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareMode, metricDisplayNames }) => {
+const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareMode, metricDisplayNames, allCampaigns = [], onNavigate }) => {
     const modalRef = useRef(null);
+    const [campaignMetadata, setCampaignMetadata] = useState(null);
+    const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+
+    const currentIndex = campaign && allCampaigns.length > 0
+        ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
+        : -1;
+    const hasPrev = currentIndex > 0;
+    const hasNext = currentIndex >= 0 && currentIndex < allCampaigns.length - 1;
 
     useEffect(() => {
         function handleClickOutside(event) {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
+                // Don't close if clicking on navigation arrows
+                if (!event.target.closest('.modal-nav-arrow')) {
+                    onClose();
+                }
+            }
+        }
+
+        function handleKeyDown(event) {
+            if (!isOpen || isCompareMode) return;
+
+            if (event.key === 'ArrowLeft' && hasPrev && onNavigate) {
+                event.preventDefault();
+                onNavigate('prev');
+            } else if (event.key === 'ArrowRight' && hasNext && onNavigate) {
+                event.preventDefault();
+                onNavigate('next');
+            } else if (event.key === 'Escape') {
                 onClose();
             }
         }
-        
+
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleKeyDown);
         } else {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         }
-        
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, isCompareMode, hasPrev, hasNext, onNavigate]);
+
+    useEffect(() => {
+        async function fetchCampaignMetadata() {
+            if (!isOpen || !campaign || isCompareMode) return;
+            
+            setIsLoadingMetadata(true);
+            try {
+                const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metadata.json?sp=r&st=2025-09-03T19:53:53Z&se=2027-09-29T04:08:53Z&spr=https&sv=2024-11-04&sr=b&sig=JWxxARzWg4FN%2FhGa17O3RGffl%2BVyJ%2FkE3npL9Iws%2FIs%3D";
+                const response = await fetch(blobUrl);
+                const jsonData = await response.json();
+                
+                const baseCampaignName = formatCampaignName(campaign.Campaign).toLowerCase();
+                const matchingCampaigns = jsonData.filter(item => 
+                    item.base_campaign_name.toLowerCase().includes(baseCampaignName) ||
+                    baseCampaignName.includes(item.base_campaign_name.toLowerCase())
+                );
+                
+                if (matchingCampaigns.length > 0) {
+                    const combinedMetadata = combineDeploymentMetadata(matchingCampaigns);
+                    setCampaignMetadata(combinedMetadata);
+                }
+            } catch (error) {
+                console.error('Error fetching campaign metadata:', error);
+            } finally {
+                setIsLoadingMetadata(false);
+            }
+        }
+        
+        fetchCampaignMetadata();
+    }, [isOpen, campaign, isCompareMode]);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -51,6 +109,147 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
 
     const formatCampaignName = (name) => {
         return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
+    };
+
+    const combineDeploymentMetadata = (deployments) => {
+        if (deployments.length === 1) {
+            return deployments[0];
+        }
+
+        const combined = { ...deployments[0] };
+        
+        // Time-based open rates: weighted average by total_unique_opens
+        if (deployments[0].time_based_open_rates) {
+            let totalUniqueOpens = 0;
+            let weighted1Hour = 0;
+            let weighted12Hour = 0;
+            let weighted24Hour = 0;
+            
+            deployments.forEach(d => {
+                const opens = d.time_based_open_rates.total_unique_opens || 0;
+                totalUniqueOpens += opens;
+                weighted1Hour += (d.time_based_open_rates["1_hour_open_rate"] || 0) * opens;
+                weighted12Hour += (d.time_based_open_rates["12_hour_open_rate"] || 0) * opens;
+                weighted24Hour += (d.time_based_open_rates["24_hour_open_rate"] || 0) * opens;
+            });
+            
+            combined.time_based_open_rates = {
+                total_delivered: deployments.reduce((sum, d) => sum + (d.time_based_open_rates.total_delivered || 0), 0),
+                total_unique_opens: totalUniqueOpens,
+                "1_hour_open_rate": totalUniqueOpens > 0 ? weighted1Hour / totalUniqueOpens : 0,
+                "12_hour_open_rate": totalUniqueOpens > 0 ? weighted12Hour / totalUniqueOpens : 0,
+                "24_hour_open_rate": totalUniqueOpens > 0 ? weighted24Hour / totalUniqueOpens : 0
+            };
+        }
+
+        // Audience breakdown: use combined opens, deployment 1 delivered for rates
+        if (deployments[0].audience_breakdown) {
+            combined.audience_breakdown = {};
+            const allAudienceTypes = new Set();
+            deployments.forEach(d => Object.keys(d.audience_breakdown || {}).forEach(key => allAudienceTypes.add(key)));
+            
+            // Get deployment 1 data (first deployment chronologically or marked as deployment 1)
+            const deployment1 = deployments.find(d => d.campaign_name && /deployment\s*#?\s*1\s*$/i.test(d.campaign_name)) || deployments[0];
+            
+            // Calculate total delivered from deployment 1 only
+            const totalDeliveredDeployment1 = Object.values(deployment1.audience_breakdown || {}).reduce((sum, audience) => sum + (audience.delivered || 0), 0);
+            
+            allAudienceTypes.forEach(audienceType => {
+                const deployment1Delivered = deployment1.audience_breakdown[audienceType]?.delivered || 0;
+                const totalOpens = deployments.reduce((sum, d) => sum + (d.audience_breakdown[audienceType]?.opens || 0), 0);
+                
+                combined.audience_breakdown[audienceType] = {
+                    delivered: deployment1Delivered,
+                    opens: totalOpens,
+                    open_rate: deployment1Delivered > 0 ? (totalOpens / deployment1Delivered) * 100 : 0,
+                    percentage_of_audience: totalDeliveredDeployment1 > 0 ? (deployment1Delivered / totalDeliveredDeployment1) * 100 : 0
+                };
+            });
+        }
+
+        // Geographic breakdown: use combined opens, deployment 1 delivered for rates  
+        if (deployments[0].geographic_breakdown) {
+            combined.geographic_breakdown = {};
+            const regions = Object.keys(deployments[0].geographic_breakdown);
+            
+            // Get deployment 1 data
+            const deployment1 = deployments.find(d => d.campaign_name && /deployment\s*#?\s*1\s*$/i.test(d.campaign_name)) || deployments[0];
+            
+            // Calculate total delivered from deployment 1 only
+            const totalDeliveredDeployment1 = Object.values(deployment1.geographic_breakdown || {}).reduce((sum, region) => sum + (region.delivered || 0), 0);
+            
+            regions.forEach(region => {
+                const deployment1Delivered = deployment1.geographic_breakdown[region]?.delivered || 0;
+                const totalOpens = deployments.reduce((sum, d) => sum + (d.geographic_breakdown[region]?.opens || 0), 0);
+                
+                combined.geographic_breakdown[region] = {
+                    delivered: deployment1Delivered,
+                    opens: totalOpens,
+                    open_rate: deployment1Delivered > 0 ? (totalOpens / deployment1Delivered) * 100 : 0,
+                    percentage_of_audience: totalDeliveredDeployment1 > 0 ? (deployment1Delivered / totalDeliveredDeployment1) * 100 : 0
+                };
+            });
+        }
+
+        // Device breakdown: weighted average by total_opens
+        if (deployments[0].device_breakdown) {
+            let totalOpens = 0;
+            let weightedMobile = 0;
+            let weightedDesktop = 0;
+            
+            deployments.forEach(d => {
+                const opens = d.device_breakdown.total_opens || 0;
+                totalOpens += opens;
+                weightedMobile += (d.device_breakdown.mobile_rate || 0) * opens;
+                weightedDesktop += (d.device_breakdown.desktop_rate || 0) * opens;
+            });
+            
+            const mobileRate = totalOpens > 0 ? weightedMobile / totalOpens : 0;
+            const desktopRate = totalOpens > 0 ? weightedDesktop / totalOpens : 0;
+            const unknownRate = 100 - mobileRate - desktopRate;
+            
+            combined.device_breakdown = {
+                mobile_rate: mobileRate,
+                desktop_rate: desktopRate,
+                unknown_rate: Math.max(0, unknownRate), // Ensure non-negative
+                total_opens: totalOpens
+            };
+        }
+
+        // What was clicked: aggregate clicks and recalculate percentages
+        if (deployments[0].what_was_clicked) {
+            const allLinks = {};
+            let totalClicksAfterFiltering = 0;
+            let totalBotClicksRemoved = 0;
+
+            deployments.forEach(d => {
+                if (d.what_was_clicked) {
+                    totalClicksAfterFiltering += d.what_was_clicked.total_clicks_after_filtering || 0;
+                    totalBotClicksRemoved += d.what_was_clicked.total_bot_clicks_removed || 0;
+                    
+                    (d.what_was_clicked.links || []).forEach(link => {
+                        if (allLinks[link.url]) {
+                            allLinks[link.url].clicks += link.clicks;
+                        } else {
+                            allLinks[link.url] = { ...link };
+                        }
+                    });
+                }
+            });
+
+            const linksArray = Object.values(allLinks).map(link => ({
+                ...link,
+                percentage: totalClicksAfterFiltering > 0 ? (link.clicks / totalClicksAfterFiltering) * 100 : 0
+            })).sort((a, b) => b.clicks - a.clicks);
+
+            combined.what_was_clicked = {
+                links: linksArray,
+                total_clicks_after_filtering: totalClicksAfterFiltering,
+                total_bot_clicks_removed: totalBotClicksRemoved
+            };
+        }
+
+        return combined;
     };
 
     const getDeploymentNumber = (campaignName) => {
@@ -101,6 +300,30 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
 
     return (
         <div className="campaign-modal-overlay">
+            {!isCompareMode && hasPrev && onNavigate && (
+                <button
+                    className="modal-nav-arrow modal-nav-left"
+                    onClick={() => onNavigate('prev')}
+                    aria-label="Previous campaign"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            )}
+
+            {!isCompareMode && hasNext && onNavigate && (
+                <button
+                    className="modal-nav-arrow modal-nav-right"
+                    onClick={() => onNavigate('next')}
+                    aria-label="Next campaign"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            )}
+
             <div className="campaign-modal" ref={modalRef}>
                 {isCompareMode ? (
                     <>
@@ -345,6 +568,152 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 </ResponsiveContainer>
                             </div>
                         </div>
+
+                        {campaignMetadata && (
+                            <>
+                                {campaignMetadata.time_based_open_rates && (
+                                    <div className="time-based-section">
+                                        <h4>Time-Based Open Rates</h4>
+                                        <div className="time-based-metrics">
+                                            <div className="time-metric-card">
+                                                <div className="time-metric-label">1 Hour</div>
+                                                <div className="time-metric-value">{formatPercentage(campaignMetadata.time_based_open_rates["1_hour_open_rate"])}</div>
+                                            </div>
+                                            <div className="time-metric-card">
+                                                <div className="time-metric-label">12 Hours</div>
+                                                <div className="time-metric-value">{formatPercentage(campaignMetadata.time_based_open_rates["12_hour_open_rate"])}</div>
+                                            </div>
+                                            <div className="time-metric-card">
+                                                <div className="time-metric-label">24 Hours</div>
+                                                <div className="time-metric-value">{formatPercentage(campaignMetadata.time_based_open_rates["24_hour_open_rate"])}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {campaignMetadata.geographic_breakdown && (
+                                    <div className="geographic-section">
+                                        <h4>Geographic Metrics</h4>
+                                        <div className="geographic-grid">
+                                            {Object.entries(campaignMetadata.geographic_breakdown).map(([region, data]) => (
+                                                <div key={region} className="geographic-card">
+                                                    <div className="geographic-region">{region.toUpperCase()}</div>
+                                                    <div className="geographic-stats">
+                                                        <div className="geographic-stat">
+                                                            <span className="stat-label">Delivered:</span>
+                                                            <span className="stat-value">{formatNumber(data.delivered)}</span>
+                                                        </div>
+                                                        <div className="geographic-stat">
+                                                            <span className="stat-label">Opens:</span>
+                                                            <span className="stat-value">{formatNumber(data.opens)}</span>
+                                                        </div>
+                                                        <div className="geographic-stat">
+                                                            <span className="stat-label">Open Rate:</span>
+                                                            <span className="stat-value">{formatPercentage(data.open_rate)}</span>
+                                                        </div>
+                                                        <div className="geographic-stat">
+                                                            <span className="stat-label">% of Audience:</span>
+                                                            <span className="stat-value">{formatPercentage(data.percentage_of_audience)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {campaignMetadata.audience_breakdown && (
+                                    <div className="audience-section">
+                                        <h4>Audience Breakdowns</h4>
+                                        <div className="audience-grid">
+                                            {Object.entries(campaignMetadata.audience_breakdown)
+                                                .sort((a, b) => b[1].percentage_of_audience - a[1].percentage_of_audience)
+                                                .slice(0, 6)
+                                                .map(([audienceType, data]) => (
+                                                    <div key={audienceType} className="audience-card">
+                                                        <div className="audience-type">{audienceType}</div>
+                                                        <div className="audience-metrics">
+                                                            <div className="audience-primary-metric">
+                                                                <span className="primary-label">% of Audience</span>
+                                                                <span className="primary-value">{formatPercentage(data.percentage_of_audience)}</span>
+                                                            </div>
+                                                            <div className="audience-secondary-metrics">
+                                                                <div className="secondary-metric">
+                                                                    <span>Delivered: {formatNumber(data.delivered)}</span>
+                                                                </div>
+                                                                <div className="secondary-metric">
+                                                                    <span>Opens: {formatNumber(data.opens)}</span>
+                                                                </div>
+                                                                <div className="secondary-metric">
+                                                                    <span>Open Rate: {formatPercentage(data.open_rate)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                  {campaignMetadata.device_breakdown && (
+                                    <div className="device-section">
+                                        <h4>Device Usage</h4>
+                                        <div className="device-stats">
+                                            <div className="device-card">
+                                                <div className="device-label">Desktop</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.desktop_rate)}</div>
+                                            </div>
+                                            <div className="device-card">
+                                                <div className="device-label">Mobile</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.mobile_rate)}</div>
+                                            </div>
+                                            <div className="device-card">
+                                                <div className="device-label">Unknown</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.unknown_rate)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {campaignMetadata.what_was_clicked && (
+                                    <div className="clicks-section">
+                                        <h4>What Was Clicked</h4>
+                                        <div className="clicks-summary">
+                                            <div className="clicks-stat">
+                                                <span className="clicks-label">Total Clicks (Filtered):</span>
+                                                <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_clicks_after_filtering)}</span>
+                                            </div>
+                                            <div className="clicks-stat">
+                                                <span className="clicks-label">Bot Clicks Removed:</span>
+                                                <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_bot_clicks_removed)}</span>
+                                            </div>
+                                        </div>
+                                        <div className="clicks-links">
+                                            {campaignMetadata.what_was_clicked.links.slice(0, 5).map((link, index) => (
+                                                <div key={index} className="click-link-card">
+                                                    <div className="link-url">
+                                                        <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                                            {link.url}
+                                                        </a>
+                                                    </div>
+                                                    <div className="link-stats">
+                                                        <span className="link-clicks">{formatNumber(link.clicks)} clicks</span>
+                                                        <span className="link-percentage">({formatPercentage(link.percentage)})</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {isLoadingMetadata && (
+                            <div className="loading-metadata">
+                                <div className="loading-spinner"></div>
+                                <span>Loading extended analytics...</span>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

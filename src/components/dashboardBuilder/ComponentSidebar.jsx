@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES } from './template/LayoutTemplates';
+import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES, TABLE_DEFINITIONS } from './template/LayoutTemplates';
 
 const ComponentSidebar = ({ 
   isOpen, 
@@ -21,7 +21,10 @@ const ComponentSidebar = ({
   budgetedCost,
   actualCost, 
   onBudgetedCostChange,
-  onActualCostChange
+  onActualCostChange,
+  currentTemplate = 'single',
+  selectedTableTypes = {},
+  onTableTypeChange
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
@@ -478,6 +481,58 @@ const ComponentSidebar = ({
                   }}
                 />
               </div>
+
+              {(currentTemplate === 'single-two' || currentTemplate === 'single-three' || currentTemplate === 'multi-two' || currentTemplate === 'multi-three') && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>
+                    Table Configuration
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {Array.from({ length: (currentTemplate === 'single-two' || currentTemplate === 'multi-two') ? 2 : 3 }, (_, index) => {
+                      const tablePosition = index + 1;
+                      const currentSelection = selectedTableTypes[`table${tablePosition}`] || TABLE_TYPES.ONLINE_JOURNAL;
+                      
+                      return (
+                        <div key={tablePosition} style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          padding: '12px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                          <label style={{ 
+                            color: 'white', 
+                            display: 'block', 
+                            marginBottom: '6px', 
+                            fontWeight: '600',
+                            fontSize: '13px'
+                          }}>
+                            Table {tablePosition}
+                          </label>
+                          <select 
+                            value={currentSelection}
+                            onChange={(e) => onTableTypeChange?.(`table${tablePosition}`, e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {Object.entries(TABLE_DEFINITIONS).map(([key, definition]) => (
+                              <option key={key} value={key} style={{ background: '#1e293b', color: 'white' }}>
+                                {definition.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>

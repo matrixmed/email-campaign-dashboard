@@ -104,6 +104,15 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
         setIsModalOpen(true);
         setIsCompareMode(false);
     };
+
+    const handleModalNavigate = (direction) => {
+        const currentIndex = currentRows.findIndex(c => c.Campaign === selectedCampaign.Campaign);
+        if (direction === 'next' && currentIndex < currentRows.length - 1) {
+            setSelectedCampaign(currentRows[currentIndex + 1]);
+        } else if (direction === 'prev' && currentIndex > 0) {
+            setSelectedCampaign(currentRows[currentIndex - 1]);
+        }
+    };
     
     const toggleCampaignSelection = (campaign, isSelected) => {
         if (isSelected) {
@@ -324,13 +333,15 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                 </button>
             </div>
             
-            <CampaignModal 
+            <CampaignModal
                 isOpen={isModalOpen}
                 onClose={closeModal}
                 campaign={selectedCampaign}
                 compareCampaigns={selectedCampaigns}
                 isCompareMode={isCompareMode}
                 metricDisplayNames={metricDisplayNames}
+                allCampaigns={currentRows}
+                onNavigate={handleModalNavigate}
             />
         </div>
     );

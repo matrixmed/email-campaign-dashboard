@@ -8,6 +8,7 @@ import InsightsSection from './insights/InsightsSection';
 import DigitalJournals from './journal/DigitalJournals';
 import VideoMetrics from './video/VideoMetrics';
 import SpecialtySection from './specialty/SpecialtySection';
+import AudienceBreakdown from './audience/AudienceBreakdown';
 import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
 import Dash from './Dash';
 import ChatInterface from './chatbot/ChatInterface';
@@ -355,6 +356,7 @@ const Dashboard = () => {
             <DigitalJournals />
             <VideoMetrics />
             <SpecialtySection />
+            <AudienceBreakdown />
             {/*
             <ChatInterface />
            
@@ -372,6 +374,7 @@ const Dashboard = () => {
             <Dash/>
             */}
 
+            <ReportsManager/>
             <DashboardCanvas />
 
         </div>

@@ -27,6 +27,7 @@ const TableComponent = ({
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState(title);
   const [isEditingCell, setIsEditingCell] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
   const tableRef = useRef(null);
   const titleInputRef = useRef(null);
 
@@ -225,6 +226,16 @@ const TableComponent = ({
     onEdit?.(id, { data: newData });
   }, [tableData, onEdit, id]);
 
+  const handleDeleteRow = useCallback((rowIndex) => {
+    if (rowIndex === 0) return; // Don't allow deleting header row
+    if (tableData.length <= 2) return; // Keep at least one data row + header
+    
+    const newData = tableData.filter((_, index) => index !== rowIndex);
+    setTableData(newData);
+    onEdit?.(id, { data: newData });
+    setContextMenu(null);
+  }, [tableData, onEdit, id]);
+
   const handleTitleEdit = useCallback((newTitle) => {
     setTableTitle(newTitle);
     onEdit?.(id, { title: newTitle });
@@ -232,6 +243,22 @@ const TableComponent = ({
 
   const handleCellDoubleClick = useCallback((rowIndex, colIndex) => {
     setIsEditingCell({ row: rowIndex, col: colIndex });
+  }, []);
+
+  const handleRowRightClick = useCallback((e, rowIndex) => {
+    if (rowIndex === 0) return; // No context menu for header row
+    
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      rowIndex
+    });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
   }, []);
 
   const handleCellKeyDown = useCallback((e, rowIndex, colIndex) => {
@@ -370,6 +397,15 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    if (contextMenu) {
+      const handleClickOutside = () => setContextMenu(null);
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
   return (
     <div 
       ref={(node) => {
@@ -444,53 +480,60 @@ const TableComponent = ({
       <div style={tableContainerStyle}>
         <table style={actualTableStyle}>
           <tbody>
-            {tableData.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                {row.map((cell, colIndex) => {
-                  const isHeader = rowIndex === 0;
-                  const isEditingThisCell = isEditingCell?.row === rowIndex && isEditingCell?.col === colIndex;
-                  
-                  return (
-                    <td 
-                      key={colIndex} 
-                      style={getCellStyle(rowIndex, colIndex)}
-                      onDoubleClick={() => {
-                        setEditValue(cell);
-                        handleCellDoubleClick(rowIndex, colIndex);
-                      }}
-                    >
-                      {isEditingThisCell ? (
-                        <input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={() => {
-                            handleCellEdit(rowIndex, colIndex, editValue);
-                            setIsEditingCell(null);
-                          }}
-                          onKeyDown={(e) => handleCellKeyDown(e, rowIndex, colIndex)}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: 'inherit',
-                            width: '100%',
-                            padding: '0',
-                            outline: 'none'
-                          }}
-                          autoFocus
-                        />
-                      ) : (
-                        <span 
-                          title="Double-click to edit"
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {cell}
-                        </span>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {tableData.map((row, rowIndex) => {
+              const isHeader = rowIndex === 0;
+              
+              return (
+                <tr 
+                  key={rowIndex} 
+                  style={{ position: 'relative' }}
+                  onContextMenu={(e) => handleRowRightClick(e, rowIndex)}
+                >
+                  {row.map((cell, colIndex) => {
+                    const isEditingThisCell = isEditingCell?.row === rowIndex && isEditingCell?.col === colIndex;
+                    
+                    return (
+                      <td 
+                        key={colIndex} 
+                        style={getCellStyle(rowIndex, colIndex)}
+                        onDoubleClick={() => {
+                          setEditValue(cell);
+                          handleCellDoubleClick(rowIndex, colIndex);
+                        }}
+                      >
+                        {isEditingThisCell ? (
+                          <input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={() => {
+                              handleCellEdit(rowIndex, colIndex, editValue);
+                              setIsEditingCell(null);
+                            }}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, colIndex)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              fontSize: 'inherit',
+                              width: '100%',
+                              padding: '0',
+                              outline: 'none'
+                            }}
+                            autoFocus
+                          />
+                        ) : (
+                          <span 
+                            title="Double-click to edit"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {cell}
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -509,6 +552,39 @@ const TableComponent = ({
           transition: 'opacity 0.2s ease'
         }}
       />
+
+      {/* Context Menu for row deletion */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '120px'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#dc3545',
+              borderRadius: '4px'
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+            onMouseLeave={(e) => e.target.style.background = 'transparent'}
+            onClick={() => handleDeleteRow(contextMenu.rowIndex)}
+          >
+            Delete Row
+          </div>
+        </div>
+      )}
     </div>
   );
 };

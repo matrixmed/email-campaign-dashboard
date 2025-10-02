@@ -94,10 +94,10 @@ export const NPPA_COLORS = {
 export const ICNS_COLORS = {
   primary: '#1a365d',      // Deep navy blue
   primaryDark: '#102a44',  // Darker navy
-  secondary: '#2b77ad',    // Medium blue  
+  secondary: '#2b77ad',    // Medium blue
   secondaryLight: '#4299e1', // Light blue
   accent: '#6366f1',       // Indigo accent
-  
+
   // Neutrals
   white: '#ffffff',
   lightGray: '#f7fafc',
@@ -108,12 +108,12 @@ export const ICNS_COLORS = {
   border: '#e2e8f0',
   surface: '#edf2f7',
   onSurface: '#1a202c',
-  
+
   // Status colors
   success: '#059669',
   warning: '#ed8936',
   info: '#4299e1',
-  
+
   // Gradients
   primaryGradient: 'linear-gradient(135deg, #1a365d 0%, #102a44 100%)',
   secondaryGradient: 'linear-gradient(135deg, #2b77ad 0%, #4299e1 100%)',
@@ -122,12 +122,45 @@ export const ICNS_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
 };
 
+// Oncology Color Scheme
+export const ONCOLOGY_COLORS = {
+  primary: '#2a5fa3',      // Main blue
+  primaryDark: '#1d4a85',  // Darker blue
+  secondary: '#37bbb4',    // Teal
+  secondaryLight: '#5cc9c2', // Light teal
+  accent: '#37bbb4',       // Teal accent
+
+  // Neutrals
+  white: '#ffffff',
+  lightGray: '#efefef',
+  gray: '#6c757d',
+  darkGray: '#2c3e50',
+  text: '#1a365d',         // Dark blue for text
+  textSecondary: '#6c757d',
+  border: '#d1e7dd',       // Light blue border
+  surface: '#f8fbfc',      // Very light blue
+  onSurface: '#1a365d',    // Dark blue for text
+
+  // Status colors
+  success: '#28a745',
+  warning: '#ffc107',
+  info: '#17a2b8',
+
+  // Gradients
+  primaryGradient: 'linear-gradient(135deg, #2a5fa3 0%, #1d4a85 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #37bbb4 0%, #5cc9c2 100%)',
+  heroGradient: 'linear-gradient(135deg, #37bbb4 0%, #2a5fa3 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #efefef 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #f8fbfc 0%, #efefef 100%)'
+};
+
 // Theme configuration
 export const THEMES = {
   MATRIX: 'matrix',
-  JCAD: 'jcad', 
+  JCAD: 'jcad',
   NPPA: 'nppa',
-  ICNS: 'icns'
+  ICNS: 'icns',
+  ONCOLOGY: 'oncology'
 };
 
 // Theme metadata for UI display
@@ -151,6 +184,11 @@ export const THEME_INFO = {
     name: 'ICNS',
     colors: ['#1a365d', '#2b77ad', '#4299e1'],
     logo: 'icns.png',
+  },
+  [THEMES.ONCOLOGY]: {
+    name: 'Oncology',
+    colors: ['#2a5fa3', '#37bbb4', '#efefef'],
+    logo: 'oncology.png',
   }
 };
 
@@ -162,6 +200,8 @@ export const getThemeColors = (theme) => {
       return NPPA_COLORS;
     case THEMES.ICNS:
       return ICNS_COLORS;
+    case THEMES.ONCOLOGY:
+      return ONCOLOGY_COLORS;
     case THEMES.MATRIX:
     default:
       return MATRIX_COLORS;
@@ -171,6 +211,68 @@ export const getThemeColors = (theme) => {
 export const getThemeLogo = (theme) => {
   const themeInfo = THEME_INFO[theme];
   return `${process.env.PUBLIC_URL}/${themeInfo?.logo || 'matrix.png'}`;
+};
+
+// Table type definitions
+export const TABLE_TYPES = {
+  ONLINE_JOURNAL: 'online-journal',
+  VIDEO_METRICS: 'video-metrics', 
+  SOCIAL_MEDIA: 'social-media'
+};
+
+export const TABLE_DEFINITIONS = {
+  [TABLE_TYPES.ONLINE_JOURNAL]: {
+    title: 'Online Journal Metrics',
+    headers: ['Metric', 'Value'],
+    data: [
+      ['Avg Time in Issue', '3m 19s'],
+      ['Total Page Views', '2,778'],
+      ['Total Issue Visits', '439']
+    ]
+  },
+  [TABLE_TYPES.VIDEO_METRICS]: {
+    title: 'Video Metrics', 
+    headers: ['Metric', 'Value'],
+    data: [
+      ['Total Time Watched', '24h 27m 6s'],
+      ['Avg Time Watched', '52.7%'],
+      ['Total Impressions', '1,812']
+    ]
+  },
+  [TABLE_TYPES.SOCIAL_MEDIA]: {
+    title: 'Social Media Metrics',
+    headers: ['Metric', 'Value'],
+    data: [
+      ['Impressions', '1,000'],
+      ['Engagement Rate', '12%'],
+      ['CTR', '5%']
+    ]
+  }
+};
+
+// Smart table selection based on campaign title
+export const getSmartTableSelection = (campaignTitle) => {
+  if (!campaignTitle) return [TABLE_TYPES.ONLINE_JOURNAL]; // Default fallback
+  
+  const title = campaignTitle.toLowerCase();
+  
+  // Check for video content indicators
+  if (title.includes('jcadtv') || title.includes('video') || title.includes('tv')) {
+    return [TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.SOCIAL_MEDIA];
+  }
+  
+  // Check for journal/hot topics indicators  
+  if (title.includes('hot topics') || title.includes('ht') || title.includes('journal')) {
+    return [TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.SOCIAL_MEDIA];
+  }
+  
+  // Check for social media indicators
+  if (title.includes('social') || title.includes('linkedin') || title.includes('twitter')) {
+    return [TABLE_TYPES.SOCIAL_MEDIA, TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS];
+  }
+  
+  // Default fallback order
+  return [TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.SOCIAL_MEDIA];
 };
 
 
@@ -374,54 +476,6 @@ export const AVAILABLE_METRICS = [
   'estimated_patient_impact'
 ];
 
-// Table configuration types
-export const TABLE_TYPES = {
-  SOCIAL_MEDIA_METRICS: {
-    title: 'Social Media Metrics',
-    columns: 3,
-    rows: 4,
-    defaultData: [
-      ['Platform', 'Reach', 'Engagement'],
-      ['LinkedIn', '12.5K', '2.1%'],
-      ['Facebook', '8.3K', '1.8%'],
-      ['Twitter', '5.2K', '3.2%']
-    ]
-  },
-  DIGITAL_METRICS: {
-    title: 'Digital Metrics', 
-    columns: 3,
-    rows: 4,
-    defaultData: [
-      ['Metric', 'Value', 'Change'],
-      ['Email CTR', '3.2%', '+0.4%'],
-      ['Website Visits', '15.7K', '+12%'],
-      ['Conversion Rate', '2.8%', '+0.2%']
-    ]
-  },
-  VIDEO_METRICS: {
-    title: 'Video Metrics',
-    columns: 3, 
-    rows: 4,
-    defaultData: [
-      ['Metric', 'Value', 'Benchmark'],
-      ['Views', '22.1K', '18K avg'],
-      ['Completion', '78%', '65% avg'],
-      ['Engagement', '4.2min', '3.1min avg']
-    ]
-  },
-  PERFORMANCE_BREAKDOWN: {
-    title: 'Performance Breakdown',
-    columns: 4,
-    rows: 6,
-    defaultData: [
-      ['Metric', 'Q1', 'Q2', 'Q3'],
-      ['Opens', '12.5K', '15.2K', '18.1K'],
-      ['Clicks', '1.8K', '2.1K', '2.7K'],
-      ['Conversions', '145', '168', '201'],
-      ['Revenue', '$28.5K', '$31.2K', '$39.8K']
-    ]
-  }
-};
 
 // Utility functions
 export const getMetricValue = (campaign, metricKey) => {
@@ -493,6 +547,8 @@ export default {
   MATRIX_COLORS,
   JCAD_COLORS,
   NPPA_COLORS,
+  ICNS_COLORS,
+  ONCOLOGY_COLORS,
   THEMES,
   THEME_INFO,
   getThemeColors,

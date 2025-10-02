@@ -188,19 +188,47 @@
 }
 
 .report-row {
-  transition: all 0.2s ease;
+  transition: none;
 }
 
-.report-row:hover {
-  background-color: rgba(255, 255, 255, 0.03);
-}
-
-.cmi-report-row {
+.report-row.even-row {
   background-color: rgba(0, 255, 255, 0.05);
 }
 
-.cmi-report-row:hover {
-  background-color: rgba(0, 255, 255, 0.08);
+.report-row.odd-row {
+  background-color: transparent;
+}
+
+/* Agency Section Styles */
+.agency-section-header {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+.agency-section-title {
+  padding: 16px 12px !important;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 2px solid #444;
+  border-bottom: 1px solid #444;
+}
+
+.agency-count {
+  color: #888;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.agency-divider {
+  height: 16px;
+  background-color: transparent;
+}
+
+.agency-divider td {
+  padding: 0 !important;
+  border-bottom: 2px solid #444;
 }
 
 /* Column Styles */
@@ -233,10 +261,31 @@
   color: #00cccc;
 }
 
+.cmi-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .cmi-icon {
   color: #0ff;
   flex-shrink: 0;
   opacity: 0.8;
+}
+
+.weeks-count {
+  background-color: #dc3545;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
 .brand-column {
@@ -494,7 +543,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 25px;
+  padding: 15px 25px;
   border-bottom: 1px solid #444;
   background-color: #333;
 }
@@ -585,9 +634,7 @@
   border-radius: 8px;
   padding: 20px;
   border: 1px solid #333;
-  overflow-x: auto;
   max-height: 500px;
-  overflow-y: auto;
 }
 
 .json-content {

@@ -13,6 +13,43 @@
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Modal Navigation Arrows */
+.modal-nav-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 12px;
+  z-index: 10002 !important;
+  transition: all 0.2s ease;
+  border-radius: 50%;
+}
+
+.modal-nav-arrow:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.modal-nav-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.modal-nav-left {
+  left: max(20px, calc((100vw - 1300px) / 2 - 100px));
+}
+
+.modal-nav-right {
+  right: max(20px, calc((100vw - 1300px) / 2 - 100px));
+}
+
+.modal-nav-arrow svg {
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
 /* Modal Container */
 .campaign-modal {
   background-color: #222;
@@ -336,19 +373,393 @@ body.light .campaign-name {
   color: #333;
 }
 
+/* Extended Analytics Sections */
+
+/* Loading Metadata */
+.loading-metadata {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: #0ff;
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  margin-bottom: 25px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #333;
+  border-top: 2px solid #0ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Time-Based Open Rates */
+.time-based-section {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.time-based-metrics {
+  display: flex;
+  gap: 20px;
+}
+
+.time-metric-card {
+  flex: 1;
+  background-color: #333;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+}
+
+.time-metric-label {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.time-metric-value {
+  color: #0ff;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Geographic Breakdown */
+.geographic-section {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.geographic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.geographic-card {
+  background-color: #333;
+  border-radius: 4px;
+  padding: 18px;
+}
+
+.geographic-region {
+  color: #0ff;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.geographic-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.geographic-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #444;
+}
+
+.geographic-stat:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  color: #999;
+  font-size: 12px;
+}
+
+.stat-value {
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Audience Breakdown */
+.audience-section {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.audience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.audience-card {
+  background-color: #333;
+  border-radius: 4px;
+  padding: 20px;
+  border-left: 1px solid #0ff;
+}
+
+.audience-type {
+  color: #0ff;
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 15px;
+  line-height: 1.3;
+}
+
+.audience-primary-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #444;
+  padding: 12px 15px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.primary-label {
+  color: #999;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.primary-value {
+  color: #0ff;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.audience-secondary-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.secondary-metric {
+  color: #ccc;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #444;
+}
+
+.secondary-metric:last-child {
+  border-bottom: none;
+}
+
+/* Device Breakdown */
+.device-section {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.device-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.device-card {
+  flex: 1;
+  background-color: #333;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+}
+
+.device-label {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.device-value {
+  color: #0ff;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* What Was Clicked */
+.clicks-section {
+  background-color: #2a2a2d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.clicks-summary {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.clicks-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #333;
+  padding: 15px 25px;
+  border-radius: 4px;
+  min-width: 180px;
+}
+
+.clicks-label {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.clicks-value {
+  color: #0ff;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.clicks-links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.click-link-card {
+  background-color: #333;
+  border-radius: 4px;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.link-url {
+  flex: 1;
+  margin-right: 15px;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.link-url a {
+  color: #0ff;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.link-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.link-clicks {
+  color: #fff;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.link-percentage {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Light Theme Adjustments for New Sections */
+body.light .loading-metadata {
+  background-color: #f5f5f5;
+  color: #0077ff;
+}
+
+body.light .loading-spinner {
+  border-color: #e0e0e0;
+  border-top-color: #0077ff;
+}
+
+body.light .time-based-section,
+body.light .geographic-section,
+body.light .audience-section,
+body.light .device-section,
+body.light .clicks-section {
+  background-color: #f5f5f5;
+}
+
 /* Mobile Responsive Adjustments */
 @media (max-width: 768px) {
   .campaign-modal {
     width: 95%;
     padding: 15px;
   }
-  
+
   .campaign-modal-metrics,
   .campaign-modal-details {
     grid-template-columns: 1fr;
   }
-  
+
   .campaign-modal-header h3 {
     font-size: 20px;
+  }
+
+  .time-based-metrics {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .geographic-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .audience-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .device-stats {
+    flex-direction: column;
+  }
+
+  .clicks-summary {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .click-link-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .link-stats {
+    align-items: flex-start;
+  }
+
+  /* Mobile navigation arrows */
+  .modal-nav-left {
+    left: 10px;
+  }
+
+  .modal-nav-right {
+    right: 10px;
+  }
+
+  .modal-nav-arrow {
+    padding: 8px;
+  }
+
+  .modal-nav-arrow svg {
+    width: 20px;
+    height: 20px;
   }
 }

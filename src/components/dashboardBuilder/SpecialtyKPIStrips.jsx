@@ -203,7 +203,8 @@ const SpecialtyKPIStrips = ({
   }, [handleEdit]);
 
   const formatSpecialtyName = (name) => {
-    return name.length > 40 ? name.substring(0, 40) + '...' : name;
+    // Always return the full name - no truncation
+    return name;
   };
 
   const getTrendIcon = (delta) => {
@@ -279,7 +280,7 @@ const SpecialtyKPIStrips = ({
     justifyContent: 'center',
     transition: 'all 0.2s ease',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-    overflow: 'hidden'
+    overflow: 'visible'
   };
 
   const editing = isEditing === id;
@@ -486,7 +487,7 @@ const SpecialtyKPIStrips = ({
                   whiteSpace: 'normal',
                   wordBreak: 'break-word'
                 }}>
-                  {cleanName}
+                  {name}
                 </div>
                 
                 <div style={{ 

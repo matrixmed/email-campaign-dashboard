@@ -12,7 +12,7 @@ const ReportsManager = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [futureCurrentPage, setFutureCurrentPage] = useState(1);
     const [archiveCurrentPage, setArchiveCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(100);
     const [futureRowsPerPage, setFutureRowsPerPage] = useState(10);
     const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(10);
 
@@ -69,40 +69,53 @@ const ReportsManager = () => {
         const daysToMonday = day === 0 ? -6 : 1 - day;
         mondayThisWeek.setDate(today.getDate() + daysToMonday);
         mondayThisWeek.setHours(0, 0, 0, 0);
-        const mondayLastWeek = new Date(mondayThisWeek);
-        mondayLastWeek.setDate(mondayThisWeek.getDate() - 7);
-        return mondayLastWeek;
+        return mondayThisWeek;
     };
 
     const getReportWeek = (sendDate) => {
         if (!sendDate) return null;
-        
+
         const send = parseSendDate(sendDate);
         if (!send) return null;
-        
-        const currentMonday = getCurrentWeekMonday();
-        
-        const sendDay = send.getDay();
+
+        // The reporting week is the PREVIOUS Monday-Sunday (last complete week)
+        const reportingMonday = getCurrentWeekMonday();
+        reportingMonday.setDate(reportingMonday.getDate() - 7); // Go back one week
+
+        // Get the Monday of the week the campaign was sent
+        const sendDay = send.getUTCDay();
         const daysToSendMonday = sendDay === 0 ? -6 : 1 - sendDay;
         const sendMonday = new Date(send);
-        sendMonday.setDate(send.getDate() + daysToSendMonday);
-        sendMonday.setHours(0, 0, 0, 0);
-        
+        sendMonday.setUTCDate(send.getUTCDate() + daysToSendMonday);
+        sendMonday.setUTCHours(0, 0, 0, 0);
+
+        // Convert reportingMonday to UTC for consistent comparison
+        const reportingMondayUTC = new Date(Date.UTC(
+            reportingMonday.getFullYear(),
+            reportingMonday.getMonth(),
+            reportingMonday.getDate()
+        ));
+
         const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-        const weeksDiff = Math.floor((currentMonday - sendMonday) / msPerWeek);
-        
-        if (weeksDiff === 0) return 1;
-        if (weeksDiff === 1) return 2;
-        if (weeksDiff === 2) return 3;
-        
+        const weeksDiff = Math.round((reportingMondayUTC - sendMonday) / msPerWeek);
+
+        // Reporting week (last Monday-Sunday) = Week 1
+        // 1 week before reporting week = Week 2
+        // 2 weeks before reporting week = Week 3
+        if (weeksDiff === 0) return 1;  // Last week (9/22-9/28) = Week 1
+        if (weeksDiff === 1) return 2;  // Two weeks ago (9/15-9/21) = Week 2
+        if (weeksDiff === 2) return 3;  // Three weeks ago (9/8-9/14) = Week 3
+
         return null;
     };
 
     const getCurrentWeekTimeframe = () => {
-        const monday = getCurrentWeekMonday();
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        // Return the PREVIOUS week's Monday-Sunday as the reporting timeframe
+        const reportingMonday = getCurrentWeekMonday();
+        reportingMonday.setDate(reportingMonday.getDate() - 7); // Go back one week
+        const sunday = new Date(reportingMonday);
+        sunday.setDate(reportingMonday.getDate() + 6);
+        return { start: reportingMonday, end: sunday };
     };
     
     const formatDateRange = (start, end) => {
@@ -127,8 +140,10 @@ const ReportsManager = () => {
     const getCurrentWeekReports = useMemo(() => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const reports = [];
-        
+
         reportsData.forEach(report => {
+            if (report.is_no_data_report) return; // Skip no data reports here
+
             const week = getReportWeek(report.send_date);
             if (week !== null) {
                 reports.push({
@@ -139,7 +154,28 @@ const ReportsManager = () => {
                 });
             }
         });
-        
+
+        return filterReports(reports);
+    }, [reportsData, searchTerm]);
+
+    const getCurrentWeekNoDataReports = useMemo(() => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const reports = [];
+
+        reportsData.forEach(report => {
+            if (!report.is_no_data_report) return; // Only no data reports
+
+            const week = getReportWeek(report.send_date);
+            if (week !== null) {
+                reports.push({
+                    ...report,
+                    week_number: week,
+                    week_range: currentTimeframe,
+                    unique_key: `${report.campaign_id}_no_data`
+                });
+            }
+        });
+
         return filterReports(reports);
     }, [reportsData, searchTerm]);
 
@@ -240,74 +276,276 @@ const ReportsManager = () => {
             ...checkedReports,
             [key]: !checkedReports[key]
         };
-        
+
         setCheckedReports(newStates);
-        
+
         localStorage.setItem('reportCheckboxStates', JSON.stringify({
             states: newStates,
             lastUpdate: new Date().getTime()
         }));
     };
 
+    const handleNoDataCheckboxChange = (reportId) => {
+        const key = `${reportId}_no_data`;
+        const newStates = {
+            ...checkedReports,
+            [key]: !checkedReports[key]
+        };
+
+        setCheckedReports(newStates);
+
+        localStorage.setItem('reportCheckboxStates', JSON.stringify({
+            states: newStates,
+            lastUpdate: new Date().getTime()
+        }));
+    };
+
+    const generateAgencyJSON = (report, specificWeek = null) => {
+        const agency = report.agency.toLowerCase();
+
+        switch(agency) {
+            case 'cmi':
+                return generateCMIJSON(report, specificWeek);
+            case 'bi':
+                return generateBIJSON(report, specificWeek);
+            case 'amg':
+                return generateAMGJSON(report, specificWeek);
+            case 'ortho':
+                return generateOrthoJSON(report, specificWeek);
+            case 'sun':
+                return generateSunJSON(report, specificWeek);
+            case 'cas':
+                return generateCasJSON(report, specificWeek);
+            case 'deer':
+                return generateDeerJSON(report, specificWeek);
+            case 'good':
+                return generateGoodJSON(report, specificWeek);
+            case 'iq':
+                return generateIQJSON(report, specificWeek);
+            case 'klik':
+                return generateKlikJSON(report, specificWeek);
+            case 'sl':
+                return generateSLJSON(report, specificWeek);
+            default:
+                return generateDefaultJSON(report, specificWeek);
+        }
+    };
+
     const generateCMIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        
+
         const formatDate = (date) => {
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const year = date.getFullYear();
             return `${month}${day}${year}`;
         };
-        
+
         const formatDateSlash = (date) => {
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const year = date.getFullYear();
             return `${month}/${day}/${year}`;
         };
-        
+
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
-            return isEndOfDay ? 
-                `${year}-${month}-${day}T23:59:59` : 
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
                 `${year}-${month}-${day}T00:00:00`;
         };
-        
+
         const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
-        
+
         const previousMonday = new Date(currentTimeframe.start);
         previousMonday.setDate(previousMonday.getDate() - 7);
-        
+
+        // Extract brand name, vehicle name, and contract number for filename construction
+        const brandName = report.cmi_metadata?.Brand_Name || report.brand || "";
+        const vehicleName = report.cmi_metadata?.Vehicle_Name || "";
+        const contractNumber = report.cmi_metadata?.contract_number || "";
+
         return {
-            "folder": month,
+            "folder": month.toLowerCase(),
             "dateOfSubmission": formatDate(currentTimeframe.end),
             "mondayDate": formatDate(previousMonday),
             "mondaydate": formatDateSlash(currentTimeframe.start),
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
-            "internal_campaign_name": report.campaign_name,
-            "client_campaign_name": "",
+            "internal_campaign_name": report.campaign_name || "",
+            "client_campaign_name": report.cmi_metadata?.client_campaign_name || "",
             "TargetListID": report.cmi_metadata?.target_list_id || "",
-            "CMI_PlacementID": report.cmi_metadata?.cmi_placement_id || "",
-            "Client_PlacementID": report.cmi_metadata?.client_placement_id || "",
+            "CMI_PlacementID": report.cmi_metadata?.placement_id || "",
+            "Client_PlacementID": report.cmi_metadata?.Client_PlacementID || "",
             "Creative_Code": report.cmi_metadata?.creative_code || "",
-            "GCM_Placement_ID": report.cmi_metadata?.gcm_placement_id || "",
-            "GCM_Placement_ID2": "",
+            "GCM_Placement_ID": report.cmi_metadata?.GCM_Placement_ID || "",
+            "GCM_Placement_ID2": report.cmi_metadata?.GCM_Placement_ID2 || "",
             "Client_ID": "",
-            "finalFileName": `${report.brand}_PLD_${report.cmi_metadata?.vehicle_name || ''}_${report.cmi_metadata?.contract_number || ''}`,
-            "aggFileName": `${report.brand}_AGG_${report.cmi_metadata?.vehicle_name || ''}_${report.cmi_metadata?.contract_number || ''}`,
-            "Brand_Name": report.brand,
-            "Supplier": report.cmi_metadata?.supplier || "",
-            "Vehicle_Name": report.cmi_metadata?.vehicle_name || "",
-            "Placement_Description": report.cmi_metadata?.placement_description || ""
+            "finalFileName": `${brandName}_PLD_${vehicleName}_${contractNumber}`,
+            "aggFileName": `${brandName}_AGG_${vehicleName}_${contractNumber}`,
+            "Brand_Name": brandName,
+            "Supplier": report.cmi_metadata?.Supplier || "",
+            "Vehicle_Name": vehicleName,
+            "Placement_Description": report.cmi_metadata?.Placement_Description || "",
+            "Buy_Component_Type": report.cmi_metadata?.Buy_Component_Type || "",
+            "Campaign_Type": report.cmi_metadata?.Campaign_Type || ""
         };
     };
 
+    const generateBIJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+
+        const formatISODateTime = (date, isEndOfDay = false) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
+                `${year}-${month}-${day}T00:00:00`;
+        };
+
+        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+
+        return {
+            "campaigns": [
+                {
+                    "campaign_name": cleanCampaignName,
+                    "topic_brand": report.brand.toUpperCase(),
+                    "topic_therapeutic_area": "IMMUNOLOGY",
+                    "topic_asset_ids": ["1339853"]
+                }
+            ],
+            "folder": month,
+            "channel": "Email",
+            "sub_channel": "Third Party Initiated Email",
+            "interaction_functional_area": "Human Pharma Commercial",
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true)
+        };
+    };
+
+    const generateAMGJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+
+        const formatISODateTime = (date, isEndOfDay = false) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
+                `${year}-${month}-${day}T00:00:00`;
+        };
+
+        const formatDate = (date) => {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${year}${month}${day}`;
+        };
+
+        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+
+        return {
+            "folder": month,
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "internal_campaign_name": cleanCampaignName,
+            "channel_partner": "Matrix_Medical",
+            "channel": "EM",
+            "brand_name": report.brand.toUpperCase(),
+            "promotion_type": "Branded",
+            "campaign_target_date": formatDate(currentTimeframe.start),
+            "campaign_code": `${report.brand.toUpperCase()}11778`,
+            "offer_name": `${report.brand.toUpperCase()} MATRIX_EM`,
+            "offer_code": "CampOffer-08492",
+            "vendor_code": "VC-00103",
+            "tactic_name": `${report.brand.toUpperCase()} EMAIL`,
+            "tactic_id": "Tactic-019998",
+            "contact_filename_base": "CONTACT_DATA",
+            "response_filename_base": "RESPONSE",
+            "aggregate_filename_base": "AggReport"
+        };
+    };
+
+    const generateOrthoJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+
+        const formatISODateTime = (date, isEndOfDay = false) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
+                `${year}-${month}-${day}T00:00:00`;
+        };
+
+        const formatDate = (date) => {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${month}${day}${year}`;
+        };
+
+        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+
+        return {
+            "internal_campaign_name": cleanCampaignName,
+            "folder": month,
+            "finalFileName": "Ortho_PLD_",
+            "aggFileName": "Ortho_AGG_",
+            "campaginMonth": formatDate(currentTimeframe.start).substring(0, 6),
+            "date": `${currentTimeframe.start.getMonth() + 1}/${currentTimeframe.start.getDate()}/${currentTimeframe.start.getFullYear()}`,
+            "dateOfSubmission": formatDate(currentTimeframe.end),
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true)
+        };
+    };
+
+    const generateDefaultJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+
+        const formatISODateTime = (date, isEndOfDay = false) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
+                `${year}-${month}-${day}T00:00:00`;
+        };
+
+        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+
+        return {
+            "folder": month,
+            "internal_campaign_name": cleanCampaignName,
+            "brand_name": report.brand,
+            "agency": report.agency,
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true)
+        };
+    };
+
+    const generateSunJSON = generateDefaultJSON;
+    const generateCasJSON = generateDefaultJSON;
+    const generateDeerJSON = generateDefaultJSON;
+    const generateGoodJSON = generateDefaultJSON;
+    const generateIQJSON = generateDefaultJSON;
+    const generateKlikJSON = generateDefaultJSON;
+    const generateSLJSON = generateDefaultJSON;
+
     const openCMIModal = (report, specificWeek = null) => {
-        setSelectedCMIReport(generateCMIJSON(report, specificWeek));
+        setSelectedCMIReport(generateAgencyJSON(report, specificWeek));
         setShowModal(true);
     };
 
@@ -357,19 +595,75 @@ const ReportsManager = () => {
         return date.toLocaleDateString('en-US', { timeZone: 'UTC' });
     };
 
-    const renderCurrentReportRow = (report) => {
+    const renderNoDataReportRow = (report, rowIndex) => {
         const isCMI = report.agency === 'CMI';
-        
+
         return (
-            <tr key={report.unique_key} className={`report-row ${isCMI ? 'cmi-report-row' : ''}`}>
+            <tr key={report.unique_key} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
                 <td className="campaign-column">
-                    <div 
-                        className={`campaign-text ${isCMI ? 'clickable-campaign' : ''}`}
-                        onClick={isCMI ? () => openCMIModal(report) : undefined}
-                        title={isCMI ? 'Click to open CMI JSON modal' : report.campaign_name}
+                    <div
+                        className="campaign-text clickable-campaign"
+                        onClick={() => openCMIModal(report)}
+                        title={report.campaign_name}
                     >
-                        <span className="campaign-name">{report.campaign_name}</span>
-                        {isCMI && <FileText className="cmi-icon" size={16} />}
+                        <span className="campaign-name no-data-campaign" title={report.campaign_name}>
+                            {report.campaign_name}
+                        </span>
+                        {isCMI && (
+                            <div className="cmi-info">
+                                <FileText className="cmi-icon" size={16} />
+                            </div>
+                        )}
+                    </div>
+                </td>
+                <td className="brand-column">{report.brand}</td>
+                <td className="agency-column">
+                    <span className={`agency-badge ${report.agency.toLowerCase()}`}>
+                        {report.agency}
+                    </span>
+                </td>
+                <td className="date-column-report">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
+                <td className="no-data-status-column">
+                    <label className="checkbox-container">
+                        <input
+                            type="checkbox"
+                            checked={checkedReports[`${report.campaign_id}_no_data`] || false}
+                            onChange={() => handleNoDataCheckboxChange(report.campaign_id)}
+                        />
+                        <span className="checkmark"></span>
+                    </label>
+                </td>
+            </tr>
+        );
+    };
+
+    const renderCurrentReportRow = (report, rowIndex, allReports) => {
+        const isCMI = report.agency === 'CMI';
+
+        // Count how many CMI campaigns with the same brand are in the current reports
+        const brandCount = isCMI ? allReports.filter(r => r.agency === 'CMI' && r.brand === report.brand).length : 0;
+
+        return (
+            <tr key={report.unique_key} className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
+                <td className="campaign-column">
+                    <div
+                        className="campaign-text clickable-campaign"
+                        onClick={() => openCMIModal(report)}
+                        title={report.campaign_name}
+                    >
+                        <span className="campaign-name" title={report.campaign_name}>
+                            {report.campaign_name}
+                        </span>
+                        {isCMI && (
+                            <div className="cmi-info">
+                                <FileText className="cmi-icon" size={16} />
+                                {brandCount > 1 && (
+                                    <span className="weeks-count" title={`${brandCount} ${report.brand} campaigns due this week`}>
+                                        {brandCount}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </td>
                 <td className="brand-column">{report.brand}</td>
@@ -381,6 +675,15 @@ const ReportsManager = () => {
                 <td className="date-column-report">{formatSendDate(report.send_date)}</td>
                 <td className="week-column">Week {report.week_number}</td>
                 <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
+                <td className="confidence-column">
+                    {report.cmi_metadata?.match_confidence !== undefined ? (
+                        <span className="confidence-score" title={`Match confidence: ${(report.cmi_metadata.match_confidence * 100).toFixed(0)}%`}>
+                            {(report.cmi_metadata.match_confidence * 100).toFixed(0)}%
+                        </span>
+                    ) : (
+                        <span className="confidence-score no-confidence">N/A</span>
+                    )}
+                </td>
                 <td className="week-column">
                     {report.week_number === 1 ? (
                         <label className="checkbox-container">
@@ -490,13 +793,15 @@ const ReportsManager = () => {
 
             {activeTab === 'current' && (() => {
                 const allCurrentReports = getCurrentWeekReports;
+                const allNoDataReports = getCurrentWeekNoDataReports;
                 const totalPages = getTotalPages(allCurrentReports.length, rowsPerPage);
                 const paginatedCurrentReports = getPaginatedData(allCurrentReports, currentPage, rowsPerPage);
-                
+
                 return (
                     <div className="reports-section current-reports">
+                        {/* Regular Campaign Reports Section */}
                         <div className="section-header">
-                            <h3>Reports Due This Week</h3>
+                            <h3>Campaign Reports Due This Week</h3>
                             <div className="section-stats">
                                 <span className="stat-item">
                                     <span className="stat-label">Total:</span>
@@ -520,24 +825,102 @@ const ReportsManager = () => {
                                         <th className="date-header">Send Date</th>
                                         <th className="week-header">Week</th>
                                         <th className="timeframe-header">Timeframe</th>
+                                        <th className="confidence-header">Confidence</th>
                                         <th className="week-header">Week 1</th>
                                         <th className="week-header">Week 2</th>
                                         <th className="week-header">Week 3</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {paginatedCurrentReports.map(report => renderCurrentReportRow(report))}
-                                    {paginatedCurrentReports.length === 0 && (
-                                        <tr>
-                                            <td colSpan="9" className="empty-state">
-                                                {searchTerm ? 'No reports match your search' : 'No reports due this week'}
-                                            </td>
-                                        </tr>
-                                    )}
+                                    {(() => {
+                                        if (paginatedCurrentReports.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan="10" className="empty-state">
+                                                        {searchTerm ? 'No reports match your search' : 'No reports due this week'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        // Group reports by agency
+                                        const groupedReports = paginatedCurrentReports
+                                            .sort((a, b) => {
+                                                const dateA = parseSendDate(a.send_date);
+                                                const dateB = parseSendDate(b.send_date);
+                                                return dateA - dateB;
+                                            })
+                                            .reduce((acc, report) => {
+                                                const agency = report.agency;
+                                                if (!acc[agency]) acc[agency] = [];
+                                                acc[agency].push(report);
+                                                return acc;
+                                            }, {});
+
+                                        // Sort agencies with CMI first
+                                        const sortedAgencies = Object.keys(groupedReports).sort((a, b) => {
+                                            if (a === 'CMI') return -1;
+                                            if (b === 'CMI') return 1;
+                                            return a.localeCompare(b);
+                                        });
+
+                                        let globalIndex = 0;
+                                        return sortedAgencies.map((agency, agencyIndex) => (
+                                            <React.Fragment key={`agency-${agency}`}>
+                                                <tr className="agency-section-header">
+                                                    <td colSpan="10" className="agency-section-title">
+                                                        <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
+                                                        <span className="agency-count">({groupedReports[agency].length} reports)</span>
+                                                    </td>
+                                                </tr>
+                                                {groupedReports[agency].map((report) => {
+                                                    const row = renderCurrentReportRow(report, globalIndex, paginatedCurrentReports);
+                                                    globalIndex++;
+                                                    return row;
+                                                })}
+                                                {agencyIndex < sortedAgencies.length - 1 && (
+                                                    <tr className="agency-divider">
+                                                        <td colSpan="10"></td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ));
+                                    })()}
                                 </tbody>
                             </table>
                         </div>
                         {renderPaginationButtons(currentPage, totalPages, 'current')}
+
+                        {/* No Data Reports Section */}
+                        {allNoDataReports.length > 0 && (
+                            <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
+                                <div className="section-header">
+                                    <h3>No Data Reports Due This Week</h3>
+                                    <div className="section-stats">
+                                        <span className="stat-item">
+                                            <span className="stat-label">Total:</span>
+                                            <span className="stat-value">{allNoDataReports.length}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="table-container">
+                                    <table className="reports-table no-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th className="campaign-header">No Data Report</th>
+                                                <th className="brand-header">Brand</th>
+                                                <th className="agency-header">Agency</th>
+                                                <th className="timeframe-header">Week Timeframe</th>
+                                                <th className="status-header">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allNoDataReports.map((report, index) => renderNoDataReportRow(report, index))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             })()}
@@ -567,42 +950,91 @@ const ReportsManager = () => {
                                     </tr>
                                 </thead>
                                 <tbody key={`archive-${archiveCurrentPage}-${archiveRowsPerPage}`}>
-                                    {paginatedArchiveReports.map(report => (
-                                        <tr key={report.unique_key} className={`report-row archive-row ${report.agency === 'CMI' ? 'cmi-report-row' : ''}`}>
-                                            <td className="campaign-column">
-                                                <div 
-                                                    className={`campaign-text ${report.agency === 'CMI' ? 'clickable-campaign' : ''}`}
-                                                    onClick={report.agency === 'CMI' ? () => openCMIModal(report, report.week_number) : undefined}
-                                                >
-                                                    <span className="campaign-name">{report.campaign_name}</span>
-                                                    {report.agency === 'CMI' && <FileText className="cmi-icon" size={16} />}
-                                                </div>
-                                            </td>
-                                            <td className="brand-column">{report.brand}</td>
-                                            <td className="agency-column">
-                                                <span className={`agency-badge ${report.agency.toLowerCase()}`}>
-                                                    {report.agency}
-                                                </span>
-                                            </td>
-                                            <td className="date-column-report">{formatSendDate(report.send_date)}</td>
-                                            <td className="week-column">Week {report.week_number}</td>
-                                            <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
-                                            <td className="status-column">
-                                                {report[`week_${report.week_number}_completed`] ? (
-                                                    <span className="status-completed">Completed</span>
-                                                ) : (
-                                                    <span className="status-pending">Pending</span>
+                                    {(() => {
+                                        if (paginatedArchiveReports.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan="7" className="empty-state">
+                                                        {searchTerm ? 'No past reports match your search' : 'No past reports found'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        // Group reports by agency
+                                        const groupedReports = paginatedArchiveReports.reduce((acc, report) => {
+                                            const agency = report.agency;
+                                            if (!acc[agency]) acc[agency] = [];
+                                            acc[agency].push(report);
+                                            return acc;
+                                        }, {});
+
+                                        // Sort agencies with CMI first
+                                        const sortedAgencies = Object.keys(groupedReports).sort((a, b) => {
+                                            if (a === 'CMI') return -1;
+                                            if (b === 'CMI') return 1;
+                                            return a.localeCompare(b);
+                                        });
+
+                                        let globalIndex = 0;
+                                        return sortedAgencies.map((agency, agencyIndex) => (
+                                            <React.Fragment key={`archive-agency-${agency}`}>
+                                                <tr className="agency-section-header">
+                                                    <td colSpan="7" className="agency-section-title">
+                                                        <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
+                                                        <span className="agency-count">({groupedReports[agency].length} reports)</span>
+                                                    </td>
+                                                </tr>
+                                                {groupedReports[agency].map((report) => {
+                                                    const isCMI = report.agency === 'CMI';
+                                                    const row = (
+                                                        <tr key={report.unique_key} className={`report-row archive-row ${globalIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''}`}>
+                                                            <td className="campaign-column">
+                                                                <div
+                                                                    className="campaign-text clickable-campaign"
+                                                                    onClick={() => openCMIModal(report, report.week_number)}
+                                                                    title={report.campaign_name}
+                                                                >
+                                                                    <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
+                                                                        {report.campaign_name}
+                                                                        {report.is_no_data_report && <span className="no-data-indicator">(No Data)</span>}
+                                                                    </span>
+                                                                    {isCMI && (
+                                                                        <div className="cmi-info">
+                                                                            <FileText className="cmi-icon" size={16} />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="brand-column">{report.brand}</td>
+                                                            <td className="agency-column">
+                                                                <span className={`agency-badge ${report.agency.toLowerCase()}`}>
+                                                                    {report.agency}
+                                                                </span>
+                                                            </td>
+                                                            <td className="date-column-report">{formatSendDate(report.send_date)}</td>
+                                                            <td className="week-column">Week {report.week_number}</td>
+                                                            <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
+                                                            <td className="status-column">
+                                                                {report[`week_${report.week_number}_completed`] ? (
+                                                                    <span className="status-completed">Completed</span>
+                                                                ) : (
+                                                                    <span className="status-pending">Pending</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                    globalIndex++;
+                                                    return row;
+                                                })}
+                                                {agencyIndex < sortedAgencies.length - 1 && (
+                                                    <tr className="agency-divider">
+                                                        <td colSpan="7"></td>
+                                                    </tr>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {paginatedArchiveReports.length === 0 && (
-                                        <tr>
-                                            <td colSpan="7" className="empty-state">
-                                                {searchTerm ? 'No past reports match your search' : 'No past reports found'}
-                                            </td>
-                                        </tr>
-                                    )}
+                                            </React.Fragment>
+                                        ));
+                                    })()}
                                 </tbody>
                             </table>
                         </div>
@@ -617,7 +1049,7 @@ const ReportsManager = () => {
                         <div className="modal-header">
                             <div className="modal-title">
                                 <FileText size={20} />
-                                <h3>CMI Report JSON</h3>
+                                <h3>Campaign JSON</h3>
                             </div>
                             <button 
                                 className="modal-close"
@@ -635,7 +1067,7 @@ const ReportsManager = () => {
                                         onClick={copyToClipboard}
                                     >
                                         <Copy size={14} />
-                                        Copy to Clipboard
+                                        Copy
                                     </button>
                                 </div>
                                 <div className="json-container">

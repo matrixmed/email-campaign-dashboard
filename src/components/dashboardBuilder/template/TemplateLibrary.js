@@ -1,4 +1,16 @@
-import { TEMPLATE_TYPES, getThemeColors } from './LayoutTemplates';
+import { TEMPLATE_TYPES, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS } from './LayoutTemplates';
+
+// Helper function to add Matrix logo
+const addMatrixLogo = (components) => {
+  components.push({
+    id: 'matrix-logo-bottom',
+    type: 'image',
+    src: `${process.env.PUBLIC_URL}/matrix.png`,
+    position: { x: 905, y: 520, width: 90, height: 36 },
+    isLogo: true,
+    style: { pointerEvents: 'none' }
+  });
+};
 
 export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = [];
@@ -175,11 +187,11 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     id: 'audience-breakdown',
     type: 'specialty-strips',
     title: 'AUDIENCE BREAKDOWN',
-    specialties: mergeSubspecialties ? 
-      getTopSpecialties(campaign.specialty_performance, true) : 
+    specialties: mergeSubspecialties ?
+      getTopSpecialties(campaign.specialty_performance, true) :
       Object.entries(campaign.specialty_performance)
         .filter(([name, data]) => {
-          return data.audience_total >= 100 && 
+          return data.audience_total >= 100 &&
                 !name.toLowerCase().includes('unknown') &&
                 !name.toLowerCase().includes('staff') &&
                 data.unique_open_rate > 0;
@@ -190,6 +202,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     style: { background: 'transparent' }
   });
 
+  addMatrixLogo(components);
   return components;
 };
 
@@ -206,7 +219,7 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
     id: 'additional-table-1',
     type: 'table',
     title: 'Online Journal Metrics',
-    config: { 
+    config: {
       customData: [
         ['Avg Time in Issue', '3m 19s'],
         ['Total Page Views', '2,778'],
@@ -222,6 +235,7 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
+  addMatrixLogo(components);
   return components;
 };
 
@@ -375,7 +389,48 @@ function generateMultiCampaignTableData(campaigns) {
   return rows;
 }
 
-export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+const generateTableForType = (tableType, position, themeColors) => {
+  const tableDefinition = TABLE_DEFINITIONS[tableType];
+  
+  if (!tableDefinition) {
+    // Fallback to default table
+    return {
+      id: `table-${position}`,
+      type: 'table',
+      title: `Table ${position}`,
+      config: { 
+        customData: [
+          ['Metric', 'Value'],
+          ['Example 1', '100'],
+          ['Example 2', '200']
+        ],
+        headers: ['Metric', 'Value']
+      },
+      style: {
+        background: themeColors.cardGradient || '#f8fafc',
+        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+        borderRadius: '6px'
+      }
+    };
+  }
+  
+  return {
+    id: `additional-table-${position}`,
+    type: 'table',
+    title: tableDefinition.title,
+    config: { 
+      customData: tableDefinition.data,
+      headers: tableDefinition.headers
+    },
+    style: {
+      background: themeColors.cardGradient || '#f8fafc',
+      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+      borderRadius: '6px'
+    }
+  };
+};
+
+export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {}) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -514,20 +569,6 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       value: `${campaign.core_metrics?.total_click_rate?.toFixed(1)}%`,
       subtitle: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}% unique click rate`,
       x: 319
-    },
-    {
-      id: 'unique-click-rate',
-      title: 'UNIQUE CLICK RATE',
-      value: `${campaign.core_metrics?.unique_click_rate?.toFixed(1)}%`,
-      subtitle: undefined,
-      x: 462
-    },
-    {
-      id: 'one-hour-open-rate',
-      title: 'ONE HOUR OPEN RATE',
-      value: campaign.core_metrics?.['1_hour_open_rate'] ? `${campaign.core_metrics['1_hour_open_rate'].toFixed(1)}%` : 'undefined%',
-      subtitle: 'Percent of opens in the first hour',
-      x: 605
     }
   );
 
@@ -566,72 +607,37 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     style: { background: 'transparent' }
   });
 
-  components.push({
-    id: 'additional-table-1',
-    type: 'table',
-    title: 'Video Metrics',
-    config: { 
-      customData: [
-        ['Total Time Watched', '24h 27m 6s'],
-        ['Avg Time Watched', '52.7%'],
-        ['Total Impressions', '1,812']
-      ],
-      headers: ['Platform', 'Value']
-    },
-    position: { x: 463, y: 395, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
+  // Generate Table 1 (position 395)
+  const table1Type = selectedTableTypes.table1 || TABLE_TYPES.VIDEO_METRICS;
+  const table1 = generateTableForType(table1Type, 1, themeColors);
+  table1.position = { x: 463, y: 395, width: 261, height: 140 };
+  components.push(table1);
 
-  components.push({
-    id: 'additional-table-2',
-    type: 'table',
-    title: 'Online Journal Metrics',
-    config: { 
-      customData: [
-        ['Avg Time in Issue', '3m 19s'],
-        ['Total Page Views', '2,778'],
-        ['Total Issue Visits', '439']
-      ],
-      headers: ['Metric', 'Value']
-    },
-    position: { x: 464, y: 228, width: 261, height: 140 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
+  // Generate Table 2 (position 228)
+  const table2Type = selectedTableTypes.table2 || TABLE_TYPES.ONLINE_JOURNAL;
+  const table2 = generateTableForType(table2Type, 2, themeColors);
+  table2.position = { x: 464, y: 228, width: 261, height: 140 };
+  components.push(table2);
 
+  addMatrixLogo(components);
   return components;
 };
 
-export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
-  const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {}) => {
+  const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
   const themeColors = getThemeColors(theme);
-  
-  components.push({
-    id: 'additional-table-3',
-    type: 'table',
-    title: 'Social Media Metrics',
-    config: { 
-      customData: [
-        ['Impressions', '1,000'],
-        ['Engagement Rate', '12%'],
-        ['CTR', '5%']
-      ],
-      headers: ['Metric', 'Value']
-    },
-    position: { x: 752, y: 431, width: 225, height: 104 },
-    style: {
-      background: themeColors.cardGradient || '#f8fafc',
-      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-      borderRadius: '6px'
-    }
-  });
+
+  // Remove the Matrix logo since we're adding a third table
+  const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
+  if (matrixLogoIndex !== -1) {
+    components.splice(matrixLogoIndex, 1);
+  }
+
+  // Generate Table 3
+  const table3Type = selectedTableTypes.table3 || TABLE_TYPES.SOCIAL_MEDIA;
+  const table3 = generateTableForType(table3Type, 3, themeColors);
+  table3.position = { x: 752, y: 431, width: 225, height: 104 };
+  components.push(table3);
 
   return components;
 };
@@ -767,13 +773,14 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     style: { background: 'transparent' }
   });
 
+  addMatrixLogo(components);
   return components;
 };
 
 export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
-  
+
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
   if (audienceComponent) {
     audienceComponent.position = { x: 10, y: 400, width: 457, height: 170 };
@@ -783,7 +790,7 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
     id: 'additional-table-1',
     type: 'table',
     title: 'Online Journal Metrics',
-    config: { 
+    config: {
       customData: [
         ['Avg Time in Issue', '3m 19s'],
         ['Total Page Views', '2,778'],
@@ -799,13 +806,20 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
     }
   });
 
+  // Logo already added by generateMultiNoneTemplate, don't add again
   return components;
 };
 
 export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
-  
+
+  // Remove the Matrix logo for multi-two (table would overlap)
+  const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
+  if (matrixLogoIndex !== -1) {
+    components.splice(matrixLogoIndex, 1);
+  }
+
   const firstTable = components.find(c => c.id === 'additional-table-1');
   if (firstTable) {
     firstTable.position = { x: 472, y: 415, width: 244, height: 125 };
@@ -837,7 +851,9 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
 export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
-  
+
+  // Matrix logo is already removed in generateMultiTwoTemplate
+
   const secondTable = components.find(c => c.id === 'additional-table-2');
   if (secondTable) {
     secondTable.position = { x: 741, y: 415, width: 244, height: 125 };
@@ -877,7 +893,7 @@ export const TEMPLATE_GENERATORS = {
 };
 
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {} } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
   
   if (!generator) {
@@ -885,9 +901,9 @@ export const generateTemplate = (config) => {
   }
   
   if (type === 'single') {
-    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
   } else {
-    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
   }
 };
 

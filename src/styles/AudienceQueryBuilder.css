@@ -1,0 +1,434 @@
+
+.aqb-query-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.aqb-query-header h2 {
+  color: #ff0077;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.aqb-query-header p {
+  color: #ccc;
+  font-size: 0.9rem;
+  margin: 5px 0 0 0;
+}
+
+.aqb-query-form {
+  background: #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.aqb-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.aqb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.aqb-form-group.aqb-full-width {
+  grid-column: 1 / -1;
+}
+
+.aqb-form-group.aqb-checkbox-group {
+  justify-content: center;
+}
+
+.aqb-form-group label {
+  font-weight: 500;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.aqb-form-group small {
+  display: block;
+  font-weight: 400;
+  color: #999;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.aqb-form-group input,
+.aqb-form-group select,
+.aqb-form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background-color: #444;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.aqb-form-group input:focus,
+.aqb-form-group select:focus,
+.aqb-form-group textarea:focus {
+  outline: none;
+  border-color: #0ff;
+  background-color: #555;
+}
+
+.aqb-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.aqb-checkbox-label input[type="checkbox"] {
+  margin-right: 10px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.aqb-warning-message {
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  border-left: 3px solid #e74c3c;
+}
+
+.aqb-form-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 15px;
+  border-top: 1px solid #555;
+}
+
+.aqb-submit-button {
+  background: #0077ff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.aqb-submit-button:hover:not(:disabled) {
+  background: #005bb5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.aqb-submit-button:disabled {
+  background: #555;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.aqb-error-message {
+  background: #2a2a2d;
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.aqb-error-message h3 {
+  color: #e74c3c;
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+}
+
+.aqb-error-message p {
+  color: #ccc;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.aqb-results-section {
+  margin-top: 20px;
+}
+
+.aqb-download-success {
+  background: #2a2a2d;
+  border: 1px solid #27ae60;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.aqb-download-success h3 {
+  color: #27ae60;
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+}
+
+.aqb-download-success p {
+  color: #ccc;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.aqb-display-results {
+  background: #2a2a2d;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.aqb-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #444;
+}
+
+.aqb-results-header h3 {
+  color: #0ff;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.aqb-results-summary {
+  display: flex;
+  gap: 15px;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.aqb-results-summary span {
+  font-weight: 500;
+}
+
+.aqb-users-grid {
+  display: grid;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.aqb-user-card {
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.aqb-user-card:hover {
+  background: #444;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.aqb-user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.aqb-user-name {
+  display: flex;
+  flex-direction: column;
+}
+
+.aqb-user-name strong {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+
+.aqb-user-email {
+  color: #0ff;
+  font-size: 0.9rem;
+}
+
+.aqb-engagement-score {
+  background: #0077ff;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.aqb-user-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.aqb-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.aqb-user-info span {
+  color: #ccc;
+  font-size: 0.85rem;
+}
+
+.aqb-activity-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.aqb-activity-summary span {
+  background: #444;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.aqb-recent-activity {
+  border-top: 1px solid #444;
+  padding-top: 15px;
+}
+
+.aqb-recent-activity h4 {
+  color: #0ff;
+  font-size: 1rem;
+  margin: 0 0 10px 0;
+}
+
+.aqb-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aqb-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: #2a2a2d;
+  border-radius: 6px;
+  border: 1px solid #444;
+}
+
+.aqb-action-badge {
+  padding: 3px 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  min-width: 45px;
+  text-align: center;
+}
+
+.aqb-action-badge.sent {
+  background: #444;
+  color: #ccc;
+}
+
+.aqb-action-badge.open {
+  background: #27ae60;
+  color: white;
+}
+
+.aqb-action-badge.click {
+  background: #0077ff;
+  color: white;
+}
+
+.aqb-activity-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.aqb-campaign-name {
+  font-weight: 500;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.aqb-timestamp {
+  color: #999;
+  font-size: 0.75rem;
+}
+
+.aqb-link-url {
+  color: #0ff;
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+.aqb-more-results-notice {
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 15px;
+  text-align: center;
+  margin-top: 15px;
+}
+
+.aqb-more-results-notice p {
+  color: #ccc;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .aqb-audience-query-builder {
+    padding: 15px;
+  }
+
+  .aqb-query-form {
+    padding: 15px;
+  }
+
+  .aqb-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aqb-user-details {
+    grid-template-columns: 1fr;
+  }
+
+  .aqb-results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .aqb-results-summary {
+    gap: 10px;
+  }
+
+  .aqb-activity-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .aqb-user-card {
+    padding: 15px;
+  }
+}

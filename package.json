@@ -2,7 +2,7 @@
   "name": "email-campaign-dashboard",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://matrixmed.github.io/email-campaign-dashboard",
+  "homepage": "https://matrix-dashboard-qiq6.onrender.com",
   "dependencies": {
     "@azure/storage-blob": "^12.27.0",
     "@testing-library/jest-dom": "^5.17.0",

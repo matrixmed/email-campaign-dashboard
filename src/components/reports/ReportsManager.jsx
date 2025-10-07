@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, Clock, CheckCircle, FileText, Eye, Copy } from 'lucide-react';
+import '../../styles/ReportsManager.css';
 
 const ReportsManager = () => {
     const [reportsData, setReportsData] = useState([]);
@@ -747,12 +748,12 @@ const ReportsManager = () => {
 
     return (
         <div className="reports-manager">
-            <div className="reports-header">
-                <h2>Reports Manager</h2>
+            <div className="page-header">
+                <h1>Reports Manager</h1>
                 <div className="search-container">
                     <input
                         type="text"
-                        placeholder="Search campaigns, brands, or agencies..."
+                        placeholder="Search"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="search-input"

@@ -1,0 +1,176 @@
+.cmi-contract-values {
+  padding: 0;
+}
+
+.cmi-contract-values .search-container {
+  width: 384px !important;
+  margin-right: 6px;
+  flex: none;
+}
+
+.cmi-contract-values .search-input {
+  width: 100%;
+  padding: 11.5px 16px;
+  font-size: 1rem;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  background: var(--color-bg-elevated, #222224);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-primary, #ffffff);
+  transition: all 0.2s ease;
+}
+
+.cmi-contract-values .search-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #0ff);
+  background: var(--color-bg-secondary, #141416);
+}
+
+.cmi-contract-values .search-input::placeholder {
+  color: var(--color-text-tertiary, #8a8a8a);
+}
+
+.cmi-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+  justify-content: space-between;
+}
+
+.cmi-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cmi-btn-add {
+  background: var(--color-success, #10b981);
+  color: white;
+}
+
+.cmi-btn-add:hover {
+  background: #059669;
+}
+
+.cmi-btn-export {
+  background: #333;
+  color: #0ff;
+}
+
+.cmi-btn-export:hover {
+  background: #444;
+}
+
+.cmi-table-wrapper {
+  background: var(--color-bg-card, #2a2a2d);
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #333336);
+  overflow-x: auto;
+}
+
+.cmi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.cmi-table thead {
+  background: #333;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.cmi-table th {
+  padding: 12px;
+  text-align: left;
+  color: #0ff;
+  font-weight: 600 !important;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  background: #333 !important;
+  border-bottom: 1px solid #444 !important;
+}
+
+.cmi-table th:last-child {
+  cursor: default;
+}
+
+.sort-indicator {
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.cmi-table tbody tr {
+  border-bottom: 1px solid #444 !important;
+  background: #2a2a2d !important;
+}
+
+.cmi-table tbody tr:nth-child(odd) {
+  background: #222 !important;
+}
+
+.cmi-table tbody tr:hover {
+  background: #2a2a2d !important;
+}
+
+.cmi-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.cmi-table td {
+  padding: 12px !important;
+  cursor: pointer;
+  vertical-align: top;
+  color: #fff !important;
+  border-bottom: 1px solid #444 !important;
+}
+
+.cmi-table td.editing {
+  padding: 0;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--color-accent, #0ff);
+  background: var(--color-bg-elevated, #222224);
+  color: var(--color-text-primary, #ffffff);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.cell-input:focus {
+  outline: none;
+}
+
+.cmi-btn-delete {
+  padding: 4px 12px;
+  background: var(--color-error, #ef4444);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cmi-btn-delete:hover {
+  background: #dc2626;
+}
+
+.cmi-loading,
+.cmi-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-secondary, #b8b8b8);
+  background: var(--color-bg-card, #2a2a2d);
+  border-radius: 8px;
+  margin-top: 20px;
+}

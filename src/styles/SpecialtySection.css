@@ -15,24 +15,42 @@ body.space-theme .specialty-total-card .specialty-name {
 }
 
 .specialty-section {
-  margin: 20px 0;
+  padding: 0;
+}
+
+.specialty-section .page-header {
+  display: flex;
+  justify-content: space-between;
+  height: 43px;
+  align-items: center;
+  padding: var(--spacing-lg, 24px);
+  background: var(--color-bg-card, #2a2a2d);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #333336);
+  margin-bottom: var(--spacing-lg, 24px);
+  gap: var(--spacing-lg, 24px);
+}
+
+.specialty-section .page-header h1 {
+  margin: 0;
+  color: var(--color-text-primary, #ffffff);
+  font-family: var(--font-heading, 'Lora', serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.specialty-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.specialty-content {
   background-color: #222;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
-}
-
-.specialty-section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.specialty-section-header h2 {
-  color: #ff0077;
-  margin: 0;
 }
 
 .specialty-bucket-toggles {
@@ -723,7 +741,7 @@ body.space-theme .specialty-open-rate {
 
 /* Grouped Specialty Card Styles */
 .specialty-grouped-card {
-  border-left: 3px solid #0ff;
+  border: 1px solid #0ff;
   background-color: #2a3a4a !important;
 }
 
@@ -763,7 +781,7 @@ body.space-theme .specialty-open-rate {
   padding: 8px 12px;
   background-color: #2a2a2d;
   border-radius: 6px;
-  border-left: 2px solid #0ff;
+  border: 1px solid #0ff;
 }
 
 .specialty-subspecialty-name {

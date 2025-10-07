@@ -397,40 +397,45 @@ const DigitalJournals = () => {
     const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
     return (
-        <div className="table-section">
-            <div className="digital-journals-header">
-                <h2>Digital Journal Metrics</h2>
+        <div className="digital-journals-container">
+            <div className="page-header">
+                <h1>Digital Journal Metrics</h1>
                 <div className="search-container">
                     <input
                         type="text"
-                        className="digital-journals-search-box"
+                        className="search-input"
                         placeholder="Search by Title or URL"
                         value={search}
                         onChange={handleSearchChange}
                     />
                 </div>
-                <div className="digital-journals-controls">
-                    <div className="specialty-combine-toggle">
-                        <input
-                            type="checkbox"
-                            id="groupByTitleToggle"
-                            checked={groupByTitle}
-                            onChange={(e) => setGroupByTitle(e.target.checked)}
-                        />
-                        <label htmlFor="groupByTitleToggle" className="specialty-toggle-slider"></label>
-                        <span className="specialty-toggle-label">Group by Title</span>
+            </div>
+
+            <div className="table-section">
+                <div className="table-controls">
+                    <div className="digital-journals-toggles">
+                        <div className="specialty-combine-toggle">
+                            <input
+                                type="checkbox"
+                                id="groupByTitleToggle"
+                                checked={groupByTitle}
+                                onChange={(e) => setGroupByTitle(e.target.checked)}
+                            />
+                            <label htmlFor="groupByTitleToggle" className="specialty-toggle-slider"></label>
+                            <span className="specialty-toggle-label">Group by Title</span>
+                        </div>
+                        <div className="specialty-combine-toggle">
+                            <input
+                                type="checkbox"
+                                id="showUrlsToggle"
+                                checked={showUrls}
+                                onChange={(e) => setShowUrls(e.target.checked)}
+                            />
+                            <label htmlFor="showUrlsToggle" className="specialty-toggle-slider"></label>
+                            <span className="specialty-toggle-label">Show URLs</span>
+                        </div>
                     </div>
-                    <div className="specialty-combine-toggle">
-                        <input
-                            type="checkbox"
-                            id="showUrlsToggle"
-                            checked={showUrls}
-                            onChange={(e) => setShowUrls(e.target.checked)}
-                        />
-                        <label htmlFor="showUrlsToggle" className="specialty-toggle-slider"></label>
-                        <span className="specialty-toggle-label">Show URLs</span>
-                    </div>
-                    <div className="digital-ed-rows-per-page">
+                    <div className="rows-per-page-control">
                         <label htmlFor="rowsPerPage">Rows per page:</label>
                         <select
                             id="rowsPerPage"
@@ -445,56 +450,57 @@ const DigitalJournals = () => {
                         </select>
                     </div>
                 </div>
-            </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th className="journal-title-column">Title</th>
-                        <th>Total Users</th>
-                        <th>Avg Duration</th>
-                        <th>Bounce Rate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {currentRows.map((item, index) => (
-                        <tr key={index}>
-                            <td 
-                                className="title-cell journal-title"
-                                onClick={() => handleJournalClick(item)}
-                            >
-                                {getDisplayTitle(item)}
-                            </td>
-                            <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
-                            <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
-                            <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
+                <table className="digital-journals-table">
+                    <thead>
+                        <tr>
+                            <th className="journal-title-column">Title</th>
+                            <th>Total Users</th>
+                            <th>Avg Duration</th>
+                            <th>Bounce Rate</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-            
-            <div className="pagination">
-                {currentPage > 1 && (
-                    <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
-                )}
-                {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
-                    <button
-                        key={num}
-                        onClick={() => handlePagination(num)}
-                        className={currentPage === num ? 'active' : ''}
-                    >
-                        {num}
+                    </thead>
+                    <tbody>
+                        {currentRows.map((item, index) => (
+                            <tr key={index}>
+                                <td
+                                    className="journal-title"
+                                    onClick={() => handleJournalClick(item)}
+                                >
+                                    {getDisplayTitle(item)}
+                                </td>
+                                <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
+                                <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
+                                <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <div className="table-footer">
+                    <div className="pagination">
+                        {currentPage > 1 && (
+                            <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
+                        )}
+                        {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
+                            <button
+                                key={num}
+                                onClick={() => handlePagination(num)}
+                                className={currentPage === num ? 'active' : ''}
+                            >
+                                {num}
+                            </button>
+                        ))}
+                        {currentPage < totalPages && (
+                            <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
+                        )}
+                    </div>
+                </div>
+                <div className="export-button-container">
+                    <button className="export-button" onClick={exportToCSV}>
+                        Export CSV
                     </button>
-                ))}
-                {currentPage < totalPages && (
-                    <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
-                )}
-            </div>
-            
-            <div className="export-button-container">
-                <button className="export-button" onClick={exportToCSV}>
-                    Export CSV
-                </button>
+                </div>
             </div>
             
             {isModalOpen && selectedJournal && (

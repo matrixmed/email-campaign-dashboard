@@ -311,8 +311,8 @@ const SpecialtySection = () => {
 
   return (
     <div className="specialty-section">
-      <div className="specialty-section-header">
-        <h2>Specialty Metrics</h2>
+      <div className="page-header">
+        <h1>Specialty Metrics</h1>
         <div className="specialty-controls">
           <div className="specialty-bucket-toggles">
             {buckets.map((bucket) => (
@@ -338,7 +338,7 @@ const SpecialtySection = () => {
       </div>
 
       {activeBucket && specialtyData[activeBucket] && (
-        <div className="specialty-bucket-content">
+        <div className="specialty-content">
           <div className="specialty-aggregate-metrics">
             <div className="specialty-aggregate-card">
               <div className="specialty-aggregate-label">Sent</div>

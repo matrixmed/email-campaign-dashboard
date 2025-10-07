@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES, TABLE_DEFINITIONS } from './template/LayoutTemplates';
+import { API_BASE_URL } from '../../config/api';
 
-const ComponentSidebar = ({ 
-  isOpen, 
+const ComponentSidebar = ({
+  isOpen,
   onToggle,
   campaigns = [],
   selectedCampaign,
@@ -19,17 +20,36 @@ const ComponentSidebar = ({
   deletedCards = [],
   onRestoreCard,
   budgetedCost,
-  actualCost, 
+  actualCost,
   onBudgetedCostChange,
   onActualCostChange,
   currentTemplate = 'single',
   selectedTableTypes = {},
-  onTableTypeChange
+  onTableTypeChange,
+  onRestoreDashboard
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
   const [customTableRows, setCustomTableRows] = useState(3);
   const [customTableCols, setCustomTableCols] = useState(3);
+
+  const [savedDashboards, setSavedDashboards] = useState([]);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
+
+  const fetchSavedDashboards = useCallback(async () => {
+    setLoadingDashboards(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboards/list?user_id=default_user`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        setSavedDashboards(data.dashboards);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboards:', error);
+    } finally {
+      setLoadingDashboards(false);
+    }
+  }, []);
 
   const sections = [
     {
@@ -49,6 +69,12 @@ const ComponentSidebar = ({
       label: 'Restore',
       icon: '♻️',
       count: deletedCards.length
+    },
+    {
+      id: 'archive',
+      label: 'Archive',
+      icon: '📁',
+      count: savedDashboards.length
     }
   ];
 
@@ -253,18 +279,16 @@ const ComponentSidebar = ({
     <div className="dc-component-sidebar dc-open" style={{
       position: 'relative',
       background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-      width: 'auto',
-      height: '81vh',
+      width: '320px',
+      height: '100%',
       transition: 'width 0.3s ease',
       boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)',
       zIndex: 150,
       borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-      borderRadius: '0 8px 0px 0',
+      borderRadius: '12px',
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column',
-      overflowX: "hidden",
-      overflowY: "auto"
+      flexDirection: 'column'
     }}>
 
       <div className="dc-sidebar-content" style={{ 
@@ -768,9 +792,9 @@ const ComponentSidebar = ({
                   Click to restore deleted components
                 </p>
               </div>
-              
+
               {deletedCards.length === 0 ? (
-                <div style={{ 
+                <div style={{
                   padding: '20px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   borderRadius: '6px',
@@ -814,6 +838,112 @@ const ComponentSidebar = ({
                         {card.type} • {card.value || 'No value'}
                       </div>
                     </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === 'archive' && (
+            <div className="dc-sidebar-section">
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600' }}>
+                  Saved Dashboards
+                </h3>
+                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', margin: '0 0 16px 0' }}>
+                  Load a previously saved dashboard
+                </p>
+                <button
+                  onClick={fetchSavedDashboards}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'rgba(59, 130, 246, 0.2)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
+                >
+                  {loadingDashboards ? 'Loading...' : 'Refresh List'}
+                </button>
+              </div>
+
+              {savedDashboards.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
+                    No saved dashboards found
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {savedDashboards.map((dashboard) => (
+                    <div
+                      key={dashboard.id}
+                      style={{
+                        padding: '12px',
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', color: 'white', marginBottom: '6px' }}>
+                        {dashboard.title}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
+                        {new Date(dashboard.updated_at).toLocaleDateString()}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => onRestoreDashboard?.(dashboard.id)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            background: 'rgba(99, 102, 241, 0.2)',
+                            border: '1px solid rgba(99, 102, 241, 0.4)',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm('Delete this dashboard?')) return;
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/api/dashboards/${dashboard.id}`, {
+                                method: 'DELETE'
+                              });
+                              const data = await response.json();
+                              if (data.status === 'success') {
+                                fetchSavedDashboards();
+                              }
+                            } catch (error) {
+                              alert('Error deleting dashboard: ' + error.message);
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

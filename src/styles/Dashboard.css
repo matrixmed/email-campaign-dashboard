@@ -115,10 +115,6 @@ h1 {
   margin-left: 20px;
   color: #0ff;
 }
- 
-h2 {
-  color: #ff0077;
-}
 
 .rows-per-page {
   display: flex;
@@ -143,7 +139,7 @@ h2 {
 
 .export-button {
   padding: 8px 12px;
-  background-color: #007bff;
+  background-color: var(--color-table-header, #1a4d7a);
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -152,7 +148,7 @@ h2 {
 }
 
 .export-button:hover {
-  background-color: #0056b3;
+  background-color: var(--color-primary-hover, #143d61);
 }
  
 #d3Chart {
@@ -167,24 +163,33 @@ table {
   width: 100%;
   border-collapse: collapse;
 }
- 
+
 th, td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #444;
+  padding: 12px !important;
+  text-align: left !important;
+  border-bottom: 1px solid #444 !important;
 }
- 
+
 th {
-  background-color: #333;
-  color: #0ff; 
+  background-color: #333 !important;
+  color: #0ff !important;
+  font-weight: 600 !important;
 }
- 
+
 td {
-  color: #fff;
+  color: #fff !important;
 }
- 
-tr:nth-child(even) {
-  background-color: #2a2a2d;
+
+tbody tr:nth-child(even) {
+  background-color: #2a2a2d !important;
+}
+
+tbody tr:nth-child(odd) {
+  background-color: #222 !important;
+}
+
+tr:hover {
+  background-color: #2a2a2d !important;
 }
  
 .dropdown {
@@ -442,8 +447,8 @@ body.light tr.selected-row:hover {
 }
 
 .compare-button {
-  background-color: #0ff;
-  color: #111;
+  background-color: var(--color-table-header, #1a4d7a);
+  color: white;
   border: none;
   border-radius: 4px;
   padding: 8px 15px;
@@ -453,7 +458,7 @@ body.light tr.selected-row:hover {
 }
 
 .compare-button:hover {
-  background-color: #00cccc;
+  background-color: var(--color-primary-hover, #143d61);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
@@ -551,7 +556,7 @@ body.light .dropdown-arrow svg {
 .pagination button {
   padding: 1px 20px;
   margin-top: 27.5px;
-  background-color: #0077ff;
+  background-color: var(--color-table-header, #1a4d7a);
   color: white;
   border: none;
   border-radius: 4px;
@@ -560,10 +565,10 @@ body.light .dropdown-arrow svg {
   margin-right: 0px;
   height: 30px;
   margin-left: 10px;
-} 
- 
+}
+
 .pagination button:hover {
-  background-color: #005bb5;
+  background-color: var(--color-primary-hover, #143d61);
 }
 
 .pagination-ellipsis {

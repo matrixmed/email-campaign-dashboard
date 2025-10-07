@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import MatrixSignIn from './components/MatrixSignIn';
+import './App.css';
 import './styles/Dashboard.css';
-import './styles//MatrixSignIn.css';
-import './styles//ReportsManager.css';
-import './themes/SpaceTheme.css';
+import './styles/MatrixSignIn.css';
+import './styles/ReportsManager.css';
 import './themes/SpaceTheme.css';
 import './themes/MarbleTheme.css';
 import './themes/CyberpunkTheme.css';
@@ -59,11 +60,12 @@ function App() {
 
   return (
     <div className="App">
-      {!isAuthenticated ? (
-        <MatrixSignIn onAuthenticated={handleAuthentication} />
-      ) : (
-        <Dashboard />
-      )}
+      <BrowserRouter>
+        <Dashboard
+          isAuthenticated={isAuthenticated}
+          onAuthenticated={handleAuthentication}
+        />
+      </BrowserRouter>
     </div>
   );
 }

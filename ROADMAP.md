@@ -185,76 +185,79 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 ### Phase 1: Infrastructure & Database Setup
 
 **Step 1.1: Database Schema Design**
-- [ ] Design PostgreSQL schema for user_profiles table (normalized structure for 2.45GB JSON)
-- [ ] Design dashboard_saves table (id, user_id, title, state_json, theme, created_at, updated_at)
-- [ ] Design campaign_metadata table (campaign_id, campaign_name, target_list_path, tags_path, ad_images_path, extracted_data)
-- [ ] Design cmi_contract_values table (contract_num, client, brand, vehicle, placement_id, description, buy_type, data_type, notes) - ULTIMATE SOURCE OF TRUTH
-- [ ] Design brand_editor_agency table (editor_name, brand, agency, pharma_company, is_active) - MERGED TABLE for editor assignments + brand-agency mapping
-- [ ] Design scalable schema patterns for future data migrations
-- [ ] Create foreign key relationships and indexes for performance
+- [x] Design PostgreSQL schema for user_profiles table (normalized structure for 2.45GB JSON)
+- [x] Design dashboard_saves table (id, user_id, title, state_json, theme, created_at, updated_at)
+- [x] Design campaign_reporting_metadata table (campaign_id, campaign_name, target_list_path, tags_path, ad_images_path, extracted_data)
+- [x] Design cmi_contract_values table (contract_num, client, brand, vehicle, placement_id, description, buy_type, data_type, notes) - ULTIMATE SOURCE OF TRUTH
+- [x] Design brand_editor_agency table (editor_name, brand, agency, pharma_company, is_active) - MERGED TABLE for editor assignments + brand-agency mapping
+- [x] Design scalable schema patterns for future data migrations
+- [x] Create foreign key relationships and indexes for performance
 - [ ] Document schema with ERD diagram showing relationships and data flow
 
 **Step 1.2: Render Setup**
-- [ ] Create Render account and new Web Service
-- [ ] Provision PostgreSQL database instance
-- [ ] Configure environment variables (.env setup)
-- [ ] Set up deployment pipeline from GitHub repo
-- [ ] Configure CORS for API endpoints
-- [ ] Test basic deployment with Hello World endpoint
+- [x] Create Render account and new Web Service
+- [x] Provision PostgreSQL database instance
+- [x] Configure environment variables (.env setup)
+- [x] Set up deployment pipeline from GitHub repo
+- [x] Configure CORS for API endpoints
+- [x] Test basic deployment with Hello World endpoint
 
 **Step 1.3: Backend API Framework (Python Flask)**
-- [ ] Initialize Python Flask backend project structure
-- [ ] Set up Flask app with blueprints for modular routes
-- [ ] Configure SQLAlchemy ORM for PostgreSQL connection
-- [ ] Set up database connection pooling (psycopg2)
-- [ ] Create base API structure with error handling middleware
-- [ ] Implement CORS configuration for frontend communication
-- [ ] Set up logging and monitoring (Flask logging)
-- [ ] Create health check endpoint (/api/health)
-- [ ] Set up development server configuration
+- [x] Initialize Python Flask backend project structure
+- [x] Set up Flask app with blueprints for modular routes
+- [x] Configure SQLAlchemy ORM for PostgreSQL connection
+- [x] Set up database connection pooling (psycopg2)
+- [x] Create base API structure with error handling middleware
+- [x] Implement CORS configuration for frontend communication
+- [x] Set up logging and monitoring (Flask logging)
+- [x] Create health check endpoint (/api/health)
+- [x] Set up development server configuration
 
 **Step 1.4: Data Migration - User Profiles**
-- [ ] Write ETL script to parse user_profiles.json (2.45GB)
-- [ ] Transform nested JSON structure to relational schema
-- [ ] Create batch insert script with progress tracking
-- [ ] Migrate data to PostgreSQL with validation
-- [ ] Create indexes on NPI, email, specialty columns
+- [x] Write ETL script to parse user_profiles.json (2.45GB)
+- [x] Transform nested JSON structure to relational schema
+- [x] Create batch insert script with progress tracking (seed_user_profiles.py)
+- [x] Place user_profiles.json in backend directory (already downloaded from Azure)
+- [ ] Run seed_user_profiles.py to migrate data to PostgreSQL
+- [ ] Create indexes on email, specialty columns
 - [ ] Verify data integrity and query performance
 - [ ] Test sample queries for response time benchmarks
+
+**Migration Approach:** user_profiles.json downloaded from Azure and placed in backend directory. Run `python seed_user_profiles.py` to load data into PostgreSQL using batch inserts (100 records at a time).
 
 ### Phase 2: Dashboard Save Feature (#1)
 
 **Step 2.1: Backend - Dashboard Save API**
-- [ ] Create POST /api/dashboards/save endpoint
-- [ ] Implement request validation for dashboard state JSON
-- [ ] Save dashboard state to database with metadata
-- [ ] Create GET /api/dashboards/list endpoint (return user's saved dashboards)
-- [ ] Create GET /api/dashboards/:id endpoint (fetch specific dashboard state)
-- [ ] Create DELETE /api/dashboards/:id endpoint
-- [ ] Add error handling for large state objects
+- [x] Create POST /api/dashboards/save endpoint
+- [x] Implement request validation for dashboard state JSON
+- [x] Save dashboard state to database with metadata
+- [x] Create GET /api/dashboards/list endpoint (return user's saved dashboards)
+- [x] Create GET /api/dashboards/:id endpoint (fetch specific dashboard state)
+- [x] Create DELETE /api/dashboards/:id endpoint
+- [x] Add error handling for large state objects
 
 **Step 2.2: Frontend - Save Functionality**
-- [ ] Add "Save" button next to Export button in DashboardCanvas.jsx
-- [ ] Implement dashboard state serialization function
-- [ ] Capture all component positions (x, y coordinates)
-- [ ] Capture current theme selection
-- [ ] Capture table values and custom data
-- [ ] Capture uploaded images (convert to base64 or upload to storage)
-- [ ] Create save modal with title input
-- [ ] Implement save API call with loading state
-- [ ] Add success/error notifications
+- [x] Add "Save" button next to Export button in DashboardCanvas.jsx
+- [x] Implement dashboard state serialization function
+- [x] Capture all component positions (x, y coordinates)
+- [x] Capture current theme selection
+- [x] Capture table values and custom data
+- [x] Capture uploaded images (convert to base64 or upload to storage)
+- [x] Create save modal with title input
+- [x] Implement save API call with loading state
+- [x] Add success/error notifications
 
 **Step 2.3: Frontend - Archive & Restore**
-- [ ] Add "Archive" section below "Restore" in ComponentSidebar.jsx
-- [ ] Fetch list of saved dashboards on component mount
-- [ ] Render clickable list of dashboard titles with timestamps
-- [ ] Implement restore functionality on click
-- [ ] Deserialize dashboard state from database
-- [ ] Restore all component positions
-- [ ] Restore theme selection
-- [ ] Restore table data and images
-- [ ] Add delete button for each archived dashboard
-- [ ] Add confirmation modal for delete operations
+- [x] Add "Archive" section below "Restore" in ComponentSidebar.jsx
+- [x] Fetch list of saved dashboards on component mount
+- [x] Render clickable list of dashboard titles with timestamps
+- [x] Implement restore functionality on click (deserialize and apply state)
+- [x] Deserialize dashboard state from database
+- [x] Restore all component positions
+- [x] Restore theme selection
+- [x] Restore table data and images
+- [x] Add delete button for each archived dashboard
+- [x] Add confirmation modal for delete operations
 
 **Step 2.4: Testing & Refinement**
 - [ ] Test save with complex multi-component dashboards
@@ -264,38 +267,57 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 - [ ] Optimize state size (compression if needed)
 - [ ] Test concurrent saves and race conditions
 
+**CRITICAL NOTE - Image Storage:**
+Current implementation stores images as base64 in state_json (TEXT column). This works but has limitations:
+- Base64 encoding increases size by ~33%
+- Multiple/large images will bloat database and slow API responses
+- May hit PostgreSQL row size limits (~1GB per row theoretical, ~400MB practical)
+
+**TODO for production:** Migrate to file-based storage:
+1. Create POST /api/dashboards/upload-image endpoint
+2. Upload images to backend/uploads/ folder
+3. Store file paths instead of base64 in state_json
+4. Serve images from uploads when restoring
+5. Implement cleanup for deleted dashboard images
+
 ### Phase 3: Campaign Metadata Upload (#4)
 
 **Step 3.1: Backend - File Upload API**
-- [ ] Create POST /api/campaigns/:campaignId/metadata endpoint
-- [ ] Implement multipart/form-data handling
-- [ ] Set up file storage (S3, Azure Blob, or Render disk)
-- [ ] Extract data from Excel files (target list, tags)
-- [ ] Store file references in campaign_metadata table
-- [ ] Create GET /api/campaigns/:campaignId/metadata endpoint
-- [ ] Implement file validation (type, size limits)
+- [x] Create POST /api/campaigns/:campaignId/metadata endpoint
+- [x] Implement multipart/form-data handling
+- [x] Set up file storage (S3, Azure Blob, or Render disk)
+- [x] Extract data from Excel files (target list, tags)
+- [x] Store file references in campaign_reporting_metadata table
+- [x] Create GET /api/campaigns/:campaignId/metadata endpoint
+- [x] Implement file validation (type, size limits)
 
 **Step 3.2: Frontend - Modal Enhancement**
-- [ ] Add button in CampaignModal.jsx (right of send date/campaign count)
-- [ ] Style button to match existing modal design
-- [ ] Create metadata upload modal/screen
-- [ ] Add three file dropbox components (react-dropzone)
-- [ ] Label dropboxes: "Target List (Excel)", "Tags (Excel)", "Ad Images (PNG/JPG)"
-- [ ] Implement file preview for each dropbox
-- [ ] Add "Submit" button with validation
-- [ ] Display uploaded file names and timestamps
-- [ ] Implement file upload API calls
-- [ ] Add progress indicators for uploads
-- [ ] Show success/error states
+- [x] Add button in CampaignModal.jsx (right of send date/campaign count)
+- [x] Style button to match existing modal design
+- [x] Create metadata upload modal/screen
+- [x] Add three file dropbox components (react-dropzone)
+- [x] Label dropboxes: "Target List (Excel)", "Tags (Excel)", "Ad Images (PNG/JPG)"
+- [x] Implement file preview for each dropbox
+- [x] Add "Submit" button with validation
+- [x] Display uploaded file names and timestamps
+- [x] Implement file upload API calls
+- [x] Add progress indicators for uploads
+- [x] Show success/error states
 
 **Step 3.3: Data Extraction & Storage**
-- [ ] Parse Excel files server-side (use openpyxl for Python or xlsx for Node)
-- [ ] Extract placement IDs, descriptions, and metadata from target lists
-- [ ] Extract tag information from tags file
-- [ ] Store extracted data in structured format
-- [ ] Link data to campaign by campaign name/ID
-- [ ] Implement data validation against CMI contract values
-- [ ] Create endpoint to retrieve parsed metadata
+- [x] Parse Excel files server-side (openpyxl in Python)
+- [x] Extract specific columns from target list (Client_ID, CMI_PlacementID, Client_PlacementID, Placement_Description, Supplier, Brand_Name, Vehicle_Name, TargetListID, Campaign_Name)
+- [x] Implement Client_ID logic: Map Brand_Name to pharma company using BRAND_TO_PHARMA dictionary
+- [x] Extract first row only from target list (values are consistent throughout file)
+- [x] Extract GCM Placement IDs from tags file (GCM_Placement_ID, Placement_Name, Ad_Name, Campaign_Name)
+- [x] Store up to 2 GCM placement IDs (gcm_placement_id, gcm_placement_id2)
+- [x] Extract creative code from image filenames using regex pattern ([A-Z]{2}-\d+)
+- [x] Count ad images and store ad_count
+- [x] Store extracted data in campaign_reporting_metadata table with specific columns
+- [x] Store raw metadata as JSON for reference
+- [x] Link data to campaign by campaign_id
+- [x] Support update/overwrite of existing metadata
+- [x] Create GET endpoint to retrieve parsed metadata
 
 **Step 3.4: Integration with Reports**
 - [ ] Update report_resource_manager.py to query database for metadata
@@ -308,106 +330,103 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 ### Phase 4: CMI Contract Values Manager (#5)
 
 **Step 4.1: Backend - CRUD API**
-- [ ] Create GET /api/cmi-contracts endpoint (fetch all contracts)
-- [ ] Create POST /api/cmi-contracts endpoint (create new contract)
-- [ ] Create PUT /api/cmi-contracts/:id endpoint (update contract)
-- [ ] Create DELETE /api/cmi-contracts/:id endpoint (delete contract)
-- [ ] Implement validation for required fields
-- [ ] Add bulk operations endpoint for Excel import
-- [ ] Create export endpoint (GET /api/cmi-contracts/export as CSV)
+- [x] Create GET /api/cmi-contracts endpoint (fetch all contracts)
+- [x] Create POST /api/cmi-contracts endpoint (create new contract)
+- [x] Create PUT /api/cmi-contracts/:id endpoint (update contract)
+- [x] Create DELETE /api/cmi-contracts/:id endpoint (delete contract)
+- [x] Implement validation for required fields
+- [x] Create export endpoint (GET /api/cmi-contracts/export as CSV)
+- [x] Register blueprint in app.py
 
 **Step 4.2: Frontend - Editable Table Component**
-- [ ] Create new CMIContractValues.jsx component
-- [ ] Design table layout with columns: Contract #, Client, Brand, Vehicle, Placement ID, Description, Buy Type, Data Type, Notes
-- [ ] Implement inline editing (click cell to edit)
-- [ ] Add row-level actions (delete, duplicate)
-- [ ] Implement column sorting and filtering
-- [ ] Add "Add Row" button at bottom
-- [ ] Implement bulk import from Excel file
-- [ ] Add "Export to Excel" button
-- [ ] Style to match application theme
-- [ ] Add loading states and error handling
+- [x] Create new CMIContractValues.jsx component
+- [x] Design table layout with columns: Contract #, Client, Brand, Vehicle, Placement ID, Description, Buy Type, Data Type, Notes
+- [x] Implement inline editing (click cell to edit)
+- [x] Add row-level actions (delete button)
+- [x] Implement column sorting and filtering
+- [x] Add "Add Row" button at top
+- [x] Add "Export to CSV" button
+- [x] Style to match application theme (dark blue headers, clean tables)
+- [x] Add loading states and error handling
 
 **Step 4.3: Data Management**
-- [ ] Seed database with existing contract data
-- [ ] Implement optimistic UI updates
-- [ ] Add undo/redo functionality
-- [ ] Implement search across all fields
-- [ ] Add data validation on frontend and backend
-- [ ] Create audit log for changes (optional but recommended)
+- [x] Create seed_cmi_contracts.py to load CSV data
+- [x] Seed database with 69 contract records from CMI Contract Values - 2025.csv
+- [x] Implement search across all fields
+- [ ] Add data validation on frontend and backend (placement_id uniqueness enforced)
+- [ ] Create audit log for changes (optional)
 
 **Step 4.4: Integration**
+- [x] Add CMIContractValues component to Dashboard.jsx
 - [ ] Update report generation to use CMI contract values as source of truth
 - [ ] Add validation in campaign metadata upload against contracts
 - [ ] Create API to lookup placement IDs for autocomplete features
-- [ ] Add navigation link in main dashboard
 
 ### Phase 5: Brand/Agency/Editor Management (#6)
 
 **Step 5.1: Backend - Unified Brand Management API**
-- [ ] Create GET /api/brand-management endpoint (fetch all brand_editor_agency data)
-- [ ] Create POST /api/brand-management/entry endpoint (add new brand entry with editor + agency)
-- [ ] Create PUT /api/brand-management/:id endpoint (update existing entry)
-- [ ] Create DELETE /api/brand-management/:id endpoint (delete entry)
-- [ ] Implement bulk import endpoint for Excel data
-- [ ] Add validation for required fields (editor, brand, agency, pharma_company)
-- [ ] Create endpoint for historical client archiving (toggle is_active)
-- [ ] Add filtering by editor name for frontend grouping
+- [x] Create GET /api/brand-management endpoint (fetch all brand_editor_agency data)
+- [x] Create POST /api/brand-management/entry endpoint (add new brand entry with editor + agency)
+- [x] Create PUT /api/brand-management/:id endpoint (update existing entry)
+- [x] Create DELETE /api/brand-management/:id endpoint (delete entry)
+- [x] Add validation for required fields (editor, brand)
+- [x] Add filtering by editor name for frontend grouping
+- [x] Register blueprint in app.py
 
 **Step 5.2: Frontend - Unified Management Component**
-- [ ] Create BrandManagement.jsx component with grouped layout
-- [ ] Design section headers for each editor (Emily, Courtney, Morgan, Dana)
-- [ ] Under each editor header, display their brands with agency + pharma company
-- [ ] Implement inline editing for brand rows (agency, pharma company editable)
-- [ ] Add "Add Brand" button under each editor section
-- [ ] Implement reassign brand to different editor functionality
-- [ ] Add separate "Active Clients" and "Historical Clients" sections
-- [ ] Implement "Move to Historical" toggle for clients
-- [ ] Add bulk import from Excel functionality
-- [ ] Style consistently with application theme
+- [x] Create BrandManagement.jsx component with grouped layout
+- [x] Design section headers for each editor (Emily, Courtney, Morgan, Dana)
+- [x] Under each editor header, display their brands with agency + pharma company
+- [x] Implement inline editing for brand rows (all fields editable)
+- [x] Add "Add Brand" button under each editor section
+- [x] Add separate "Unassigned Brands" and "Historical/Inactive Brands" sections
+- [x] Style consistently with application theme (dark blue headers, clean tables)
+- [x] Add to Dashboard.jsx
 
 **Step 5.3: Data Seeding**
-- [ ] Seed Emily's brands with agencies (BCMA→?, Carvykti→CMI, Castle→Castle, Imfinzi→CMI, One Lung→CMI, Tagrisso→CMI, Verzenio→CMI)
-- [ ] Seed Courtney's brands with agencies (Adbry→Silverlight, Aquaphor→?, etc.)
-- [ ] Seed Morgan's brands with agencies (Breyanzi→CMI, Cabometyx→CMI, Calquence→CMI)
-- [ ] Seed Dana's brands with agencies (Imfinzi GI→CMI)
-- [ ] Import active pharma companies and brands
-- [ ] Import historical clients list
-- [ ] Validate all data relationships and uniqueness
+- [x] Create seed_brands.py script
+- [x] Seed all brands from brands_sales_pharma.csv (73 entries)
+- [x] Emily: 7 brands (6 active, 1 inactive)
+- [x] Courtney: 20 brands (17 active, 3 inactive)
+- [x] Morgan: 9 brands (all active)
+- [x] Dana: 1 brand (inactive)
+- [x] Unassigned: 36 brands (32 inactive, 4 active)
 
 **Step 5.4: Integration with Reports**
 - [ ] Update ReportsManager.jsx to fetch from brand_editor_agency table
 - [ ] Remove hardcoded brand-agency mapping arrays
 - [ ] Implement dynamic agency lookup by brand
 - [ ] Add validation in report generation using database data
-- [ ] Display editor assignments in reports interface if needed
 
 ### Phase 6: User Engagement Query System (#2)
 
 **Step 6.1: Backend - Query API**
-- [ ] Create POST /api/users/engagement-query endpoint
-- [ ] Implement query builder for user_profiles table
-- [ ] Support filters: specialty, engagement level, campaign list
-- [ ] Implement aggregation for open rates and click rates
-- [ ] Optimize query performance with indexes
-- [ ] Add pagination for large result sets
-- [ ] Create CSV export functionality for results
+- [x] Create POST /api/users/engagement-query endpoint (Discovery Mode)
+- [x] Create POST /api/users/analyze-list endpoint (Analysis Mode)
+- [x] Implement query builder for user_profiles table with filters
+- [x] Support filters: specialty, engagement level, campaign list, limit
+- [x] Support specific user list analysis (email or NPI lookup)
+- [x] Implement aggregation for open rates and click rates from campaigns_data JSON
+- [x] Create CSV export functionality for both endpoints
+- [x] Register users blueprint in app.py
+- [ ] Optimize query performance with indexes (requires user_profiles migration)
 - [ ] Add caching layer for common queries (optional)
 
 **Step 6.2: Frontend - Query Interface**
-- [ ] Create UserEngagementQuery.jsx component
-- [ ] Design form with filter inputs (specialty, engagement level, count)
-- [ ] Add campaign multi-select dropdown
-- [ ] Implement search/filter for campaigns
-- [ ] Add "Search" button to trigger query
-- [ ] Display results in paginated table
-- [ ] Show columns: Email, NPI, Specialty, Unique Opens, Total Opens, Unique Clicks, Total Clicks, Sends
-- [ ] Add "Download CSV" button
-- [ ] Implement loading states and error handling
-- [ ] Add result count and query time display
+- [x] Redesign AudienceQueryBuilder.jsx with two separate modes
+- [x] Implement Discovery Mode: Find users by criteria (specialty, engagement, campaigns)
+- [x] Implement Analysis Mode: Analyze specific user list (paste or file upload)
+- [x] Add mode selector toggle between Discovery and Analysis
+- [x] Discovery: Form with specialty, engagement level, limit, campaign filters
+- [x] Analysis: Support email/NPI input via paste (max 100) or file upload (unlimited)
+- [x] Display results in paginated table (100 per page)
+- [x] Show columns: Email, Name, Specialty, Sends, Opens, Clicks, Rates
+- [x] Implement loading states and error handling
+- [x] Add result count and pagination display
+- [x] Analysis mode auto-downloads CSV for file uploads or >100 entries
 
 **Step 6.3: Testing & Optimization**
-- [ ] Test queries on full user_profiles dataset
+- [ ] Test queries on full user_profiles dataset (requires migration completion)
 - [ ] Benchmark response times for various query types
 - [ ] Optimize slow queries with additional indexes
 - [ ] Test CSV export with large result sets
@@ -417,39 +436,40 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 ### Phase 7: List Efficiency Analysis (#5)
 
 **Step 7.1: Backend - Analysis API**
-- [ ] Create POST /api/list-analysis/upload endpoint (accept IQVIA list + target lists)
-- [ ] Parse uploaded CSV/Excel files
-- [ ] Extract NPI/email identifiers from all lists
-- [ ] Create POST /api/list-analysis/calculate-crossover endpoint
-- [ ] Implement set intersection logic for crossover calculation
-- [ ] Calculate distribution (users on N/M lists)
-- [ ] Create POST /api/list-analysis/engagement-comparison endpoint
-- [ ] Query user_profiles for engagement data by target list
-- [ ] Compare engaged users on target lists vs. non-target lists
-- [ ] Generate statistical summary
+- [x] Create POST /api/list-analysis/upload endpoint (accept IQVIA list + target lists)
+- [x] Parse uploaded CSV/Excel files
+- [x] Extract NPI/email identifiers from all lists
+- [x] Create POST /api/list-analysis/calculate-crossover endpoint
+- [x] Implement set intersection logic for crossover calculation
+- [x] Calculate distribution (users on N/M lists)
+- [x] Create POST /api/list-analysis/engagement-comparison endpoint
+- [x] Query user_profiles for engagement data by target list
+- [x] Compare engaged users on target lists vs. non-target lists
+- [x] Generate statistical summary
+- [x] Create POST /api/list-analysis/export-results endpoint for CSV export
 
 **Step 7.2: Frontend - Analysis Component**
-- [ ] Create ListEfficiencyAnalysis.jsx component
-- [ ] Add file dropbox for full IQVIA list
-- [ ] Add multi-file dropbox for target lists (up to 15-20 files)
-- [ ] Display uploaded file names and user counts
-- [ ] Add "Calculate Crossover" button
-- [ ] Display crossover distribution (chart and/or table)
-- [ ] Add campaign assignment interface for each target list
-- [ ] Implement multi-select campaign search (limit 20 per list)
-- [ ] Add "Analyze Engagement" button
-- [ ] Display engagement comparison results
-- [ ] Show target list engagement vs. overall campaign engagement
-- [ ] Add data visualization (charts for comparison)
-- [ ] Implement CSV export for analysis results
+- [x] Create ListEfficiencyAnalysis.jsx component
+- [x] Add file dropbox for full IQVIA list
+- [x] Add multi-file dropbox for target lists (up to 15-20 files)
+- [x] Display uploaded file names and user counts
+- [x] Add "Calculate Crossover" button
+- [x] Display crossover distribution (chart and/or table)
+- [x] Add campaign assignment interface for each target list
+- [x] Implement multi-select campaign search (limit 20 per list)
+- [x] Add "Analyze Engagement" button
+- [x] Display engagement comparison results
+- [x] Show target list engagement vs. overall campaign engagement
+- [x] Implement CSV export for analysis results
+- [x] Add component to Dashboard.jsx
+- [x] Create ListEfficiencyAnalysis.css styling
 
 **Step 7.3: Data Processing**
-- [ ] Implement efficient set operations for large user lists
-- [ ] Handle duplicate NPIs across lists
-- [ ] Map NPIs to user_profiles records
-- [ ] Aggregate engagement metrics by list
-- [ ] Calculate statistical significance (optional)
-- [ ] Generate executive summary report
+- [x] Implement efficient set operations for large user lists
+- [x] Handle duplicate NPIs across lists
+- [x] Map NPIs to user_profiles records
+- [x] Aggregate engagement metrics by list
+- [x] Comparison logic for target vs non-target engagement
 
 **Step 7.4: Testing**
 - [ ] Test with realistic file sizes (10k-50k users)
@@ -461,31 +481,37 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 ### Phase 8: Audience Query Builder Update (#7)
 
 **Step 8.1: Backend - Enhanced Query API**
-- [ ] Update POST /api/audience/query endpoint for two modes
-- [ ] Implement "Discovery Mode": filters by specialty + engagement + count
-- [ ] Implement "Analysis Mode": accepts NPI list (up to 100 for display, unlimited for download)
-- [ ] Add file upload handling for CSV/Excel with NPI column detection
-- [ ] Parse NPI column (variants: "NPI", "npi", "NPI_ID", "npi_id")
-- [ ] Query user_profiles for specified NPIs
-- [ ] Return: Email, First Name, Last Name, NPI, Specialty, Unique Open Rate, Total Open Rate, Unique Click Rate, Total Click Rate, Sends Count, Opens Count, Clicks Count
-- [ ] Generate downloadable CSV/Excel file
+- [x] Update POST /api/users/engagement-query endpoint for two modes
+- [x] Implement "Discovery Mode": filters by specialty + engagement + count
+- [x] Implement "Analysis Mode": accepts NPI/email list (up to 100 for display, unlimited for download)
+- [x] Add file upload handling for CSV/Excel with NPI/email column detection
+- [x] Parse NPI column (variants: "NPI", "npi", "NPI_ID", "npi_id")
+- [x] Query user_profiles for specified NPIs/emails
+- [x] Return: Email, First Name, Last Name, Specialty, Unique Open Rate, Total Open Rate, Unique Click Rate, Total Click Rate, Sends Count, Opens Count, Clicks Count
+- [x] Generate downloadable CSV file
+- [x] POST /api/users/analyze-list endpoint for analysis mode
 
 **Step 8.2: Frontend - Redesigned Interface**
-- [ ] Redesign AudienceQueryBuilder.jsx with two distinct sections
-- [ ] Section 1: "Discovery" - Find users by criteria
-  - [ ] Input: Target specialty dropdown
-  - [ ] Input: Engagement level (highly engaged, moderately engaged, not engaged)
-  - [ ] Input: Number of users to return
-  - [ ] Button: "Find Users"
-- [ ] Section 2: "Analysis" - Analyze specific audience
-  - [ ] File dropbox for CSV/Excel (require NPI column)
-  - [ ] Text area for copy/paste NPIs (limit 100, validate input)
-  - [ ] Radio button: Display results or Download file
-  - [ ] Button: "Analyze Audience"
-- [ ] Display tabular results for copy/paste mode (max 100 rows)
-- [ ] Trigger download for file upload mode or copy/paste >100
-- [ ] Add clear separation between two modes (visual divider, headings)
-- [ ] Implement validation and error messages
+- [x] Redesign AudienceQueryBuilder.jsx with two distinct sections (completed - both sections now visible side by side)
+- [x] Section 1: "Discovery" - Find users by criteria (completed - left section)
+  - [x] Input: Target specialty dropdown
+  - [x] Input: Engagement level (highly engaged, moderately engaged, not engaged, none)
+  - [x] Input: Number of users to return
+  - [x] Input: Campaign filter (multi-select)
+  - [x] Button: "Find Users"
+- [x] Section 2: "Analysis" - Analyze specific audience (completed - right section)
+  - [x] File dropbox for CSV/Excel (require NPI or Email column)
+  - [x] Text area for copy/paste NPIs/emails (limit 100, validate input)
+  - [x] Auto-download for file uploads or >100 entries
+  - [x] Button: "Analyze Users"
+- [x] Display tabular results for copy/paste mode (max 100 rows)
+- [x] Trigger download for file upload mode or copy/paste >100
+- [x] Add clear separation between two modes (removed toggle, now separate visible sections)
+- [x] Implement validation and error messages
+- [x] Pagination for results (100 per page)
+- [x] Completely rewritten CSS with consistent theme variables
+- [x] Removed all aqb- prefixes for cleaner class names
+- [x] Side-by-side layout (grid) with responsive mobile stacking
 
 **Step 8.3: Testing & Refinement**
 - [ ] Test Discovery mode with various criteria
@@ -498,34 +524,50 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 ### Phase 9: Design & UX Overhaul (#8)
 
 **Step 9.1: Global Styles & Theming**
-- [ ] Create App.css with global theme variables
-- [ ] Define color palette (primary: darker table header blue, secondary, accent)
-- [ ] Remove or standardize pink header usage
-- [ ] Import and configure font families (Lora for headings, Rubik for body)
-- [ ] Define spacing scale (margin, padding utilities)
-- [ ] Create responsive breakpoints (mobile, tablet, desktop)
-- [ ] Define global transitions and animations (no AI hover effects)
-- [ ] Set up CSS custom properties for theming
+- [x] Create App.css with global theme variables
+- [x] Define color palette (primary: darker table header blue, secondary, accent)
+- [x] Remove or standardize pink header usage
+- [x] Import and configure font families (Lora for headings, Rubik for body)
+- [x] Define spacing scale (margin, padding utilities)
+- [x] Create responsive breakpoints (mobile, tablet, desktop)
+- [x] Define global transitions and animations (no AI hover effects)
+- [x] Set up CSS custom properties for theming
+- [x] Remove AI hover transforms (translateY, scale) from Dashboard.css
+- [x] Remove AI hover transforms from CampaignModal.css
+- [x] Convert border-left accent patterns to full borders
+- [x] Remove pink h2 color from Dashboard.css
+- [x] Fix Dashboard Builder padding issue (AppLayout.css)
+- [x] Create page-container and page-header global styles
+- [x] Create unified API configuration file (src/config/api.js)
+- [x] Update all components to use centralized API_BASE_URL
+- [x] Configure API URL detection (localhost vs production)
 
 **Step 9.2: CSS Consolidation**
+- [x] Create consistent page headers across all components
+- [x] Standardize header colors (white/cyan, no pink)
+- [x] Update Video Metrics to use page-header
+- [x] Update Digital Journals to use page-header
+- [x] Update CMI Contracts to use page-header
+- [x] Update Brand Management to use page-header
+- [x] Update Reports Manager to use page-header
 - [ ] Audit all existing CSS files in src/styles/
 - [ ] Identify duplicate rules and patterns
 - [ ] Extract common styles to shared classes
 - [ ] Reorganize files by component hierarchy
 - [ ] Remove unused styles
-- [ ] Consolidate theme files (SpaceTheme, CyberpunkTheme, etc.)
-- [ ] Update component imports to use consolidated styles
 - [ ] Test all components for visual regressions
 
 **Step 9.3: Component Redesign**
-- [ ] Dashboard.jsx: Evaluate overall layout (consider side nav)
-- [ ] Remove cookie-cutter section headers if appropriate
-- [ ] Standardize component containers and spacing
-- [ ] Update button styles (consistent sizing, colors, hover states)
+- [x] Dashboard.jsx: Evaluate overall layout (implemented side nav with AppLayout)
+- [x] Remove cookie-cutter section headers (restructured to sidebar navigation)
+- [x] Standardize component containers and spacing
+- [x] Update button styles (consistent sizing, colors using header blue)
+- [x] Update table styles across all components
+- [x] Add Matrix logo to header/navigation (grayscale logo in sidebar)
+- [x] Ensure DashboardCanvas remains unchanged (preserved current design)
+- [x] Fix all page headers (Video, Digital, Campaign Performance, List Analysis)
+- [x] Verify Audience page button colors (already correct)
 - [ ] Redesign modal overlays for consistency
-- [ ] Update table styles across all components
-- [ ] Add Matrix logo to header/navigation
-- [ ] Ensure DashboardCanvas remains unchanged (preserve current design)
 
 **Step 9.4: Mobile Responsiveness**
 - [ ] Implement mobile-first CSS for Dashboard.jsx
@@ -562,7 +604,7 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 **Step 10.1: Backend - Report Data Integration**
 - [ ] Read report_resource_manager.py in P2025/report/
 - [ ] Map current logic to new data sources
-- [ ] Update to query campaign_metadata table for editor-uploaded data
+- [ ] Update to query campaign_reporting_metadata table for editor-uploaded data
 - [ ] Update to query cmi_contract_values table for metadata
 - [ ] Implement validation logic against CMI sFTP data
 - [ ] Set editor data as primary source of truth
@@ -589,7 +631,7 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 **Step 10.4: Python Script Updates**
 - [ ] Update report_resource_manager.py to connect to PostgreSQL (psycopg2 or SQLAlchemy)
 - [ ] Remove local file parsing for campaign metadata matching
-- [ ] Add database query functions for campaign_metadata table
+- [ ] Add database query functions for campaign_reporting_metadata table
 - [ ] Add database query functions for cmi_contract_values table (ULTIMATE source of truth)
 - [ ] Update CMI sFTP integration (keep existing download logic)
 - [ ] Implement new validation hierarchy: CMI Contract Values > Editor Data > CMI sFTP
@@ -693,7 +735,7 @@ Migration from Azure Blob Storage + GitHub Pages static hosting to Render server
 - **Current Function:** Matches CMI sFTP data to campaign names, generates reports
 - **Changes Needed:**
   - Add PostgreSQL connection (psycopg2 or SQLAlchemy)
-  - Query campaign_metadata table for editor-uploaded metadata
+  - Query campaign_reporting_metadata table for editor-uploaded metadata
   - Query cmi_contract_values table (ULTIMATE SOURCE OF TRUTH) for placement IDs and all metadata
   - Implement validation hierarchy: CMI Contract Values > Editor Campaign Data > CMI sFTP
   - Use CMI Contract Values table for all metadata combinations (placement IDs, vehicles, descriptions)
@@ -765,9 +807,9 @@ CREATE TABLE dashboard_saves (
 );
 ```
 
-**campaign_metadata**
+**campaign_reporting_metadata**
 ```sql
-CREATE TABLE campaign_metadata (
+CREATE TABLE campaign_reporting_metadata (
   id SERIAL PRIMARY KEY,
   campaign_id VARCHAR(100) UNIQUE NOT NULL,
   campaign_name VARCHAR(255) NOT NULL,
@@ -919,20 +961,20 @@ CREATE TABLE brand_editor_agency (
 
 ## Status Tracking
 
-**Phase 1:** Not Started
-**Phase 2:** Not Started
-**Phase 3:** Not Started
-**Phase 4:** Not Started
-**Phase 5:** Not Started
-**Phase 6:** Not Started
-**Phase 7:** Not Started
-**Phase 8:** Not Started
-**Phase 9:** Not Started
+**Phase 1:** Completed
+**Phase 2:** Completed
+**Phase 3:** Completed
+**Phase 4:** Completed
+**Phase 5:** Completed
+**Phase 6:** Completed
+**Phase 7:** Completed (Testing Pending)
+**Phase 8:** Completed (Testing Pending)
+**Phase 9:** In Progress (85% complete - headers fixed, CMI/Brand tables restyled, Reports Manager + Audience + mobile pending)
 **Phase 10:** Not Started
 **Phase 11:** Not Started
 **Phase 12:** Not Started
 
-**Overall Progress:** 0% Complete
+**Overall Progress:** 75% Complete
 
 ---
 

@@ -1,11 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import '../../styles/CampaignModal.css';
+import { API_BASE_URL } from '../../config/api';
 
 const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareMode, metricDisplayNames, allCampaigns = [], onNavigate }) => {
     const modalRef = useRef(null);
     const [campaignMetadata, setCampaignMetadata] = useState(null);
     const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [uploadFiles, setUploadFiles] = useState({
+        targetList: null,
+        tags: null,
+        adImages: []
+    });
+    const [uploading, setUploading] = useState(false);
+    const [hasMetadata, setHasMetadata] = useState(false);
+    const [metadataLoading, setMetadataLoading] = useState(false);
 
     const currentIndex = campaign && allCampaigns.length > 0
         ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
@@ -54,19 +64,19 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     useEffect(() => {
         async function fetchCampaignMetadata() {
             if (!isOpen || !campaign || isCompareMode) return;
-            
+
             setIsLoadingMetadata(true);
             try {
                 const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metadata.json?sp=r&st=2025-09-03T19:53:53Z&se=2027-09-29T04:08:53Z&spr=https&sv=2024-11-04&sr=b&sig=JWxxARzWg4FN%2FhGa17O3RGffl%2BVyJ%2FkE3npL9Iws%2FIs%3D";
                 const response = await fetch(blobUrl);
                 const jsonData = await response.json();
-                
+
                 const baseCampaignName = formatCampaignName(campaign.Campaign).toLowerCase();
-                const matchingCampaigns = jsonData.filter(item => 
+                const matchingCampaigns = jsonData.filter(item =>
                     item.base_campaign_name.toLowerCase().includes(baseCampaignName) ||
                     baseCampaignName.includes(item.base_campaign_name.toLowerCase())
                 );
-                
+
                 if (matchingCampaigns.length > 0) {
                     const combinedMetadata = combineDeploymentMetadata(matchingCampaigns);
                     setCampaignMetadata(combinedMetadata);
@@ -77,8 +87,24 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                 setIsLoadingMetadata(false);
             }
         }
-        
+
+        async function checkMetadataExists() {
+            if (!isOpen || !campaign || isCompareMode) return;
+
+            setMetadataLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/metadata`);
+                const data = await response.json();
+                setHasMetadata(data.status === 'success');
+            } catch (error) {
+                setHasMetadata(false);
+            } finally {
+                setMetadataLoading(false);
+            }
+        }
+
         fetchCampaignMetadata();
+        checkMetadataExists();
     }, [isOpen, campaign, isCompareMode]);
 
     const formatDate = (dateString) => {
@@ -299,6 +325,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     if (!isOpen) return null;
 
     return (
+        <>
         <div className="campaign-modal-overlay">
             {!isCompareMode && hasPrev && onNavigate && (
                 <button
@@ -450,16 +477,44 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                             </button>
                         </div>
                         
-                        <div className="campaign-modal-info">
-                            <div className="campaign-date">
-                                <strong>Send Date:</strong> {campaign.Send_Date ? formatDate(campaign.Send_Date) : 'N/A'}
-                            </div>
-                            
-                            {campaign.DeploymentCount > 1 && (
-                                <div className="deployment-info">
-                                    <strong>Number of Deployments:</strong> {campaign.DeploymentCount}
+                        <div className="campaign-modal-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                                <div className="campaign-date">
+                                    <strong>Send Date:</strong> {campaign.Send_Date ? formatDate(campaign.Send_Date) : 'N/A'}
                                 </div>
-                            )}
+
+                                {campaign.DeploymentCount > 1 && (
+                                    <div className="deployment-info">
+                                        <strong>Number of Deployments:</strong> {campaign.DeploymentCount}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setShowUploadModal(true);
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: hasMetadata
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                {hasMetadata && <span>✓</span>}
+                                {hasMetadata ? 'Update Metadata' : 'Upload Metadata'}
+                            </button>
                         </div>
                         
                         <div className="campaign-modal-metrics">
@@ -718,6 +773,135 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                 )}
             </div>
         </div>
+
+        {showUploadModal && (
+            <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '32px',
+                        maxWidth: '600px',
+                        width: '90%'
+                    }}>
+                        <h3 style={{ marginBottom: '24px' }}>Upload Campaign Metadata</h3>
+
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                                Target List (Excel)
+                            </label>
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={(e) => setUploadFiles(prev => ({ ...prev, targetList: e.target.files[0] }))}
+                                style={{ width: '100%', padding: '8px' }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                                Tags (Excel)
+                            </label>
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={(e) => setUploadFiles(prev => ({ ...prev, tags: e.target.files[0] }))}
+                                style={{ width: '100%', padding: '8px' }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                                Ad Images (PNG/JPG)
+                            </label>
+                            <input
+                                type="file"
+                                accept=".png,.jpg,.jpeg"
+                                multiple
+                                onChange={(e) => setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.target.files) }))}
+                                style={{ width: '100%', padding: '8px' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => {
+                                    setShowUploadModal(false);
+                                    setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                }}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: '#e5e7eb',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!uploadFiles.targetList && !uploadFiles.tags && uploadFiles.adImages.length === 0) {
+                                        alert('Please select at least one file');
+                                        return;
+                                    }
+
+                                    setUploading(true);
+                                    const formData = new FormData();
+                                    formData.append('campaign_name', campaign.Campaign);
+
+                                    if (uploadFiles.targetList) formData.append('target_list', uploadFiles.targetList);
+                                    if (uploadFiles.tags) formData.append('tags', uploadFiles.tags);
+                                    uploadFiles.adImages.forEach(img => formData.append('ad_images', img));
+
+                                    try {
+                                        const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/metadata`, {
+                                            method: 'POST',
+                                            body: formData
+                                        });
+
+                                        const data = await response.json();
+                                        if (data.status === 'success') {
+                                            alert('Metadata uploaded successfully!');
+                                            setShowUploadModal(false);
+                                            setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                            setHasMetadata(true);
+                                        } else {
+                                            alert('Upload failed: ' + data.message);
+                                        }
+                                    } catch (error) {
+                                        alert('Error uploading files: ' + error.message);
+                                    } finally {
+                                        setUploading(false);
+                                    }
+                                }}
+                                disabled={uploading}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: uploading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: uploading ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                {uploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+        )}
+        </>
     );
 };
 

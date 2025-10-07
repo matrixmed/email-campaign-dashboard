@@ -44,24 +44,25 @@
     }
 }
 .audience-section {
-    margin: 20px 0;
-    background-color: #222;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+    margin: var(--spacing-lg, 24px) 0;
+    background-color: var(--color-bg-card, #2a2a2d);
+    padding: var(--spacing-xl, 32px);
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--color-border, #333336);
 }
 
 .audience-section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-lg, 24px);
     flex-wrap: wrap;
 }
 
 .audience-section-header h2 {
-    color: #ff0077;
+    color: var(--color-text-primary, #ffffff);
     margin: 0;
+    font-family: var(--font-heading, 'Lora', serif);
 }
 
 .audience-topics-grid {
@@ -685,7 +686,7 @@
     padding: 1rem;
     background: #333;
     border-radius: 8px;
-    border-left: 4px solid #4A90E2;
+    border: 1px solid #4A90E2;
 }
 
 .campaign-info {
@@ -759,7 +760,7 @@
     padding: 1rem;
     background: #333;
     border-radius: 8px;
-    border-left: 4px solid #4A90E2;
+    border: 1px solid #4A90E2;
 }
 
 .link-info {

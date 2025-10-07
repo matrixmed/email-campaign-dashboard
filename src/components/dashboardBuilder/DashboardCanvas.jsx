@@ -17,17 +17,34 @@ import { createGroup, ungroupComponents, getComponentsInRect, SelectionBox, Mult
 import TemplateSelectionModal from './TemplateSelectionModal';
 import { generateTemplate } from './template/TemplateLibrary';
 import { getThemeLogo, getMetricValue, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS, getSmartTableSelection } from './template/LayoutTemplates';
+import { API_BASE_URL } from '../../config/api';
 
 const DashboardCanvasContent = () => {
-  const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [selectedMultiCampaigns, setSelectedMultiCampaigns] = useState([]);
-  const [cards, setCards] = useState([]);
+  // Load initial state from localStorage
+  const loadInitialState = () => {
+    const saved = localStorage.getItem('dashboard-canvas-state');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved dashboard state:', e);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const initialState = loadInitialState();
+
+  const [selectedCampaign, setSelectedCampaign] = useState(initialState?.selectedCampaign || null);
+  const [selectedMultiCampaigns, setSelectedMultiCampaigns] = useState(initialState?.selectedMultiCampaigns || []);
+  const [cards, setCards] = useState(initialState?.cards || []);
   const [deletedCards, setDeletedCards] = useState([]);
   const [isEditing, setIsEditing] = useState(null);
-  const [currentTemplate, setCurrentTemplate] = useState(null);
+  const [currentTemplate, setCurrentTemplate] = useState(initialState?.currentTemplate || null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [specialtyMergeMode, setSpecialtyMergeMode] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState([]);
+  const [specialtyMergeMode, setSpecialtyMergeMode] = useState(initialState?.specialtyMergeMode || false);
+  const [uploadedImages, setUploadedImages] = useState(initialState?.uploadedImages || []);
   const [selectedElement, setSelectedElement] = useState(null);
   const [alignmentGuides, setAlignmentGuides] = useState([]);
   const [selectedComponents, setSelectedComponents] = useState([]);
@@ -35,22 +52,22 @@ const DashboardCanvasContent = () => {
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [budgetedCost, setBudgetedCost] = useState(10.00);
-  const [actualCost, setActualCost] = useState(5.00);
-  const [costComparisonMode, setCostComparisonMode] = useState('none');
-  const [showPatientImpact, setShowPatientImpact] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState('matrix');
+  const [budgetedCost, setBudgetedCost] = useState(initialState?.budgetedCost || 10.00);
+  const [actualCost, setActualCost] = useState(initialState?.actualCost || 5.00);
+  const [costComparisonMode, setCostComparisonMode] = useState(initialState?.costComparisonMode || 'none');
+  const [showPatientImpact, setShowPatientImpact] = useState(initialState?.showPatientImpact || false);
+  const [currentTheme, setCurrentTheme] = useState(initialState?.currentTheme || 'matrix');
   const [userModifications, setUserModifications] = useState(new Map());
   const [userEdits, setUserEdits] = useState(() => {
     const saved = localStorage.getItem('dashboard-user-edits');
     return saved ? JSON.parse(saved) : {};
   });
-  const [deletedCardIds, setDeletedCardIds] = useState(new Set());
-  
+  const [deletedCardIds, setDeletedCardIds] = useState(new Set(initialState?.deletedCardIds || []));
+
   // Table selection state
-  const [selectedTableTypes, setSelectedTableTypes] = useState({
+  const [selectedTableTypes, setSelectedTableTypes] = useState(initialState?.selectedTableTypes || {
     table1: TABLE_TYPES.ONLINE_JOURNAL,
-    table2: TABLE_TYPES.VIDEO_METRICS, 
+    table2: TABLE_TYPES.VIDEO_METRICS,
     table3: TABLE_TYPES.SOCIAL_MEDIA
   });
   const canvasRef = useRef(null);
@@ -117,6 +134,26 @@ const DashboardCanvasContent = () => {
   useEffect(() => {
     localStorage.setItem('dashboard-user-edits', JSON.stringify(userEdits));
   }, [userEdits]);
+
+  // Save dashboard state to localStorage whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+      cards,
+      uploadedImages,
+      selectedCampaign,
+      selectedMultiCampaigns,
+      currentTemplate,
+      currentTheme,
+      specialtyMergeMode,
+      costComparisonMode,
+      showPatientImpact,
+      budgetedCost,
+      actualCost,
+      selectedTableTypes,
+      deletedCardIds: Array.from(deletedCardIds)
+    };
+    localStorage.setItem('dashboard-canvas-state', JSON.stringify(stateToSave));
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, deletedCardIds]);
 
   // Template regeneration should only happen for specific triggers, not card edits
   const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
@@ -707,22 +744,159 @@ const DashboardCanvasContent = () => {
     return () => document.removeEventListener('paste', handlePaste);
   }, [handleImageUpload]);
 
+  const handleSaveDashboard = useCallback(async () => {
+    const titleCard = cards.find(card => card.type === 'title');
+    const dashboardName = titleCard?.title || (selectedCampaign
+      ? selectedCampaign.campaign_name
+      : selectedMultiCampaigns && selectedMultiCampaigns.length > 0
+        ? `Multi: ${selectedMultiCampaigns.map(c => c.campaign_name).join(', ')}`
+        : 'Untitled Dashboard');
+
+    const title = dashboardName;
+
+    const dashboardState = {
+      cards: cards.map(card => ({
+        ...card,
+        position: card.position,
+        config: card.config,
+        title: card.title,
+        value: card.value,
+        subtitle: card.subtitle
+      })),
+      uploadedImages: uploadedImages.map(img => ({
+        id: img.id,
+        src: img.src,
+        position: img.position
+      })),
+      selectedCampaign: selectedCampaign?.campaign_name,
+      selectedMultiCampaigns: selectedMultiCampaigns?.map(c => c.campaign_name),
+      theme: currentTheme,
+      specialtyMergeMode,
+      costComparisonMode,
+      showPatientImpact,
+      budgetedCost,
+      actualCost,
+      selectedTableTypes,
+      currentTemplate: currentTemplate?.id,
+      userEdits
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboards/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 'default_user',
+          title,
+          state_json: dashboardState,
+          theme: currentTheme
+        })
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        alert('Dashboard saved successfully!');
+      } else {
+        alert('Failed to save dashboard: ' + data.message);
+      }
+    } catch (error) {
+      alert('Error saving dashboard: ' + error.message);
+    }
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
+
+  const handleRestoreDashboard = useCallback(async (dashboardId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboards/${dashboardId}`);
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        const state = data.dashboard.state_json;
+
+        if (state.cards) {
+          setCards(state.cards);
+        }
+
+        if (state.uploadedImages) {
+          setUploadedImages(state.uploadedImages);
+        }
+
+        if (state.theme) {
+          setCurrentTheme(state.theme);
+        }
+
+        if (state.specialtyMergeMode !== undefined) {
+          setSpecialtyMergeMode(state.specialtyMergeMode);
+        }
+
+        if (state.costComparisonMode) {
+          setCostComparisonMode(state.costComparisonMode);
+        }
+
+        if (state.showPatientImpact !== undefined) {
+          setShowPatientImpact(state.showPatientImpact);
+        }
+
+        if (state.budgetedCost !== undefined) {
+          setBudgetedCost(state.budgetedCost);
+        }
+
+        if (state.actualCost !== undefined) {
+          setActualCost(state.actualCost);
+        }
+
+        if (state.selectedTableTypes) {
+          setSelectedTableTypes(state.selectedTableTypes);
+        }
+
+        if (state.userEdits) {
+          setUserEdits(state.userEdits);
+        }
+
+        if (state.selectedCampaign) {
+          const campaign = campaigns.find(c => c.campaign_name === state.selectedCampaign);
+          if (campaign) {
+            setSelectedCampaign(campaign);
+          }
+        }
+
+        if (state.selectedMultiCampaigns && state.selectedMultiCampaigns.length > 0) {
+          const multiCampaigns = state.selectedMultiCampaigns
+            .map(name => campaigns.find(c => c.campaign_name === name))
+            .filter(c => c);
+          if (multiCampaigns.length > 0) {
+            setSelectedMultiCampaigns(multiCampaigns);
+          }
+        }
+
+        if (state.currentTemplate) {
+          setCurrentTemplate({ id: state.currentTemplate });
+        }
+
+        alert('Dashboard restored successfully!');
+      } else {
+        alert('Failed to load dashboard: ' + data.message);
+      }
+    } catch (error) {
+      alert('Error loading dashboard: ' + error.message);
+    }
+  }, [campaigns]);
+
   const handleExportScreenshot = useCallback(async () => {
     if (!canvasRef.current) return;
-    
+
     let dashboardName;
     if (selectedCampaign) {
       dashboardName = selectedCampaign.campaign_name;
     } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
       const campaignNames = selectedMultiCampaigns.map(c => c.campaign_name).slice(0, 2).join(' + ');
-      dashboardName = selectedMultiCampaigns.length > 2 ? 
+      dashboardName = selectedMultiCampaigns.length > 2 ?
         `${campaignNames} + ${selectedMultiCampaigns.length - 2} more` : campaignNames;
     } else {
       return;
     }
-    
+
     const result = await exportDashboard(canvasRef, dashboardName);
-    
+
     if (!result.success) {
     }
   }, [selectedCampaign, selectedMultiCampaigns]);
@@ -775,79 +949,133 @@ const DashboardCanvasContent = () => {
 
   return (
     <div style={{
-      minHeight: '92vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: 0,
+      height: '100%',
+      background: 'rgba(102, 126, 234, 0.15)',
+      padding: '20px',
       margin: 0,
       fontFamily: "'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',
-      borderRadius: '8px',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      boxSizing: 'border-box',
+      borderRadius: '16px'
     }}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '16px 24px',
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: '8px',
-        margin: '20px 20px 16px 20px',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
+        background: 'rgba(255, 255, 255, 0.98)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '12px',
+        marginBottom: '16px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        border: '1px solid rgba(0, 0, 0, 0.08)',
         position: 'relative',
-        zIndex: 100
+        zIndex: 100,
+        flexShrink: 0
       }}>
-        <button 
+        <button
           onClick={() => setShowTemplateModal(true)}
           style={{
-            padding: '12px 24px',
+            padding: '10px 20px',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '14px',
-            fontWeight: '600',
+            fontWeight: '500',
             fontFamily: 'inherit',
             transition: 'all 0.2s ease',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: '#667eea',
             color: 'white',
-            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+            boxShadow: 'none'
           }}
+          onMouseOver={(e) => e.target.style.background = '#5568d3'}
+          onMouseOut={(e) => e.target.style.background = '#667eea'}
         >
           Generate
         </button>
-        
-        <button 
-          onClick={handleExportScreenshot}
-          disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
-            fontSize: '14px',
-            fontWeight: '600',
-            fontFamily: 'inherit',
-            transition: 'all 0.2s ease',
-            background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : '#e2e8f0',
-            color: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'white' : '#94a3b8',
-            boxShadow: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '0 2px 8px rgba(79, 70, 229, 0.3)' : 'none'
-          }}
-        >
-          Export
-        </button>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={handleSaveDashboard}
+            disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              fontWeight: '500',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#10b981' : '#4a4a4d',
+              color: 'white',
+              boxShadow: 'none',
+              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.5
+            }}
+            onMouseOver={(e) => {
+              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+                e.target.style.background = '#059669';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+                e.target.style.background = '#10b981';
+              }
+            }}
+          >
+            Save
+          </button>
+
+          <button
+            onClick={handleExportScreenshot}
+            disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              fontWeight: '500',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#4f46e5' : '#4a4a4d',
+              color: 'white',
+              boxShadow: 'none',
+              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.5
+            }}
+            onMouseOver={(e) => {
+              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+                e.target.style.background = '#4338ca';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+                e.target.style.background = '#4f46e5';
+              }
+            }}
+          >
+            Export
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1 }}>
+      <div style={{
+        display: 'flex',
+        flex: 1,
+        overflow: 'hidden',
+        minHeight: 0,
+        borderRadius: '12px'
+      }}>
         <div style={{
           position: 'relative',
           width: sidebarOpen ? '320px' : '0px',
           transition: 'width 0.3s ease',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          flexShrink: 0,
+          borderRadius: '12px'
         }}>
           <ComponentSidebar
             isOpen={sidebarOpen}
@@ -873,6 +1101,7 @@ const DashboardCanvasContent = () => {
             currentTemplate={currentTemplate?.id || 'single'}
             selectedTableTypes={selectedTableTypes}
             onTableTypeChange={handleTableTypeChange}
+            onRestoreDashboard={handleRestoreDashboard}
           />
         </div>
 
@@ -880,10 +1109,10 @@ const DashboardCanvasContent = () => {
           onClick={() => setSidebarOpen(!sidebarOpen)}
           style={{
             position: 'absolute',
-            left: sidebarOpen ? '320px' : '0px',
+            left: sidebarOpen ? 'calc(320px + 20px)' : '20px',
             top: '40%',
             transform: 'translateY(-50%)',
-            zIndex: 10,
+            zIndex: 1000,
             background: 'rgba(255, 255, 255, 0.9)',
             border: 'none',
             borderRadius: '0 8px 8px 0',
@@ -903,14 +1132,18 @@ const DashboardCanvasContent = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          padding: '0 20px 20px 20px'
+          padding: '16px',
+          overflow: 'auto',
+          minHeight: 0
         }}>
-          <div 
+          <div
             ref={drop}
             style={{
               position: 'relative',
-              width: '1024px',
-              height: '576px',
+              width: 'min(1024px, 100%)',
+              height: 'min(576px, calc(100vh - 200px))',
+              maxWidth: '1024px',
+              maxHeight: '576px',
               background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
               border: '2px solid rgba(255, 255, 255, 0.3)',
               borderRadius: '16px',
@@ -918,6 +1151,7 @@ const DashboardCanvasContent = () => {
               boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
               backdropFilter: 'blur(8px)',
               cursor: isMultiSelecting ? 'crosshair' : 'default',
+              flexShrink: 0,
               ...getDropZoneStyles()
             }}
             onMouseDown={handleCanvasMouseDown}

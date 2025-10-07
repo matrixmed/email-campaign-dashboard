@@ -1,0 +1,228 @@
+from flask import Blueprint, request, jsonify, send_file
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import os
+import pandas as pd
+import json
+from io import BytesIO
+from collections import defaultdict
+
+list_analysis_bp = Blueprint('list_analysis', __name__)
+
+def get_db_connection():
+    return psycopg2.connect(os.getenv('DATABASE_URL'))
+
+@list_analysis_bp.route('/upload', methods=['POST'])
+def upload_lists():
+    try:
+        if 'iqvia_list' not in request.files:
+            return jsonify({'error': 'IQVIA list is required'}), 400
+
+        iqvia_file = request.files['iqvia_list']
+        target_files = request.files.getlist('target_lists')
+
+        if not target_files or len(target_files) == 0:
+            return jsonify({'error': 'At least one target list is required'}), 400
+
+        iqvia_df = pd.read_excel(iqvia_file) if iqvia_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(iqvia_file)
+
+        npi_column = None
+        for col in iqvia_df.columns:
+            if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER']:
+                npi_column = col
+                break
+
+        if not npi_column:
+            return jsonify({'error': 'NPI column not found in IQVIA list'}), 400
+
+        iqvia_npis = set(iqvia_df[npi_column].dropna().astype(str).tolist())
+
+        target_lists_data = []
+        for idx, target_file in enumerate(target_files):
+            target_df = pd.read_excel(target_file) if target_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(target_file)
+
+            target_npi_column = None
+            for col in target_df.columns:
+                if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER']:
+                    target_npi_column = col
+                    break
+
+            if not target_npi_column:
+                return jsonify({'error': f'NPI column not found in target list: {target_file.filename}'}), 400
+
+            target_npis = set(target_df[target_npi_column].dropna().astype(str).tolist())
+
+            target_lists_data.append({
+                'filename': target_file.filename,
+                'npis': list(target_npis),
+                'count': len(target_npis)
+            })
+
+        session_id = str(hash(frozenset(iqvia_npis)))
+
+        return jsonify({
+            'session_id': session_id,
+            'iqvia_count': len(iqvia_npis),
+            'iqvia_npis': list(iqvia_npis),
+            'target_lists': target_lists_data
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@list_analysis_bp.route('/calculate-crossover', methods=['POST'])
+def calculate_crossover():
+    try:
+        data = request.json
+        iqvia_npis = set(data.get('iqvia_npis', []))
+        target_lists = data.get('target_lists', [])
+
+        if not iqvia_npis or not target_lists:
+            return jsonify({'error': 'Missing required data'}), 400
+
+        npi_to_lists = defaultdict(set)
+
+        for idx, target_list in enumerate(target_lists):
+            for npi in target_list.get('npis', []):
+                if npi in iqvia_npis:
+                    npi_to_lists[npi].add(idx)
+
+        total_lists = len(target_lists)
+        distribution = defaultdict(int)
+
+        for npi in iqvia_npis:
+            count = len(npi_to_lists.get(npi, set()))
+            distribution[count] += 1
+
+        distribution_list = []
+        for i in range(total_lists + 1):
+            percentage = (distribution[i] / len(iqvia_npis) * 100) if len(iqvia_npis) > 0 else 0
+            distribution_list.append({
+                'lists_count': f'{i}/{total_lists}',
+                'users_count': distribution[i],
+                'percentage': round(percentage, 2)
+            })
+
+        distribution_list.reverse()
+
+        return jsonify({
+            'distribution': distribution_list,
+            'total_iqvia_users': len(iqvia_npis),
+            'total_target_lists': total_lists
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@list_analysis_bp.route('/engagement-comparison', methods=['POST'])
+def engagement_comparison():
+    try:
+        data = request.json
+        target_lists = data.get('target_lists', [])
+        campaign_assignments = data.get('campaign_assignments', {})
+
+        if not target_lists or not campaign_assignments:
+            return jsonify({'error': 'Missing required data'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        results = []
+
+        for list_idx, target_list in enumerate(target_lists):
+            list_name = target_list.get('filename')
+            list_npis = set(target_list.get('npis', []))
+            assigned_campaigns = campaign_assignments.get(str(list_idx), [])
+
+            if not assigned_campaigns:
+                continue
+
+            for campaign_name in assigned_campaigns:
+                cursor.execute("""
+                    SELECT npi, opened, clicked, sent
+                    FROM user_profiles
+                    WHERE campaign_name = %s
+                """, (campaign_name,))
+
+                campaign_data = cursor.fetchall()
+
+                target_users = [row for row in campaign_data if row['npi'] in list_npis]
+                non_target_users = [row for row in campaign_data if row['npi'] not in list_npis]
+
+                def calculate_metrics(users):
+                    if not users:
+                        return {'open_rate': 0, 'click_rate': 0, 'total_sent': 0}
+
+                    total = len(users)
+                    opened = sum(1 for u in users if u.get('opened'))
+                    clicked = sum(1 for u in users if u.get('clicked'))
+
+                    return {
+                        'open_rate': round((opened / total * 100) if total > 0 else 0, 2),
+                        'click_rate': round((clicked / total * 100) if total > 0 else 0, 2),
+                        'total_sent': total
+                    }
+
+                target_metrics = calculate_metrics(target_users)
+                non_target_metrics = calculate_metrics(non_target_users)
+
+                results.append({
+                    'list_name': list_name,
+                    'campaign_name': campaign_name,
+                    'target_list_metrics': target_metrics,
+                    'non_target_metrics': non_target_metrics,
+                    'difference': {
+                        'open_rate': round(target_metrics['open_rate'] - non_target_metrics['open_rate'], 2),
+                        'click_rate': round(target_metrics['click_rate'] - non_target_metrics['click_rate'], 2)
+                    }
+                })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'results': results
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@list_analysis_bp.route('/export-results', methods=['POST'])
+def export_results():
+    try:
+        data = request.json
+        results = data.get('results', [])
+
+        if not results:
+            return jsonify({'error': 'No results to export'}), 400
+
+        rows = []
+        for result in results:
+            rows.append({
+                'List Name': result['list_name'],
+                'Campaign Name': result['campaign_name'],
+                'Target List - Total Sent': result['target_list_metrics']['total_sent'],
+                'Target List - Open Rate (%)': result['target_list_metrics']['open_rate'],
+                'Target List - Click Rate (%)': result['target_list_metrics']['click_rate'],
+                'Non-Target - Total Sent': result['non_target_metrics']['total_sent'],
+                'Non-Target - Open Rate (%)': result['non_target_metrics']['open_rate'],
+                'Non-Target - Click Rate (%)': result['non_target_metrics']['click_rate'],
+                'Difference - Open Rate (%)': result['difference']['open_rate'],
+                'Difference - Click Rate (%)': result['difference']['click_rate']
+            })
+
+        df = pd.DataFrame(rows)
+
+        output = BytesIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='list_efficiency_analysis.csv'
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

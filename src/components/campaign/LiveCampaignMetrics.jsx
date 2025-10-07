@@ -3,7 +3,7 @@ import _ from 'lodash';
 import CampaignModal from './CampaignModal';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
 
-const LiveCampaignMetrics = () => {
+const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     const [metrics, setMetrics] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,10 +83,18 @@ const LiveCampaignMetrics = () => {
         fetchData();
     }, []);
 
+    const filteredMetrics = searchTerm
+        ? metrics.filter(item =>
+            searchTerm.split(' ').every(word =>
+                item.Campaign.toLowerCase().includes(word.toLowerCase())
+            )
+          )
+        : metrics;
+
     const indexOfLastCampaign = currentPage * campaignsPerPage;
     const indexOfFirstCampaign = indexOfLastCampaign - campaignsPerPage;
-    const currentCampaigns = metrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
-    const totalPages = Math.ceil(metrics.length / campaignsPerPage);
+    const currentCampaigns = filteredMetrics.slice(indexOfFirstCampaign, indexOfLastCampaign);
+    const totalPages = Math.ceil(filteredMetrics.length / campaignsPerPage);
 
     const handleCampaignClick = (campaign) => {
         setSelectedCampaign(campaign);

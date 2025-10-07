@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import VideoModal from './VideoModal';
+import '../../styles/video.css';
 
 const metricDisplayNames = {
   views: "Views",
@@ -211,87 +212,90 @@ const VideoMetrics = () => {
     const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
     return (
-        <div className="table-section">
-            <div className="digital-journals-header">
-                <h2>Video Metrics</h2>
+        <div className="video-metrics-container">
+            <div className="page-header">
+                <h1>Video Metrics</h1>
                 <div className="search-container">
                     <input
                         type="text"
-                        className="digital-journals-search-box"
+                        className="search-input"
                         placeholder="Search by Title"
                         value={search}
                         onChange={handleSearchChange}
                     />
                 </div>
-                <div className="digital-journals-controls">
-                    <div className="digital-ed-rows-per-page">
-                        <label htmlFor="rowsPerPage">Rows per page:</label>
-                        <select
-                            id="rowsPerPage"
-                            value={rowsPerPage}
-                            onChange={handleRowsPerPageChange}
-                        >
-                            {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
-                                <option key={num} value={num}>{num}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
             </div>
 
-            <table className="video-metrics-table">
-                <thead>
-                    <tr>
-                        <th className="title-column">Title</th>
-                        <th className="source-column">Source</th>
-                        {displayMetrics.map((metric) => (
-                            <th key={metric} className="metric-column">
-                                {metricDisplayNames[metric]}
-                            </th>
+            <div className="table-section">
+                <div className="table-controls">
+                    <label htmlFor="rowsPerPage">Rows per page:</label>
+                    <select
+                        id="rowsPerPage"
+                        value={rowsPerPage}
+                        onChange={handleRowsPerPageChange}
+                    >
+                        {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
+                            <option key={num} value={num}>{num}</option>
                         ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {currentRows.map((item, index) => (
-                        <tr key={index}>
-                            <td 
-                                className="journal-title"
-                                onClick={() => openVideoModal(item)}
-                            >
-                                {item.title}
-                            </td>
-                            <td className="source-column">{getSourceBadge(item)}</td>
+                    </select>
+                </div>
+
+                <table className="video-metrics-table">
+                    <thead>
+                        <tr>
+                            <th className="title-column">Title</th>
+                            <th className="source-column">Source</th>
                             {displayMetrics.map((metric) => (
-                                <td key={metric} className="metric-column">
-                                    {formatMetric(metric, item[metric], item)}
-                                </td>
+                                <th key={metric} className="metric-column">
+                                    {metricDisplayNames[metric]}
+                                </th>
                             ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-            
-            <div className="pagination">
-                {currentPage > 1 && (
-                    <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
-                )}
-                {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
-                    <button
-                        key={num}
-                        onClick={() => handlePagination(num)}
-                        className={currentPage === num ? 'active' : ''}
-                    >
-                        {num}
+                    </thead>
+                    <tbody>
+                        {currentRows.map((item, index) => (
+                            <tr key={index}>
+                                <td
+                                    className="journal-title"
+                                    onClick={() => openVideoModal(item)}
+                                >
+                                    {item.title}
+                                </td>
+                                <td className="source-column">{getSourceBadge(item)}</td>
+                                {displayMetrics.map((metric) => (
+                                    <td key={metric} className="metric-column">
+                                        {formatMetric(metric, item[metric], item)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <div className="table-footer">
+                    <div className="pagination">
+                        {currentPage > 1 && (
+                            <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
+                        )}
+                        {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
+                            <button
+                                key={num}
+                                onClick={() => handlePagination(num)}
+                                className={currentPage === num ? 'active' : ''}
+                            >
+                                {num}
+                            </button>
+                        ))}
+                        {currentPage < totalPages && (
+                            <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
+                        )}
+                    </div>
+                </div>
+                <div className="export-button-container">
+                    <button className="export-button" onClick={exportToCSV}>
+                        Export CSV
                     </button>
-                ))}
-                {currentPage < totalPages && (
-                    <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
-                )}
-            </div>
-            <div className="export-button-container">
-                <button className="export-button" onClick={exportToCSV}>
-                    Export CSV
-                </button>
+                </div>
             </div>
 
             {isModalOpen && selectedVideo && (

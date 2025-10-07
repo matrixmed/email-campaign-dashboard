@@ -1,0 +1,113 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-bg-primary);
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 260px;
+  background-color: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  z-index: 1000;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 80px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  height: 60px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-header:hover {
+  background-color: var(--color-bg-elevated);
+}
+
+.sidebar-logo {
+  max-width: 180px;
+  height: auto;
+  filter: grayscale(100%) brightness(0.8);
+  transition: all 0.3s ease;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  max-width: 50px;
+}
+
+.sidebar-nav {
+  padding: var(--spacing-md) 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+  margin: 4px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.nav-item:hover {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border-color: var(--color-primary);
+}
+
+.nav-item.active {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.nav-label {
+  font-size: 0.95rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
+  padding: var(--spacing-xl);
+  background-color: var(--color-bg-primary);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 80px;
+}
+
+.main-content.dashboard-builder-page {
+  padding: 20px;
+  background: none;
+  overflow: hidden;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    position: relative;
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+}

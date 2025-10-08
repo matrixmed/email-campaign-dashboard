@@ -503,21 +503,20 @@ body.synthwave-theme .tooltip-top::before {
 body.synthwave-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
-  background: rgba(31, 0, 51, 0.5);
 }
 
 body.synthwave-theme ::-webkit-scrollbar-track {
-  background: rgba(31, 0, 51, 0.5);
-  border-radius: 0;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.synthwave-theme ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #FF3366, #00CCFF);
-  border-radius: 0;
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.synthwave-theme ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #00CCFF, #FF3366);
+  background: #6b7280;
 }
 
 /* Sample query lists */

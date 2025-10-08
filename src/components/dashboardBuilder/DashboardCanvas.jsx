@@ -794,13 +794,11 @@ const DashboardCanvasContent = () => {
       });
 
       const data = await response.json();
-      if (data.status === 'success') {
-        alert('Dashboard saved successfully!');
-      } else {
-        alert('Failed to save dashboard: ' + data.message);
+      if (data.status !== 'success') {
+        console.error('Failed to save dashboard:', data.message);
       }
     } catch (error) {
-      alert('Error saving dashboard: ' + error.message);
+      console.error('Error saving dashboard:', error.message);
     }
   }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
 
@@ -871,13 +869,11 @@ const DashboardCanvasContent = () => {
         if (state.currentTemplate) {
           setCurrentTemplate({ id: state.currentTemplate });
         }
-
-        alert('Dashboard restored successfully!');
       } else {
-        alert('Failed to load dashboard: ' + data.message);
+        console.error('Failed to load dashboard:', data.message);
       }
     } catch (error) {
-      alert('Error loading dashboard: ' + error.message);
+      console.error('Error loading dashboard:', error.message);
     }
   }, [campaigns]);
 
@@ -915,7 +911,6 @@ const DashboardCanvasContent = () => {
     return (
       <div style={{
         minHeight: '92vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -933,7 +928,6 @@ const DashboardCanvasContent = () => {
     return (
       <div style={{
         minHeight: '92vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -976,53 +970,112 @@ const DashboardCanvasContent = () => {
         zIndex: 100,
         flexShrink: 0
       }}>
-        <button
-          onClick={() => setShowTemplateModal(true)}
-          style={{
-            padding: '10px 20px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            fontFamily: 'inherit',
-            transition: 'all 0.2s ease',
-            background: '#667eea',
-            color: 'white',
-            boxShadow: 'none'
-          }}
-          onMouseOver={(e) => e.target.style.background = '#5568d3'}
-          onMouseOut={(e) => e.target.style.background = '#667eea'}
-        >
-          Generate
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            style={{
+              padding: '12px 28px',
+              border: '2px solid #2a2a2d',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '600',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+              background: 'rgba(42, 42, 45, 0.05)',
+              color: '#2a2a2d',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.borderColor = '#1a1a1d';
+              e.target.style.color = '#1a1a1d';
+              e.target.style.background = 'rgba(42, 42, 45, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.borderColor = '#2a2a2d';
+              e.target.style.color = '#2a2a2d';
+              e.target.style.background = 'rgba(42, 42, 45, 0.05)';
+            }}
+          >
+            Generate
+          </button>
+
+          <button
+            onClick={() => {
+              // Clear all dashboard state
+              setCards([]);
+              setUploadedImages([]);
+              setSelectedCampaign(null);
+              setSelectedMultiCampaigns([]);
+              setCurrentTemplate(null);
+              setDeletedCards([]);
+              setDeletedCardIds(new Set());
+              setSelectedElement(null);
+              setSelectedComponents([]);
+              clearAllEdits();
+              localStorage.removeItem('dashboard-canvas-state');
+            }}
+            style={{
+              padding: '12px 28px',
+              border: '2px solid #2a2a2d',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '600',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+              background: 'rgba(42, 42, 45, 0.05)',
+              color: '#2a2a2d',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.borderColor = '#1a1a1d';
+              e.target.style.color = '#1a1a1d';
+              e.target.style.background = 'rgba(42, 42, 45, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.borderColor = '#2a2a2d';
+              e.target.style.color = '#2a2a2d';
+              e.target.style.background = 'rgba(42, 42, 45, 0.05)';
+            }}
+          >
+            Clear
+          </button>
+        </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={handleSaveDashboard}
             disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
             style={{
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: '6px',
+              padding: '12px 28px',
+              border: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '2px solid #2a2a2d' : '2px solid #d1d5db',
+              borderRadius: '8px',
               cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: '15px',
+              fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',
-              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#10b981' : '#4a4a4d',
-              color: 'white',
-              boxShadow: 'none',
-              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.5
+              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'rgba(42, 42, 45, 0.05)' : 'transparent',
+              color: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#2a2a2d' : '#9ca3af',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.6
             }}
             onMouseOver={(e) => {
               if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
-                e.target.style.background = '#059669';
+                e.target.style.borderColor = '#1a1a1d';
+                e.target.style.color = '#1a1a1d';
+                e.target.style.background = 'rgba(42, 42, 45, 0.1)';
               }
             }}
             onMouseOut={(e) => {
               if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
-                e.target.style.background = '#10b981';
+                e.target.style.borderColor = '#2a2a2d';
+                e.target.style.color = '#2a2a2d';
+                e.target.style.background = 'rgba(42, 42, 45, 0.05)';
               }
             }}
           >
@@ -1033,27 +1086,32 @@ const DashboardCanvasContent = () => {
             onClick={handleExportScreenshot}
             disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
             style={{
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: '6px',
+              padding: '12px 28px',
+              border: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '2px solid #2a2a2d' : '2px solid #d1d5db',
+              borderRadius: '8px',
               cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: '15px',
+              fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',
-              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#4f46e5' : '#4a4a4d',
-              color: 'white',
-              boxShadow: 'none',
-              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.5
+              background: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'rgba(42, 42, 45, 0.05)' : 'transparent',
+              color: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '#2a2a2d' : '#9ca3af',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.6
             }}
             onMouseOver={(e) => {
               if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
-                e.target.style.background = '#4338ca';
+                e.target.style.borderColor = '#1a1a1d';
+                e.target.style.color = '#1a1a1d';
+                e.target.style.background = 'rgba(42, 42, 45, 0.1)';
               }
             }}
             onMouseOut={(e) => {
               if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
-                e.target.style.background = '#4f46e5';
+                e.target.style.borderColor = '#2a2a2d';
+                e.target.style.color = '#2a2a2d';
+                e.target.style.background = 'rgba(42, 42, 45, 0.05)';
               }
             }}
           >

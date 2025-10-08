@@ -7,13 +7,14 @@ const BrandManagement = () => {
   const [loading, setLoading] = useState(true);
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
+  const [searchText, setSearchText] = useState('');
 
   const salesMembers = ['Emily', 'Courtney', 'Morgan', 'Dana'];
 
   const fetchBrands = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch('${API_BASE_URL}/api/brand-management');
+      const response = await fetch(`${API_BASE_URL}/api/brand-management`);
       const data = await response.json();
       if (data.status === 'success') {
         setBrands(data.brands);
@@ -58,18 +59,16 @@ const BrandManagement = () => {
           b.id === brandId ? { ...b, [field]: editValue } : b
         ));
       } else {
-        alert('Failed to update: ' + data.message);
+        console.error('Failed to update:', data.message);
       }
     } catch (error) {
-      alert('Error updating brand: ' + error.message);
+      console.error('Error updating brand:', error.message);
     }
 
     setEditingCell(null);
   };
 
   const handleDelete = async (brandId) => {
-    if (!window.confirm('Delete this brand assignment?')) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/brand-management/${brandId}`, {
         method: 'DELETE'
@@ -79,21 +78,31 @@ const BrandManagement = () => {
       if (data.status === 'success') {
         setBrands(prev => prev.filter(b => b.id !== brandId));
       } else {
-        alert('Failed to delete: ' + data.message);
+        console.error('Failed to delete:', data.message);
       }
     } catch (error) {
-      alert('Error deleting brand: ' + error.message);
+      console.error('Error deleting brand:', error.message);
     }
   };
 
   const handleAddBrand = async (editor) => {
+    // Generate unique brand name
+    let brandName = 'Brand1';
+    let counter = 1;
+    const existingBrandNames = brands.map(b => (b.brand || '').toLowerCase());
+
+    while (existingBrandNames.includes(brandName.toLowerCase())) {
+      counter++;
+      brandName = `Brand${counter}`;
+    }
+
     try {
-      const response = await fetch('${API_BASE_URL}/api/brand-management/entry', {
+      const response = await fetch(`${API_BASE_URL}/api/brand-management/entry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          editor_name: editor,
-          brand: 'New Brand',
+          sales_member: editor,
+          brand: brandName,
           agency: '',
           pharma_company: '',
           is_active: true
@@ -104,23 +113,65 @@ const BrandManagement = () => {
       if (data.status === 'success') {
         fetchBrands();
       } else {
-        alert('Failed to add brand: ' + data.message);
+        console.error('Failed to add brand:', data.message);
       }
     } catch (error) {
-      alert('Error adding brand: ' + error.message);
+      console.error('Error adding brand:', error.message);
     }
   };
 
+  const handleMoveBrand = async (brandId, targetLocation) => {
+    const brand = brands.find(b => b.id === brandId);
+    if (!brand) return;
+
+    let updates = {};
+
+    if (targetLocation === 'historic') {
+      updates = { is_active: false };
+    } else if (salesMembers.includes(targetLocation)) {
+      updates = { sales_member: targetLocation, is_active: true };
+    } else if (targetLocation === 'unassigned') {
+      updates = { sales_member: '', is_active: true };
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brand-management/${brandId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        fetchBrands();
+      } else {
+        console.error('Failed to move brand:', data.message);
+      }
+    } catch (error) {
+      console.error('Error moving brand:', error.message);
+    }
+  };
+
+  const filterBrands = (brandsList) => {
+    if (!searchText) return brandsList;
+    const search = searchText.toLowerCase();
+    return brandsList.filter(b =>
+      (b.brand || '').toLowerCase().includes(search) ||
+      (b.agency || '').toLowerCase().includes(search) ||
+      (b.pharma_company || '').toLowerCase().includes(search)
+    );
+  };
+
   const getBrandsByEditor = (editor) => {
-    return brands.filter(b => b.editor_name === editor && b.is_active);
+    return filterBrands(brands.filter(b => b.sales_member === editor && b.is_active));
   };
 
   const getUnassignedBrands = () => {
-    return brands.filter(b => !b.editor_name || b.editor_name.trim() === '');
+    return filterBrands(brands.filter(b => !b.sales_member || b.sales_member.trim() === ''));
   };
 
   const getHistoricalBrands = () => {
-    return brands.filter(b => !b.is_active);
+    return filterBrands(brands.filter(b => !b.is_active));
   };
 
   const renderCell = (brand, field) => {
@@ -130,6 +181,7 @@ const BrandManagement = () => {
       <td
         onClick={() => handleCellClick(brand.id, field, brand[field])}
         className={isEditing ? 'editing' : ''}
+        style={{ width: '25%' }}
       >
         {isEditing ? (
           <input
@@ -151,25 +203,47 @@ const BrandManagement = () => {
     );
   };
 
+  const renderMoveDropdown = (brand) => {
+    const currentEditor = brand.sales_member;
+    const moveOptions = [
+      ...salesMembers.filter(m => m !== currentEditor),
+      'unassigned',
+      'historic'
+    ];
+
+    return (
+      <select
+        onChange={(e) => {
+          if (e.target.value) {
+            handleMoveBrand(brand.id, e.target.value);
+            e.target.value = '';
+          }
+        }}
+        className="move-dropdown"
+        defaultValue=""
+      >
+        <option value="" disabled>Move to</option>
+        {moveOptions.map(option => (
+          <option key={option} value={option}>
+            {option === 'historic' ? 'Historic' :
+             option === 'unassigned' ? 'Unassigned' :
+             option}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
   const renderBrandSection = (editor, brandsData) => (
     <div key={editor} className="reports-section">
       <table className="reports-table">
         <tbody>
           <tr className="agency-section-header">
             <td colSpan="4" className="agency-section-title">
-              {editor}'s Brands <span className="agency-count">({brandsData.length})</span>
+              <span>{editor}'s Brands <span className="agency-count">({brandsData.length})</span></span>
               <button
                 onClick={() => handleAddBrand(editor)}
-                style={{
-                  marginLeft: 'auto',
-                  padding: '4px 12px',
-                  background: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
+                className="add-brand-button"
               >
                 Add Brand
               </button>
@@ -180,21 +254,16 @@ const BrandManagement = () => {
               {renderCell(brand, 'brand')}
               {renderCell(brand, 'agency')}
               {renderCell(brand, 'pharma_company')}
-              <td>
-                <button
-                  onClick={() => handleDelete(brand.id)}
-                  style={{
-                    padding: '4px 12px',
-                    background: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete
-                </button>
+              <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                  {renderMoveDropdown(brand)}
+                  <button
+                    onClick={() => handleDelete(brand.id)}
+                    className="delete-button"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -227,17 +296,25 @@ const BrandManagement = () => {
     <div className="brand-management">
       <div className="page-header">
         <h1>Brand & Agency Management</h1>
-        <div className="header-spacer"></div>
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="search-input"
+          />
+        </div>
       </div>
 
       <div className="table-container">
         <table className="reports-table">
           <thead>
             <tr>
-              <th>Brand</th>
-              <th>Agency</th>
-              <th>Pharma Company</th>
-              <th>Actions</th>
+              <th style={{ width: '25%', fontSize: '18px' }}>Brand</th>
+              <th style={{ width: '25%', fontSize: '18px' }}>Agency</th>
+              <th style={{ width: '25%', fontSize: '18px' }}>Pharma Company</th>
+              <th style={{ width: '25%', textAlign: 'right', paddingRight: '16px', fontSize: '18px' }}>Actions</th>
             </tr>
           </thead>
         </table>
@@ -258,21 +335,16 @@ const BrandManagement = () => {
                 {renderCell(brand, 'brand')}
                 {renderCell(brand, 'agency')}
                 {renderCell(brand, 'pharma_company')}
-                <td>
-                  <button
-                    onClick={() => handleDelete(brand.id)}
-                    style={{
-                      padding: '4px 12px',
-                      background: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Delete
-                  </button>
+                <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                    {renderMoveDropdown(brand)}
+                    <button
+                      onClick={() => handleDelete(brand.id)}
+                      className="delete-button"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -294,7 +366,7 @@ const BrandManagement = () => {
         <table className="reports-table">
           <tbody>
             <tr className="agency-section-header">
-              <td colSpan="5" className="agency-section-title">
+              <td colSpan="4" className="agency-section-title">
                 Historical / Inactive Brands <span className="agency-count">({getHistoricalBrands().length})</span>
               </td>
             </tr>
@@ -303,28 +375,22 @@ const BrandManagement = () => {
                 {renderCell(brand, 'brand')}
                 {renderCell(brand, 'agency')}
                 {renderCell(brand, 'pharma_company')}
-                <td style={{ color: '#888' }}>{brand.editor_name || '-'}</td>
-                <td>
-                  <button
-                    onClick={() => handleDelete(brand.id)}
-                    style={{
-                      padding: '4px 12px',
-                      background: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Delete
-                  </button>
+                <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                    {renderMoveDropdown(brand)}
+                    <button
+                      onClick={() => handleDelete(brand.id)}
+                      className="delete-button"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {getHistoricalBrands().length === 0 && (
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
+                <td colSpan="4" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
                   No historical brands
                 </td>
               </tr>

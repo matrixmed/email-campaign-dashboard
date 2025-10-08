@@ -11,15 +11,15 @@ const CMIContractValues = () => {
   const [filterText, setFilterText] = useState('');
 
   const columns = [
-    { key: 'contract_number', label: 'Contract #', width: '120px' },
-    { key: 'client', label: 'Client', width: '150px' },
-    { key: 'brand', label: 'Brand', width: '150px' },
-    { key: 'vehicle', label: 'Vehicle', width: '200px' },
-    { key: 'placement_id', label: 'Placement ID', width: '150px' },
-    { key: 'placement_description', label: 'Placement Description', width: '300px' },
-    { key: 'buy_component_type', label: 'Buy Component Type', width: '180px' },
-    { key: 'data_type', label: 'Data Type', width: '120px' },
-    { key: 'notes', label: 'Notes', width: '200px' }
+    { key: 'contract_number', label: 'Contract #', width: '150px' },
+    { key: 'client', label: 'Client', width: '200px' },
+    { key: 'brand', label: 'Brand', width: '180px' },
+    { key: 'vehicle', label: 'Vehicle', width: '300px' },
+    { key: 'placement_id', label: 'Placement ID', width: '200px' },
+    { key: 'placement_description', label: 'Placement Description', width: '450px' },
+    { key: 'buy_component_type', label: 'Buy Component Type', width: '220px' },
+    { key: 'data_type', label: 'Data Type', width: '150px' },
+    { key: 'notes', label: 'Notes', width: '300px' }
   ];
 
   const fetchContracts = useCallback(async () => {
@@ -70,10 +70,10 @@ const CMIContractValues = () => {
           c.id === contractId ? { ...c, [columnKey]: editValue } : c
         ));
       } else {
-        alert('Failed to update: ' + data.message);
+        console.error('Failed to update:', data.message);
       }
     } catch (error) {
-      alert('Error updating contract: ' + error.message);
+      console.error('Error updating contract:', error.message);
     }
 
     setEditingCell(null);
@@ -103,16 +103,14 @@ const CMIContractValues = () => {
       if (data.status === 'success') {
         fetchContracts();
       } else {
-        alert('Failed to add row: ' + data.message);
+        console.error('Failed to add row:', data.message);
       }
     } catch (error) {
-      alert('Error adding row: ' + error.message);
+      console.error('Error adding row:', error.message);
     }
   };
 
   const handleDeleteRow = async (contractId) => {
-    if (!window.confirm('Delete this contract?')) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/${contractId}`, {
         method: 'DELETE'
@@ -122,10 +120,10 @@ const CMIContractValues = () => {
       if (data.status === 'success') {
         setContracts(prev => prev.filter(c => c.id !== contractId));
       } else {
-        alert('Failed to delete: ' + data.message);
+        console.error('Failed to delete:', data.message);
       }
     } catch (error) {
-      alert('Error deleting contract: ' + error.message);
+      console.error('Error deleting contract:', error.message);
     }
   };
 
@@ -150,7 +148,7 @@ const CMIContractValues = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      alert('Error exporting: ' + error.message);
+      console.error('Error exporting:', error.message);
     }
   };
 
@@ -183,94 +181,98 @@ const CMIContractValues = () => {
 
   return (
     <div className="cmi-contract-values">
-      <div className="page-header">
-        <h1>CMI Contract Values</h1>
-        <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search"
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            className="search-input"
-          />
+      <div className="cmi-sticky-header">
+        <div className="page-header">
+          <h1>CMI Contract Values</h1>
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              className="search-input"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="cmi-table-wrapper">
-        <table className="cmi-table">
-          <thead>
-            <tr>
-              {columns.map(col => (
-                <th
-                  key={col.key}
-                  style={{ width: col.width }}
-                  onClick={() => handleSort(col.key)}
-                >
-                  {col.label}
-                  {sortConfig.key === col.key && (
-                    <span className="sort-indicator">
-                      {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
-                    </span>
-                  )}
-                </th>
-              ))}
-              <th style={{ width: '80px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedContracts.map(contract => (
-              <tr key={contract.id}>
+      <div className="cmi-scrollable-content">
+        <div className="cmi-table-wrapper">
+          <table className="cmi-table">
+            <thead>
+              <tr>
                 {columns.map(col => (
-                  <td
+                  <th
                     key={col.key}
-                    onClick={() => handleCellClick(contract.id, col.key, contract[col.key])}
-                    className={editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? 'editing' : ''}
+                    style={{ width: col.width }}
+                    onClick={() => handleSort(col.key)}
                   >
-                    {editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={handleCellBlur}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCellBlur();
-                          if (e.key === 'Escape') setEditingCell(null);
-                        }}
-                        autoFocus
-                        className="cell-input"
-                      />
-                    ) : (
-                      <span>{contract[col.key] || ''}</span>
+                    {col.label}
+                    {sortConfig.key === col.key && (
+                      <span className="sort-indicator">
+                        {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
+                      </span>
                     )}
-                  </td>
+                  </th>
                 ))}
-                <td>
-                  <button
-                    onClick={() => handleDeleteRow(contract.id)}
-                    className="cmi-btn-delete"
-                  >
-                    Delete
-                  </button>
-                </td>
+                <th style={{ width: '80px' }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {sortedContracts.length === 0 && (
-        <div className="cmi-empty">
-          No contracts found. Click "Add Row" to create one.
+            </thead>
+            <tbody>
+              {sortedContracts.map(contract => (
+                <tr key={contract.id}>
+                  {columns.map(col => (
+                    <td
+                      key={col.key}
+                      onClick={() => handleCellClick(contract.id, col.key, contract[col.key])}
+                      className={editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? 'editing' : ''}
+                    >
+                      {editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellBlur}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCellBlur();
+                            if (e.key === 'Escape') setEditingCell(null);
+                          }}
+                          autoFocus
+                          className="cell-input"
+                        />
+                      ) : (
+                        <span>{contract[col.key] || ''}</span>
+                      )}
+                    </td>
+                  ))}
+                  <td>
+                    <button
+                      onClick={() => handleDeleteRow(contract.id)}
+                      className="cmi-btn-delete"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      <div className="cmi-controls">
-        <button onClick={handleAddRow} className="cmi-btn cmi-btn-add">
-          Add Row
-        </button>
-        <button onClick={handleExport} className="cmi-btn cmi-btn-export">
-          Export CSV
-        </button>
+        {sortedContracts.length === 0 && (
+          <div className="cmi-empty">
+            No contracts found. Click "Add Row" to create one.
+          </div>
+        )}
+
+        <div className="cmi-controls">
+          <button onClick={handleAddRow} className="cmi-btn cmi-btn-add">
+            Add Row
+          </button>
+          <button onClick={handleExport} className="cmi-btn cmi-btn-export">
+            Export CSV
+          </button>
+        </div>
       </div>
     </div>
   );

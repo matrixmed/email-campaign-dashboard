@@ -11,7 +11,7 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True)
     contact_id = Column(String(50))
-    email = Column(String(255), index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
     first_name = Column(String(100))
     last_name = Column(String(100))
     specialty = Column(String(100), index=True)
@@ -108,7 +108,7 @@ class BrandEditorAgency(Base):
     __tablename__ = 'brand_editor_agency'
 
     id = Column(Integer, primary_key=True)
-    editor_name = Column(String(100), nullable=False, index=True)
+    sales_member = Column(String(100), index=True)
     brand = Column(String(255), nullable=False, index=True)
     agency = Column(String(255))
     pharma_company = Column(String(255))
@@ -117,7 +117,7 @@ class BrandEditorAgency(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_editor_brand', 'editor_name', 'brand'),
+        Index('idx_sales_brand', 'sales_member', 'brand'),
     )
 
 def init_db():

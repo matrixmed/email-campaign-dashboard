@@ -437,23 +437,22 @@ body.cyberpunk-theme .tooltip-top::before {
 
 /* Scrollbars */
 body.cyberpunk-theme ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  background: rgba(10, 10, 20, 0.7);
+  width: 10px;
+  height: 10px;
 }
 
 body.cyberpunk-theme ::-webkit-scrollbar-track {
-  background: rgba(10, 10, 20, 0.7);
-  border-radius: 0;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.cyberpunk-theme ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #ff00aa, #00ffff);
-  border-radius: 0;
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.cyberpunk-theme ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #00ffff, #ff00aa);
+  background: #6b7280;
 }
 
 /* Sample query lists */

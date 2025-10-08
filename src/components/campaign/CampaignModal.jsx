@@ -16,6 +16,11 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     const [uploading, setUploading] = useState(false);
     const [hasMetadata, setHasMetadata] = useState(false);
     const [metadataLoading, setMetadataLoading] = useState(false);
+    const [dragActive, setDragActive] = useState({
+        targetList: false,
+        tags: false,
+        adImages: false
+    });
 
     const currentIndex = campaign && allCampaigns.length > 0
         ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
@@ -23,8 +28,19 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex >= 0 && currentIndex < allCampaigns.length - 1;
 
+    // Reset upload modal state when campaign changes
+    useEffect(() => {
+        if (isOpen && campaign) {
+            setShowUploadModal(false);
+            setUploadFiles({ targetList: null, tags: null, adImages: [] });
+        }
+    }, [campaign?.Campaign, isOpen]);
+
     useEffect(() => {
         function handleClickOutside(event) {
+            // Don't close modal if upload modal is showing
+            if (showUploadModal) return;
+
             if (modalRef.current && !modalRef.current.contains(event.target)) {
                 // Don't close if clicking on navigation arrows
                 if (!event.target.closest('.modal-nav-arrow')) {
@@ -59,7 +75,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, onClose, isCompareMode, hasPrev, hasNext, onNavigate]);
+    }, [isOpen, onClose, isCompareMode, hasPrev, hasNext, onNavigate, showUploadModal]);
 
     useEffect(() => {
         async function fetchCampaignMetadata() {
@@ -775,131 +791,268 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
         </div>
 
         {showUploadModal && (
-            <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10000
-                }}>
-                    <div style={{
-                        background: 'white',
-                        borderRadius: '12px',
-                        padding: '32px',
-                        maxWidth: '600px',
-                        width: '90%'
-                    }}>
-                        <h3 style={{ marginBottom: '24px' }}>Upload Campaign Metadata</h3>
+            <div
+                className="upload-modal-overlay"
+                onClick={(e) => {
+                    if (e.target.className === 'upload-modal-overlay') {
+                        setShowUploadModal(false);
+                        setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                    }
+                }}
+            >
+                <div className="upload-modal-content">
+                    <div className="upload-modal-header">
+                        <h3>Upload Campaign Metadata</h3>
+                        <button
+                            className="upload-modal-close"
+                            onClick={() => {
+                                setShowUploadModal(false);
+                                setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
 
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-                                Target List (Excel)
-                            </label>
+                    <div className="upload-modal-body">
+                        <div className="upload-section">
+                            <label className="upload-label">Target List (Excel)</label>
+                            <div
+                                className={`dropbox ${dragActive.targetList ? 'drag-active' : ''} ${uploadFiles.targetList ? 'has-file' : ''}`}
+                                onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, targetList: true }));
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, targetList: false }));
+                                }}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, targetList: false }));
+                                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                        setUploadFiles(prev => ({ ...prev, targetList: e.dataTransfer.files[0] }));
+                                    }
+                                }}
+                                onClick={() => document.getElementById('targetListInput').click()}
+                            >
+                                {uploadFiles.targetList ? (
+                                    <div className="file-info">
+                                        <span className="file-name">{uploadFiles.targetList.name}</span>
+                                        <button
+                                            className="remove-file"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setUploadFiles(prev => ({ ...prev, targetList: null }));
+                                            }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="dropbox-placeholder">
+                                        <div className="dropbox-icon">📄</div>
+                                        <div className="dropbox-text">Drop Excel file here or click to browse</div>
+                                    </div>
+                                )}
+                            </div>
                             <input
+                                id="targetListInput"
                                 type="file"
                                 accept=".xlsx,.xls"
-                                onChange={(e) => setUploadFiles(prev => ({ ...prev, targetList: e.target.files[0] }))}
-                                style={{ width: '100%', padding: '8px' }}
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        setUploadFiles(prev => ({ ...prev, targetList: e.target.files[0] }));
+                                    }
+                                }}
+                                style={{ display: 'none' }}
                             />
                         </div>
 
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-                                Tags (Excel)
-                            </label>
+                        <div className="upload-section">
+                            <label className="upload-label">Tags (Excel)</label>
+                            <div
+                                className={`dropbox ${dragActive.tags ? 'drag-active' : ''} ${uploadFiles.tags ? 'has-file' : ''}`}
+                                onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, tags: true }));
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, tags: false }));
+                                }}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, tags: false }));
+                                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                        setUploadFiles(prev => ({ ...prev, tags: e.dataTransfer.files[0] }));
+                                    }
+                                }}
+                                onClick={() => document.getElementById('tagsInput').click()}
+                            >
+                                {uploadFiles.tags ? (
+                                    <div className="file-info">
+                                        <span className="file-name">{uploadFiles.tags.name}</span>
+                                        <button
+                                            className="remove-file"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setUploadFiles(prev => ({ ...prev, tags: null }));
+                                            }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="dropbox-placeholder">
+                                        <div className="dropbox-icon">📄</div>
+                                        <div className="dropbox-text">Drop Excel file here or click to browse</div>
+                                    </div>
+                                )}
+                            </div>
                             <input
+                                id="tagsInput"
                                 type="file"
                                 accept=".xlsx,.xls"
-                                onChange={(e) => setUploadFiles(prev => ({ ...prev, tags: e.target.files[0] }))}
-                                style={{ width: '100%', padding: '8px' }}
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        setUploadFiles(prev => ({ ...prev, tags: e.target.files[0] }));
+                                    }
+                                }}
+                                style={{ display: 'none' }}
                             />
                         </div>
 
-                        <div style={{ marginBottom: '24px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-                                Ad Images (PNG/JPG)
-                            </label>
+                        <div className="upload-section">
+                            <label className="upload-label">Ad Images (PNG/JPG)</label>
+                            <div
+                                className={`dropbox ${dragActive.adImages ? 'drag-active' : ''} ${uploadFiles.adImages.length > 0 ? 'has-file' : ''}`}
+                                onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, adImages: true }));
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, adImages: false }));
+                                }}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDragActive(prev => ({ ...prev, adImages: false }));
+                                    if (e.dataTransfer.files) {
+                                        setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.dataTransfer.files) }));
+                                    }
+                                }}
+                                onClick={() => document.getElementById('adImagesInput').click()}
+                            >
+                                {uploadFiles.adImages.length > 0 ? (
+                                    <div className="file-info">
+                                        <span className="file-name">{uploadFiles.adImages.length} image(s) selected</span>
+                                        <button
+                                            className="remove-file"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setUploadFiles(prev => ({ ...prev, adImages: [] }));
+                                            }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="dropbox-placeholder">
+                                        <div className="dropbox-icon">🖼️</div>
+                                        <div className="dropbox-text">Drop images here or click to browse</div>
+                                        <div className="dropbox-hint">Multiple files allowed</div>
+                                    </div>
+                                )}
+                            </div>
                             <input
+                                id="adImagesInput"
                                 type="file"
                                 accept=".png,.jpg,.jpeg"
                                 multiple
-                                onChange={(e) => setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.target.files) }))}
-                                style={{ width: '100%', padding: '8px' }}
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.target.files) }));
+                                    }
+                                }}
+                                style={{ display: 'none' }}
                             />
                         </div>
+                    </div>
 
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => {
-                                    setShowUploadModal(false);
-                                    setUploadFiles({ targetList: null, tags: null, adImages: [] });
-                                }}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: '#e5e7eb',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    if (!uploadFiles.targetList && !uploadFiles.tags && uploadFiles.adImages.length === 0) {
-                                        alert('Please select at least one file');
-                                        return;
+                    <div className="upload-modal-footer">
+                        <button
+                            className="upload-btn-cancel"
+                            onClick={() => {
+                                setShowUploadModal(false);
+                                setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="upload-btn-submit"
+                            onClick={async () => {
+                                if (!uploadFiles.targetList && !uploadFiles.tags && uploadFiles.adImages.length === 0) {
+                                    return;
+                                }
+
+                                setUploading(true);
+                                const formData = new FormData();
+                                formData.append('campaign_name', campaign.Campaign);
+
+                                if (uploadFiles.targetList) formData.append('target_list', uploadFiles.targetList);
+                                if (uploadFiles.tags) formData.append('tags', uploadFiles.tags);
+                                uploadFiles.adImages.forEach(img => formData.append('ad_images', img));
+
+                                try {
+                                    const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/metadata`, {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+
+                                    const data = await response.json();
+                                    if (data.status === 'success') {
+                                        setShowUploadModal(false);
+                                        setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                        setHasMetadata(true);
+                                    } else {
+                                        console.error('Upload failed:', data.message);
                                     }
-
-                                    setUploading(true);
-                                    const formData = new FormData();
-                                    formData.append('campaign_name', campaign.Campaign);
-
-                                    if (uploadFiles.targetList) formData.append('target_list', uploadFiles.targetList);
-                                    if (uploadFiles.tags) formData.append('tags', uploadFiles.tags);
-                                    uploadFiles.adImages.forEach(img => formData.append('ad_images', img));
-
-                                    try {
-                                        const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/metadata`, {
-                                            method: 'POST',
-                                            body: formData
-                                        });
-
-                                        const data = await response.json();
-                                        if (data.status === 'success') {
-                                            alert('Metadata uploaded successfully!');
-                                            setShowUploadModal(false);
-                                            setUploadFiles({ targetList: null, tags: null, adImages: [] });
-                                            setHasMetadata(true);
-                                        } else {
-                                            alert('Upload failed: ' + data.message);
-                                        }
-                                    } catch (error) {
-                                        alert('Error uploading files: ' + error.message);
-                                    } finally {
-                                        setUploading(false);
-                                    }
-                                }}
-                                disabled={uploading}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: uploading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: uploading ? 'not-allowed' : 'pointer'
-                                }}
-                            >
-                                {uploading ? 'Uploading...' : 'Upload'}
-                            </button>
-                        </div>
+                                } catch (error) {
+                                    console.error('Error uploading files:', error.message);
+                                } finally {
+                                    setUploading(false);
+                                }
+                            }}
+                            disabled={uploading}
+                        >
+                            {uploading ? 'Uploading...' : 'Upload'}
+                        </button>
                     </div>
                 </div>
+            </div>
         )}
         </>
     );

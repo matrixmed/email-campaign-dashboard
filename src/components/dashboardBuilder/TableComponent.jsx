@@ -377,7 +377,8 @@ const TableComponent = ({
       ...dataCellStyle,
       backgroundColor: rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff',
       width: getColumnWidth(colIndex),
-      fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal'
+      fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal',
+      color: '#1f2937'
     };
   };
 
@@ -387,7 +388,7 @@ const TableComponent = ({
     textAlign: isCampaignComparisonTable ? 'center' : 'left',
     verticalAlign: 'middle',
     fontSize: 'inherit',
-    color: '#111'
+    color: '#1f2937'
   };
 
   useEffect(() => {

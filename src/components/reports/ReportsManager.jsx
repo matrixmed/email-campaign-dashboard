@@ -562,7 +562,7 @@ const ReportsManager = () => {
                 button.classList.remove('copied');
             }, 2000);
         } catch (err) {
-            alert('Failed to copy to clipboard');
+            console.error('Failed to copy to clipboard:', err);
         }
     };
 
@@ -748,49 +748,53 @@ const ReportsManager = () => {
 
     return (
         <div className="reports-manager">
-            <div className="page-header">
-                <h1>Reports Manager</h1>
-                <div className="search-container">
-                    <input
-                        type="text"
-                        placeholder="Search"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="search-input"
-                    />
+            <div className="reports-sticky-header">
+                <div className="page-header">
+                    <h1>Reports Manager</h1>
+                    <div className="search-container">
+                        <input
+                            type="text"
+                            placeholder="Search"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="search-input"
+                        />
+                    </div>
                 </div>
-            </div>
-            
-            <div className="reports-tabs">
-                <button 
-                    className={`tab-button ${activeTab === 'current' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('current')}
-                >
-                    <Clock size={16} />
-                    <span>Current Week ({getCurrentWeekReports.length})</span>
-                </button>
-                <button 
-                    className={`tab-button ${activeTab === 'archive' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('archive')}
-                >
-                    <FileText size={16} />
-                    <span>Archive ({getPastReports.length})</span>
-                </button>
-                <div className="rows-control">
-                    <label htmlFor="rowsPerPage">Rows per page:</label>
-                    <select
-                        id="rowsPerPage"
-                        value={getCurrentRowsPerPage()}
-                        onChange={handleCurrentTabRowsChange}
+
+                <div className="reports-tabs">
+                    <button
+                        className={`tab-button ${activeTab === 'current' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('current')}
                     >
-                        {[7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
-                            <option key={num} value={num}>
-                                {num}
-                            </option>
-                        ))}
-                    </select>
+                        <Clock size={16} />
+                        <span>Current Week ({getCurrentWeekReports.length})</span>
+                    </button>
+                    <button
+                        className={`tab-button ${activeTab === 'archive' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('archive')}
+                    >
+                        <FileText size={16} />
+                        <span>Archive ({getPastReports.length})</span>
+                    </button>
+                    <div className="rows-control">
+                        <label htmlFor="rowsPerPage">Rows per page:</label>
+                        <select
+                            id="rowsPerPage"
+                            value={getCurrentRowsPerPage()}
+                            onChange={handleCurrentTabRowsChange}
+                        >
+                            {[7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
+                                <option key={num} value={num}>
+                                    {num}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
+
+            <div className="reports-scrollable-content">
 
             {activeTab === 'current' && (() => {
                 const allCurrentReports = getCurrentWeekReports;
@@ -1044,6 +1048,8 @@ const ReportsManager = () => {
                 );
             })()}
 
+            </div>
+
             {showModal && selectedCMIReport && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -1052,7 +1058,7 @@ const ReportsManager = () => {
                                 <FileText size={20} />
                                 <h3>Campaign JSON</h3>
                             </div>
-                            <button 
+                            <button
                                 className="modal-close"
                                 onClick={() => setShowModal(false)}
                             >
@@ -1063,7 +1069,7 @@ const ReportsManager = () => {
                             <div className="json-preview">
                                 <div className="json-header">
                                     <span className="json-label">Generated JSON Structure</span>
-                                    <button 
+                                    <button
                                         className="copy-button"
                                         onClick={copyToClipboard}
                                     >

@@ -15,17 +15,17 @@ def get_session():
 @brand_management_bp.route('', methods=['GET'])
 def get_all_brands():
     try:
-        editor = request.args.get('editor')
+        sales_member = request.args.get('sales_member')
         session = get_session()
 
-        if editor:
-            brands = session.query(BrandEditorAgency).filter_by(editor_name=editor).order_by(BrandEditorAgency.brand.asc()).all()
+        if sales_member:
+            brands = session.query(BrandEditorAgency).filter_by(sales_member=sales_member).order_by(BrandEditorAgency.brand.asc()).all()
         else:
-            brands = session.query(BrandEditorAgency).order_by(BrandEditorAgency.editor_name.asc(), BrandEditorAgency.brand.asc()).all()
+            brands = session.query(BrandEditorAgency).order_by(BrandEditorAgency.sales_member.asc(), BrandEditorAgency.brand.asc()).all()
 
         result = [{
             'id': b.id,
-            'editor_name': b.editor_name,
+            'sales_member': b.sales_member,
             'brand': b.brand,
             'agency': b.agency,
             'pharma_company': b.pharma_company,
@@ -50,16 +50,16 @@ def create_brand_entry():
     try:
         data = request.json
 
-        if not data.get('editor_name') or not data.get('brand'):
+        if not data.get('brand'):
             return jsonify({
                 'status': 'error',
-                'message': 'editor_name and brand are required'
+                'message': 'brand is required'
             }), 400
 
         session = get_session()
 
         existing = session.query(BrandEditorAgency).filter_by(
-            editor_name=data['editor_name'],
+            sales_member=data.get('sales_member'),
             brand=data['brand']
         ).first()
 
@@ -67,11 +67,11 @@ def create_brand_entry():
             session.close()
             return jsonify({
                 'status': 'error',
-                'message': 'Brand already assigned to this editor'
+                'message': 'Brand already assigned to this sales member'
             }), 400
 
         brand_entry = BrandEditorAgency(
-            editor_name=data.get('editor_name'),
+            sales_member=data.get('sales_member'),
             brand=data.get('brand'),
             agency=data.get('agency'),
             pharma_company=data.get('pharma_company'),
@@ -111,8 +111,8 @@ def update_brand_entry(entry_id):
                 'message': 'Brand entry not found'
             }), 404
 
-        if 'editor_name' in data:
-            entry.editor_name = data['editor_name']
+        if 'sales_member' in data:
+            entry.sales_member = data['sales_member']
         if 'brand' in data:
             entry.brand = data['brand']
         if 'agency' in data:

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './AppLayout';
 import MatrixSignIn from './MatrixSignIn';
 import CampaignPerformancePage from '../pages/CampaignPerformancePage';
+import AnalyticsPage from '../pages/AnalyticsPage';
 import ReportsPage from '../pages/ReportsPage';
 import AudiencePage from '../pages/AudiencePage';
 import BrandManagementPage from '../pages/BrandManagementPage';
@@ -23,6 +24,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/" element={<Navigate to="/campaigns" replace />} />
           <Route path="/campaigns" element={<CampaignPerformancePage />} />
           <Route path="/dashboard-builder" element={<DashboardCanvas />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/audience" element={<AudiencePage />} />
           <Route path="/brands" element={<BrandManagementPage />} />

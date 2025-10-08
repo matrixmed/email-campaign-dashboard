@@ -270,22 +270,22 @@ body.company-theme .tooltip-top::before {
 
 /* Scrollbars */
 body.company-theme ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 body.company-theme ::-webkit-scrollbar-track {
-  background: var(--company-light);
-  border-radius: 4px;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.company-theme ::-webkit-scrollbar-thumb {
-  background: var(--company-secondary);
-  border-radius: 4px;
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.company-theme ::-webkit-scrollbar-thumb:hover {
-  background: var(--company-primary);
+  background: #6b7280;
 }
 
 /* Sample query lists */

@@ -13,9 +13,9 @@ def seed_cmi_contracts():
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    existing = session.query(CMIContractValue).first()
-    if existing:
-        print("CMI contracts already seeded. Skipping.")
+    count = session.query(CMIContractValue).count()
+    if count > 0:
+        print(f"CMI contracts already seeded ({count} records). Skipping.")
         session.close()
         return
 
@@ -24,14 +24,24 @@ def seed_cmi_contracts():
     with open(csv_file_path, 'r', encoding='utf-8') as file:
         csv_reader = csv.DictReader(file)
         contracts = []
+        seen_ids = set()
 
         for row in csv_reader:
+            placement_id = row.get('Placement ID', '').strip()
+
+            # Skip duplicates
+            if placement_id in seen_ids:
+                print(f"Skipping duplicate placement_id: {placement_id}")
+                continue
+
+            seen_ids.add(placement_id)
+
             contract = CMIContractValue(
                 contract_number=row.get('Contract #', '').strip(),
                 client=row.get('Client', '').strip(),
                 brand=row.get('Brand', '').strip(),
                 vehicle=row.get('Vehicle', '').strip(),
-                placement_id=row.get('Placement ID', '').strip(),
+                placement_id=placement_id,
                 placement_description=row.get('Placement Description', '').strip(),
                 buy_component_type=row.get('Buy Component Type', '').strip(),
                 data_type=row.get('Data Type', '').strip(),

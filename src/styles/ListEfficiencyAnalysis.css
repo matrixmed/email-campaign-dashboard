@@ -482,3 +482,190 @@ body.light .data-summary p {
 body.light .file-name {
     color: #0077ff;
 }
+
+.engagement-analysis-section {
+    background-color: #2a2a2d;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.engagement-tier-results {
+    background-color: #2a2a2d;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.tier-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.tier-card {
+    background-color: #333;
+    border: 2px solid #444;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.tier-card:hover {
+    border-color: #0ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 255, 255, 0.2);
+}
+
+.tier-card.selected {
+    border-color: #0ff;
+    background-color: #3a3a3d;
+}
+
+.tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #555;
+}
+
+.tier-header h4 {
+    margin: 0;
+    color: #0ff;
+    font-size: 18px;
+}
+
+.tier-count {
+    color: #fff;
+    font-size: 14px;
+    background-color: #444;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.tier-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.metric-label {
+    color: #aaa;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.metric-value {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.tier-users-detail {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #555;
+}
+
+.tier-users-detail h5 {
+    color: #0ff;
+    margin-bottom: 10px;
+}
+
+.tier-users-detail table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.tier-users-detail th {
+    background-color: #444;
+    color: #0ff;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.tier-users-detail td {
+    padding: 8px;
+    color: #fff;
+    border-bottom: 1px solid #555;
+}
+
+.tier-users-detail td.engaged {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.tier-users-detail tr:hover {
+    background-color: #3a3a3d;
+}
+
+body.light .engagement-analysis-section,
+body.light .engagement-tier-results {
+    background-color: #f9f9f9;
+}
+
+body.light .tier-card {
+    background-color: #fff;
+    border-color: #ddd;
+}
+
+body.light .tier-card:hover {
+    border-color: #0077ff;
+    box-shadow: 0 4px 12px rgba(0, 119, 255, 0.2);
+}
+
+body.light .tier-card.selected {
+    border-color: #0077ff;
+    background-color: #f0f8ff;
+}
+
+body.light .tier-header h4 {
+    color: #0077ff;
+}
+
+body.light .tier-count {
+    background-color: #e9ecef;
+    color: #333;
+}
+
+body.light .metric-label {
+    color: #666;
+}
+
+body.light .metric-value {
+    color: #333;
+}
+
+body.light .tier-users-detail h5 {
+    color: #0077ff;
+}
+
+body.light .tier-users-detail th {
+    background-color: #e9ecef;
+    color: #333;
+}
+
+body.light .tier-users-detail td {
+    color: #333;
+    border-bottom: 1px solid #ddd;
+}
+
+body.light .tier-users-detail td.engaged {
+    color: #28a745;
+}
+
+body.light .tier-users-detail tr:hover {
+    background-color: #f8f9fa;
+}

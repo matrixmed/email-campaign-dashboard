@@ -1,73 +1,72 @@
-Sales_member,Brand,Pharma_company,Active
-Emily,BCMA,,FALSE
-Emily,Carvykti,Johnson & Johnson,TRUE
-Emily,Castle,,FALSE
-Emily,Imfinzi NSCLC,,FALSE
-Emily,One Lung (AZ),,FALSE
-Emily,Tagrisso,AstraZeneca,TRUE
-Emily,Verzenio,Eli Lilly,TRUE
-Courtney,Adbry,LEO Pharma,TRUE
-Courtney,Aquaphor,Beiersdorf,TRUE
-Courtney,Anzupgo,,FALSE
-Courtney,Bimzelx,UCB,TRUE
-Courtney,Cabtreo,Ortho Dermatologics,TRUE
-Courtney,Eucerin,Beiersdorf,TRUE
-Courtney,Imlunestrant,Eli Lilly,TRUE
-Courtney,Kisunla,Eli Lilly,TRUE
-Courtney,Leqselvi,Sun Pharma,TRUE
-Courtney,MelaB3,,FALSE
-Courtney,Nemluvio,Galderma,TRUE
-Courtney,Neutrogena,Kenvue,TRUE
-Courtney,Opzelura,Incyte,TRUE
-Courtney,Rinvoq,Abbvie,TRUE
-Courtney,Skinbetter,L'Oréal,TRUE
-Courtney,Skinceuticals,L'Oréal,TRUE
-Courtney,Skyrizi,Abbvie,TRUE
-Courtney,Spevigo,Boehringer Ingelheim,TRUE
-Courtney,Truqap,AstraZeneca,TRUE
-Courtney,Winlevi,Sun Pharma,TRUE
-Courtney,Zoryve,Arcutis,TRUE
-Morgan,Breyanzi,BMS,TRUE
-Morgan,Cabometyx,Exelixis,TRUE
-Morgan,Calquence,AstraZeneca,TRUE
-Morgan,Claritin,Bayer,TRUE
-Morgan,Gvoke VialDx,American Regent,TRUE
-Morgan,Lyfgenia,bluebird bio,TRUE
-Morgan,Phesgo,Genentech,TRUE
-Morgan,Signia,Medtronic,TRUE
-Morgan,Uplizna,Amgen,TRUE
-Morgan,Vabysmo,Genentech,TRUE
-Dana,Imfinzi GI,,FALSE
-,Imfinzi,AstraZeneca,TRUE
-,One Lung,AstraZeneca,TRUE
-,Decision-Dx,Castle Biosciences,TRUE
-,MyPath,Castle Biosciences,TRUE
-,Delgocitinib,LEO Pharma,TRUE
-,Seysara,Almirall,FALSE
-,Otezla,Amgen,FALSE
-,Lynparza,AstraZeneca,FALSE
-,Datroway,AZ/Daichii-Sankyo,FALSE
-,Enhertu,AZ/Daichii-Sankyo,FALSE
-,Jardiance,BI/Eli Lilly,FALSE
-,Abraxane,BMS,FALSE
-,Reblozyl,BMS,FALSE
-,Sotyktu,BMS,FALSE
-,Injectafer,Daichii-Sankyo,FALSE
-,Vtama,Dermavant,FALSE
-,Halaven,Eisai,FALSE
-,Jaypirca,Eli Lilly,FALSE
-,Retevmo,Eli Lilly,FALSE
-,Taltz,Eli Lilly,FALSE
-,Rhofade,EPI Health,FALSE
-,Ocrevus,Genentech,FALSE
-,Tecentriq,Genentech,FALSE
-,Invokana,Johnson & Johnson,FALSE
-,SkinAlliance,L'Oréal,FALSE
-,Altreno,Ortho Dermatologics,FALSE
-,Arazlo,Ortho Dermatologics,FALSE
-,Upneeq,RVL Pharma,FALSE
-,Xtrac,Strata Skin Sciences,FALSE
-,Ilumya,Sun Pharma,FALSE
-,Cimzia,UCB,FALSE
-,Ycanth,Verrica,FALSE
-,Breast Cancer Medical Affairs,,FALSE
+Sales_member,Brand,Agency,Pharma_company,Active
+,Abraxane,,BMS,FALSE
+Courtney,Adbry,Silverlight,LEO Pharma,TRUE
+,Altreno,,Ortho Dermatologics,FALSE
+Courtney,Anzupgo,,,FALSE
+Courtney,Aquaphor,,Beiersdorf,TRUE
+,Arazlo,,Ortho Dermatologics,FALSE
+Emily,BCMA,,,FALSE
+Courtney,Bimzelx,,UCB,TRUE
+,Breast Cancer Medical Affairs,CMI,,FALSE
+Morgan,Breyanzi,CMI,BMS,TRUE
+Morgan,Cabometyx,CMI,Exelixis,TRUE
+Courtney,Cabtreo,Ortho,Ortho Dermatologics,TRUE
+Morgan,Calquence,CMI,AstraZeneca,TRUE
+Emily,Carvykti,CMI,Johnson & Johnson,TRUE
+Emily,Castle,,,FALSE
+,Cimzia,,UCB,FALSE
+Morgan,Claritin,,Bayer,TRUE
+,Datroway,,AZ/Daichii-Sankyo,FALSE
+,Decision-Dx,Castle,Castle Biosciences,TRUE
+,Delgocitinib,,LEO Pharma,TRUE
+,Enhertu,,AZ/Daichii-Sankyo,FALSE
+Courtney,Eucerin,,Beiersdorf,TRUE
+Morgan,Gvoke VialDx,,American Regent,TRUE
+,Halaven,,Eisai,FALSE
+,Ilumya,,Sun Pharma,FALSE
+,Imfinzi,CMI,AstraZeneca,TRUE
+Dana,Imfinzi GI,CMI,AstraZeneca,FALSE
+Emily,Imfinzi NSCLC,CMI,AstraZeneca,FALSE
+Courtney,Imlunestrant,CMI,Eli Lilly,TRUE
+,Injectafer,,Daichii-Sankyo,FALSE
+,Invokana,,Johnson & Johnson,FALSE
+,Jardiance,,BI/Eli Lilly,FALSE
+,Jaypirca,,Eli Lilly,FALSE
+Courtney,Kisunla,CMI,Eli Lilly,TRUE
+Courtney,Leqselvi,Klick,Sun Pharma,TRUE
+Morgan,Lyfgenia,,bluebird bio,TRUE
+,Lynparza,,AstraZeneca,FALSE
+Courtney,MelaB3,,,FALSE
+,MyPath,Castle,Castle Biosciences,TRUE
+Courtney,Nemluvio,,Galderma,TRUE
+Courtney,Neutrogena,GoodApple,Kenvue,TRUE
+,Ocrevus,,Genentech,FALSE
+Emily,One Lung,CMI,AstraZeneca,FALSE
+Courtney,Opzelura,Deerfield,Incyte,TRUE
+,Otezla,,Amgen,FALSE
+Morgan,Phesgo,CMI,Genentech,TRUE
+,Reblozyl,,BMS,FALSE
+,Retevmo,,Eli Lilly,FALSE
+,Rhofade,,EPI Health,FALSE
+Courtney,Rinvoq,CMI,Abbvie,TRUE
+,Seysara,,Almirall,FALSE
+Morgan,Signia,,Medtronic,TRUE
+,SkinAlliance,,L'Oréal,FALSE
+Courtney,Skinbetter,CMI,L'Oréal,TRUE
+Courtney,Skinceuticals,CMI,L'Oréal,TRUE
+Courtney,Skyrizi,CMI,Abbvie,TRUE
+,Sotyktu,,BMS,FALSE
+Courtney,Spevigo,BI,Boehringer Ingelheim,TRUE
+Emily,Tagrisso,CMI,AstraZeneca,TRUE
+,Taltz,,Eli Lilly,FALSE
+,Tecentriq,,Genentech,FALSE
+Courtney,Truqap,CMI,AstraZeneca,TRUE
+Morgan,Uplizna,Amgen,Amgen,TRUE
+,Upneeq,,RVL Pharma,FALSE
+Morgan,Vabysmo,CMI,Genentech,TRUE
+Emily,Verzenio,CMI,Eli Lilly,TRUE
+,Vtama,,Dermavant,FALSE
+Courtney,Winlevi,Sun,Sun Pharma,TRUE
+,Xtrac,,Strata Skin Sciences,FALSE
+,Ycanth,,Verrica,FALSE
+Courtney,Zoryve,Klick,Arcutis,TRUE

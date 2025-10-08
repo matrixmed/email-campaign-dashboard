@@ -28,6 +28,7 @@ def seed_brands():
         for row in csv_reader:
             sales_member = row.get('Sales_member', '').strip()
             brand = row.get('Brand', '').strip()
+            agency = row.get('Agency', '').strip()
             pharma = row.get('Pharma_company', '').strip()
             active = row.get('Active', '').strip().upper() == 'TRUE'
 
@@ -35,9 +36,9 @@ def seed_brands():
                 continue
 
             entry = BrandEditorAgency(
-                editor_name=sales_member if sales_member else None,
+                sales_member=sales_member if sales_member else None,
                 brand=brand,
-                agency=None,
+                agency=agency if agency else None,
                 pharma_company=pharma if pharma else None,
                 is_active=active
             )

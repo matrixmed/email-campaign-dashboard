@@ -12,6 +12,86 @@ list_analysis_bp = Blueprint('list_analysis', __name__)
 def get_db_connection():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 
+def find_npi_column(df):
+    """
+    Find NPI column by checking:
+    1. Exact matches: 'NPI', 'NPI_ID', 'NPI NUMBER'
+    2. Partial matches: any column containing 'NPI'
+    3. Validation: Check if values are mostly 10-digit strings starting with '1'
+    """
+    # First pass: exact matches
+    for col in df.columns:
+        if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER', 'NPI_NUM']:
+            if validate_npi_column(df[col]):
+                return col
+
+    # Second pass: partial matches containing 'NPI'
+    potential_cols = [col for col in df.columns if 'NPI' in col.upper()]
+    for col in potential_cols:
+        if validate_npi_column(df[col]):
+            return col
+
+    return None
+
+def validate_npi_column(series):
+    """
+    Validate if a column contains NPI values:
+    - Check if majority of non-null values are 10 characters
+    - Check if majority start with '1'
+    """
+    non_null = series.dropna().astype(str)
+    if len(non_null) == 0:
+        return False
+
+    # Check length (NPIs are 10 digits)
+    ten_char_count = sum(1 for val in non_null if len(val.strip()) == 10)
+    starts_with_one = sum(1 for val in non_null if val.strip().startswith('1'))
+    is_numeric = sum(1 for val in non_null if val.strip().isdigit())
+
+    total = len(non_null)
+
+    # At least 80% should be 10 characters, start with 1, and be numeric
+    return (ten_char_count / total >= 0.8 and
+            starts_with_one / total >= 0.8 and
+            is_numeric / total >= 0.8)
+
+def find_email_column(df):
+    """
+    Find email column by checking:
+    1. Exact matches: 'EMAIL', 'EMAIL_ADDRESS', 'EMAILADDRESS'
+    2. Partial matches: any column containing 'EMAIL' or 'MAIL'
+    3. Validation: Check if values contain '@'
+    """
+    # First pass: exact matches
+    for col in df.columns:
+        col_upper = col.upper().replace(' ', '').replace('_', '')
+        if col_upper in ['EMAIL', 'EMAILADDRESS', 'MAIL']:
+            if validate_email_column(df[col]):
+                return col
+
+    # Second pass: partial matches
+    potential_cols = [col for col in df.columns if 'EMAIL' in col.upper() or 'MAIL' in col.upper()]
+    for col in potential_cols:
+        if validate_email_column(df[col]):
+            return col
+
+    return None
+
+def validate_email_column(series):
+    """
+    Validate if a column contains email addresses:
+    - Check if majority of non-null values contain '@'
+    """
+    non_null = series.dropna().astype(str)
+    if len(non_null) == 0:
+        return False
+
+    has_at_sign = sum(1 for val in non_null if '@' in val)
+    total = len(non_null)
+
+    # At least 80% should contain '@'
+    return has_at_sign / total >= 0.8
+
 @list_analysis_bp.route('/upload', methods=['POST'])
 def upload_lists():
     try:
@@ -26,31 +106,23 @@ def upload_lists():
 
         iqvia_df = pd.read_excel(iqvia_file) if iqvia_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(iqvia_file)
 
-        npi_column = None
-        for col in iqvia_df.columns:
-            if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER']:
-                npi_column = col
-                break
+        npi_column = find_npi_column(iqvia_df)
 
         if not npi_column:
-            return jsonify({'error': 'NPI column not found in IQVIA list'}), 400
+            return jsonify({'error': 'NPI column not found in IQVIA list. Please ensure the file contains a valid NPI column.'}), 400
 
-        iqvia_npis = set(iqvia_df[npi_column].dropna().astype(str).tolist())
+        iqvia_npis = set(iqvia_df[npi_column].dropna().astype(str).str.strip().tolist())
 
         target_lists_data = []
         for idx, target_file in enumerate(target_files):
             target_df = pd.read_excel(target_file) if target_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(target_file)
 
-            target_npi_column = None
-            for col in target_df.columns:
-                if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER']:
-                    target_npi_column = col
-                    break
+            target_npi_column = find_npi_column(target_df)
 
             if not target_npi_column:
-                return jsonify({'error': f'NPI column not found in target list: {target_file.filename}'}), 400
+                return jsonify({'error': f'NPI column not found in target list: {target_file.filename}. Please ensure the file contains a valid NPI column.'}), 400
 
-            target_npis = set(target_df[target_npi_column].dropna().astype(str).tolist())
+            target_npis = set(target_df[target_npi_column].dropna().astype(str).str.strip().tolist())
 
             target_lists_data.append({
                 'filename': target_file.filename,
@@ -109,6 +181,113 @@ def calculate_crossover():
             'distribution': distribution_list,
             'total_iqvia_users': len(iqvia_npis),
             'total_target_lists': total_lists
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@list_analysis_bp.route('/engagement-by-tier', methods=['POST'])
+def engagement_by_tier():
+    try:
+        data = request.json
+        iqvia_npis = set(data.get('iqvia_npis', []))
+        target_lists = data.get('target_lists', [])
+
+        if not iqvia_npis or not target_lists:
+            return jsonify({'error': 'Missing required data'}), 400
+
+        # Build NPI to lists count mapping
+        npi_to_lists = defaultdict(set)
+        for idx, target_list in enumerate(target_lists):
+            for npi in target_list.get('npis', []):
+                if npi in iqvia_npis:
+                    npi_to_lists[npi].add(idx)
+
+        # Group NPIs by tier (12/12, 11/12, etc.)
+        total_lists = len(target_lists)
+        tier_to_npis = defaultdict(list)
+
+        for npi in iqvia_npis:
+            count = len(npi_to_lists.get(npi, set()))
+            tier_to_npis[count].append(npi)
+
+        # Query user_profiles for engagement data
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        tier_results = []
+
+        for tier_count in range(total_lists, -1, -1):
+            npis_in_tier = tier_to_npis.get(tier_count, [])
+
+            if not npis_in_tier:
+                tier_results.append({
+                    'tier': f'{tier_count}/{total_lists}',
+                    'user_count': 0,
+                    'aggregate': {
+                        'avg_open_rate': 0,
+                        'avg_emails_sent': 0,
+                        'avg_emails_opened': 0,
+                        'engaged_count': 0,
+                        'engaged_percentage': 0
+                    },
+                    'users': []
+                })
+                continue
+
+            # Query user_profiles directly by NPI
+            placeholders = ','.join(['%s'] * len(npis_in_tier))
+            cursor.execute(f"""
+                SELECT email, npi, unique_open_rate, emails_sent, emails_opened
+                FROM user_profiles
+                WHERE npi IN ({placeholders})
+            """, npis_in_tier)
+
+            user_data = cursor.fetchall()
+
+            # Calculate aggregate metrics
+            total_users = len(npis_in_tier)
+            matched_users = len(user_data)
+
+            if user_data:
+                avg_open_rate = sum(float(u.get('unique_open_rate', 0) or 0) for u in user_data) / matched_users
+                avg_emails_sent = sum(int(u.get('emails_sent', 0) or 0) for u in user_data) / matched_users
+                avg_emails_opened = sum(int(u.get('emails_opened', 0) or 0) for u in user_data) / matched_users
+                engaged_count = sum(1 for u in user_data if float(u.get('unique_open_rate', 0) or 0) >= 20)
+                engaged_percentage = (engaged_count / matched_users * 100) if matched_users > 0 else 0
+            else:
+                avg_open_rate = avg_emails_sent = avg_emails_opened = engaged_count = engaged_percentage = 0
+
+            # Build individual user details (top 10 by open rate)
+            user_details = []
+            for user in sorted(user_data, key=lambda x: float(x.get('unique_open_rate', 0) or 0), reverse=True)[:10]:
+                user_details.append({
+                    'email': user.get('email'),
+                    'npi': user.get('npi'),
+                    'open_rate': round(float(user.get('unique_open_rate', 0) or 0), 2),
+                    'emails_sent': int(user.get('emails_sent', 0) or 0),
+                    'emails_opened': int(user.get('emails_opened', 0) or 0)
+                })
+
+            tier_results.append({
+                'tier': f'{tier_count}/{total_lists}',
+                'user_count': total_users,
+                'matched_count': matched_users,
+                'aggregate': {
+                    'avg_open_rate': round(avg_open_rate, 2),
+                    'avg_emails_sent': round(avg_emails_sent, 2),
+                    'avg_emails_opened': round(avg_emails_opened, 2),
+                    'engaged_count': engaged_count,
+                    'engaged_percentage': round(engaged_percentage, 2)
+                },
+                'users': user_details
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'tiers': tier_results
         }), 200
 
     except Exception as e:

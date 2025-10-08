@@ -172,91 +172,105 @@ const TemplateSelectionModal = ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: '20px'
+    padding: '20px',
+    backdropFilter: 'blur(4px)'
   };
 
   const contentStyle = {
     background: '#ffffff',
-    borderRadius: '16px',
+    borderRadius: '20px',
     width: '90%',
     maxWidth: '1200px',
     maxHeight: '90vh',
-    overflow: 'auto',
+    overflow: 'hidden',
     position: 'relative',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
-    border: '1px solid rgba(0, 0, 0, 0.08)'
+    boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)',
+    border: '2px solid #e5e7eb'
   };
 
   const headerStyle = {
-    padding: '24px 32px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+    padding: '18px 24px',
+    borderBottom: '1px solid #e5e7eb',
     background: '#ffffff',
     color: '#1f2937',
-    borderRadius: '16px 16px 0 0'
+    borderRadius: '20px 20px 0 0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   };
 
   const bodyStyle = {
-    padding: '32px',
+    padding: '36px',
     minHeight: '500px',
-    background: '#ffffff'
+    background: '#ffffff',
+    overflowY: 'auto',
+    maxHeight: 'calc(90vh - 180px)'
   };
 
   const footerStyle = {
-    padding: '20px 32px',
-    borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+    padding: '24px 36px',
+    borderTop: '2px solid #e5e7eb',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: '#f9fafb',
-    borderRadius: '0 0 16px 16px'
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+    borderRadius: '0 0 20px 20px'
   };
 
   return (
     <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={contentStyle}>
         <div style={headerStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              padding: '4px 12px',
+              background: '#f3f4f6',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#6b7280'
+            }}>
+              Step {step} of 4
+            </div>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+              {
+                step === 1 ? 'Choose Your Theme' :
+                step === 2 ? 'Select Campaign Type' :
+                step === 3 ? 'Pick Your Campaigns' :
+                'Choose Template Layout'
+              }
+            </h2>
+          </div>
           <button
             onClick={onClose}
             style={{
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              background: 'rgba(255, 255, 255, 0.2)',
+              background: 'transparent',
               border: 'none',
-              borderRadius: '50%',
               width: '32px',
               height: '32px',
-              color: '#1f2937',
-              fontSize: '18px',
+              color: '#9ca3af',
+              fontSize: '20px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              transition: 'color 0.2s ease'
             }}
+            onMouseOver={(e) => e.target.style.color = '#6b7280'}
+            onMouseOut={(e) => e.target.style.color = '#9ca3af'}
           >
             ×
           </button>
-          <p style={{ margin: '2px 0 0', opacity: 0.9, fontSize: '16px' }}>
-            Step {step} of 4: {
-              step === 1 ? 'Choose Theme' :
-              step === 2 ? 'Campaign Type' :
-              step === 3 ? 'Select Campaigns' :
-              'Choose Template'
-            }
-          </p>
         </div>
 
         <div style={bodyStyle}>
           {step === 1 && (
             <div>
-              <h3 style={{ marginBottom: '24px', fontSize: '24px', color: '#1f2937' }}>
-                Choose Your Theme
-              </h3>
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
@@ -267,50 +281,50 @@ const TemplateSelectionModal = ({
                     key={themeKey}
                     onClick={() => setSelectedTheme(themeKey)}
                     style={{
-                      border: selectedTheme === themeKey ? '2px solid #667eea' : '1px solid rgba(0, 0, 0, 0.08)',
+                      border: selectedTheme === themeKey ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                       borderRadius: '12px',
                       padding: '24px',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      background: selectedTheme === themeKey ? '#f0f7ff' : '#ffffff',
-                      boxShadow: selectedTheme === themeKey ? '0 8px 24px rgba(102, 126, 234, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      transition: 'all 0.2s ease',
+                      background: selectedTheme === themeKey ? '#eff6ff' : '#ffffff',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
                       <div style={{
                         width: '48px',
                         height: '48px',
-                        borderRadius: '6px',
+                        borderRadius: '8px',
                         background: `linear-gradient(135deg, ${themeData.colors[0]} 0%, ${themeData.colors[1]} 100%)`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#1f2937',
-                        fontWeight: 'bold',
-                        fontSize: '18px'
+                        color: '#ffffff',
+                        fontWeight: '600',
+                        fontSize: '20px'
                       }}>
                         {themeData.name.charAt(0)}
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '20px', fontWeight: '500', color: '#1f2937' }}>
+                        <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
                           {themeData.name}
                         </h4>
-                        <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px' }}>
+                        <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px', lineHeight: '1.4' }}>
                           {themeData.description}
                         </p>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {themeData.colors.map((color, index) => (
                         <div
                           key={index}
                           style={{
-                            width: '32px',
-                            height: '32px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '6px',
                             backgroundColor: color,
-                            border: '2px solid rgba(255, 255, 255, 0.8)',
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                            border: '2px solid white',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                           }}
                         />
                       ))}
@@ -323,9 +337,6 @@ const TemplateSelectionModal = ({
 
           {step === 2 && (
             <div>
-              <h3 style={{ marginBottom: '24px', fontSize: '24px', color: '#1f2937' }}>
-                Campaign Type
-              </h3>
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
@@ -334,13 +345,14 @@ const TemplateSelectionModal = ({
                 <div
                   onClick={() => setCampaignType('single')}
                   style={{
-                    border: campaignType === 'single' ? '2px solid #667eea' : '1px solid rgba(0, 0, 0, 0.08)',
+                    border: campaignType === 'single' ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                     borderRadius: '16px',
                     padding: '32px 24px',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    background: campaignType === 'single' ? '#f0f7ff' : '#ffffff',
-                    textAlign: 'center'
+                    transition: 'all 0.2s ease',
+                    background: campaignType === 'single' ? '#eff6ff' : '#ffffff',
+                    textAlign: 'center',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                   }}
                 >
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '500', color: '#1f2937' }}>
@@ -354,13 +366,14 @@ const TemplateSelectionModal = ({
                 <div
                   onClick={() => setCampaignType('multi')}
                   style={{
-                    border: campaignType === 'multi' ? '2px solid #667eea' : '1px solid rgba(0, 0, 0, 0.08)',
+                    border: campaignType === 'multi' ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                     borderRadius: '16px',
                     padding: '32px 24px',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    background: campaignType === 'multi' ? '#f0f7ff' : '#ffffff',
-                    textAlign: 'center'
+                    transition: 'all 0.2s ease',
+                    background: campaignType === 'multi' ? '#eff6ff' : '#ffffff',
+                    textAlign: 'center',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                   }}
                 >
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: '500', color: '#1f2937' }}>
@@ -376,14 +389,14 @@ const TemplateSelectionModal = ({
 
           {step === 3 && (
             <div>
-              <p style={{ marginBottom: '24px', marginTop: '0px', color: '#6b7280', fontSize: '16px' }}>
-                {campaignType === 'single' 
+              <p style={{ marginBottom: '20px', marginTop: '0px', color: '#6b7280', fontSize: '14px' }}>
+                {campaignType === 'single'
                   ? 'Choose one campaign to analyze in detail'
                   : `Select up to 8 campaigns to compare (${selectedCampaigns.length}/8 selected)`
                 }
               </p>
 
-              <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <input
                   type="text"
                   placeholder="Search campaigns"
@@ -391,15 +404,17 @@ const TemplateSelectionModal = ({
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
                     width: '95%',
-                    padding: '12px 16px',
-                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    padding: '10px 14px',
+                    border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    fontSize: '16px',
+                    fontSize: '14px',
                     outline: 'none',
-                    transition: 'border-color 0.2s ease'
+                    transition: 'border-color 0.2s ease',
+                    background: '#ffffff',
+                    color: '#111827'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                 />
               </div>
 
@@ -421,22 +436,22 @@ const TemplateSelectionModal = ({
                       key={campaign.campaign_name}
                       onClick={() => handleCampaignToggle(campaign)}
                       style={{
-                        border: isSelected ? '2px solid #667eea' : '1px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '12px',
-                        padding: '20px',
+                        border: isSelected ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '16px',
                         cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        background: isSelected ? '#f0f7ff' : '#ffffff',
-                        boxShadow: isSelected ? '0 4px 16px rgba(102, 126, 234, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.05)'
+                        transition: 'all 0.2s ease',
+                        background: isSelected ? '#eff6ff' : '#ffffff',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                         <div style={{
-                          width: '20px',
-                          height: '20px',
+                          width: '18px',
+                          height: '18px',
                           borderRadius: '50%',
-                          border: `3px solid ${isSelected ? '#667eea' : '#d1d5db'}`,
-                          background: isSelected ? '#667eea' : 'transparent',
+                          border: `2px solid ${isSelected ? '#3b82f6' : '#d1d5db'}`,
+                          background: isSelected ? '#3b82f6' : 'transparent',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -444,25 +459,25 @@ const TemplateSelectionModal = ({
                           flexShrink: 0
                         }}>
                           {isSelected && (
-                            <div style={{ 
-                              width: '6px', 
-                              height: '6px', 
-                              borderRadius: '50%', 
-                              background: 'white' 
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: 'white'
                             }} />
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <h4 style={{ 
-                            margin: '0 0 8px 0', 
-                            fontSize: '16px', 
-                            fontWeight: '500', 
-                            color: '#1f2937',
+                          <h4 style={{
+                            margin: '0 0 8px 0',
+                            fontSize: '15px',
+                            fontWeight: '600',
+                            color: '#111827',
                             wordBreak: 'break-word'
                           }}>
                             {campaign.campaign_name}
                           </h4>
-                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
                             <div>Opens: {campaign.volume_metrics?.unique_opens?.toLocaleString() || 'N/A'}</div>
                             <div>Rate: {campaign.core_metrics?.unique_open_rate?.toFixed(1) || 'N/A'}%</div>
                           </div>
@@ -484,12 +499,12 @@ const TemplateSelectionModal = ({
               </div>
 
               {filteredCampaigns.length === 0 && (
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '40px', 
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px',
                   color: '#6b7280',
                   background: '#f9fafb',
-                  borderRadius: '6px'
+                  borderRadius: '8px'
                 }}>
                   No campaigns found matching "{searchTerm}"
                 </div>
@@ -499,9 +514,6 @@ const TemplateSelectionModal = ({
 
           {step === 4 && (
             <div>
-              <h3 style={{ marginBottom: '24px', marginTop: '0px', fontSize: '24px', color: '#1f2937' }}>
-                Choose Template Layout
-              </h3>
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', 
@@ -514,14 +526,14 @@ const TemplateSelectionModal = ({
                     key={template.id}
                     onClick={() => setSelectedTemplate(template)}
                     style={{
-                      border: selectedTemplate?.id === template.id ? '2px solid #667eea' : '1px solid rgba(0, 0, 0, 0.08)',
-                      borderRadius: '16px',
+                      border: selectedTemplate?.id === template.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                      borderRadius: '12px',
                       cursor: 'pointer',
                       width: '97%',
-                      transition: 'all 0.3s ease',
-                      background: selectedTemplate?.id === template.id ? '#f0f7ff' : '#ffffff',
+                      transition: 'all 0.2s ease',
+                      background: selectedTemplate?.id === template.id ? '#eff6ff' : '#ffffff',
                       overflow: 'hidden',
-                      boxShadow: selectedTemplate?.id === template.id ? '0 8px 24px rgba(102, 126, 234, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.05)'
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
                     <div
@@ -541,22 +553,22 @@ const TemplateSelectionModal = ({
                     </div>
 
                     <div style={{ padding: '20px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '500', color: '#1f2937' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: '#111827' }}>
                         {template.name}
                       </h4>
-                      <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
                         {template.description}
                       </p>
                       <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                         {template.features.map((feature, index) => (
-                          <li key={index} style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '4px', 
-                            paddingLeft: '16px', 
-                            position: 'relative' 
+                          <li key={index} style={{
+                            fontSize: '13px',
+                            color: '#6b7280',
+                            marginBottom: '4px',
+                            paddingLeft: '16px',
+                            position: 'relative'
                           }}>
-                            <span style={{ position: 'absolute', left: 0, color: '#667eea', fontWeight: 'bold' }}>•</span>
+                            <span style={{ position: 'absolute', left: 0, color: '#3b82f6' }}>•</span>
                             {feature}
                           </li>
                         ))}
@@ -577,14 +589,16 @@ const TemplateSelectionModal = ({
                 style={{
                   padding: '10px 20px',
                   background: '#ffffff',
-                  color: '#1f2937',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'background 0.2s ease'
                 }}
+                onMouseOver={(e) => e.target.style.background = '#f9fafb'}
+                onMouseOut={(e) => e.target.style.background = '#ffffff'}
               >
                 Back
               </button>
@@ -598,21 +612,20 @@ const TemplateSelectionModal = ({
                 disabled={!canProceed()}
                 style={{
                   padding: '10px 24px',
-                  background: canProceed() ? '#667eea' : '#4a4a4d',
-                  color: '#1f2937',
+                  background: canProceed() ? '#1a4d7a' : '#555',
+                  color: 'white',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: canProceed() ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s ease',
-                  opacity: canProceed() ? 1 : 0.5
+                  transition: 'background 0.2s ease'
                 }}
                 onMouseOver={(e) => {
-                  if (canProceed()) e.target.style.background = '#5568d3';
+                  if (canProceed()) e.target.style.background = '#143d61';
                 }}
                 onMouseOut={(e) => {
-                  if (canProceed()) e.target.style.background = '#667eea';
+                  if (canProceed()) e.target.style.background = '#1a4d7a';
                 }}
               >
                 Next
@@ -623,21 +636,20 @@ const TemplateSelectionModal = ({
                 disabled={!canProceed()}
                 style={{
                   padding: '10px 24px',
-                  background: canProceed() ? '#10b981' : '#4a4a4d',
-                  color: '#1f2937',
+                  background: canProceed() ? '#1a4d7a' : '#555',
+                  color: 'white',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: canProceed() ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s ease',
-                  opacity: canProceed() ? 1 : 0.5
+                  transition: 'background 0.2s ease'
                 }}
                 onMouseOver={(e) => {
-                  if (canProceed()) e.target.style.background = '#059669';
+                  if (canProceed()) e.target.style.background = '#143d61';
                 }}
                 onMouseOut={(e) => {
-                  if (canProceed()) e.target.style.background = '#10b981';
+                  if (canProceed()) e.target.style.background = '#1a4d7a';
                 }}
               >
                 Generate Dashboard

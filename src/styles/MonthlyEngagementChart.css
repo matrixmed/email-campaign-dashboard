@@ -1,0 +1,110 @@
+.monthly-chart-container {
+  background: var(--color-bg-card, #2a2a2d);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #333336);
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chart-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.line-chart {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+.chart-area {
+  display: flex;
+  gap: 1rem;
+  min-height: 500px;
+  margin-bottom: 2rem;
+}
+
+.y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 1rem;
+  color: #8a8a8a;
+  font-size: 0.85rem;
+  min-width: 40px;
+}
+
+.y-label {
+  text-align: right;
+}
+
+.chart-grid {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+  border-left: 2px solid #444;
+  border-bottom: 2px solid #444;
+  padding: 1rem 0 0 1rem;
+  position: relative;
+}
+
+.month-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.data-points {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  position: relative;
+  justify-content: center;
+}
+
+.data-point {
+  width: 20px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  cursor: pointer;
+  min-height: 2px;
+}
+
+.x-label {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #8a8a8a;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #444;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-color {
+  width: 20px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend-item span:last-child {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 500;
+}

@@ -401,21 +401,21 @@ body.space-theme .campaign-details {
 
 /* Scrollbar Styling - IMPROVED FOR MODAL */
 body.space-theme .campaign-modal::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 body.space-theme .campaign-modal::-webkit-scrollbar-track {
-  background: rgba(30, 30, 50, 0.5);
-  border-radius: 4px;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.space-theme .campaign-modal::-webkit-scrollbar-thumb {
-  background: rgba(103, 58, 183, 0.7);
-  border-radius: 4px;
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.space-theme .campaign-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(103, 58, 183, 0.9);
+  background: #6b7280;
 }
 
 /* Deployment number */
@@ -600,22 +600,22 @@ body.space-theme .sample-queries li:hover {
 
 /* Space theme scrollbars */
 body.space-theme ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 body.space-theme ::-webkit-scrollbar-track {
-  background: rgba(30, 30, 50, 0.5);
-  border-radius: 4px;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.space-theme ::-webkit-scrollbar-thumb {
-  background: rgba(103, 58, 183, 0.7);
-  border-radius: 4px;
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.space-theme ::-webkit-scrollbar-thumb:hover {
-  background: rgba(103, 58, 183, 0.9);
+  background: #6b7280;
 }
 
 /* Theme selector dropdown */

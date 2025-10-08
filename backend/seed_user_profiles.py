@@ -3,8 +3,20 @@ import os
 from dotenv import load_dotenv
 from models import get_session, UserProfile, CampaignInteraction
 from datetime import datetime
+import math
 
 load_dotenv()
+
+def clean_nan(obj):
+    """Recursively clean NaN values from dictionaries and lists"""
+    if isinstance(obj, dict):
+        return {k: clean_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan(item) for item in obj]
+    elif isinstance(obj, float) and math.isnan(obj):
+        return None
+    else:
+        return obj
 
 def seed_user_profiles():
     print("Starting user_profiles data migration...")
@@ -23,19 +35,25 @@ def seed_user_profiles():
         processed = 0
 
         for email, user_data in data.items():
+            if not isinstance(user_data, dict):
+                continue
+
+            # Clean NaN values from campaigns data
+            campaigns_data = clean_nan(user_data.get('campaigns', {}))
+
             user_profile = UserProfile(
                 contact_id=user_data.get('contact_id'),
                 email=email,
-                first_name=user_data.get('first_name'),
-                last_name=user_data.get('last_name'),
-                specialty=user_data.get('specialty'),
+                first_name=user_data.get('first_name') if not (isinstance(user_data.get('first_name'), float) and math.isnan(user_data.get('first_name'))) else None,
+                last_name=user_data.get('last_name') if not (isinstance(user_data.get('last_name'), float) and math.isnan(user_data.get('last_name'))) else None,
+                specialty=user_data.get('specialty') if not (isinstance(user_data.get('specialty'), float) and math.isnan(user_data.get('specialty'))) else None,
                 degree=user_data.get('degree'),
                 address=user_data.get('address'),
-                city=user_data.get('city'),
+                city=user_data.get('city') if not (isinstance(user_data.get('city'), float) and math.isnan(user_data.get('city'))) else None,
                 state=user_data.get('state'),
                 zipcode=user_data.get('zipcode'),
-                country=user_data.get('country'),
-                campaigns_data=user_data.get('campaigns', {})
+                country=user_data.get('country') if not (isinstance(user_data.get('country'), float) and math.isnan(user_data.get('country'))) else None,
+                campaigns_data=campaigns_data
             )
 
             batch.append(user_profile)

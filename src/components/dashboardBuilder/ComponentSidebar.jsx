@@ -917,7 +917,6 @@ const ComponentSidebar = ({
                         </button>
                         <button
                           onClick={async () => {
-                            if (!window.confirm('Delete this dashboard?')) return;
                             try {
                               const response = await fetch(`${API_BASE_URL}/api/dashboards/${dashboard.id}`, {
                                 method: 'DELETE'
@@ -927,7 +926,7 @@ const ComponentSidebar = ({
                                 fetchSavedDashboards();
                               }
                             } catch (error) {
-                              alert('Error deleting dashboard: ' + error.message);
+                              console.error('Error deleting dashboard:', error.message);
                             }
                           }}
                           style={{

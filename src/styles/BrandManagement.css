@@ -2,10 +2,28 @@
   padding: 0;
 }
 
-.brand-management .header-spacer {
-  width: 350px;
-  margin-right: 40px;
-  height: calc(1rem + 26px + 2px);
+.brand-management .search-container {
+  width: 384px !important;
+  margin-right: 6px;
+  flex: none;
+}
+
+.brand-management .search-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  background: var(--color-bg-elevated, #222224);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-primary, #ffffff);
+  transition: all 0.2s ease;
+}
+
+.brand-management .search-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #0ff);
+  background: var(--color-bg-secondary, #141416);
 }
 
 .brand-section {
@@ -37,22 +55,6 @@
   font-family: var(--font-heading, 'Lora', serif);
 }
 
-.add-btn {
-  padding: 6px 16px;
-  background: var(--color-success, #10b981);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.add-btn:hover {
-  background: #059669;
-}
-
 .table-wrapper {
   overflow-x: auto;
 }
@@ -61,23 +63,30 @@
 .reports-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 18px;
+  table-layout: auto;
 }
 
 .brand-table thead th,
 .reports-table thead th {
-  padding: 12px;
-  text-align: left;
+  padding: 16px;
   background: #333;
   color: #0ff;
   font-weight: 600;
+  font-size: 18px;
   border-bottom: 1px solid #444;
+}
+
+.brand-table thead th:not(:last-child),
+.reports-table thead th:not(:last-child) {
+  text-align: left;
 }
 
 .brand-table tbody tr,
 .reports-table tbody tr {
   background: var(--color-bg-card, #2a2a2d);
   border-bottom: 1px solid var(--color-border, #333336);
+  transition: all 0.2s ease;
 }
 
 .brand-table tbody tr:nth-child(odd),
@@ -97,25 +106,33 @@
 
 .brand-table td,
 .reports-table td {
-  padding: 12px;
+  padding: 14px 16px;
   cursor: pointer;
   vertical-align: middle;
   color: var(--color-text-primary, #ffffff);
   border-bottom: 1px solid var(--color-border, #333336);
+  font-size: 18px;
 }
 
-.brand-table td.editing {
+.brand-table td.editing,
+.reports-table td.editing {
   padding: 0;
+}
+
+.brand-table td.actions-cell,
+.reports-table td.actions-cell {
+  cursor: default;
 }
 
 .cell-input {
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border: 2px solid var(--color-accent, #0ff);
   background: var(--color-bg-elevated, #222224);
   color: var(--color-text-primary, #ffffff);
-  font-size: 14px;
+  font-size: 18px;
   font-family: inherit;
+  transition: all 0.2s ease;
 }
 
 .cell-input:focus {
@@ -123,19 +140,95 @@
   border-color: var(--color-accent-dark, #00cccc);
 }
 
-.delete-btn {
-  padding: 4px 12px;
-  background: var(--color-error, #ef4444);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
+.agency-section-header {
+  background: #1a1a1c !important;
 }
 
-.delete-btn:hover {
-  background: #dc2626;
+.agency-section-title {
+  padding: 16px !important;
+  color: #0ff;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: default !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agency-count {
+  color: #888;
+  font-weight: normal;
+  font-size: 16px;
+}
+
+.add-brand-button {
+  padding: 8px 16px;
+  background: rgba(0, 255, 255, 0.15);
+  color: #0ff;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: absolute;
+  right: 16px;
+}
+
+.add-brand-button:hover {
+  background: rgba(0, 255, 255, 0.25);
+  border-color: rgba(0, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.delete-button {
+  padding: 7px 14px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-button:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+}
+
+.move-dropdown {
+  padding: 7px 12px;
+  background: rgba(51, 87, 146, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  max-width: 110px;
+}
+
+.move-dropdown:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.move-dropdown option {
+  background: #1a1a1c;
+  color: #fff;
+}
+
+.agency-divider {
+  height: 12px;
+  background: transparent !important;
+}
+
+.agency-divider td {
+  border: none !important;
+  padding: 0 !important;
 }
 
 .empty-msg {

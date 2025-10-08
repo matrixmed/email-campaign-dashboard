@@ -261,23 +261,22 @@ body.marble-theme .tooltip-top::before {
 
 /* Scrollbars */
 body.marble-theme ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 body.marble-theme ::-webkit-scrollbar-track {
-  background: rgba(240, 240, 240, 0.5);
-  border-radius: 4px;
+  background-color: #e5e7eb;
+  border-radius: 5px;
 }
 
 body.marble-theme ::-webkit-scrollbar-thumb {
-  background: rgba(200, 200, 200, 0.7);
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: #9ca3af;
+  border-radius: 5px;
 }
 
 body.marble-theme ::-webkit-scrollbar-thumb:hover {
-  background: rgba(180, 180, 180, 0.9);
+  background: #6b7280;
 }
 
 /* Sample query lists */

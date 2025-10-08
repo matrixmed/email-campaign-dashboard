@@ -778,3 +778,301 @@ body.light .clicks-section {
     height: 20px;
   }
 }
+
+/* Upload Modal Styles */
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10002;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.upload-modal-content {
+  background-color: #2a2a2d;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
+  border: 1px solid #444;
+  animation: slideIn 0.3s ease-out;
+}
+
+.upload-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  border-bottom: 2px solid #444;
+  background-color: #333;
+}
+
+.upload-modal-header h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #0ff;
+}
+
+.upload-modal-close {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 32px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.upload-modal-close:hover {
+  background-color: #444;
+  color: #fff;
+}
+
+.upload-modal-body {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upload-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  display: block;
+}
+
+.dropbox {
+  border: 2px dashed #555;
+  border-radius: 8px;
+  padding: 30px;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropbox:hover {
+  border-color: #0ff;
+  background-color: rgba(0, 255, 255, 0.05);
+}
+
+.dropbox.drag-active {
+  border-color: #0ff;
+  background-color: rgba(0, 255, 255, 0.1);
+  border-style: solid;
+  transform: scale(1.02);
+}
+
+.dropbox.has-file {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.dropbox-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.dropbox-icon {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+.dropbox-text {
+  font-size: 15px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.dropbox-hint {
+  font-size: 12px;
+  color: #777;
+  font-style: italic;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 15px;
+}
+
+.file-name {
+  color: #0ff;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-file {
+  padding: 6px 14px;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.remove-file:hover {
+  background-color: #dc2626;
+  transform: scale(1.05);
+}
+
+.upload-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px 30px;
+  border-top: 2px solid #444;
+  background-color: #333;
+}
+
+.upload-btn-cancel,
+.upload-btn-submit {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-btn-cancel {
+  background-color: #555;
+  color: #fff;
+}
+
+.upload-btn-cancel:hover {
+  background-color: #666;
+}
+
+.upload-btn-submit {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.upload-btn-submit:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.upload-btn-submit:disabled {
+  background: #666;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Light Theme for Upload Modal */
+body.light .upload-modal-content {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+}
+
+body.light .upload-modal-header {
+  background-color: #f9fafb;
+  border-bottom-color: #e5e7eb;
+}
+
+body.light .upload-modal-header h3 {
+  color: #0077ff;
+}
+
+body.light .upload-modal-close {
+  color: #6b7280;
+}
+
+body.light .upload-modal-close:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+body.light .upload-label {
+  color: #1f2937;
+}
+
+body.light .dropbox {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+body.light .dropbox:hover {
+  border-color: #0077ff;
+  background-color: rgba(0, 119, 255, 0.05);
+}
+
+body.light .dropbox.drag-active {
+  border-color: #0077ff;
+  background-color: rgba(0, 119, 255, 0.1);
+}
+
+body.light .dropbox.has-file {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+body.light .dropbox-text {
+  color: #6b7280;
+}
+
+body.light .dropbox-hint {
+  color: #9ca3af;
+}
+
+body.light .file-name {
+  color: #0077ff;
+}
+
+body.light .upload-modal-footer {
+  background-color: #f9fafb;
+  border-top-color: #e5e7eb;
+}
+
+body.light .upload-btn-cancel {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+body.light .upload-btn-cancel:hover {
+  background-color: #d1d5db;
+}

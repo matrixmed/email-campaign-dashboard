@@ -28,13 +28,11 @@ const InsightsSection = ({
 
     const handleGenerateChart = () => {
         if (!selectedMetric || !selectedChartType || selectedSubjects.every(subject => !subject)) {
-            alert("Please fill out all parameters before generating the chart.");
             return;
         }
 
         const validSubjects = selectedSubjects.filter(subject => subject);
         if (validSubjects.length === 0) {
-            alert("Please select at least one valid subject.");
             return;
         }
 

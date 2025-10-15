@@ -1,6 +1,3 @@
-/* Main Audience Section Styles - Matching SpecialtySection */
-
-/* Skeleton Loading Styles */
 .skeleton-row {
     opacity: 0.7;
 }
@@ -157,7 +154,6 @@
     transform: translateX(4px);
 }
 
-/* Password Modal Styles - Matching App Theme */
 .password-modal-overlay {
     position: fixed;
     top: 0;
@@ -285,7 +281,6 @@
     cursor: not-allowed;
 }
 
-/* User List Modal Styles - Matching App Theme */
 .user-list-modal-overlay {
     position: fixed;
     top: 0;
@@ -507,7 +502,6 @@
     font-size: 0.85rem;
 }
 
-/* User Profile Modal Styles */
 .user-profile-modal-overlay {
     position: fixed;
     top: 0;
@@ -806,7 +800,6 @@
     padding: 2rem;
 }
 
-/* Pagination Controls */
 .pagination-controls {
     display: flex;
     justify-content: center;
@@ -850,9 +843,6 @@
     text-align: center;
 }
 
-/* All components now use consistent dark theme by default */
-
-/* Responsive Design */
 @media (max-width: 768px) {
     .audience-breakdown {
         padding: 1rem;

@@ -40,10 +40,7 @@ const TableComponent = ({
       if (config.customData.headers && config.customData.rows) {
         setTableData([config.customData.headers, ...config.customData.rows]);
       } else if (Array.isArray(config.customData)) {
-        if (isCampaignComparisonTable && config.headers && !Array.isArray(config.customData[0])) {
-          setTableData([config.headers, ...config.customData]);
-        } else if (isCampaignComparisonTable && config.headers && config.customData.length > 0 && 
-                   config.customData[0].length > 0 && config.customData[0][0] !== 'Campaign Name') {
+        if (isCampaignComparisonTable && config.headers) {
           setTableData([config.headers, ...config.customData]);
         } else {
           setTableData(config.customData);
@@ -227,8 +224,8 @@ const TableComponent = ({
   }, [tableData, onEdit, id]);
 
   const handleDeleteRow = useCallback((rowIndex) => {
-    if (rowIndex === 0) return; // Don't allow deleting header row
-    if (tableData.length <= 2) return; // Keep at least one data row + header
+    if (rowIndex === 0) return; 
+    if (tableData.length <= 2) return; 
     
     const newData = tableData.filter((_, index) => index !== rowIndex);
     setTableData(newData);
@@ -246,7 +243,7 @@ const TableComponent = ({
   }, []);
 
   const handleRowRightClick = useCallback((e, rowIndex) => {
-    if (rowIndex === 0) return; // No context menu for header row
+    if (rowIndex === 0) return;
     
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -398,7 +395,6 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
-  // Close context menu when clicking elsewhere
   useEffect(() => {
     if (contextMenu) {
       const handleClickOutside = () => setContextMenu(null);

@@ -82,6 +82,11 @@
   text-align: left;
 }
 
+.brand-table thead th:last-child,
+.reports-table thead th:last-child {
+  text-align: right !important;
+}
+
 .brand-table tbody tr,
 .reports-table tbody tr {
   background: var(--color-bg-card, #2a2a2d);

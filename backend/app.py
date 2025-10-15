@@ -21,6 +21,7 @@ from routes.database import db_bp
 from routes.dashboards import dashboards_bp
 from routes.campaigns import campaigns_bp
 from routes.cmi_contracts import cmi_contracts_bp
+from routes.cmi_reports import cmi_reports_bp
 from routes.brand_management import brand_management_bp
 from routes.users import users_bp
 from routes.list_analysis import list_analysis_bp
@@ -30,6 +31,7 @@ app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
 app.register_blueprint(campaigns_bp, url_prefix='/api/campaigns')
 app.register_blueprint(cmi_contracts_bp, url_prefix='/api/cmi-contracts')
+app.register_blueprint(cmi_reports_bp, url_prefix='/api/cmi')
 app.register_blueprint(brand_management_bp, url_prefix='/api/brand-management')
 app.register_blueprint(users_bp, url_prefix='/api/users')
 app.register_blueprint(list_analysis_bp, url_prefix='/api/list-analysis')

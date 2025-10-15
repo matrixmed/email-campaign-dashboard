@@ -91,18 +91,38 @@
 }
 
 .video-metrics-table .title-column {
-  width: 55%; /* Make title column wider */
+  max-width: 600px;
+  width: 600px;
   text-align: left;
-  padding-right: 15px;
+  position: relative;
+}
+
+@media (min-width: 1800px) {
+  .video-metrics-table .title-column {
+    max-width: 800px;
+    width: 800px;
+  }
+}
+
+.video-metrics-table .title-column .journal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  cursor: pointer;
+}
+
+.video-metrics-table .title-column .journal-title:hover {
+  color: #0ff;
 }
 
 .video-metrics-table .source-column {
-  width: 10%;
+  width: auto;
   text-align: center;
 }
 
 .video-metrics-table .metric-column {
-  width: 11.66%;
+  width: auto;
   text-align: right;
   padding-right: 15px;
 }
@@ -112,12 +132,16 @@
   color: #0ff;
   padding: 12px;
   font-weight: 600;
+  font-size: 16px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444;
 }
 
 .video-metrics-table td {
   padding: 12px;
   color: #fff;
+  font-size: 15px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444;
 }
 
@@ -137,7 +161,6 @@
   background-color: var(--color-bg-card, #2a2a2d);
 }
 
-/* Source badges */
 .source-badge {
   display: inline-block;
   padding: 3px 6px;
@@ -195,7 +218,6 @@ body.light .video-metrics-table tr:hover {
     animation: fadeIn 0.2s ease-out;
   }
   
-  /* Modal Container */
   .video-modal {
     background-color: #222;
     width: 90%;
@@ -209,7 +231,6 @@ body.light .video-metrics-table tr:hover {
     animation: slideIn 0.3s ease-out;
   }
   
-  /* Modal Header */
   .video-modal-header {
     display: flex;
     justify-content: space-between;
@@ -261,7 +282,6 @@ body.light .video-metrics-table tr:hover {
     background: #777;
   }
   
-  /* Video Thumbnail Preview */
   .video-preview-container {
     display: flex;
     gap: 20px;
@@ -347,7 +367,6 @@ body.light .video-metrics-table tr:hover {
     align-items: center;
   }
   
-  /* Controls Section */
   .video-modal-controls {
     display: flex;
     justify-content: flex-end;
@@ -372,7 +391,6 @@ body.light .video-metrics-table tr:hover {
     border-radius: 4px;
   }
   
-  /* Metrics Cards */
   .video-modal-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -399,7 +417,6 @@ body.light .video-metrics-table tr:hover {
     font-weight: bold;
   }
   
-  /* Charts & Data */
   .video-modal-charts {
     margin-bottom: 25px;
   }
@@ -417,7 +434,6 @@ body.light .video-metrics-table tr:hover {
     margin-bottom: 15px;
   }
   
-  /* Charts grid for traffic sources and playback locations */
   .charts-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -457,7 +473,6 @@ body.light .video-metrics-table tr:hover {
     font-size: 14px;
   }
   
-  /* Daily performance table */
   .video-modal-daily {
     background-color: #2a2a2d;
     border-radius: 6px;
@@ -498,7 +513,6 @@ body.light .video-metrics-table tr:hover {
     border-bottom: none;
   }
   
-  /* Positive/negative subscribers styling */
   .positive-subs {
     color: #0f0;
   }
@@ -507,7 +521,6 @@ body.light .video-metrics-table tr:hover {
     color: #f00;
   }
   
-  /* Video description section */
   .video-modal-description {
     background-color: #2a2a2d;
     border-radius: 6px;
@@ -523,7 +536,6 @@ body.light .video-metrics-table tr:hover {
     overflow-y: auto;
   }
   
-  /* No data message */
   .no-data-message {
     padding: 30px;
     text-align: center;
@@ -533,7 +545,6 @@ body.light .video-metrics-table tr:hover {
     margin: 20px 0;
   }
   
-  /* Animation Keyframes */
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -544,7 +555,6 @@ body.light .video-metrics-table tr:hover {
     to { transform: translateY(0); opacity: 1; }
   }
   
-  /* Source Badge */
   .source-badge {
     display: inline-block;
     padding: 3px 6px;
@@ -565,7 +575,6 @@ body.light .video-metrics-table tr:hover {
     color: white;
   }
   
-  /* Light Theme Adjustments */
   body.light .video-modal {
     background-color: #fff;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
@@ -682,7 +691,6 @@ body.light .video-metrics-table tr:hover {
     color: #fff;
   }
   
-  /* Mobile responsiveness */
   @media (max-width: 768px) {
     .video-modal {
       width: 95%;

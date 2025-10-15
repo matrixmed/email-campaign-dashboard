@@ -159,36 +159,74 @@ h1 {
   overflow-x: auto;
 }
  
-table {
+.dashboard-container table,
+.table-section table,
+.chart-section table,
+.insights-section table,
+.live-campaign-metrics table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th, td {
+.dashboard-container th, .dashboard-container td,
+.table-section th, .table-section td,
+.chart-section th, .chart-section td,
+.insights-section th, .insights-section td {
   padding: 12px !important;
   text-align: left !important;
   border-bottom: 1px solid #444 !important;
+  font-family: var(--font-body, 'Rubik', sans-serif) !important;
 }
 
-th {
+
+.live-campaign-metrics th, .live-campaign-metrics td {
+  padding: 6px !important;
+  text-align: left !important;
+  border-bottom: 1px solid #444 !important;
+  font-family: var(--font-body, 'Rubik', sans-serif) !important;
+}
+
+.dashboard-container th,
+.table-section th,
+.chart-section th,
+.insights-section th,
+.live-campaign-metrics th {
   background-color: #333 !important;
   color: #0ff !important;
   font-weight: 600 !important;
+  font-size: 14px !important;
 }
 
-td {
+.dashboard-container td,
+.table-section td,
+.chart-section td,
+.insights-section td,
+.live-campaign-metrics td {
   color: #fff !important;
+  font-size: 15px !important;
 }
 
-tbody tr:nth-child(even) {
+.dashboard-container tbody tr:nth-child(even),
+.table-section tbody tr:nth-child(even),
+.chart-section tbody tr:nth-child(even),
+.insights-section tbody tr:nth-child(even),
+.live-campaign-metrics tbody tr:nth-child(even) {
   background-color: #2a2a2d !important;
 }
 
-tbody tr:nth-child(odd) {
+.dashboard-container tbody tr:nth-child(odd),
+.table-section tbody tr:nth-child(odd),
+.chart-section tbody tr:nth-child(odd),
+.insights-section tbody tr:nth-child(odd),
+.live-campaign-metrics tbody tr:nth-child(odd) {
   background-color: #222 !important;
 }
 
-tr:hover {
+.dashboard-container tr:hover,
+.table-section tr:hover,
+.chart-section tr:hover,
+.insights-section tr:hover,
+.live-campaign-metrics tr:hover {
   background-color: #2a2a2d !important;
 }
  
@@ -394,7 +432,6 @@ body.light .rows-control select {
   transform: rotate(45deg);
 }
 
-/* Campaign Selection Styles */
 .select-column {
   width: 50px;
   text-align: center;
@@ -441,7 +478,6 @@ body.light tr.selected-row:hover {
   background-color: rgba(0, 119, 255, 0.15) !important;
 }
 
-/* Compare Button */
 .compare-control {
   margin-left: auto;
 }
@@ -776,7 +812,6 @@ body.light .dropdown-arrow svg {
   max-height: 500px; 
 }
 
-/* Light theme styles */
 body.light {
   background-color: #f9f9f9;
   color: #222;
@@ -918,7 +953,6 @@ body.light .metric-selection-row button:hover {
   background-color: #004085;
 }
 
-/* Page Loader Styles */
 .loading {
   display: flex;
   flex-direction: column;
@@ -989,19 +1023,16 @@ body.light .metric-selection-row button:hover {
   }
 }
 
-/* width */
 ::-webkit-scrollbar {
   width: 10px;
   height: 5px;
 }
 
-/* Track */
 ::-webkit-scrollbar-track {
   background-color: #e5e7eb;
   border-radius: 5px;
 }
 
-/* Handle */
 ::-webkit-scrollbar-thumb {
   background: #434347;
   border-radius: 5px;

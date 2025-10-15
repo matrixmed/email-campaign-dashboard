@@ -30,8 +30,8 @@ const ComponentSidebar = ({
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
-  const [customTableRows, setCustomTableRows] = useState(3);
-  const [customTableCols, setCustomTableCols] = useState(3);
+  const [customTableRows, setCustomTableRows] = useState(2);
+  const [customTableCols, setCustomTableCols] = useState(2);
 
   const [savedDashboards, setSavedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
@@ -120,8 +120,8 @@ const ComponentSidebar = ({
   }, [selectedCampaign, campaigns, onAddComponent]);
 
   const handleAddCustomTable = useCallback(() => {
-    const rows = Math.max(2, Math.min(10, customTableRows)); 
-    const cols = Math.max(2, Math.min(8, customTableCols)); 
+    const rows = Math.max(1, Math.min(8, customTableRows));
+    const cols = Math.max(1, Math.min(8, customTableCols)); 
     
     const tableData = [];
     for (let i = 0; i < rows; i++) {
@@ -722,16 +722,15 @@ const ComponentSidebar = ({
                 }}>
                   <div style={{ marginBottom: '8px' }}>
                     <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                      Rows (2-10):
+                      Rows (1-8):
                     </label>
                     <input
                       type="range"
-                      min="2"
-                      max="10"
+                      min="1"
+                      max="8"
                       value={customTableRows}
                       onChange={(e) => setCustomTableRows(parseInt(e.target.value))}
                       style={{
-                        width: '100%',
                         marginBottom: '4px'
                       }}
                     />
@@ -742,16 +741,15 @@ const ComponentSidebar = ({
                   
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                      Columns (2-8):
+                      Columns (1-8):
                     </label>
                     <input
                       type="range"
-                      min="2"
+                      min="1"
                       max="8"
                       value={customTableCols}
                       onChange={(e) => setCustomTableCols(parseInt(e.target.value))}
                       style={{
-                        width: '100%',
                         marginBottom: '4px'
                       }}
                     />

@@ -124,3 +124,33 @@
     font-size: 0.75rem;
   }
 }
+
+.table-section table th {
+  font-size: 16px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+}
+
+.table-section table td {
+  font-size: 15px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+}
+
+.table-section .campaign-column {
+  max-width: 400px;
+  width: 400px;
+}
+
+.table-section .campaign-column-with-tooltip {
+  position: relative;
+}
+
+.table-section .campaign-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.table-section .campaign-text:hover {
+  color: #0ff;
+}

@@ -203,7 +203,6 @@ const SpecialtyKPIStrips = ({
   }, [handleEdit]);
 
   const formatSpecialtyName = (name) => {
-    // Always return the full name - no truncation
     return name;
   };
 
@@ -513,8 +512,8 @@ const SpecialtyKPIStrips = ({
                   {engagementRate}%
                 </div>
                 
-                {deltaText && (
-                  <div style={{ 
+                {deltaText && delta > 0 && (
+                  <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '2px',

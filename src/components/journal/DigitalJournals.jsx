@@ -464,7 +464,7 @@ const DigitalJournals = () => {
                         {currentRows.map((item, index) => (
                             <tr key={index}>
                                 <td
-                                    className="journal-title"
+                                    className="journal-title-column journal-title"
                                     onClick={() => handleJournalClick(item)}
                                 >
                                     {getDisplayTitle(item)}

@@ -256,7 +256,7 @@ const VideoMetrics = () => {
                         {currentRows.map((item, index) => (
                             <tr key={index}>
                                 <td
-                                    className="journal-title"
+                                    className="title-column journal-title"
                                     onClick={() => openVideoModal(item)}
                                 >
                                     {item.title}

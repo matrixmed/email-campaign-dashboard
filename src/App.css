@@ -148,39 +148,6 @@ select:focus {
   border-color: var(--color-border-focus);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-th {
-  background-color: #333 !important;
-  color: #0ff !important;
-  padding: 12px !important;
-  text-align: left !important;
-  font-weight: 600 !important;
-  border-bottom: 1px solid #444 !important;
-}
-
-td {
-  padding: 12px !important;
-  color: #fff !important;
-  border-bottom: 1px solid #444 !important;
-}
-
-tr:nth-child(even) {
-  background-color: #2a2a2d !important;
-}
-
-tr:nth-child(odd) {
-  background-color: #222 !important;
-}
-
-tr:hover {
-  background-color: #2a2a2d !important;
-}
-
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-text-primary);

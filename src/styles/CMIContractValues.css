@@ -30,53 +30,89 @@
   color: var(--color-text-tertiary, #8a8a8a);
 }
 
-.cmi-controls {
+.cmi-controls-top {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 24px;
-  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 25px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 0;
 }
 
 .cmi-btn {
-  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: none;
   border: none;
-  border-radius: 6px;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  white-space: nowrap;
+  position: relative;
 }
 
 .cmi-btn-add {
-  background: var(--color-success, #10b981);
-  color: white;
+  color: #10b981;
+  background-color: rgba(16, 185, 129, 0.1);
 }
 
 .cmi-btn-add:hover {
-  background: #059669;
+  background-color: rgba(16, 185, 129, 0.2);
+  border-bottom: 2px solid #10b981;
 }
 
 .cmi-btn-export {
-  background: #333;
   color: #0ff;
+  background-color: rgba(0, 255, 255, 0.1);
 }
 
 .cmi-btn-export:hover {
-  background: #444;
+  background-color: rgba(0, 255, 255, 0.2);
+  border-bottom: 2px solid #0ff;
+}
+
+.cmi-table-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--color-bg-card, #2a2a2d);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.cmi-table-container::-webkit-scrollbar {
+  height: 12px;
+}
+
+.cmi-table-container::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 6px;
+}
+
+.cmi-table-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 6px;
+}
+
+.cmi-table-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
 .cmi-table-wrapper {
-  background: var(--color-bg-card, #2a2a2d);
-  border-radius: 8px;
-  border: 1px solid var(--color-border, #333336);
-  overflow-x: auto;
+  min-width: min-content;
 }
 
 .cmi-table {
-  width: 100%;
+  width: auto;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: auto;
 }
 
 .cmi-table thead {
@@ -87,15 +123,17 @@
 }
 
 .cmi-table th {
-  padding: 12px;
+  padding: 12px 16px;
   text-align: left;
   color: #0ff;
   font-weight: 600 !important;
+  font-size: 16px !important;
+  font-family: var(--font-body, 'Rubik', sans-serif) !important;
   cursor: pointer;
   user-select: none;
-  white-space: nowrap;
   background: #333 !important;
   border-bottom: 1px solid #444 !important;
+  white-space: nowrap;
 }
 
 .cmi-table th:last-child {
@@ -125,19 +163,32 @@
 }
 
 .cmi-table td {
-  padding: 12px !important;
+  padding: 12px 16px !important;
   cursor: pointer;
   vertical-align: top;
   color: #fff !important;
   border-bottom: 1px solid #444 !important;
+  font-size: 15px !important;
+  font-family: var(--font-body, 'Rubik', sans-serif) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+}
+
+.cmi-table td:hover {
+  white-space: normal;
+  overflow: visible;
 }
 
 .cmi-table td.editing {
   padding: 0;
+  white-space: normal;
 }
 
 .cell-input {
   width: 100%;
+  min-width: 200px;
   padding: 12px 16px;
   border: 2px solid var(--color-accent, #0ff);
   background: var(--color-bg-elevated, #222224);
@@ -151,7 +202,7 @@
 }
 
 .cmi-btn-delete {
-  padding: 4px 12px;
+  padding: 6px 12px;
   background: var(--color-error, #ef4444);
   color: white;
   border: none;
@@ -159,6 +210,7 @@
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .cmi-btn-delete:hover {

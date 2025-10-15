@@ -23,17 +23,49 @@ const ReportsManager = () => {
                 const response = await fetch('https://emaildash.blob.core.windows.net/json-data/report_resource.json?sp=r&st=2025-08-19T18:46:57Z&se=2028-10-27T03:01:57Z&spr=https&sv=2024-11-04&sr=b&sig=ckSR839%2FioPD%2F7Si5EoW7E1%2B5ybwAe5MMw3q2r8M6rA%3D');
                 const data = await response.json();
                 setReportsData(data);
-                
-                const savedStates = localStorage.getItem('reportCheckboxStates');
-                if (savedStates) {
-                    const { states, lastUpdate } = JSON.parse(savedStates);
-                    const oneWeekAgo = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
-                    const lastMonday = getLastMonday();
-                    
-                    if (lastUpdate > oneWeekAgo && lastUpdate > lastMonday.getTime()) {
-                        setCheckedReports(states);
+
+                try {
+                    const currentWeekMonday = getCurrentWeekMonday();
+                    currentWeekMonday.setDate(currentWeekMonday.getDate() - 7);
+                    const weekStart = currentWeekMonday.toISOString().split('T')[0];
+
+                    const statusResponse = await fetch(`http://localhost:5000/api/cmi/reports/week/${weekStart}`);
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+
+                        const newCheckedStates = {};
+                        statusData.reports?.forEach(report => {
+                            if (report.is_submitted) {
+                                const campaignId = report.campaign_id;
+                                newCheckedStates[`${campaignId}_week_1`] = true;
+                                newCheckedStates[`${campaignId}_week_2`] = true;
+                                newCheckedStates[`${campaignId}_week_3`] = true;
+                                if (report.report_category === 'no_data') {
+                                    newCheckedStates[`${campaignId}_no_data`] = true;
+                                }
+                            }
+                        });
+                        setCheckedReports(newCheckedStates);
                     } else {
-                        localStorage.removeItem('reportCheckboxStates');
+                        const savedStates = localStorage.getItem('reportCheckboxStates');
+                        if (savedStates) {
+                            const { states, lastUpdate } = JSON.parse(savedStates);
+                            const oneWeekAgo = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
+                            const lastMonday = getLastMonday();
+
+                            if (lastUpdate > oneWeekAgo && lastUpdate > lastMonday.getTime()) {
+                                setCheckedReports(states);
+                            } else {
+                                localStorage.removeItem('reportCheckboxStates');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching submission statuses from backend:', error);
+                    const savedStates = localStorage.getItem('reportCheckboxStates');
+                    if (savedStates) {
+                        const { states } = JSON.parse(savedStates);
+                        setCheckedReports(states);
                     }
                 }
             } finally {
@@ -79,18 +111,15 @@ const ReportsManager = () => {
         const send = parseSendDate(sendDate);
         if (!send) return null;
 
-        // The reporting week is the PREVIOUS Monday-Sunday (last complete week)
         const reportingMonday = getCurrentWeekMonday();
-        reportingMonday.setDate(reportingMonday.getDate() - 7); // Go back one week
+        reportingMonday.setDate(reportingMonday.getDate() - 7);
 
-        // Get the Monday of the week the campaign was sent
         const sendDay = send.getUTCDay();
         const daysToSendMonday = sendDay === 0 ? -6 : 1 - sendDay;
         const sendMonday = new Date(send);
         sendMonday.setUTCDate(send.getUTCDate() + daysToSendMonday);
         sendMonday.setUTCHours(0, 0, 0, 0);
 
-        // Convert reportingMonday to UTC for consistent comparison
         const reportingMondayUTC = new Date(Date.UTC(
             reportingMonday.getFullYear(),
             reportingMonday.getMonth(),
@@ -100,20 +129,16 @@ const ReportsManager = () => {
         const msPerWeek = 7 * 24 * 60 * 60 * 1000;
         const weeksDiff = Math.round((reportingMondayUTC - sendMonday) / msPerWeek);
 
-        // Reporting week (last Monday-Sunday) = Week 1
-        // 1 week before reporting week = Week 2
-        // 2 weeks before reporting week = Week 3
-        if (weeksDiff === 0) return 1;  // Last week (9/22-9/28) = Week 1
-        if (weeksDiff === 1) return 2;  // Two weeks ago (9/15-9/21) = Week 2
-        if (weeksDiff === 2) return 3;  // Three weeks ago (9/8-9/14) = Week 3
+        if (weeksDiff === 0) return 1; 
+        if (weeksDiff === 1) return 2; 
+        if (weeksDiff === 2) return 3;
 
         return null;
     };
 
     const getCurrentWeekTimeframe = () => {
-        // Return the PREVIOUS week's Monday-Sunday as the reporting timeframe
         const reportingMonday = getCurrentWeekMonday();
-        reportingMonday.setDate(reportingMonday.getDate() - 7); // Go back one week
+        reportingMonday.setDate(reportingMonday.getDate() - 7);
         const sunday = new Date(reportingMonday);
         sunday.setDate(reportingMonday.getDate() + 6);
         return { start: reportingMonday, end: sunday };
@@ -143,7 +168,7 @@ const ReportsManager = () => {
         const reports = [];
 
         reportsData.forEach(report => {
-            if (report.is_no_data_report) return; // Skip no data reports here
+            if (report.is_no_data_report) return;
 
             const week = getReportWeek(report.send_date);
             if (week !== null) {
@@ -164,7 +189,7 @@ const ReportsManager = () => {
         const reports = [];
 
         reportsData.forEach(report => {
-            if (!report.is_no_data_report) return; // Only no data reports
+            if (!report.is_no_data_report) return;
 
             const week = getReportWeek(report.send_date);
             if (week !== null) {
@@ -271,34 +296,68 @@ const ReportsManager = () => {
         }
     };
 
-    const handleCheckboxChange = (reportId, week) => {
+    const handleCheckboxChange = async (reportId, week) => {
         const key = `${reportId}_week_${week}`;
+        const newCheckedState = !checkedReports[key];
+
         const newStates = {
             ...checkedReports,
-            [key]: !checkedReports[key]
+            [key]: newCheckedState
         };
-
         setCheckedReports(newStates);
 
-        localStorage.setItem('reportCheckboxStates', JSON.stringify({
-            states: newStates,
-            lastUpdate: new Date().getTime()
-        }));
+        try {
+            const response = await fetch(`http://localhost:5000/api/cmi/reports/${reportId}/submit`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    is_submitted: newCheckedState,
+                    submitted_by: 'user'
+                })
+            });
+
+            if (!response.ok) {
+                setCheckedReports(checkedReports);
+                console.error('Failed to update submission status');
+            }
+        } catch (error) {
+            setCheckedReports(checkedReports);
+            console.error('Error updating submission status:', error);
+        }
     };
 
-    const handleNoDataCheckboxChange = (reportId) => {
+    const handleNoDataCheckboxChange = async (reportId) => {
         const key = `${reportId}_no_data`;
+        const newCheckedState = !checkedReports[key];
+
         const newStates = {
             ...checkedReports,
-            [key]: !checkedReports[key]
+            [key]: newCheckedState
         };
-
         setCheckedReports(newStates);
 
-        localStorage.setItem('reportCheckboxStates', JSON.stringify({
-            states: newStates,
-            lastUpdate: new Date().getTime()
-        }));
+        try {
+            const response = await fetch(`http://localhost:5000/api/cmi/reports/${reportId}/submit`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    is_submitted: newCheckedState,
+                    submitted_by: 'user'
+                })
+            });
+
+            if (!response.ok) {
+                setCheckedReports(checkedReports);
+                console.error('Failed to update no-data submission status');
+            }
+        } catch (error) {
+            setCheckedReports(checkedReports);
+            console.error('Error updating no-data submission status:', error);
+        }
     };
 
     const generateAgencyJSON = (report, specificWeek = null) => {
@@ -364,7 +423,6 @@ const ReportsManager = () => {
         const previousMonday = new Date(currentTimeframe.start);
         previousMonday.setDate(previousMonday.getDate() - 7);
 
-        // Extract brand name, vehicle name, and contract number for filename construction
         const brandName = report.cmi_metadata?.Brand_Name || report.brand || "";
         const vehicleName = report.cmi_metadata?.Vehicle_Name || "";
         const contractNumber = report.cmi_metadata?.contract_number || "";
@@ -546,7 +604,11 @@ const ReportsManager = () => {
     const generateSLJSON = generateDefaultJSON;
 
     const openCMIModal = (report, specificWeek = null) => {
-        setSelectedCMIReport(generateAgencyJSON(report, specificWeek));
+        const jsonData = generateAgencyJSON(report, specificWeek);
+        const confidence = report.cmi_metadata?.match_confidence !== undefined
+            ? (report.cmi_metadata.match_confidence * 100).toFixed(0) + '%'
+            : 'N/A';
+        setSelectedCMIReport({ ...jsonData, _confidence: confidence });
         setShowModal(true);
     };
 
@@ -593,7 +655,10 @@ const ReportsManager = () => {
     const formatSendDate = (dateString) => {
         const date = parseSendDate(dateString);
         if (!date) return '-';
-        return date.toLocaleDateString('en-US', { timeZone: 'UTC' });
+        const month = date.getUTCMonth() + 1;
+        const day = date.getUTCDate();
+        const year = String(date.getUTCFullYear()).slice(-2);
+        return `${month}/${day}/${year}`;
     };
 
     const renderNoDataReportRow = (report, rowIndex) => {
@@ -641,18 +706,17 @@ const ReportsManager = () => {
     const renderCurrentReportRow = (report, rowIndex, allReports) => {
         const isCMI = report.agency === 'CMI';
 
-        // Count how many CMI campaigns with the same brand are in the current reports
         const brandCount = isCMI ? allReports.filter(r => r.agency === 'CMI' && r.brand === report.brand).length : 0;
 
         return (
             <tr key={report.unique_key} className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
                 <td className="campaign-column">
                     <div
-                        className="campaign-text clickable-campaign"
+                        className="reports-campaign-text clickable-campaign"
                         onClick={() => openCMIModal(report)}
                         title={report.campaign_name}
                     >
-                        <span className="campaign-name" title={report.campaign_name}>
+                        <span className="reports-campaign-name" title={report.campaign_name}>
                             {report.campaign_name}
                         </span>
                         {isCMI && (
@@ -674,17 +738,6 @@ const ReportsManager = () => {
                     </span>
                 </td>
                 <td className="date-column-report">{formatSendDate(report.send_date)}</td>
-                <td className="week-column">Week {report.week_number}</td>
-                <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
-                <td className="confidence-column">
-                    {report.cmi_metadata?.match_confidence !== undefined ? (
-                        <span className="confidence-score" title={`Match confidence: ${(report.cmi_metadata.match_confidence * 100).toFixed(0)}%`}>
-                            {(report.cmi_metadata.match_confidence * 100).toFixed(0)}%
-                        </span>
-                    ) : (
-                        <span className="confidence-score no-confidence">N/A</span>
-                    )}
-                </td>
                 <td className="week-column">
                     {report.week_number === 1 ? (
                         <label className="checkbox-container">
@@ -804,7 +857,6 @@ const ReportsManager = () => {
 
                 return (
                     <div className="reports-section current-reports">
-                        {/* Regular Campaign Reports Section */}
                         <div className="section-header">
                             <h3>Campaign Reports Due This Week</h3>
                             <div className="section-stats">
@@ -828,9 +880,6 @@ const ReportsManager = () => {
                                         <th className="brand-header">Brand</th>
                                         <th className="agency-header">Agency</th>
                                         <th className="date-header">Send Date</th>
-                                        <th className="week-header">Week</th>
-                                        <th className="timeframe-header">Timeframe</th>
-                                        <th className="confidence-header">Confidence</th>
                                         <th className="week-header">Week 1</th>
                                         <th className="week-header">Week 2</th>
                                         <th className="week-header">Week 3</th>
@@ -841,14 +890,13 @@ const ReportsManager = () => {
                                         if (paginatedCurrentReports.length === 0) {
                                             return (
                                                 <tr>
-                                                    <td colSpan="10" className="empty-state">
+                                                    <td colSpan="7" className="empty-state">
                                                         {searchTerm ? 'No reports match your search' : 'No reports due this week'}
                                                     </td>
                                                 </tr>
                                             );
                                         }
 
-                                        // Group reports by agency
                                         const groupedReports = paginatedCurrentReports
                                             .sort((a, b) => {
                                                 const dateA = parseSendDate(a.send_date);
@@ -862,7 +910,6 @@ const ReportsManager = () => {
                                                 return acc;
                                             }, {});
 
-                                        // Sort agencies with CMI first
                                         const sortedAgencies = Object.keys(groupedReports).sort((a, b) => {
                                             if (a === 'CMI') return -1;
                                             if (b === 'CMI') return 1;
@@ -873,7 +920,7 @@ const ReportsManager = () => {
                                         return sortedAgencies.map((agency, agencyIndex) => (
                                             <React.Fragment key={`agency-${agency}`}>
                                                 <tr className="agency-section-header">
-                                                    <td colSpan="10" className="agency-section-title">
+                                                    <td colSpan="7" className="agency-section-title">
                                                         <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
                                                         <span className="agency-count">({groupedReports[agency].length} reports)</span>
                                                     </td>
@@ -885,7 +932,7 @@ const ReportsManager = () => {
                                                 })}
                                                 {agencyIndex < sortedAgencies.length - 1 && (
                                                     <tr className="agency-divider">
-                                                        <td colSpan="10"></td>
+                                                        <td colSpan="7"></td>
                                                     </tr>
                                                 )}
                                             </React.Fragment>
@@ -896,7 +943,6 @@ const ReportsManager = () => {
                         </div>
                         {renderPaginationButtons(currentPage, totalPages, 'current')}
 
-                        {/* No Data Reports Section */}
                         {allNoDataReports.length > 0 && (
                             <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
                                 <div className="section-header">
@@ -966,7 +1012,6 @@ const ReportsManager = () => {
                                             );
                                         }
 
-                                        // Group reports by agency
                                         const groupedReports = paginatedArchiveReports.reduce((acc, report) => {
                                             const agency = report.agency;
                                             if (!acc[agency]) acc[agency] = [];
@@ -974,7 +1019,6 @@ const ReportsManager = () => {
                                             return acc;
                                         }, {});
 
-                                        // Sort agencies with CMI first
                                         const sortedAgencies = Object.keys(groupedReports).sort((a, b) => {
                                             if (a === 'CMI') return -1;
                                             if (b === 'CMI') return 1;
@@ -1021,8 +1065,8 @@ const ReportsManager = () => {
                                                             <td className="week-column">Week {report.week_number}</td>
                                                             <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
                                                             <td className="status-column">
-                                                                {report[`week_${report.week_number}_completed`] ? (
-                                                                    <span className="status-completed">Completed</span>
+                                                                {report.is_submitted || report[`week_${report.week_number}_completed`] ? (
+                                                                    <span className="status-completed">Submitted</span>
                                                                 ) : (
                                                                     <span className="status-pending">Pending</span>
                                                                 )}
@@ -1067,6 +1111,12 @@ const ReportsManager = () => {
                         </div>
                         <div className="modal-body">
                             <div className="json-preview">
+                                {selectedCMIReport._confidence && (
+                                    <div className="confidence-display">
+                                        <span className="confidence-label">Match Confidence:</span>
+                                        <span className="confidence-value">{selectedCMIReport._confidence}</span>
+                                    </div>
+                                )}
                                 <div className="json-header">
                                     <span className="json-label">Generated JSON Structure</span>
                                     <button
@@ -1079,7 +1129,7 @@ const ReportsManager = () => {
                                 </div>
                                 <div className="json-container">
                                     <pre className="json-content">
-                                        {JSON.stringify(selectedCMIReport, null, 2)}
+                                        {JSON.stringify(Object.fromEntries(Object.entries(selectedCMIReport).filter(([key]) => key !== '_confidence')), null, 2)}
                                     </pre>
                                 </div>
                             </div>

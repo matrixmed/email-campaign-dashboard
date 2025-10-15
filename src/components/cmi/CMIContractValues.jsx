@@ -11,15 +11,15 @@ const CMIContractValues = () => {
   const [filterText, setFilterText] = useState('');
 
   const columns = [
-    { key: 'contract_number', label: 'Contract #', width: '150px' },
-    { key: 'client', label: 'Client', width: '200px' },
-    { key: 'brand', label: 'Brand', width: '180px' },
-    { key: 'vehicle', label: 'Vehicle', width: '300px' },
-    { key: 'placement_id', label: 'Placement ID', width: '200px' },
-    { key: 'placement_description', label: 'Placement Description', width: '450px' },
-    { key: 'buy_component_type', label: 'Buy Component Type', width: '220px' },
-    { key: 'data_type', label: 'Data Type', width: '150px' },
-    { key: 'notes', label: 'Notes', width: '300px' }
+    { key: 'contract_number', label: 'Contract #' },
+    { key: 'client', label: 'Client' },
+    { key: 'brand', label: 'Brand' },
+    { key: 'vehicle', label: 'Vehicle' },
+    { key: 'placement_id', label: 'Placement ID' },
+    { key: 'placement_description', label: 'Placement Description' },
+    { key: 'buy_component_type', label: 'Buy Component Type' },
+    { key: 'data_type', label: 'Data Type' },
+    { key: 'notes', label: 'Notes' }
   ];
 
   const fetchContracts = useCallback(async () => {
@@ -181,22 +181,29 @@ const CMIContractValues = () => {
 
   return (
     <div className="cmi-contract-values">
-      <div className="cmi-sticky-header">
-        <div className="page-header">
-          <h1>CMI Contract Values</h1>
-          <div className="search-container">
-            <input
-              type="text"
-              placeholder="Search"
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              className="search-input"
-            />
-          </div>
+      <div className="page-header">
+        <h1>CMI Contract Values</h1>
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="search-input"
+          />
         </div>
       </div>
 
-      <div className="cmi-scrollable-content">
+      <div className="cmi-controls-top">
+        <button onClick={handleAddRow} className="cmi-btn cmi-btn-add">
+          Add Row
+        </button>
+        <button onClick={handleExport} className="cmi-btn cmi-btn-export">
+          Export CSV
+        </button>
+      </div>
+
+      <div className="cmi-table-container">
         <div className="cmi-table-wrapper">
           <table className="cmi-table">
             <thead>
@@ -204,7 +211,6 @@ const CMIContractValues = () => {
                 {columns.map(col => (
                   <th
                     key={col.key}
-                    style={{ width: col.width }}
                     onClick={() => handleSort(col.key)}
                   >
                     {col.label}
@@ -215,7 +221,7 @@ const CMIContractValues = () => {
                     )}
                   </th>
                 ))}
-                <th style={{ width: '80px' }}>Actions</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -258,22 +264,13 @@ const CMIContractValues = () => {
             </tbody>
           </table>
         </div>
-
-        {sortedContracts.length === 0 && (
-          <div className="cmi-empty">
-            No contracts found. Click "Add Row" to create one.
-          </div>
-        )}
-
-        <div className="cmi-controls">
-          <button onClick={handleAddRow} className="cmi-btn cmi-btn-add">
-            Add Row
-          </button>
-          <button onClick={handleExport} className="cmi-btn cmi-btn-export">
-            Export CSV
-          </button>
-        </div>
       </div>
+
+      {sortedContracts.length === 0 && (
+        <div className="cmi-empty">
+          No contracts found. Click "Add Row" to create one.
+        </div>
+      )}
     </div>
   );
 };

@@ -87,11 +87,26 @@
   border-collapse: collapse;
 }
 
+.digital-journals-table .journal-title-column {
+  max-width: 600px;
+  width: 600px;
+  position: relative;
+}
+
+@media (min-width: 1800px) {
+  .digital-journals-table .journal-title-column {
+    max-width: 800px;
+    width: 800px;
+  }
+}
+
 .digital-journals-table th {
   background-color: #333;
   color: #0ff;
   padding: 12px;
   font-weight: 600;
+  font-size: 16px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444;
   text-align: left;
 }
@@ -99,6 +114,8 @@
 .digital-journals-table td {
   padding: 12px;
   color: #fff;
+  font-size: 15px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444;
 }
 
@@ -122,6 +139,10 @@
   cursor: pointer;
   color: #fff;
   transition: color 0.2s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .journal-title:hover {
@@ -149,7 +170,6 @@ body.light .digital-journals-table tr:hover {
   background-color: rgba(0, 119, 255, 0.05);
 }
 
-/* Modal Overlay */
 .journal-modal-overlay {
   position: fixed;
   top: 0;
@@ -164,7 +184,6 @@ body.light .digital-journals-table tr:hover {
   animation: fadeIn 0.2s ease-out;
 }
 
-/* Modal Container */
 .journal-modal {
   background-color: #222;
   width: 90%;
@@ -178,7 +197,6 @@ body.light .digital-journals-table tr:hover {
   animation: slideIn 0.3s ease-out;
 }
 
-/* Modal Header */
 .journal-modal-header {
   display: flex;
   justify-content: space-between;
@@ -230,7 +248,6 @@ body.light .digital-journals-table tr:hover {
   background: #777;
 }
 
-/* URL Display */
 .journal-modal-url {
   color: #999;
   margin-bottom: 20px;
@@ -242,7 +259,6 @@ body.light .digital-journals-table tr:hover {
   font-size: 14px;
 }
 
-/* Controls Section */
 .journal-modal-controls {
   display: flex;
   justify-content: flex-end;
@@ -267,7 +283,6 @@ body.light .digital-journals-table tr:hover {
   border-radius: 4px;
 }
 
-/* Metrics Cards */
 .journal-modal-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -294,7 +309,6 @@ body.light .digital-journals-table tr:hover {
   font-weight: bold;
 }
 
-/* Details Section (Device & Source) */
 .journal-modal-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -318,7 +332,6 @@ body.light .digital-journals-table tr:hover {
   font-size: 18px;
 }
 
-/* Detail Tables */
 .detail-table {
   width: 100%;
   border-collapse: collapse;
@@ -328,7 +341,6 @@ body.light .digital-journals-table tr:hover {
   border-bottom: none;
 }
 
-/* Monthly Data Section */
 .journal-modal-monthly {
   background-color: #2a2a2d;
   border-radius: 6px;
@@ -340,14 +352,12 @@ body.light .digital-journals-table tr:hover {
   margin-bottom: 20px;
 }
 
-/* Chart Container */
 .journal-chart-container {
   margin-top: 30px;
   height: 300px;
   width: 100%;
 }
 
-/* Animation Keyframes */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -358,7 +368,6 @@ body.light .digital-journals-table tr:hover {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Light Theme Adjustments */
 body.light .journal-modal {
   background-color: #fff;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
@@ -441,7 +450,6 @@ body.light .journal-modal::-webkit-scrollbar-track {
     background: #aaa;
   }
 
-/* Mobile Responsive Adjustments */
 @media (max-width: 768px) {
   .journal-modal {
     width: 95%;
@@ -462,7 +470,6 @@ body.light .journal-modal::-webkit-scrollbar-track {
   }
 }
 
-/* Combined URLs Section */
 .journal-modal-combined-urls {
   background-color: #2a2a2d;
   border-radius: 6px;
@@ -524,7 +531,6 @@ body.light .journal-modal::-webkit-scrollbar-track {
 }
 
 
-/* Light theme for combined URLs */
 body.light .journal-modal-combined-urls {
   background-color: #f5f5f5;
 }
@@ -552,7 +558,6 @@ body.light .url-card-link:hover {
   color: #0056b3;
 }
 
-/* Responsive adjustments for combined URLs */
 @media (max-width: 768px) {
   .combined-urls-grid {
     grid-template-columns: 1fr;

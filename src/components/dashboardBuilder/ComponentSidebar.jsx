@@ -35,6 +35,7 @@ const ComponentSidebar = ({
 
   const [savedDashboards, setSavedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
+  const [archiveSearchTerm, setArchiveSearchTerm] = useState('');
 
   const fetchSavedDashboards = useCallback(async () => {
     setLoadingDashboards(true);
@@ -163,12 +164,12 @@ const ComponentSidebar = ({
       type: 'metric',
       title: 'New Card',
       value: '0',
-      subtitle: 'Custom card - double click to edit',
-      position: { 
-        x: 100 + Math.random() * 200, 
-        y: 100 + Math.random() * 200, 
-        width: 180, 
-        height: 100 
+      subtitle: '',
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 180,
+        height: 100
       }
     };
 
@@ -216,11 +217,106 @@ const ComponentSidebar = ({
           ['West', '0.0%', '0']
         ]
       },
-      position: { 
-        x: 100 + Math.random() * 200, 
-        y: 100 + Math.random() * 200, 
-        width: 380, 
-        height: 180 
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 380,
+        height: 180
+      }
+    };
+
+    onAddComponent?.(component);
+  }, [onAddComponent]);
+
+  const handleAddLandingPageImpressions = useCallback(() => {
+    const component = {
+      id: `landing-page-${Date.now()}`,
+      type: 'table',
+      title: 'Landing Page Impressions',
+      config: {
+        dataType: 'custom',
+        customData: [
+          ['728x90', ''],
+          ['300x250', '']
+        ]
+      },
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 300,
+        height: 120
+      }
+    };
+
+    onAddComponent?.(component);
+  }, [onAddComponent]);
+
+  const handleAddVideoMetricsTable = useCallback(() => {
+    const component = {
+      id: `video-metrics-${Date.now()}`,
+      type: 'table',
+      title: 'Video Metrics',
+      config: {
+        dataType: 'custom',
+        customData: [
+          ['Total Time Watched', ''],
+          ['Avg Time Watched', ''],
+          ['Total Impressions', '']
+        ]
+      },
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 300,
+        height: 120
+      }
+    };
+
+    onAddComponent?.(component);
+  }, [onAddComponent]);
+
+  const handleAddJournalMetricsTable = useCallback(() => {
+    const component = {
+      id: `journal-metrics-${Date.now()}`,
+      type: 'table',
+      title: 'Online Journal Metrics',
+      config: {
+        dataType: 'custom',
+        customData: [
+          ['Avg Time in Issue', ''],
+          ['Total Page Views', ''],
+          ['Total Issue Visits', '']
+        ]
+      },
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 300,
+        height: 120
+      }
+    };
+
+    onAddComponent?.(component);
+  }, [onAddComponent]);
+
+  const handleAddSocialMediaTable = useCallback(() => {
+    const component = {
+      id: `social-media-${Date.now()}`,
+      type: 'table',
+      title: 'LinkedIn Social Media Metrics',
+      config: {
+        dataType: 'custom',
+        customData: [
+          ['Impressions', ''],
+          ['Engagement Rate', ''],
+          ['CTR', '']
+        ]
+      },
+      position: {
+        x: 100 + Math.random() * 200,
+        y: 100 + Math.random() * 200,
+        width: 300,
+        height: 120
       }
     };
 
@@ -258,6 +354,10 @@ const ComponentSidebar = ({
 
   const filteredMetrics = AVAILABLE_METRICS.filter(metric =>
     metric.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDashboards = savedDashboards.filter(dashboard =>
+    dashboard.title.toLowerCase().includes(archiveSearchTerm.toLowerCase())
   );
 
   if (!isOpen) {
@@ -712,6 +812,74 @@ const ComponentSidebar = ({
 
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+                  Ready-Made Tables
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    onClick={handleAddLandingPageImpressions}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Landing Page Impressions
+                  </button>
+                  <button
+                    onClick={handleAddVideoMetricsTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Video Metrics
+                  </button>
+                  <button
+                    onClick={handleAddJournalMetricsTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Online Journal Metrics
+                  </button>
+                  <button
+                    onClick={handleAddSocialMediaTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    LinkedIn Social Media Metrics
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
                   Custom Table Builder
                 </h4>
                 <div style={{ 
@@ -848,7 +1016,33 @@ const ComponentSidebar = ({
                 <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600' }}>
                   Saved Dashboards
                 </h3>
-                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', margin: '0 0 16px 0' }}>
+                <input
+                  type="text"
+                  placeholder="Search dashboards..."
+                  value={archiveSearchTerm}
+                  onChange={(e) => setArchiveSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    marginBottom: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(99, 102, 241, 0.6)';
+                    e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                />
+                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', margin: '0 0 12px 0' }}>
                   Load a previously saved dashboard
                 </p>
                 <button
@@ -879,9 +1073,20 @@ const ComponentSidebar = ({
                     No saved dashboards found
                   </div>
                 </div>
+              ) : filteredDashboards.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
+                    No dashboards match your search
+                  </div>
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {savedDashboards.map((dashboard) => (
+                  {filteredDashboards.map((dashboard) => (
                     <div
                       key={dashboard.id}
                       style={{

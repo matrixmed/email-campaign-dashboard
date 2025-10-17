@@ -261,14 +261,49 @@ const TableComponent = ({
   const handleCellKeyDown = useCallback((e, rowIndex, colIndex) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      setIsEditingCell(null);
+      handleCellEdit(rowIndex, colIndex, editValue);
+      // Move to cell below
+      if (rowIndex < tableData.length - 1) {
+        setEditValue(tableData[rowIndex + 1][colIndex]);
+        setIsEditingCell({ row: rowIndex + 1, col: colIndex });
+      } else {
+        setIsEditingCell(null);
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setIsEditingCell(null);
       const originalData = [...tableData];
       setTableData(originalData);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      handleCellEdit(rowIndex, colIndex, editValue);
+      if (rowIndex < tableData.length - 1) {
+        setEditValue(tableData[rowIndex + 1][colIndex]);
+        setIsEditingCell({ row: rowIndex + 1, col: colIndex });
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      handleCellEdit(rowIndex, colIndex, editValue);
+      if (rowIndex > 0) {
+        setEditValue(tableData[rowIndex - 1][colIndex]);
+        setIsEditingCell({ row: rowIndex - 1, col: colIndex });
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handleCellEdit(rowIndex, colIndex, editValue);
+      if (colIndex < tableData[rowIndex].length - 1) {
+        setEditValue(tableData[rowIndex][colIndex + 1]);
+        setIsEditingCell({ row: rowIndex, col: colIndex + 1 });
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handleCellEdit(rowIndex, colIndex, editValue);
+      if (colIndex > 0) {
+        setEditValue(tableData[rowIndex][colIndex - 1]);
+        setIsEditingCell({ row: rowIndex, col: colIndex - 1 });
+      }
     }
-  }, [tableData]);
+  }, [tableData, editValue, handleCellEdit]);
 
   const handleTitleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -456,14 +491,15 @@ const TableComponent = ({
             }}
             onKeyDown={handleTitleKeyDown}
             style={{
-              border: 'none',
-              background: 'transparent',
+              border: '2px solid rgba(0, 123, 255, 0.5)',
+              background: 'rgba(255, 255, 255, 0.95)',
               fontSize: 'inherit',
               fontWeight: 'inherit',
-              color: 'inherit',
+              color: '#1f2937',
               width: '100%',
               outline: 'none',
-              padding: '2px'
+              padding: '4px',
+              borderRadius: '4px'
             }}
             autoFocus
           />
@@ -506,14 +542,17 @@ const TableComponent = ({
                               handleCellEdit(rowIndex, colIndex, editValue);
                               setIsEditingCell(null);
                             }}
+                            onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, colIndex)}
                             style={{
-                              border: 'none',
-                              background: 'transparent',
+                              border: '2px solid rgba(0, 123, 255, 0.6)',
+                              background: 'rgba(255, 255, 255, 0.98)',
                               fontSize: 'inherit',
                               width: '100%',
-                              padding: '0',
-                              outline: 'none'
+                              padding: '2px 4px',
+                              outline: 'none',
+                              color: '#1f2937',
+                              borderRadius: '2px'
                             }}
                             autoFocus
                           />

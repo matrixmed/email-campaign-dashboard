@@ -959,7 +959,7 @@ const DashboardCanvasContent = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '16px 24px',
+        padding: '10px 20px',
         background: 'rgba(255, 255, 255, 0.98)',
         backdropFilter: 'blur(10px)',
         borderRadius: '12px',
@@ -974,11 +974,11 @@ const DashboardCanvasContent = () => {
           <button
             onClick={() => setShowTemplateModal(true)}
             style={{
-              padding: '12px 28px',
+              padding: '10px 24px',
               border: '2px solid #2a2a2d',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',
@@ -1017,11 +1017,11 @@ const DashboardCanvasContent = () => {
               localStorage.removeItem('dashboard-canvas-state');
             }}
             style={{
-              padding: '12px 28px',
+              padding: '10px 24px',
               border: '2px solid #2a2a2d',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',
@@ -1050,11 +1050,11 @@ const DashboardCanvasContent = () => {
             onClick={handleSaveDashboard}
             disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
             style={{
-              padding: '12px 28px',
+              padding: '10px 24px',
               border: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '2px solid #2a2a2d' : '2px solid #d1d5db',
               borderRadius: '8px',
               cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',
@@ -1086,11 +1086,11 @@ const DashboardCanvasContent = () => {
             onClick={handleExportScreenshot}
             disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
             style={{
-              padding: '12px 28px',
+              padding: '10px 24px',
               border: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '2px solid #2a2a2d' : '2px solid #d1d5db',
               borderRadius: '8px',
               cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
               fontFamily: 'inherit',
               transition: 'all 0.2s ease',

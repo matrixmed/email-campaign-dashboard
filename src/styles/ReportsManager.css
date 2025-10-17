@@ -237,12 +237,12 @@
 
 .clickable-campaign {
   cursor: pointer;
-  color: #0ff;
+  color: white;
   transition: all 0.2s ease;
 }
 
 .clickable-campaign:hover {
-  color: #00cccc;
+  color: #0ff;
 }
 
 .cmi-info {

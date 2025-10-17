@@ -428,15 +428,17 @@ const MetricCard = ({
               onKeyDown={handleTitleKeyDown}
               style={{
                 ...titleStyle,
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                border: '2px solid rgba(0, 123, 255, 0.5)',
                 borderRadius: '4px',
                 padding: '4px',
                 width: '100%',
-                marginBottom: '4px'
+                marginBottom: '4px',
+                color: '#1f2937'
               }}
             />
             <input
+              ref={valueInputRef}
               type="text"
               value={localValue}
               onChange={(e) => setLocalValue(e.target.value)}
@@ -444,15 +446,17 @@ const MetricCard = ({
               onKeyDown={handleValueKeyDown}
               style={{
                 ...valueStyle,
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                border: '2px solid rgba(0, 123, 255, 0.5)',
                 borderRadius: '4px',
                 padding: '4px',
                 width: '100%',
-                marginBottom: '4px'
+                marginBottom: '4px',
+                color: '#1f2937'
               }}
             />
             <input
+              ref={subtitleInputRef}
               type="text"
               value={localSubtitle}
               onChange={(e) => setLocalSubtitle(e.target.value)}
@@ -460,11 +464,12 @@ const MetricCard = ({
               onKeyDown={handleSubtitleKeyDown}
               style={{
                 ...subtitleStyle,
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                border: '2px solid rgba(0, 123, 255, 0.5)',
                 borderRadius: '4px',
                 padding: '4px',
-                width: '100%'
+                width: '100%',
+                color: '#1f2937'
               }}
             />
           </>

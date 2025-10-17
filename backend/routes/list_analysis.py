@@ -92,37 +92,143 @@ def validate_email_column(series):
     # At least 80% should contain '@'
     return has_at_sign / total >= 0.8
 
+def read_file_to_dataframe(file):
+    """
+    Read a file (CSV or Excel) into a pandas DataFrame with robust error handling.
+    Supports:
+    - CSV files with multiple encodings (UTF-8, Latin-1, CP1252)
+    - Excel files (.xlsx, .xls) with automatic first sheet selection
+
+    Returns:
+        tuple: (DataFrame, error_message)
+        - If successful: (df, None)
+        - If failed: (None, error_message)
+    """
+    filename = file.filename
+    file_extension = filename.lower().split('.')[-1] if '.' in filename else ''
+
+    # Validate file type
+    allowed_extensions = ['csv', 'xlsx', 'xls']
+    if file_extension not in allowed_extensions:
+        return None, f"Unsupported file type '.{file_extension}'. Please upload CSV (.csv) or Excel (.xlsx, .xls) files only."
+
+    try:
+        # Handle Excel files
+        if file_extension in ['xlsx', 'xls']:
+            try:
+                # Read first sheet only
+                df = pd.read_excel(file, sheet_name=0, engine='openpyxl' if file_extension == 'xlsx' else None)
+
+                # Check if DataFrame is empty
+                if df.empty or len(df.columns) == 0:
+                    return None, f"File '{filename}' appears to be empty or has no data in the first sheet."
+
+                return df, None
+
+            except Exception as excel_error:
+                return None, f"Failed to read Excel file '{filename}': {str(excel_error)}. The file may be corrupted or password-protected."
+
+        # Handle CSV files with multiple encoding attempts
+        elif file_extension == 'csv':
+            encodings_to_try = [
+                ('utf-8', 'UTF-8'),
+                ('latin-1', 'Latin-1 (ISO-8859-1)'),
+                ('cp1252', 'Windows-1252'),
+                ('utf-8-sig', 'UTF-8 with BOM')
+            ]
+
+            last_error = None
+            for encoding, encoding_name in encodings_to_try:
+                try:
+                    file.seek(0)  # Reset file pointer
+                    df = pd.read_csv(file, encoding=encoding, low_memory=False)
+
+                    # Check if DataFrame is empty
+                    if df.empty or len(df.columns) == 0:
+                        return None, f"File '{filename}' appears to be empty or has no columns."
+
+                    return df, None
+
+                except UnicodeDecodeError as e:
+                    last_error = e
+                    continue  # Try next encoding
+                except Exception as e:
+                    return None, f"Failed to read CSV file '{filename}': {str(e)}"
+
+            # If all encodings failed
+            return None, f"Failed to read CSV file '{filename}'. Unable to detect proper encoding. Tried: UTF-8, Latin-1, Windows-1252. Please ensure the file is properly formatted."
+
+    except Exception as e:
+        return None, f"Unexpected error reading file '{filename}': {str(e)}"
+
 @list_analysis_bp.route('/upload', methods=['POST'])
 def upload_lists():
     try:
+        # Validate IQVIA file is present
         if 'iqvia_list' not in request.files:
             return jsonify({'error': 'IQVIA list is required'}), 400
 
         iqvia_file = request.files['iqvia_list']
         target_files = request.files.getlist('target_lists')
 
+        # Validate at least one target list
         if not target_files or len(target_files) == 0:
             return jsonify({'error': 'At least one target list is required'}), 400
 
-        iqvia_df = pd.read_excel(iqvia_file) if iqvia_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(iqvia_file)
+        # Check for empty filename (no file selected)
+        if not iqvia_file.filename:
+            return jsonify({'error': 'No IQVIA file selected'}), 400
 
+        # Read IQVIA file
+        iqvia_df, error = read_file_to_dataframe(iqvia_file)
+        if error:
+            return jsonify({'error': error}), 400
+
+        # Find NPI column in IQVIA list
         npi_column = find_npi_column(iqvia_df)
-
         if not npi_column:
-            return jsonify({'error': 'NPI column not found in IQVIA list. Please ensure the file contains a valid NPI column.'}), 400
+            available_columns = ', '.join(iqvia_df.columns.tolist()[:10])
+            more = '...' if len(iqvia_df.columns) > 10 else ''
+            return jsonify({
+                'error': f'NPI column not found in IQVIA list "{iqvia_file.filename}". '
+                         f'Available columns: {available_columns}{more}. '
+                         f'Please ensure the file contains a valid NPI column with 10-digit numbers starting with "1".'
+            }), 400
 
+        # Extract NPIs from IQVIA list
         iqvia_npis = set(iqvia_df[npi_column].dropna().astype(str).str.strip().tolist())
 
+        if len(iqvia_npis) == 0:
+            return jsonify({'error': f'IQVIA list "{iqvia_file.filename}" contains no valid NPIs'}), 400
+
+        # Process target lists
         target_lists_data = []
         for idx, target_file in enumerate(target_files):
-            target_df = pd.read_excel(target_file) if target_file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(target_file)
+            # Check for empty filename
+            if not target_file.filename:
+                return jsonify({'error': f'Target list #{idx + 1} has no filename (no file selected)'}), 400
 
+            # Read target file
+            target_df, error = read_file_to_dataframe(target_file)
+            if error:
+                return jsonify({'error': error}), 400
+
+            # Find NPI column in target list
             target_npi_column = find_npi_column(target_df)
-
             if not target_npi_column:
-                return jsonify({'error': f'NPI column not found in target list: {target_file.filename}. Please ensure the file contains a valid NPI column.'}), 400
+                available_columns = ', '.join(target_df.columns.tolist()[:10])
+                more = '...' if len(target_df.columns) > 10 else ''
+                return jsonify({
+                    'error': f'NPI column not found in target list "{target_file.filename}". '
+                             f'Available columns: {available_columns}{more}. '
+                             f'Please ensure the file contains a valid NPI column with 10-digit numbers starting with "1".'
+                }), 400
 
+            # Extract NPIs from target list
             target_npis = set(target_df[target_npi_column].dropna().astype(str).str.strip().tolist())
+
+            if len(target_npis) == 0:
+                return jsonify({'error': f'Target list "{target_file.filename}" contains no valid NPIs'}), 400
 
             target_lists_data.append({
                 'filename': target_file.filename,
@@ -130,6 +236,7 @@ def upload_lists():
                 'count': len(target_npis)
             })
 
+        # Generate session ID
         session_id = str(hash(frozenset(iqvia_npis)))
 
         return jsonify({
@@ -140,7 +247,10 @@ def upload_lists():
         }), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Upload error: {error_trace}")  # Log to server console for debugging
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @list_analysis_bp.route('/calculate-crossover', methods=['POST'])
 def calculate_crossover():

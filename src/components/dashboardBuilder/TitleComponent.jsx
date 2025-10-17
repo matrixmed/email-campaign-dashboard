@@ -336,8 +336,9 @@ const TitleComponent = ({
               minWidth: '300px', // Ensure minimum readable width
               outline: 'none',
               WebkitBackgroundClip: 'unset',
-              WebkitTextFillColor: 'unset',
+              WebkitTextFillColor: '#1f2937',
               backgroundClip: 'unset',
+              color: '#1f2937',
               boxSizing: 'border-box',
               resize: 'horizontal', // Allow user to resize width if needed
               overflow: 'visible'

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, Clock, CheckCircle, FileText, Eye, Copy } from 'lucide-react';
 import '../../styles/ReportsManager.css';
+import { API_BASE_URL } from '../../config/api';
 
 const ReportsManager = () => {
     const [reportsData, setReportsData] = useState([]);
@@ -29,7 +30,7 @@ const ReportsManager = () => {
                     currentWeekMonday.setDate(currentWeekMonday.getDate() - 7);
                     const weekStart = currentWeekMonday.toISOString().split('T')[0];
 
-                    const statusResponse = await fetch(`http://localhost:5000/api/cmi/reports/week/${weekStart}`);
+                    const statusResponse = await fetch(`${API_BASE_URL}/api/cmi/reports/week/${weekStart}`);
                     if (statusResponse.ok) {
                         const statusData = await statusResponse.json();
 
@@ -307,7 +308,7 @@ const ReportsManager = () => {
         setCheckedReports(newStates);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/cmi/reports/${reportId}/submit`, {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${reportId}/submit`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -339,7 +340,7 @@ const ReportsManager = () => {
         setCheckedReports(newStates);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/cmi/reports/${reportId}/submit`, {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${reportId}/submit`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

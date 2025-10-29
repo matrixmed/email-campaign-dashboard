@@ -11,7 +11,8 @@
 
 # production
 /build
-
+/backend/uploads
+/backend/migrations
 # misc
 .DS_Store
 .env.local

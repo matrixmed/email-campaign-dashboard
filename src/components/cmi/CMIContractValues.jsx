@@ -9,6 +9,7 @@ const CMIContractValues = () => {
   const [editValue, setEditValue] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterText, setFilterText] = useState('');
+  const [selectedYear, setSelectedYear] = useState(2025);
 
   const columns = [
     { key: 'contract_number', label: 'Contract #' },
@@ -25,7 +26,7 @@ const CMIContractValues = () => {
   const fetchContracts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts`);
+      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=${selectedYear}`);
       const data = await response.json();
       if (data.status === 'success') {
         setContracts(data.contracts);
@@ -35,7 +36,7 @@ const CMIContractValues = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedYear]);
 
   useEffect(() => {
     fetchContracts();
@@ -95,7 +96,8 @@ const CMIContractValues = () => {
           placement_description: '',
           buy_component_type: '',
           data_type: '',
-          notes: ''
+          notes: '',
+          year: selectedYear
         })
       });
 
@@ -137,7 +139,7 @@ const CMIContractValues = () => {
 
   const handleExport = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/export`);
+      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/export?year=${selectedYear}`);
       const csvContent = await response.text();
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -195,12 +197,34 @@ const CMIContractValues = () => {
       </div>
 
       <div className="cmi-controls-top">
-        <button onClick={handleAddRow} className="cmi-btn cmi-btn-add">
-          Add Row
-        </button>
-        <button onClick={handleExport} className="cmi-btn cmi-btn-export">
-          Export CSV
-        </button>
+        <div className="year-tabs">
+          <button
+            onClick={() => setSelectedYear(2024)}
+            className={`tab-button ${selectedYear === 2024 ? 'active' : ''}`}
+          >
+            2024
+          </button>
+          <button
+            onClick={() => setSelectedYear(2025)}
+            className={`tab-button ${selectedYear === 2025 ? 'active' : ''}`}
+          >
+            2025
+          </button>
+          <button
+            onClick={() => setSelectedYear(2026)}
+            className={`tab-button ${selectedYear === 2026 ? 'active' : ''}`}
+          >
+            2026
+          </button>
+        </div>
+        <div className="action-buttons">
+          <button onClick={handleAddRow} className="action-btn action-btn-add">
+            Add Row
+          </button>
+          <button onClick={handleExport} className="action-btn action-btn-export">
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="cmi-table-container">

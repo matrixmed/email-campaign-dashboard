@@ -287,10 +287,16 @@ def calculate_crossover():
 
         distribution_list.reverse()
 
+        # Calculate users on at least one list (any tier except 0/total_lists)
+        users_on_at_least_one_list = sum(dist['users_count'] for dist in distribution_list if dist['lists_count'] != f'0/{total_lists}')
+        percentage_on_at_least_one_list = round((users_on_at_least_one_list / len(iqvia_npis) * 100), 2) if len(iqvia_npis) > 0 else 0
+
         return jsonify({
             'distribution': distribution_list,
             'total_iqvia_users': len(iqvia_npis),
-            'total_target_lists': total_lists
+            'total_target_lists': total_lists,
+            'users_on_at_least_one_list': users_on_at_least_one_list,
+            'percentage_on_at_least_one_list': percentage_on_at_least_one_list
         }), 200
 
     except Exception as e:
@@ -298,6 +304,10 @@ def calculate_crossover():
 
 @list_analysis_bp.route('/engagement-by-tier', methods=['POST'])
 def engagement_by_tier():
+    """
+    Enhanced engagement analysis by tier with comprehensive metrics matching Audience Analysis.
+    Groups NPIs by crossover tier and analyzes their full engagement across all campaigns.
+    """
     try:
         data = request.json
         iqvia_npis = set(data.get('iqvia_npis', []))
@@ -321,7 +331,7 @@ def engagement_by_tier():
             count = len(npi_to_lists.get(npi, set()))
             tier_to_npis[count].append(npi)
 
-        # Query user_profiles for engagement data
+        # Query user_profiles and campaign_interactions for full engagement data
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -334,73 +344,272 @@ def engagement_by_tier():
                 tier_results.append({
                     'tier': f'{tier_count}/{total_lists}',
                     'user_count': 0,
+                    'matched_count': 0,
                     'aggregate': {
-                        'avg_open_rate': 0,
-                        'avg_emails_sent': 0,
-                        'avg_emails_opened': 0,
-                        'engaged_count': 0,
-                        'engaged_percentage': 0
+                        'total_delivered': 0,
+                        'total_unique_opens': 0,
+                        'total_opens': 0,
+                        'total_unique_clicks': 0,
+                        'total_clicks': 0,
+                        'avg_unique_open_rate': 0,
+                        'avg_total_open_rate': 0,
+                        'avg_unique_click_rate': 0,
+                        'avg_total_click_rate': 0,
+                        'specialties': [],
+                        'campaigns': []
                     },
                     'users': []
                 })
                 continue
 
-            # Query user_profiles directly by NPI
+            # Query user_profiles and campaign_interactions by NPI
+            # Match the logic from AudienceQueryBuilder - get full engagement data
             placeholders = ','.join(['%s'] * len(npis_in_tier))
+
+            # Get all interaction data for these NPIs
             cursor.execute(f"""
-                SELECT email, npi, unique_open_rate, emails_sent, emails_opened
-                FROM user_profiles
-                WHERE npi IN ({placeholders})
+                SELECT
+                    up.email,
+                    up.first_name,
+                    up.last_name,
+                    up.specialty,
+                    up.contact_id as npi,
+                    cd.campaign_base_name,
+                    ci.event_type,
+                    COUNT(*) as event_count
+                FROM user_profiles up
+                LEFT JOIN campaign_interactions ci ON up.email = ci.email
+                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                WHERE up.contact_id IN ({placeholders})
+                GROUP BY up.email, up.first_name, up.last_name, up.specialty, up.contact_id, cd.campaign_base_name, ci.event_type
+                ORDER BY up.email, cd.campaign_base_name
             """, npis_in_tier)
 
-            user_data = cursor.fetchall()
+            raw_data = cursor.fetchall()
 
-            # Calculate aggregate metrics
-            total_users = len(npis_in_tier)
-            matched_users = len(user_data)
+            # Process results into user-level metrics (same logic as engagement-query)
+            users_data = {}
 
-            if user_data:
-                avg_open_rate = sum(float(u.get('unique_open_rate', 0) or 0) for u in user_data) / matched_users
-                avg_emails_sent = sum(int(u.get('emails_sent', 0) or 0) for u in user_data) / matched_users
-                avg_emails_opened = sum(int(u.get('emails_opened', 0) or 0) for u in user_data) / matched_users
-                engaged_count = sum(1 for u in user_data if float(u.get('unique_open_rate', 0) or 0) >= 20)
-                engaged_percentage = (engaged_count / matched_users * 100) if matched_users > 0 else 0
-            else:
-                avg_open_rate = avg_emails_sent = avg_emails_opened = engaged_count = engaged_percentage = 0
+            for row in raw_data:
+                email = row['email']
+                campaign_name = row['campaign_base_name']
+                event_type = row['event_type']
 
-            # Build individual user details (top 10 by open rate)
-            user_details = []
-            for user in sorted(user_data, key=lambda x: float(x.get('unique_open_rate', 0) or 0), reverse=True)[:10]:
-                user_details.append({
-                    'email': user.get('email'),
-                    'npi': user.get('npi'),
-                    'open_rate': round(float(user.get('unique_open_rate', 0) or 0), 2),
-                    'emails_sent': int(user.get('emails_sent', 0) or 0),
-                    'emails_opened': int(user.get('emails_opened', 0) or 0)
+                # Initialize user if not exists
+                if email not in users_data:
+                    users_data[email] = {
+                        'email': email,
+                        'first_name': row['first_name'],
+                        'last_name': row['last_name'],
+                        'specialty': row['specialty'] or '',
+                        'npi': row['npi'],
+                        'campaigns': {},
+                        'total_sends': 0,
+                        'unique_opens': 0,
+                        'total_opens': 0,
+                        'unique_clicks': 0,
+                        'total_clicks': 0
+                    }
+
+                # Skip if no campaign data (user exists but no interactions)
+                if not campaign_name or not event_type:
+                    continue
+
+                event_type_lower = event_type.lower()
+                event_count = row['event_count']
+
+                # Initialize campaign for user if not exists
+                if campaign_name not in users_data[email]['campaigns']:
+                    users_data[email]['campaigns'][campaign_name] = {
+                        'sent': False,
+                        'bounced': False,
+                        'opened': False,
+                        'clicked': False,
+                        'open_count': 0,
+                        'click_count': 0
+                    }
+
+                # Record event
+                if event_type_lower == 'sent':
+                    users_data[email]['campaigns'][campaign_name]['sent'] = True
+                elif event_type_lower == 'bounce':
+                    users_data[email]['campaigns'][campaign_name]['bounced'] = True
+                elif event_type_lower == 'open':
+                    users_data[email]['campaigns'][campaign_name]['opened'] = True
+                    users_data[email]['campaigns'][campaign_name]['open_count'] = event_count
+                elif event_type_lower == 'click':
+                    users_data[email]['campaigns'][campaign_name]['clicked'] = True
+                    users_data[email]['campaigns'][campaign_name]['click_count'] = event_count
+
+            # Calculate user-level totals and aggregate metrics
+            enriched_users = []
+            aggregate_stats = {
+                'total_delivered': 0,
+                'total_unique_opens': 0,
+                'total_opens': 0,
+                'total_unique_clicks': 0,
+                'total_clicks': 0,
+                'specialties': set(),
+                'campaigns': set()
+            }
+
+            for email, user_data in users_data.items():
+                user_campaigns = []
+                total_delivered = 0
+
+                # Calculate metrics from campaign data
+                for campaign_name, camp_stats in user_data['campaigns'].items():
+                    if camp_stats['sent']:
+                        # Delivered = sent and (not bounced OR opened)
+                        is_delivered = not camp_stats['bounced'] or camp_stats['opened']
+
+                        if is_delivered:
+                            total_delivered += 1
+                            user_campaigns.append(campaign_name)
+
+                            if camp_stats['opened']:
+                                user_data['unique_opens'] += 1
+                                user_data['total_opens'] += camp_stats['open_count']
+
+                            if camp_stats['clicked']:
+                                user_data['unique_clicks'] += 1
+                                user_data['total_clicks'] += camp_stats['click_count']
+
+                # Skip if no delivered campaigns
+                if total_delivered == 0:
+                    continue
+
+                # Calculate rates
+                unique_open_rate = round((user_data['unique_opens'] / total_delivered * 100), 2) if total_delivered > 0 else 0
+                total_open_rate = round((user_data['total_opens'] / total_delivered * 100), 2) if total_delivered > 0 else 0
+                unique_click_rate = round((user_data['unique_clicks'] / user_data['unique_opens'] * 100), 2) if user_data['unique_opens'] > 0 else 0
+                total_click_rate = round((user_data['total_clicks'] / user_data['total_opens'] * 100), 2) if user_data['total_opens'] > 0 else 0
+
+                enriched_users.append({
+                    'email': user_data['email'],
+                    'first_name': user_data['first_name'],
+                    'last_name': user_data['last_name'],
+                    'specialty': user_data['specialty'],
+                    'npi': user_data['npi'],
+                    'campaigns_sent': user_campaigns,
+                    'campaign_count': total_delivered,
+                    'unique_opens': user_data['unique_opens'],
+                    'total_opens': user_data['total_opens'],
+                    'unique_clicks': user_data['unique_clicks'],
+                    'total_clicks': user_data['total_clicks'],
+                    'unique_open_rate': unique_open_rate,
+                    'total_open_rate': total_open_rate,
+                    'unique_click_rate': unique_click_rate,
+                    'total_click_rate': total_click_rate
                 })
+
+                # Update aggregate stats
+                aggregate_stats['total_delivered'] += total_delivered
+                aggregate_stats['total_unique_opens'] += user_data['unique_opens']
+                aggregate_stats['total_opens'] += user_data['total_opens']
+                aggregate_stats['total_unique_clicks'] += user_data['unique_clicks']
+                aggregate_stats['total_clicks'] += user_data['total_clicks']
+                aggregate_stats['specialties'].add(user_data['specialty'])
+                aggregate_stats['campaigns'].update(user_campaigns)
+
+            # Calculate aggregate rates
+            aggregate_stats['avg_unique_open_rate'] = round(
+                (aggregate_stats['total_unique_opens'] / aggregate_stats['total_delivered'] * 100), 2
+            ) if aggregate_stats['total_delivered'] > 0 else 0
+
+            aggregate_stats['avg_total_open_rate'] = round(
+                (aggregate_stats['total_opens'] / aggregate_stats['total_delivered'] * 100), 2
+            ) if aggregate_stats['total_delivered'] > 0 else 0
+
+            aggregate_stats['avg_unique_click_rate'] = round(
+                (aggregate_stats['total_unique_clicks'] / aggregate_stats['total_unique_opens'] * 100), 2
+            ) if aggregate_stats['total_unique_opens'] > 0 else 0
+
+            aggregate_stats['avg_total_click_rate'] = round(
+                (aggregate_stats['total_clicks'] / aggregate_stats['total_opens'] * 100), 2
+            ) if aggregate_stats['total_opens'] > 0 else 0
+
+            # Sort users by unique_open_rate descending (top 10 most engaged)
+            enriched_users.sort(key=lambda x: x['unique_open_rate'], reverse=True)
+            top_10_users = enriched_users[:10]
+
+            # Convert sets to sorted lists for JSON serialization
+            aggregate_stats['specialties'] = sorted(list(aggregate_stats['specialties']))
+            aggregate_stats['campaigns'] = sorted(list(aggregate_stats['campaigns']))
 
             tier_results.append({
                 'tier': f'{tier_count}/{total_lists}',
-                'user_count': total_users,
-                'matched_count': matched_users,
-                'aggregate': {
-                    'avg_open_rate': round(avg_open_rate, 2),
-                    'avg_emails_sent': round(avg_emails_sent, 2),
-                    'avg_emails_opened': round(avg_emails_opened, 2),
-                    'engaged_count': engaged_count,
-                    'engaged_percentage': round(engaged_percentage, 2)
-                },
-                'users': user_details
+                'user_count': len(npis_in_tier),
+                'matched_count': len(enriched_users),
+                'aggregate': aggregate_stats,
+                'users': top_10_users
             })
+
+        # Calculate high-level engagement summary for all users on at least one target list
+        # Get all NPIs that are on at least one target list (tier > 0)
+        all_target_list_npis = []
+        for tier_count in range(1, total_lists + 1):
+            npis_in_tier = tier_to_npis.get(tier_count, [])
+            all_target_list_npis.extend(npis_in_tier)
+
+        # Total count of NPIs on at least one target list (from IQVIA list)
+        total_npis_on_target_lists = len(all_target_list_npis)
+
+        # Query engagement data for all users on target lists
+        if all_target_list_npis:
+            placeholders = ','.join(['%s'] * len(all_target_list_npis))
+            cursor.execute(f"""
+                SELECT DISTINCT up.contact_id as npi
+                FROM user_profiles up
+                JOIN campaign_interactions ci ON up.email = ci.email
+                WHERE up.contact_id IN ({placeholders})
+                AND ci.event_type = 'open'
+            """, all_target_list_npis)
+
+            users_who_opened = cursor.fetchall()
+            users_who_opened_at_least_one = len(users_who_opened)
+        else:
+            users_who_opened_at_least_one = 0
+
+        # Aggregate stats from tier results (matched in DB)
+        total_matched_in_db = 0
+        total_delivered_overall = 0
+        total_unique_opens_overall = 0
+
+        for tier in tier_results:
+            # Skip the 0/total_lists tier (users not on any target list)
+            if tier['tier'] != f'0/{total_lists}':
+                total_matched_in_db += tier['matched_count']
+                total_delivered_overall += tier['aggregate']['total_delivered']
+                total_unique_opens_overall += tier['aggregate']['total_unique_opens']
+
+        # Calculate percentages
+        # Percentage who opened is based on total NPIs on target lists (not just matched in DB)
+        percentage_who_opened = round((users_who_opened_at_least_one / total_npis_on_target_lists * 100), 2) if total_npis_on_target_lists > 0 else 0
+        avg_unique_open_rate_overall = round((total_unique_opens_overall / total_delivered_overall * 100), 2) if total_delivered_overall > 0 else 0
+
+        engagement_summary = {
+            'total_npis_on_target_lists': total_npis_on_target_lists,  # Total NPIs from IQVIA on target lists
+            'total_matched_in_db': total_matched_in_db,  # How many we found in the database
+            'users_who_opened_at_least_one': users_who_opened_at_least_one,
+            'percentage_who_opened': percentage_who_opened,
+            'avg_unique_open_rate': avg_unique_open_rate_overall,
+            'total_delivered': total_delivered_overall,
+            'total_unique_opens': total_unique_opens_overall
+        }
 
         cursor.close()
         conn.close()
 
         return jsonify({
-            'tiers': tier_results
+            'tiers': tier_results,
+            'engagement_summary': engagement_summary
         }), 200
 
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Engagement by tier error: {error_trace}")
         return jsonify({'error': str(e)}), 500
 
 @list_analysis_bp.route('/engagement-comparison', methods=['POST'])

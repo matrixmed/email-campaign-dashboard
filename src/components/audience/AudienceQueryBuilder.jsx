@@ -3,49 +3,63 @@ import '../../styles/AudienceQueryBuilder.css';
 import { API_BASE_URL } from '../../config/api';
 
 const AudienceQueryBuilder = () => {
-    const [discoveryForm, setDiscoveryForm] = useState({
-        specialty: 'all',
-        engagement_level: 'all',
-        limit: '',
-        campaign_list: []
-    });
+    // Form state
+    const [searchMode, setSearchMode] = useState('specialty'); // 'specialty' or 'campaign'
+    const [selectedSpecialties, setSelectedSpecialties] = useState([]);
+    const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+    const [engagementType, setEngagementType] = useState('all'); // 'opened', 'unopened', 'all'
+    const [specialtyMergeMode, setSpecialtyMergeMode] = useState(false);
 
+    // Data
+    const [specialties, setSpecialties] = useState([]);
+    const [campaigns, setCampaigns] = useState([]);
+
+    // UI state
+    const [showSpecialtySelector, setShowSpecialtySelector] = useState(false);
+    const [showCampaignSelector, setShowCampaignSelector] = useState(false);
+    const [specialtySearchTerm, setSpecialtySearchTerm] = useState('');
+    const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
+
+    // Results
+    const [loading, setLoading] = useState(false);
+    const [results, setResults] = useState(null);
+    const [error, setError] = useState('');
+
+    // Analysis form state (keep existing analyze users functionality)
     const [analysisForm, setAnalysisForm] = useState({
         userInput: '',
         inputType: 'email'
     });
-
-    const [specialties, setSpecialties] = useState([]);
-    const [campaigns, setCampaigns] = useState([]);
-    const [discoveryLoading, setDiscoveryLoading] = useState(false);
     const [analysisLoading, setAnalysisLoading] = useState(false);
-    const [discoveryResults, setDiscoveryResults] = useState(null);
     const [analysisResults, setAnalysisResults] = useState(null);
-    const [discoveryError, setDiscoveryError] = useState('');
     const [analysisError, setAnalysisError] = useState('');
-    const [discoveryPage, setDiscoveryPage] = useState(1);
-    const [analysisPage, setAnalysisPage] = useState(1);
     const [fileUpload, setFileUpload] = useState(null);
-    const [showCampaignSelector, setShowCampaignSelector] = useState(false);
-    const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
-    const resultsPerPage = 100;
+
     const API_BASE = `${API_BASE_URL}/api`;
 
     useEffect(() => {
         fetchSpecialties();
         fetchCampaigns();
-    }, []);
+    }, [specialtyMergeMode]);
 
     const fetchSpecialties = async () => {
-        setSpecialties([
-            'Dermatology',
-            'Oncology',
-            'Neurology',
-            'Gastroenterology',
-            'Ophthalmology',
-            'Hematology',
-            'NPPA'
-        ]);
+        try {
+            const url = `${API_BASE}/users/specialties?merge=${specialtyMergeMode}`;
+            console.log('Fetching specialties from:', url);
+            const response = await fetch(url);
+            console.log('Specialties response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Specialties data:', data);
+                setSpecialties(data.specialties || []);
+            } else {
+                const errorText = await response.text();
+                console.error('Failed to fetch specialties:', response.status, errorText);
+            }
+        } catch (err) {
+            console.error('Error fetching specialties:', err);
+        }
     };
 
     const fetchCampaigns = async () => {
@@ -62,54 +76,150 @@ const AudienceQueryBuilder = () => {
         }
     };
 
-    const handleDiscoveryChange = (e) => {
-        const { name, value } = e.target;
-        setDiscoveryForm(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        if (discoveryResults) {
-            setDiscoveryResults(null);
-        }
-        setDiscoveryPage(1);
+    const handleSpecialtyToggle = (specialty) => {
+        setSelectedSpecialties(prev => {
+            const isSelected = prev.includes(specialty);
+            return isSelected
+                ? prev.filter(s => s !== specialty)
+                : [...prev, specialty];
+        });
     };
 
-    const handleDiscoveryCampaignToggle = (campaign) => {
-        setDiscoveryForm(prev => {
-            const currentList = prev.campaign_list || [];
-            const isSelected = currentList.includes(campaign.campaign_name);
-
-            return {
-                ...prev,
-                campaign_list: isSelected
-                    ? currentList.filter(c => c !== campaign.campaign_name)
-                    : [...currentList, campaign.campaign_name]
-            };
+    const handleCampaignToggle = (campaign) => {
+        setSelectedCampaigns(prev => {
+            const isSelected = prev.includes(campaign.campaign_name);
+            return isSelected
+                ? prev.filter(c => c !== campaign.campaign_name)
+                : [...prev, campaign.campaign_name];
         });
-        if (discoveryResults) {
-            setDiscoveryResults(null);
-        }
+    };
+
+    const handleSelectAllSpecialties = () => {
+        const filteredSpecialties = specialties.filter(spec =>
+            spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+        );
+        setSelectedSpecialties(filteredSpecialties);
+    };
+
+    const handleClearAllSpecialties = () => {
+        setSelectedSpecialties([]);
     };
 
     const handleSelectAllCampaigns = () => {
-        const filteredCampaignNames = campaigns
+        const filteredCampaigns = campaigns
             .filter(campaign =>
                 campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
             )
             .map(c => c.campaign_name);
-        setDiscoveryForm(prev => ({
-            ...prev,
-            campaign_list: filteredCampaignNames
-        }));
+        setSelectedCampaigns(filteredCampaigns);
     };
 
     const handleClearAllCampaigns = () => {
-        setDiscoveryForm(prev => ({
-            ...prev,
-            campaign_list: []
-        }));
+        setSelectedCampaigns([]);
     };
 
+    const handleFindUsers = async () => {
+        setLoading(true);
+        setError('');
+        setResults(null);
+
+        try {
+            const requestData = {
+                search_mode: searchMode,
+                specialty_list: searchMode === 'specialty' ? selectedSpecialties : [],
+                campaign_list: selectedCampaigns,
+                engagement_type: engagementType,
+                specialty_merge_mode: specialtyMergeMode,
+                export_csv: false
+            };
+
+            console.log('Request data:', requestData);
+
+            // Validation - only check what's required based on search mode
+            if (searchMode === 'specialty') {
+                if (selectedSpecialties.length === 0) {
+                    throw new Error('Please select at least one specialty');
+                }
+            } else if (searchMode === 'campaign') {
+                if (selectedCampaigns.length === 0) {
+                    throw new Error('Please select at least one campaign');
+                }
+            }
+
+            const response = await fetch(`${API_BASE}/users/engagement-query`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            console.log('Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+            }
+
+            const data = await response.json();
+            console.log('Response data:', data);
+            setResults(data);
+
+        } catch (err) {
+            console.error('Error finding users:', err);
+            setError(err.message || 'Failed to process request');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleExportCSV = async () => {
+        try {
+            const requestData = {
+                search_mode: searchMode,
+                specialty_list: searchMode === 'specialty' ? selectedSpecialties : [],
+                campaign_list: selectedCampaigns,
+                engagement_type: engagementType,
+                specialty_merge_mode: specialtyMergeMode,
+                export_csv: true
+            };
+
+            const response = await fetch(`${API_BASE}/users/engagement-query`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to export CSV');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = response.headers.get('content-disposition')?.split('filename=')[1] || 'user_engagement.csv';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+        } catch (err) {
+            console.error('Error exporting CSV:', err);
+            alert('Failed to export CSV');
+        }
+    };
+
+    // Analysis functions (keeping existing functionality)
     const handleAnalysisChange = (e) => {
         const { name, value } = e.target;
         setAnalysisForm(prev => ({
@@ -146,52 +256,11 @@ const AudienceQueryBuilder = () => {
         e.stopPropagation();
     };
 
-    const handleDiscoverySubmit = async (e) => {
-        e.preventDefault();
-        setDiscoveryLoading(true);
-        setDiscoveryError('');
-        setDiscoveryResults(null);
-        setDiscoveryPage(1);
-
-        try {
-            const requestData = {
-                specialty: discoveryForm.specialty !== 'all' ? discoveryForm.specialty : null,
-                engagement_level: discoveryForm.engagement_level !== 'all' ? discoveryForm.engagement_level : null,
-                campaign_list: discoveryForm.campaign_list.length > 0 ? discoveryForm.campaign_list : null,
-                limit: discoveryForm.limit && parseInt(discoveryForm.limit) > 0 ? parseInt(discoveryForm.limit) : null,
-                export_csv: false
-            };
-
-            const response = await fetch(`${API_BASE}/users/engagement-query`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            setDiscoveryResults(data);
-
-        } catch (err) {
-            console.error('Error querying users:', err);
-            setDiscoveryError(err.message || 'Failed to process request');
-        } finally {
-            setDiscoveryLoading(false);
-        }
-    };
-
     const handleAnalysisSubmit = async (e) => {
         e.preventDefault();
         setAnalysisLoading(true);
         setAnalysisError('');
         setAnalysisResults(null);
-        setAnalysisPage(1);
 
         try {
             let userList = [];
@@ -279,419 +348,547 @@ const AudienceQueryBuilder = () => {
         }
     };
 
-    const getEngagementLevelOptions = () => [
-        { value: 'all', label: 'All Engagement Levels' },
-        { value: 'high', label: 'High Engagement (>50% open rate)' },
-        { value: 'medium', label: 'Medium Engagement (20-50% open rate)' },
-        { value: 'low', label: 'Low Engagement (<20% open rate)' },
-        { value: 'none', label: 'No Engagement' }
-    ];
+    const filteredSpecialties = specialties.filter(spec =>
+        spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+    );
 
-    const getPaginatedUsers = (results, page) => {
-        if (!results || !results.users) return [];
-        const startIndex = (page - 1) * resultsPerPage;
-        const endIndex = startIndex + resultsPerPage;
-        return results.users.slice(startIndex, endIndex);
-    };
-
-    const getTotalPages = (results) => {
-        if (!results || !results.users) return 0;
-        return Math.ceil(results.users.length / resultsPerPage);
-    };
+    const filteredCampaigns = campaigns.filter(campaign =>
+        campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+    );
 
     return (
         <div className="audience-query-builder">
             <div className="query-sections-wrapper">
+                {/* FIND USERS SECTION */}
                 <div className="query-section discovery-section">
                     <div className="query-section-title">
                         <h3>Find Users</h3>
+                        <p className="section-subtitle">Discover users by specialty or campaign with engagement filtering</p>
                     </div>
                     <div className="query-section-content">
-                        <form onSubmit={handleDiscoverySubmit} className="query-form">
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="specialty">Specialty</label>
-                                <select
-                                    id="specialty"
-                                    name="specialty"
-                                    value={discoveryForm.specialty}
-                                    onChange={handleDiscoveryChange}
-                                >
-                                    <option value="all">All Specialties</option>
-                                    {specialties.map(specialty => (
-                                        <option key={specialty} value={specialty}>
-                                            {specialty}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="engagement_level">Engagement Level</label>
-                                <select
-                                    id="engagement_level"
-                                    name="engagement_level"
-                                    value={discoveryForm.engagement_level}
-                                    onChange={handleDiscoveryChange}
-                                >
-                                    {getEngagementLevelOptions().map(option => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="limit">Result Limit</label>
-                                <input
-                                    type="number"
-                                    id="limit"
-                                    name="limit"
-                                    value={discoveryForm.limit}
-                                    onChange={handleDiscoveryChange}
-                                    placeholder="All"
-                                    min="1"
-                                />
-                            </div>
-
+                        <div className="query-form">
+                            {/* Search Mode Toggle */}
                             <div className="form-group full-width">
-                                <label>Filter by Campaigns</label>
+                                <label>Search By</label>
+                                <div className="search-mode-toggle">
+                                    <button
+                                        type="button"
+                                        className={`mode-button ${searchMode === 'specialty' ? 'active' : ''}`}
+                                        onClick={() => setSearchMode('specialty')}
+                                    >
+                                        Specialty
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`mode-button ${searchMode === 'campaign' ? 'active' : ''}`}
+                                        onClick={() => setSearchMode('campaign')}
+                                    >
+                                        Campaign
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="form-grid">
+                                {/* Specialty Selection */}
+                                {searchMode === 'specialty' && (
+                                    <div className="form-group full-width">
+                                        <div className="form-group-header">
+                                            <label>Select Specialties</label>
+                                            <label className="checkbox-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={specialtyMergeMode}
+                                                    onChange={(e) => {
+                                                        setSpecialtyMergeMode(e.target.checked);
+                                                        setSelectedSpecialties([]);
+                                                    }}
+                                                />
+                                                <span>Merge Subspecialties</span>
+                                            </label>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="selector-button"
+                                            onClick={() => setShowSpecialtySelector(true)}
+                                        >
+                                            {selectedSpecialties.length === 0
+                                                ? 'Select Specialties'
+                                                : `${selectedSpecialties.length} Specialt${selectedSpecialties.length !== 1 ? 'ies' : 'y'} Selected`
+                                            }
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Campaign Selection */}
+                                <div className="form-group full-width">
+                                    <label>
+                                        {searchMode === 'campaign' ? 'Select Campaigns' : 'Filter by Campaigns'}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        className="selector-button"
+                                        onClick={() => setShowCampaignSelector(true)}
+                                    >
+                                        {selectedCampaigns.length === 0
+                                            ? 'Select Campaigns'
+                                            : `${selectedCampaigns.length} Campaign${selectedCampaigns.length !== 1 ? 's' : ''} Selected`
+                                        }
+                                    </button>
+                                </div>
+
+                                {/* Engagement Type */}
+                                <div className="form-group">
+                                    <label htmlFor="engagement_type">Engagement Status</label>
+                                    <select
+                                        id="engagement_type"
+                                        value={engagementType}
+                                        onChange={(e) => setEngagementType(e.target.value)}
+                                        className="form-select"
+                                    >
+                                        <option value="all">All Users</option>
+                                        <option value="opened">Opened Emails</option>
+                                        <option value="unopened">Never Opened</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="form-actions">
                                 <button
                                     type="button"
-                                    className="campaign-selector-button"
-                                    onClick={() => setShowCampaignSelector(true)}
+                                    className="submit-button"
+                                    disabled={loading}
+                                    onClick={handleFindUsers}
                                 >
-                                    {discoveryForm.campaign_list.length === 0
-                                        ? 'Select Campaigns'
-                                        : `${discoveryForm.campaign_list.length} Campaign${discoveryForm.campaign_list.length !== 1 ? 's' : ''} Selected`
-                                    }
+                                    {loading ? 'Searching...' : 'Find Users'}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="form-actions">
-                            <button
-                                type="submit"
-                                className="submit-button"
-                                disabled={discoveryLoading}
-                            >
-                                {discoveryLoading ? 'Searching...' : 'Find Users'}
-                            </button>
-                        </div>
-                    </form>
-
-                    {discoveryError && (
-                        <div className="error-message">
-                            <p>{discoveryError}</p>
-                        </div>
-                    )}
-
-                    {discoveryResults && discoveryResults.success && discoveryResults.users && (
-                        <div className="results-section">
-                            <div className="results-header">
-                                <h4>Results</h4>
-                                <div className="results-summary">
-                                    <span>Total: {discoveryResults.total_count}</span>
-                                    <span>Page {discoveryPage} of {getTotalPages(discoveryResults)}</span>
-                                </div>
+                        {error && (
+                            <div className="error-message">
+                                <p>{error}</p>
                             </div>
+                        )}
 
-                            <div className="table-container">
-                                <table className="results-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Email</th>
-                                            <th>Name</th>
-                                            <th>Specialty</th>
-                                            <th>Sends</th>
-                                            <th>U Opens</th>
-                                            <th>T Opens</th>
-                                            <th>U Clicks</th>
-                                            <th>T Clicks</th>
-                                            <th>UOR %</th>
-                                            <th>TOR %</th>
-                                            <th>UCR %</th>
-                                            <th>TCR %</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {getPaginatedUsers(discoveryResults, discoveryPage).map((user, idx) => (
-                                            <tr key={idx}>
-                                                <td>{user.email}</td>
-                                                <td>{user.first_name} {user.last_name}</td>
-                                                <td>{user.specialty}</td>
-                                                <td>{user.total_sends}</td>
-                                                <td>{user.unique_opens}</td>
-                                                <td>{user.total_opens}</td>
-                                                <td>{user.unique_clicks}</td>
-                                                <td>{user.total_clicks}</td>
-                                                <td>{user.unique_open_rate}</td>
-                                                <td>{user.total_open_rate}</td>
-                                                <td>{user.unique_click_rate}</td>
-                                                <td>{user.total_click_rate}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {getTotalPages(discoveryResults) > 1 && (
-                                <div className="pagination">
-                                    <button
-                                        onClick={() => setDiscoveryPage(p => Math.max(1, p - 1))}
-                                        disabled={discoveryPage === 1}
-                                    >
-                                        Previous
-                                    </button>
-                                    <span>Page {discoveryPage} of {getTotalPages(discoveryResults)}</span>
-                                    <button
-                                        onClick={() => setDiscoveryPage(p => Math.min(getTotalPages(discoveryResults), p + 1))}
-                                        disabled={discoveryPage === getTotalPages(discoveryResults)}
-                                    >
-                                        Next
-                                    </button>
+                        {results && results.success && results.aggregate && (
+                            <div className="results-section">
+                                {/* Aggregate Overview */}
+                                <div className="aggregate-overview">
+                                    <h4>Overview</h4>
+                                    <div className="aggregate-grid">
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Total Delivered</span>
+                                            <span className="stat-value">{(results.aggregate.total_delivered || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Unique Opens</span>
+                                            <span className="stat-value">{(results.aggregate.total_unique_opens || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Unique Open Rate</span>
+                                            <span className="stat-value">{results.aggregate.avg_unique_open_rate || 0}%</span>
+                                        </div>
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Total Open Rate</span>
+                                            <span className="stat-value">{results.aggregate.avg_total_open_rate || 0}%</span>
+                                        </div>
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Unique Click Rate</span>
+                                            <span className="stat-value">{results.aggregate.avg_unique_click_rate || 0}%</span>
+                                        </div>
+                                        <div className="aggregate-stat">
+                                            <span className="stat-label">Total Click Rate</span>
+                                            <span className="stat-value">{results.aggregate.avg_total_click_rate || 0}%</span>
+                                        </div>
+                                    </div>
+                                    <div className="aggregate-lists">
+                                        <div className="aggregate-list-item">
+                                            <strong>Specialties:</strong> {(results.aggregate.specialties || []).join(', ') || 'None'}
+                                        </div>
+                                        <div className="aggregate-list-item">
+                                            <strong>Campaigns:</strong> {(results.aggregate.campaigns || []).slice(0, 5).join(', ') || 'None'}
+                                            {(results.aggregate.campaigns || []).length > 5 && ` +${results.aggregate.campaigns.length - 5} more`}
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
+
+                                {/* Sample Data Table */}
+                                {results.users && results.users.length > 0 && (
+                                    <div className="sample-data-section">
+                                        <div className="sample-data-header">
+                                            <h4>Sample Data (First 10 Users)</h4>
+                                            <button
+                                                type="button"
+                                                className="export-button"
+                                                onClick={handleExportCSV}
+                                            >
+                                                Export All to CSV
+                                            </button>
+                                        </div>
+
+                                        <div className="table-container">
+                                            <table className="results-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Email</th>
+                                                        <th>Name</th>
+                                                        <th>Specialty</th>
+                                                        <th>Campaigns</th>
+                                                        <th>U Opens</th>
+                                                        <th>T Opens</th>
+                                                        <th>U Clicks</th>
+                                                        <th>T Clicks</th>
+                                                        <th>UOR %</th>
+                                                        <th>TOR %</th>
+                                                        <th>UCR %</th>
+                                                        <th>TCR %</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {results.users.slice(0, 10).map((user, idx) => (
+                                                        <tr key={idx}>
+                                                            <td>{user.email}</td>
+                                                            <td>{user.first_name} {user.last_name}</td>
+                                                            <td>{user.specialty}</td>
+                                                            <td title={(user.campaigns_sent || []).join(', ')}>
+                                                                {user.campaign_count || 0} campaign{user.campaign_count !== 1 ? 's' : ''}
+                                                            </td>
+                                                            <td>{user.unique_opens || 0}</td>
+                                                            <td>{user.total_opens || 0}</td>
+                                                            <td>{user.unique_clicks || 0}</td>
+                                                            <td>{user.total_clicks || 0}</td>
+                                                            <td>{user.unique_open_rate || 0}%</td>
+                                                            <td>{user.total_open_rate || 0}%</td>
+                                                            <td>{user.unique_click_rate || 0}%</td>
+                                                            <td>{user.total_click_rate || 0}%</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {results.users.length > 10 && (
+                                            <div className="sample-note">
+                                                Showing 10 of {(results.total_count || 0).toLocaleString()} users. Export to CSV to view all results.
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {results.users && results.users.length === 0 && (
+                                    <div className="sample-note">
+                                        No users found matching the criteria.
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
+                {/* ANALYZE USERS SECTION - Keep existing functionality */}
                 <div className="query-section analysis-section">
                     <div className="query-section-title">
                         <h3>Analyze Users</h3>
+                        <p className="section-subtitle">Analyze specific users by email or NPI</p>
                     </div>
                     <div className="query-section-content">
                         <form onSubmit={handleAnalysisSubmit} className="query-form">
-                        <div className="form-group">
-                            <label htmlFor="inputType">Identifier Type</label>
-                            <select
-                                id="inputType"
-                                name="inputType"
-                                value={analysisForm.inputType}
-                                onChange={handleAnalysisChange}
-                            >
-                                <option value="email">Email</option>
-                                <option value="npi">NPI</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label htmlFor="userInput">Paste User Identifiers (Max 100)</label>
-                            <textarea
-                                id="userInput"
-                                name="userInput"
-                                value={analysisForm.userInput}
-                                onChange={handleAnalysisChange}
-                                placeholder="user@example.com&#10;another@example.com&#10;..."
-                                rows="6"
-                            />
-                            <small>One per line, comma, or semicolon separated</small>
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Or Upload File (CSV/Excel with NPI or Email column)</label>
-                            <div
-                                className="drop-zone"
-                                onDrop={handleDrop}
-                                onDragOver={handleDragOver}
-                            >
-                                <input
-                                    type="file"
-                                    accept=".csv,.xlsx,.xls"
-                                    onChange={handleFileUpload}
-                                    className="file-input-hidden"
-                                    id="analysis-file-input"
-                                />
-                                <label htmlFor="analysis-file-input" className="drop-zone-label">
-                                    {fileUpload ? (
-                                        <span className="file-name-display">{fileUpload.name}</span>
-                                    ) : (
-                                        <div className="drop-zone-content">
-                                            <p>Drag and drop file here</p>
-                                            <p className="drop-zone-or">or</p>
-                                            <span className="drop-zone-browse">Click to browse</span>
-                                        </div>
-                                    )}
-                                </label>
+                            <div className="form-group">
+                                <label htmlFor="inputType">Identifier Type</label>
+                                <select
+                                    id="inputType"
+                                    name="inputType"
+                                    value={analysisForm.inputType}
+                                    onChange={handleAnalysisChange}
+                                    className="form-select"
+                                >
+                                    <option value="email">Email</option>
+                                    <option value="npi">NPI</option>
+                                </select>
                             </div>
-                        </div>
 
-                        <div className="form-actions">
-                            <button
-                                type="submit"
-                                className="submit-button"
-                                disabled={analysisLoading}
-                            >
-                                {analysisLoading ? 'Analyzing...' : 'Analyze Users'}
-                            </button>
-                        </div>
-                    </form>
+                            <div className="form-group full-width">
+                                <label htmlFor="userInput">Paste User Identifiers (Max 100)</label>
+                                <textarea
+                                    id="userInput"
+                                    name="userInput"
+                                    value={analysisForm.userInput}
+                                    onChange={handleAnalysisChange}
+                                    placeholder="user@example.com&#10;another@example.com&#10;..."
+                                    rows="6"
+                                />
+                                <small>One per line, comma, or semicolon separated</small>
+                            </div>
 
-                    {analysisError && (
-                        <div className="error-message">
-                            <p>{analysisError}</p>
-                        </div>
-                    )}
-
-                    {analysisResults && (
-                        <div className="results-section">
-                            {analysisResults.type === 'download' ? (
-                                <div className="download-success">
-                                    <p>{analysisResults.message}</p>
+                            <div className="form-group full-width">
+                                <label>Or Upload File (CSV/Excel with NPI or Email column)</label>
+                                <div
+                                    className="drop-zone"
+                                    onDrop={handleDrop}
+                                    onDragOver={handleDragOver}
+                                >
+                                    <input
+                                        type="file"
+                                        accept=".csv,.xlsx,.xls"
+                                        onChange={handleFileUpload}
+                                        className="file-input-hidden"
+                                        id="analysis-file-input"
+                                    />
+                                    <label htmlFor="analysis-file-input" className="drop-zone-label">
+                                        {fileUpload ? (
+                                            <span className="file-name-display">{fileUpload.name}</span>
+                                        ) : (
+                                            <div className="drop-zone-content">
+                                                <p>Drag and drop file here</p>
+                                                <p className="drop-zone-or">or</p>
+                                                <span className="drop-zone-browse">Click to browse</span>
+                                            </div>
+                                        )}
+                                    </label>
                                 </div>
-                            ) : analysisResults.success && analysisResults.users ? (
-                                <>
-                                    <div className="results-header">
-                                        <h4>Results</h4>
-                                        <div className="results-summary">
-                                            <span>Total: {analysisResults.total_count}</span>
-                                            <span>Page {analysisPage} of {getTotalPages(analysisResults)}</span>
-                                        </div>
-                                    </div>
+                            </div>
 
-                                    <div className="table-container">
-                                        <table className="results-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Email</th>
-                                                    <th>Name</th>
-                                                    <th>Specialty</th>
-                                                    <th>Sends</th>
-                                                    <th>U Opens</th>
-                                                    <th>T Opens</th>
-                                                    <th>U Clicks</th>
-                                                    <th>T Clicks</th>
-                                                    <th>UOR %</th>
-                                                    <th>TOR %</th>
-                                                    <th>UCR %</th>
-                                                    <th>TCR %</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {getPaginatedUsers(analysisResults, analysisPage).map((user, idx) => (
-                                                    <tr key={idx}>
-                                                        <td>{user.email}</td>
-                                                        <td>{user.first_name} {user.last_name}</td>
-                                                        <td>{user.specialty}</td>
-                                                        <td>{user.total_sends}</td>
-                                                        <td>{user.unique_opens}</td>
-                                                        <td>{user.total_opens}</td>
-                                                        <td>{user.unique_clicks}</td>
-                                                        <td>{user.total_clicks}</td>
-                                                        <td>{user.unique_open_rate}</td>
-                                                        <td>{user.total_open_rate}</td>
-                                                        <td>{user.unique_click_rate}</td>
-                                                        <td>{user.total_click_rate}</td>
+                            <div className="form-actions">
+                                <button
+                                    type="submit"
+                                    className="submit-button"
+                                    disabled={analysisLoading}
+                                >
+                                    {analysisLoading ? 'Analyzing...' : 'Analyze Users'}
+                                </button>
+                            </div>
+                        </form>
+
+                        {analysisError && (
+                            <div className="error-message">
+                                <p>{analysisError}</p>
+                            </div>
+                        )}
+
+                        {analysisResults && (
+                            <div className="results-section">
+                                {analysisResults.type === 'download' ? (
+                                    <div className="download-success">
+                                        <p>{analysisResults.message}</p>
+                                    </div>
+                                ) : analysisResults.success && analysisResults.users ? (
+                                    <div className="sample-data-section">
+                                        <div className="sample-data-header">
+                                            <h4>Results ({analysisResults.total_count} users)</h4>
+                                        </div>
+
+                                        <div className="table-container">
+                                            <table className="results-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Email</th>
+                                                        <th>Name</th>
+                                                        <th>Specialty</th>
+                                                        <th>Sends</th>
+                                                        <th>U Opens</th>
+                                                        <th>T Opens</th>
+                                                        <th>U Clicks</th>
+                                                        <th>T Clicks</th>
+                                                        <th>UOR %</th>
+                                                        <th>TOR %</th>
+                                                        <th>UCR %</th>
+                                                        <th>TCR %</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {getTotalPages(analysisResults) > 1 && (
-                                        <div className="pagination">
-                                            <button
-                                                onClick={() => setAnalysisPage(p => Math.max(1, p - 1))}
-                                                disabled={analysisPage === 1}
-                                            >
-                                                Previous
-                                            </button>
-                                            <span>Page {analysisPage} of {getTotalPages(analysisResults)}</span>
-                                            <button
-                                                onClick={() => setAnalysisPage(p => Math.min(getTotalPages(analysisResults), p + 1))}
-                                                disabled={analysisPage === getTotalPages(analysisResults)}
-                                            >
-                                                Next
-                                            </button>
+                                                </thead>
+                                                <tbody>
+                                                    {analysisResults.users.map((user, idx) => (
+                                                        <tr key={idx}>
+                                                            <td>{user.email}</td>
+                                                            <td>{user.first_name} {user.last_name}</td>
+                                                            <td>{user.specialty}</td>
+                                                            <td>{user.total_sends}</td>
+                                                            <td>{user.unique_opens}</td>
+                                                            <td>{user.total_opens}</td>
+                                                            <td>{user.unique_clicks}</td>
+                                                            <td>{user.total_clicks}</td>
+                                                            <td>{user.unique_open_rate}%</td>
+                                                            <td>{user.total_open_rate}%</td>
+                                                            <td>{user.unique_click_rate}%</td>
+                                                            <td>{user.total_click_rate}%</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    )}
-                                </>
-                            ) : null}
-                        </div>
-                    )}
+                                    </div>
+                                ) : null}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
+            {/* Specialty Selector Modal */}
+            {showSpecialtySelector && (
+                <div className="modal-overlay" onClick={() => setShowSpecialtySelector(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Select Specialties</h2>
+                            <button
+                                className="modal-close"
+                                onClick={() => setShowSpecialtySelector(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="modal-search">
+                            <input
+                                type="text"
+                                placeholder="Search specialties..."
+                                value={specialtySearchTerm}
+                                onChange={(e) => setSpecialtySearchTerm(e.target.value)}
+                                className="search-input"
+                            />
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                type="button"
+                                onClick={handleSelectAllSpecialties}
+                                className="action-button select-all"
+                            >
+                                Select All
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearAllSpecialties}
+                                className="action-button clear-all"
+                            >
+                                Clear All
+                            </button>
+                            <div className="selection-count">
+                                {selectedSpecialties.length} selected
+                            </div>
+                        </div>
+
+                        <div className="modal-list">
+                            {filteredSpecialties.length === 0 ? (
+                                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
+                                    {specialties.length === 0 ? (
+                                        <>
+                                            <p>No specialties found in the database.</p>
+                                            <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
+                                                Please check your database connection and ensure the user_profiles table has specialty data.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p>No specialties match your search.</p>
+                                    )}
+                                </div>
+                            ) : (
+                                filteredSpecialties.map(specialty => {
+                                    const isSelected = selectedSpecialties.includes(specialty);
+                                    return (
+                                        <div
+                                            key={specialty}
+                                            className={`modal-list-item ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => handleSpecialtyToggle(specialty)}
+                                        >
+                                            <div className="item-checkbox">
+                                                {isSelected && <span className="checkmark">✓</span>}
+                                            </div>
+                                            <div className="item-info">
+                                                <div className="item-name">{specialty}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                onClick={() => setShowSpecialtySelector(false)}
+                                className="done-button"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Campaign Selector Modal */}
             {showCampaignSelector && (
-                <div className="audience-campaign-modal-overlay" onClick={() => setShowCampaignSelector(false)}>
-                    <div className="audience-campaign-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="audience-campaign-modal-header">
+                <div className="modal-overlay" onClick={() => setShowCampaignSelector(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
                             <h2>Select Campaigns</h2>
                             <button
-                                className="audience-campaign-modal-close"
+                                className="modal-close"
                                 onClick={() => setShowCampaignSelector(false)}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <div className="audience-campaign-modal-search">
+                        <div className="modal-search">
                             <input
                                 type="text"
                                 placeholder="Search campaigns..."
                                 value={campaignSearchTerm}
                                 onChange={(e) => setCampaignSearchTerm(e.target.value)}
-                                className="audience-campaign-search-input"
+                                className="search-input"
                             />
                         </div>
 
-                        <div className="audience-campaign-modal-actions">
+                        <div className="modal-actions">
                             <button
                                 type="button"
                                 onClick={handleSelectAllCampaigns}
-                                className="audience-select-all-button"
+                                className="action-button select-all"
                             >
                                 Select All
                             </button>
                             <button
                                 type="button"
                                 onClick={handleClearAllCampaigns}
-                                className="audience-clear-all-button"
+                                className="action-button clear-all"
                             >
                                 Clear All
                             </button>
-                            <div className="audience-campaign-count">
-                                {discoveryForm.campaign_list.length} selected
+                            <div className="selection-count">
+                                {selectedCampaigns.length} selected
                             </div>
                         </div>
 
-                        <div className="audience-campaign-modal-list">
-                            {campaigns
-                                .filter(campaign =>
-                                    campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
-                                )
-                                .map(campaign => {
-                                    const isSelected = discoveryForm.campaign_list.includes(campaign.campaign_name);
-                                    return (
-                                        <div
-                                            key={campaign.campaign_name}
-                                            className={`audience-campaign-modal-item ${isSelected ? 'selected' : ''}`}
-                                            onClick={() => handleDiscoveryCampaignToggle(campaign)}
-                                        >
-                                            <div className="audience-campaign-checkbox">
-                                                {isSelected && <span className="checkmark">✓</span>}
-                                            </div>
-                                            <div className="audience-campaign-info">
-                                                <div className="audience-campaign-name">{campaign.campaign_name}</div>
-                                                <div className="audience-campaign-stats">
-                                                    <span>Opens: {campaign.volume_metrics?.unique_opens?.toLocaleString() || 'N/A'}</span>
-                                                    <span>Rate: {campaign.core_metrics?.unique_open_rate?.toFixed(1) || 'N/A'}%</span>
-                                                    <span>Delivered: {campaign.volume_metrics?.delivered?.toLocaleString() || 'N/A'}</span>
-                                                </div>
+                        <div className="modal-list">
+                            {filteredCampaigns.map(campaign => {
+                                const isSelected = selectedCampaigns.includes(campaign.campaign_name);
+                                return (
+                                    <div
+                                        key={campaign.campaign_name}
+                                        className={`modal-list-item ${isSelected ? 'selected' : ''}`}
+                                        onClick={() => handleCampaignToggle(campaign)}
+                                    >
+                                        <div className="item-checkbox">
+                                            {isSelected && <span className="checkmark">✓</span>}
+                                        </div>
+                                        <div className="item-info">
+                                            <div className="item-name">{campaign.campaign_name}</div>
+                                            <div className="item-stats">
+                                                <span>Opens: {campaign.volume_metrics?.unique_opens?.toLocaleString() || 'N/A'}</span>
+                                                <span>Rate: {campaign.core_metrics?.unique_open_rate?.toFixed(1) || 'N/A'}%</span>
+                                                <span>Delivered: {campaign.volume_metrics?.delivered?.toLocaleString() || 'N/A'}</span>
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                );
+                            })}
                         </div>
 
-                        <div className="audience-campaign-modal-footer">
+                        <div className="modal-footer">
                             <button
                                 type="button"
                                 onClick={() => setShowCampaignSelector(false)}
-                                className="audience-campaign-done-button"
+                                className="done-button"
                             >
                                 Done
                             </button>

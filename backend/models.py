@@ -101,6 +101,7 @@ class CMIContractValue(Base):
     buy_component_type = Column(String(100))
     data_type = Column(String(50))
     notes = Column(Text)
+    year = Column(Integer, default=2025, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -132,8 +133,11 @@ class CMIReportResult(Base):
     reporting_week_end = Column(Date)
 
     # Report categorization
-    report_category = Column(String(50), index=True)  # 'confirmed_match', 'no_data', 'aggregate_investigation'
+    report_category = Column(String(50), index=True)  # 'confirmed_match', 'no_data', 'aggregate_investigation', 'unexpected'
+    batch = Column(String(50), index=True)  # 'validated', 'no_data', 'investigation', 'unexpected', 'non_cmi'
     match_confidence = Column(Float)
+    is_cmi_brand = Column(Boolean, default=True, index=True)
+    agency = Column(String(255))
 
     # CMI contract data (from SQL database)
     cmi_placement_id = Column(String(100))

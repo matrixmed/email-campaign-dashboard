@@ -21,54 +21,29 @@ const ReportsManager = () => {
     useEffect(() => {
         const fetchReportsData = async () => {
             try {
-                const response = await fetch('https://emaildash.blob.core.windows.net/json-data/report_resource.json?sp=r&st=2025-08-19T18:46:57Z&se=2028-10-27T03:01:57Z&spr=https&sv=2024-11-04&sr=b&sig=ckSR839%2FioPD%2F7Si5EoW7E1%2B5ybwAe5MMw3q2r8M6rA%3D');
+                // Fetch from database API instead of blob storage
+                const response = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=21`);
                 const data = await response.json();
                 setReportsData(data);
 
-                try {
-                    const currentWeekMonday = getCurrentWeekMonday();
-                    currentWeekMonday.setDate(currentWeekMonday.getDate() - 7);
-                    const weekStart = currentWeekMonday.toISOString().split('T')[0];
-
-                    const statusResponse = await fetch(`${API_BASE_URL}/api/cmi/reports/week/${weekStart}`);
-                    if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
-
-                        const newCheckedStates = {};
-                        statusData.reports?.forEach(report => {
-                            if (report.is_submitted) {
-                                const campaignId = report.campaign_id;
-                                newCheckedStates[`${campaignId}_week_1`] = true;
-                                newCheckedStates[`${campaignId}_week_2`] = true;
-                                newCheckedStates[`${campaignId}_week_3`] = true;
-                                if (report.report_category === 'no_data') {
-                                    newCheckedStates[`${campaignId}_no_data`] = true;
-                                }
-                            }
-                        });
-                        setCheckedReports(newCheckedStates);
-                    } else {
-                        const savedStates = localStorage.getItem('reportCheckboxStates');
-                        if (savedStates) {
-                            const { states, lastUpdate } = JSON.parse(savedStates);
-                            const oneWeekAgo = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
-                            const lastMonday = getLastMonday();
-
-                            if (lastUpdate > oneWeekAgo && lastUpdate > lastMonday.getTime()) {
-                                setCheckedReports(states);
-                            } else {
-                                localStorage.removeItem('reportCheckboxStates');
-                            }
+                // Initialize checked states from the fetched data
+                const newCheckedStates = {};
+                data.forEach(report => {
+                    if (report.is_submitted && report.id) {
+                        const reportId = report.id;
+                        // Mark all weeks as submitted if the report is submitted
+                        newCheckedStates[`${reportId}_week_1`] = true;
+                        newCheckedStates[`${reportId}_week_2`] = true;
+                        newCheckedStates[`${reportId}_week_3`] = true;
+                        if (report.is_no_data_report) {
+                            newCheckedStates[`${reportId}_no_data`] = true;
                         }
                     }
-                } catch (error) {
-                    console.error('Error fetching submission statuses from backend:', error);
-                    const savedStates = localStorage.getItem('reportCheckboxStates');
-                    if (savedStates) {
-                        const { states } = JSON.parse(savedStates);
-                        setCheckedReports(states);
-                    }
-                }
+                });
+                setCheckedReports(newCheckedStates);
+
+            } catch (error) {
+                console.error('Error fetching reports data:', error);
             } finally {
                 setLoading(false);
             }
@@ -157,10 +132,10 @@ const ReportsManager = () => {
 
     const filterReports = (reports) => {
         if (!searchTerm) return reports;
-        return reports.filter(report => 
-            report.campaign_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            report.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            report.agency.toLowerCase().includes(searchTerm.toLowerCase())
+        return reports.filter(report =>
+            (report.campaign_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (report.brand || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (report.agency || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     };
 
@@ -177,7 +152,7 @@ const ReportsManager = () => {
                     ...report,
                     week_number: week,
                     week_range: currentTimeframe,
-                    unique_key: `${report.campaign_id}_week_${week}`
+                    unique_key: `${report.id}_week_${week}`
                 });
             }
         });
@@ -198,7 +173,7 @@ const ReportsManager = () => {
                     ...report,
                     week_number: week,
                     week_range: currentTimeframe,
-                    unique_key: `${report.campaign_id}_no_data`
+                    unique_key: `${report.id}_no_data`
                 });
             }
         });
@@ -227,7 +202,7 @@ const ReportsManager = () => {
                         ...report,
                         week_number: w,
                         week_range: { start: weekStart, end: weekEnd },
-                        unique_key: `${report.campaign_id}_week_${w}`,
+                        unique_key: `${report.id}_week_${w}`,
                         days_ago: Math.floor((new Date() - mondayFromData) / (24 * 60 * 60 * 1000))
                     });
                 }
@@ -320,8 +295,10 @@ const ReportsManager = () => {
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
                 setCheckedReports(checkedReports);
-                console.error('Failed to update submission status');
+                console.error('Failed to update submission status:', response.status, errorData);
+                alert(`Failed to update: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             setCheckedReports(checkedReports);
@@ -352,8 +329,10 @@ const ReportsManager = () => {
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
                 setCheckedReports(checkedReports);
-                console.error('Failed to update no-data submission status');
+                console.error('Failed to update no-data submission status:', response.status, errorData);
+                alert(`Failed to update: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             setCheckedReports(checkedReports);
@@ -362,7 +341,7 @@ const ReportsManager = () => {
     };
 
     const generateAgencyJSON = (report, specificWeek = null) => {
-        const agency = report.agency.toLowerCase();
+        const agency = (report.agency || '').toLowerCase();
 
         switch(agency) {
             case 'cmi':
@@ -418,7 +397,7 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         const previousMonday = new Date(currentTimeframe.start);
@@ -457,7 +436,7 @@ const ReportsManager = () => {
 
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -468,14 +447,14 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
             "campaigns": [
                 {
                     "campaign_name": cleanCampaignName,
-                    "topic_brand": report.brand.toUpperCase(),
+                    "topic_brand": (report.brand || '').toUpperCase(),
                     "topic_therapeutic_area": "IMMUNOLOGY",
                     "topic_asset_ids": ["1339853"]
                 }
@@ -491,7 +470,7 @@ const ReportsManager = () => {
 
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -509,7 +488,7 @@ const ReportsManager = () => {
             return `${year}${month}${day}`;
         };
 
-        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
@@ -519,14 +498,14 @@ const ReportsManager = () => {
             "internal_campaign_name": cleanCampaignName,
             "channel_partner": "Matrix_Medical",
             "channel": "EM",
-            "brand_name": report.brand.toUpperCase(),
+            "brand_name": (report.brand || '').toUpperCase(),
             "promotion_type": "Branded",
             "campaign_target_date": formatDate(currentTimeframe.start),
-            "campaign_code": `${report.brand.toUpperCase()}11778`,
-            "offer_name": `${report.brand.toUpperCase()} MATRIX_EM`,
+            "campaign_code": `${(report.brand || '').toUpperCase()}11778`,
+            "offer_name": `${(report.brand || '').toUpperCase()} MATRIX_EM`,
             "offer_code": "CampOffer-08492",
             "vendor_code": "VC-00103",
-            "tactic_name": `${report.brand.toUpperCase()} EMAIL`,
+            "tactic_name": `${(report.brand || '').toUpperCase()} EMAIL`,
             "tactic_id": "Tactic-019998",
             "contact_filename_base": "CONTACT_DATA",
             "response_filename_base": "RESPONSE",
@@ -536,7 +515,7 @@ const ReportsManager = () => {
 
     const generateOrthoJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -554,7 +533,7 @@ const ReportsManager = () => {
             return `${month}${day}${year}`;
         };
 
-        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
@@ -572,7 +551,7 @@ const ReportsManager = () => {
 
     const generateDefaultJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = report.campaign_name.replace(/\([^)]*\)/g, '').trim();
+        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -583,7 +562,7 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = report.campaign_name.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
@@ -683,10 +662,10 @@ const ReportsManager = () => {
                         )}
                     </div>
                 </td>
-                <td className="brand-column">{report.brand}</td>
+                <td className="brand-column">{report.brand || '-'}</td>
                 <td className="agency-column">
-                    <span className={`agency-badge ${report.agency.toLowerCase()}`}>
-                        {report.agency}
+                    <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
+                        {report.agency || '-'}
                     </span>
                 </td>
                 <td className="date-column-report">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
@@ -694,8 +673,8 @@ const ReportsManager = () => {
                     <label className="checkbox-container">
                         <input
                             type="checkbox"
-                            checked={checkedReports[`${report.campaign_id}_no_data`] || false}
-                            onChange={() => handleNoDataCheckboxChange(report.campaign_id)}
+                            checked={checkedReports[`${report.id}_no_data`] || false}
+                            onChange={() => handleNoDataCheckboxChange(report.id)}
                         />
                         <span className="checkmark"></span>
                     </label>
@@ -732,10 +711,10 @@ const ReportsManager = () => {
                         )}
                     </div>
                 </td>
-                <td className="brand-column">{report.brand}</td>
+                <td className="brand-column">{report.brand || '-'}</td>
                 <td className="agency-column">
-                    <span className={`agency-badge ${report.agency.toLowerCase()}`}>
-                        {report.agency}
+                    <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
+                        {report.agency || '-'}
                     </span>
                 </td>
                 <td className="date-column-report">{formatSendDate(report.send_date)}</td>
@@ -744,8 +723,8 @@ const ReportsManager = () => {
                         <label className="checkbox-container">
                             <input
                                 type="checkbox"
-                                checked={checkedReports[`${report.campaign_id}_week_1`] || false}
-                                onChange={() => handleCheckboxChange(report.campaign_id, 1)}
+                                checked={checkedReports[`${report.id}_week_1`] || false}
+                                onChange={() => handleCheckboxChange(report.id, 1)}
                             />
                             <span className="checkmark"></span>
                         </label>
@@ -758,8 +737,8 @@ const ReportsManager = () => {
                         <label className="checkbox-container">
                             <input
                                 type="checkbox"
-                                checked={checkedReports[`${report.campaign_id}_week_2`] || false}
-                                onChange={() => handleCheckboxChange(report.campaign_id, 2)}
+                                checked={checkedReports[`${report.id}_week_2`] || false}
+                                onChange={() => handleCheckboxChange(report.id, 2)}
                             />
                             <span className="checkmark"></span>
                         </label>
@@ -774,8 +753,8 @@ const ReportsManager = () => {
                         <label className="checkbox-container">
                             <input
                                 type="checkbox"
-                                checked={checkedReports[`${report.campaign_id}_week_3`] || false}
-                                onChange={() => handleCheckboxChange(report.campaign_id, 3)}
+                                checked={checkedReports[`${report.id}_week_3`] || false}
+                                onChange={() => handleCheckboxChange(report.id, 3)}
                             />
                             <span className="checkmark"></span>
                         </label>
@@ -1056,10 +1035,10 @@ const ReportsManager = () => {
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            <td className="brand-column">{report.brand}</td>
+                                                            <td className="brand-column">{report.brand || '-'}</td>
                                                             <td className="agency-column">
-                                                                <span className={`agency-badge ${report.agency.toLowerCase()}`}>
-                                                                    {report.agency}
+                                                                <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
+                                                                    {report.agency || '-'}
                                                                 </span>
                                                             </td>
                                                             <td className="date-column-report">{formatSendDate(report.send_date)}</td>

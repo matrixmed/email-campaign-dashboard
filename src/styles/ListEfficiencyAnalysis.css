@@ -498,8 +498,8 @@ body.light .file-name {
 }
 
 .tier-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 15px;
     margin-top: 20px;
 }
@@ -508,20 +508,13 @@ body.light .file-name {
     background-color: #333;
     border: 2px solid #444;
     border-radius: 8px;
-    padding: 15px;
-    cursor: pointer;
     transition: all 0.3s ease;
+    overflow: hidden;
+    width: 100%;
 }
 
-.tier-card:hover {
+.tier-card.expanded {
     border-color: #0ff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 255, 255, 0.2);
-}
-
-.tier-card.selected {
-    border-color: #0ff;
-    background-color: #3a3a3d;
 }
 
 .tier-header {
@@ -621,14 +614,8 @@ body.light .tier-card {
     border-color: #ddd;
 }
 
-body.light .tier-card:hover {
+body.light .tier-card.expanded {
     border-color: #0077ff;
-    box-shadow: 0 4px 12px rgba(0, 119, 255, 0.2);
-}
-
-body.light .tier-card.selected {
-    border-color: #0077ff;
-    background-color: #f0f8ff;
 }
 
 body.light .tier-header h4 {
@@ -668,4 +655,390 @@ body.light .tier-users-detail td.engaged {
 
 body.light .tier-users-detail tr:hover {
     background-color: #f8f9fa;
+}
+
+/* New styles for expandable tier cards */
+.tier-header-clickable {
+    padding: 12px 20px;
+    cursor: pointer;
+    user-select: none;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.tier-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.tier-title h4 {
+    margin: 0;
+    color: #0ff;
+    font-size: 18px;
+}
+
+.expand-icon {
+    color: #0ff;
+    font-size: 14px;
+    transition: transform 0.3s ease;
+}
+
+.tier-summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.summary-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.summary-stat .stat-label {
+    color: #aaa;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-stat .stat-value {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.tier-detail-view {
+    padding: 20px;
+    background-color: #2a2a2d;
+    border-top: 2px solid #444;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 2000px;
+    }
+}
+
+.aggregate-overview {
+    background-color: #333;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.aggregate-overview h5 {
+    color: #0ff;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.aggregate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.aggregate-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.aggregate-stat .stat-label {
+    color: #aaa;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.aggregate-stat .stat-value {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.aggregate-lists {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.aggregate-list-item {
+    color: #b8b8b8;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.aggregate-list-item strong {
+    color: #0ff;
+}
+
+.sample-data-section {
+    background-color: #333;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.sample-data-section h5 {
+    color: #0ff;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.results-table th {
+    background-color: #444 !important;
+    color: #0ff !important;
+    padding: 10px 8px !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #555 !important;
+    white-space: nowrap;
+}
+
+.results-table td {
+    padding: 10px 8px !important;
+    color: #fff !important;
+    border-bottom: 1px solid #555 !important;
+}
+
+.results-table tbody tr:nth-child(even) {
+    background-color: #2a2a2d !important;
+}
+
+.results-table tbody tr:nth-child(odd) {
+    background-color: #222 !important;
+}
+
+.results-table tr:hover {
+    background-color: #3a3a3d !important;
+}
+
+.no-data-message {
+    padding: 30px;
+    text-align: center;
+    color: #aaa;
+}
+
+.no-data-message p {
+    margin: 10px 0;
+}
+
+.no-data-message .help-text {
+    font-size: 14px;
+    color: #888;
+    margin-top: 15px;
+}
+
+/* Light mode styles for new components */
+body.light .tier-header-clickable {
+    background-color: #fff;
+}
+
+body.light .tier-title h4 {
+    color: #0077ff;
+}
+
+body.light .expand-icon {
+    color: #0077ff;
+}
+
+body.light .summary-stat .stat-label {
+    color: #666;
+}
+
+body.light .summary-stat .stat-value {
+    color: #333;
+}
+
+body.light .tier-detail-view {
+    background-color: #f8f9fa;
+    border-top-color: #ddd;
+}
+
+body.light .aggregate-overview {
+    background-color: #fff;
+}
+
+body.light .aggregate-overview h5 {
+    color: #0077ff;
+}
+
+body.light .aggregate-stat .stat-label {
+    color: #666;
+}
+
+body.light .aggregate-stat .stat-value {
+    color: #333;
+}
+
+body.light .aggregate-list-item {
+    color: #555;
+}
+
+body.light .aggregate-list-item strong {
+    color: #0077ff;
+}
+
+body.light .sample-data-section {
+    background-color: #fff;
+}
+
+body.light .sample-data-section h5 {
+    color: #0077ff;
+}
+
+body.light .results-table th {
+    background-color: #e9ecef !important;
+    color: #333 !important;
+}
+
+body.light .results-table td {
+    color: #333 !important;
+    border-bottom-color: #ddd !important;
+}
+
+body.light .results-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+
+body.light .results-table tbody tr:nth-child(odd) {
+    background-color: #fff !important;
+}
+
+body.light .results-table tr:hover {
+    background-color: #e9ecef !important;
+}
+
+body.light .no-data-message {
+    color: #666;
+}
+
+body.light .no-data-message .help-text {
+    color: #888;
+}
+
+/* Crossover summary section */
+.crossover-summary {
+    margin-top: 20px;
+    padding: 15px 20px;
+    background-color: #3a3a3d;
+    border-radius: 6px;
+    border-left: 4px solid #0ff;
+}
+
+.crossover-summary p {
+    color: #fff;
+    font-size: 15px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.crossover-summary strong {
+    color: #0ff;
+    font-weight: 600;
+}
+
+/* Engagement summary section */
+.engagement-summary {
+    margin-bottom: 25px;
+    padding: 20px;
+    background-color: #3a3a3d;
+    border-radius: 8px;
+    border-left: 4px solid #0ff;
+}
+
+.engagement-summary-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+
+.engagement-summary-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.engagement-summary-stat .summary-label {
+    color: #aaa;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.engagement-summary-stat .summary-value {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.engagement-summary-stat .summary-percentage {
+    color: #0ff;
+    font-size: 18px;
+}
+
+.engagement-summary-stat .summary-detail {
+    color: #aaa;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Light mode styles for summaries */
+body.light .crossover-summary {
+    background-color: #f0f8ff;
+    border-left-color: #0077ff;
+}
+
+body.light .crossover-summary p {
+    color: #333;
+}
+
+body.light .crossover-summary strong {
+    color: #0077ff;
+}
+
+body.light .engagement-summary {
+    background-color: #f0f8ff;
+    border-left-color: #0077ff;
+}
+
+body.light .engagement-summary-stat .summary-label {
+    color: #666;
+}
+
+body.light .engagement-summary-stat .summary-value {
+    color: #333;
+}
+
+body.light .engagement-summary-stat .summary-percentage {
+    color: #0077ff;
+}
+
+body.light .engagement-summary-stat .summary-detail {
+    color: #666;
 }

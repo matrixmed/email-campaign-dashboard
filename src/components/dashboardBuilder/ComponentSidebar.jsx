@@ -26,7 +26,8 @@ const ComponentSidebar = ({
   currentTemplate = 'single',
   selectedTableTypes = {},
   onTableTypeChange,
-  onRestoreDashboard
+  onRestoreDashboard,
+  selectedRowInfo = null
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
@@ -451,7 +452,58 @@ const ComponentSidebar = ({
                   Dashboard Controls
                 </h3>
               </div>
-              
+
+              {/* Table Row Controls - Only show when a row is selected */}
+              {selectedRowInfo && (
+                <div style={{
+                  marginBottom: '24px',
+                  padding: '16px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '2px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ color: 'white', fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>
+                    Row {selectedRowInfo.rowIndex} Selected
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        selectedRowInfo.addRowBelow();
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '14px'
+                      }}
+                    >
+                      ➕ Add Row Below
+                    </button>
+                    <button
+                      onClick={() => {
+                        selectedRowInfo.deleteRow();
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '14px'
+                      }}
+                    >
+                      🗑️ Delete Row
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '24px' }}>
                 <label style={{
                   display: 'flex',

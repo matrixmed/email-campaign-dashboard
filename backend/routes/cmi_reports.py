@@ -111,15 +111,18 @@ def update_submission_status(report_id):
 
         report.updated_at = datetime.utcnow()
 
-        session.commit()
-        session.close()
-
-        return jsonify({
+        # Get values before closing session
+        result_data = {
             'status': 'success',
             'message': 'Submission status updated successfully',
             'is_submitted': report.is_submitted,
             'submitted_at': report.submitted_at.isoformat() if report.submitted_at else None
-        }), 200
+        }
+
+        session.commit()
+        session.close()
+
+        return jsonify(result_data), 200
 
     except Exception as e:
         return jsonify({
@@ -267,6 +270,125 @@ def get_reports_stats():
         }), 200
 
     except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@cmi_reports_bp.route('/reports/all', methods=['GET'])
+@cross_origin()
+def get_all_reports():
+    """
+    Get all reports with optional filtering
+    Query params:
+    - days_back: Number of days to look back (default: 21)
+    - brand: Filter by brand name
+    - agency: Filter by agency
+    - batch: Filter by batch (validated, no_data, investigation, unexpected, non_cmi)
+    - is_cmi: Filter CMI brands only (true/false)
+    """
+    try:
+        from datetime import datetime, timedelta
+        session = get_session()
+
+        # Get query parameters
+        days_back = request.args.get('days_back', 21, type=int)
+        brand_filter = request.args.get('brand')
+        agency_filter = request.args.get('agency')
+        batch_filter = request.args.get('batch')
+        is_cmi_filter = request.args.get('is_cmi')
+
+        # Calculate date cutoff - use reporting week, not send date
+        cutoff_date = (datetime.now() - timedelta(days=days_back)).date()
+
+        # Build query - filter by reporting_week_start
+        from sqlalchemy import or_
+        query = session.query(CMIReportResult).filter(
+            or_(
+                CMIReportResult.reporting_week_start >= cutoff_date,
+                CMIReportResult.reporting_week_start.is_(None)
+            )
+        )
+
+        # Apply filters
+        if brand_filter:
+            query = query.filter(CMIReportResult.brand_name.ilike(f'%{brand_filter}%'))
+        if agency_filter:
+            query = query.filter(CMIReportResult.agency.ilike(f'%{agency_filter}%'))
+        if batch_filter:
+            query = query.filter(CMIReportResult.batch == batch_filter)
+        if is_cmi_filter is not None:
+            is_cmi_bool = is_cmi_filter.lower() == 'true'
+            query = query.filter(CMIReportResult.is_cmi_brand == is_cmi_bool)
+
+        # Order by reporting week descending, then send date
+        reports = query.order_by(
+            CMIReportResult.reporting_week_start.desc().nullslast(),
+            CMIReportResult.send_date.desc().nullslast()
+        ).all()
+
+        # Format for frontend (matching old JSON structure)
+        result = []
+        for r in reports:
+            report_data = {
+                'id': r.id,  # Database ID for submissions
+                'campaign_id': r.campaign_id or r.campaign_name,
+                'campaign_name': r.campaign_name,
+                'brand': r.brand_name,
+                'agency': r.agency,
+                'send_date': r.send_date.strftime('%Y-%m-%d') if r.send_date else None,
+                'monday_date': r.reporting_week_start.strftime('%Y-%m-%d') if r.reporting_week_start else None,
+                'is_no_data_report': r.batch == 'no_data',
+                'batch': r.batch,
+                'is_cmi_brand': r.is_cmi_brand,
+                'match_confidence': r.match_confidence,
+                'is_submitted': r.is_submitted,
+                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None
+            }
+
+            # Add CMI metadata if this is a CMI brand
+            if r.is_cmi_brand and r.cmi_placement_id:
+                # Calculate dates for CMI metadata
+                if r.reporting_week_start and r.reporting_week_end:
+                    week_start = r.reporting_week_start
+                    week_end = r.reporting_week_end
+                    previous_monday = week_start - timedelta(days=7)
+
+                    report_data['cmi_metadata'] = {
+                        'Brand_Name': r.brand_name or '',
+                        'Vehicle_Name': r.vehicle_name or '',
+                        'Supplier': r.supplier or '',
+                        'CMI_PlacementID': r.cmi_placement_id or '',
+                        'Client_PlacementID': r.client_placement_id or '',
+                        'Client_ID': r.client_id or '',
+                        'TargetListID': r.target_list_id or '',
+                        'Creative_Code': r.creative_code or '',
+                        'GCM_Placement_ID': r.gcm_placement_id or '',
+                        'GCM_Placement_ID2': r.gcm_placement_id2 or '',
+                        'Placement_Description': r.placement_description or '',
+                        'contract_number': r.contract_number or '',
+                        'Buy_Component_Type': r.buy_component_type or '',
+                        'Campaign_Type': 'email',
+                        'placement_id': r.cmi_placement_id or '',
+                        'target_list_id': r.target_list_id or '',
+                        'creative_code': r.creative_code or '',
+                        'match_confidence': r.match_confidence
+                    }
+
+            result.append(report_data)
+
+        session.close()
+
+        print(f"[API] Returning {len(result)} reports")
+        if result:
+            print(f"[API] Sample report: {result[0].get('campaign_name', 'N/A')[:50]}...")
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        import traceback
+        print(f"[API ERROR] Error in get_all_reports: {str(e)}")
+        traceback.print_exc()
         return jsonify({
             'status': 'error',
             'message': str(e)

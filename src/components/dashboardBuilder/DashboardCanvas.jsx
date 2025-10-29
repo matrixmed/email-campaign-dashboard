@@ -63,6 +63,7 @@ const DashboardCanvasContent = () => {
     return saved ? JSON.parse(saved) : {};
   });
   const [deletedCardIds, setDeletedCardIds] = useState(new Set(initialState?.deletedCardIds || []));
+  const [selectedRowInfo, setSelectedRowInfo] = useState(null);
 
   // Table selection state
   const [selectedTableTypes, setSelectedTableTypes] = useState(initialState?.selectedTableTypes || {
@@ -1160,6 +1161,7 @@ const DashboardCanvasContent = () => {
             selectedTableTypes={selectedTableTypes}
             onTableTypeChange={handleTableTypeChange}
             onRestoreDashboard={handleRestoreDashboard}
+            selectedRowInfo={selectedRowInfo}
           />
         </div>
 
@@ -1296,6 +1298,7 @@ const DashboardCanvasContent = () => {
                           setIsEditing={setIsEditing}
                           isSelected={selectedElement === card.id || isComponentSelected}
                           onSelect={(e) => handleComponentClick(card.id, e || {})}
+                          onRowSelect={setSelectedRowInfo}
                           campaign={selectedCampaign}
                         />
                       );

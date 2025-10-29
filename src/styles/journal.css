@@ -91,6 +91,7 @@
   max-width: 600px;
   width: 600px;
   position: relative;
+  vertical-align: middle;
 }
 
 @media (min-width: 1800px) {
@@ -107,7 +108,7 @@
   font-weight: 600;
   font-size: 16px;
   font-family: var(--font-body, 'Rubik', sans-serif);
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid #444 !important;
   text-align: left;
 }
 
@@ -135,14 +136,17 @@
   background-color: var(--color-bg-card, #2a2a2d);
 }
 
+.digital-journals-table .journal-title-column {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 .journal-title {
   cursor: pointer;
   color: #fff;
   transition: color 0.2s ease;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
 }
 
 .journal-title:hover {

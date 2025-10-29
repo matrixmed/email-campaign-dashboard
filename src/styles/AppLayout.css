@@ -87,10 +87,14 @@
   padding: var(--spacing-xl);
   background-color: var(--color-bg-primary);
   transition: margin-left 0.3s ease;
+  max-width: calc(100vw - 260px);
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .main-content.sidebar-collapsed {
   margin-left: 80px;
+  max-width: calc(100vw - 80px);
 }
 
 .main-content.dashboard-builder-page {

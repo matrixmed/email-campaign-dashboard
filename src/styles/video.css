@@ -95,6 +95,7 @@
   width: 600px;
   text-align: left;
   position: relative;
+  vertical-align: middle;
 }
 
 @media (min-width: 1800px) {
@@ -104,12 +105,16 @@
   }
 }
 
-.video-metrics-table .title-column .journal-title {
+.video-metrics-table .title-column {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  display: block;
+}
+
+.video-metrics-table .title-column .journal-title {
   cursor: pointer;
+  color: #fff;
+  transition: color 0.2s ease;
 }
 
 .video-metrics-table .title-column .journal-title:hover {
@@ -134,7 +139,8 @@
   font-weight: 600;
   font-size: 16px;
   font-family: var(--font-body, 'Rubik', sans-serif);
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid #444 !important;
+  text-align: left;
 }
 
 .video-metrics-table td {

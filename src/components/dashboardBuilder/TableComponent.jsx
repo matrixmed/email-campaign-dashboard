@@ -2,19 +2,20 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useDrag } from 'react-dnd';
 import { getComponentStyle, MATRIX_COLORS } from './template/LayoutTemplates';
 
-const TableComponent = ({ 
-  id, 
+const TableComponent = ({
+  id,
   title = 'Data Table',
   data = [],
   config = { rows: 5, cols: 3 },
   position = { x: 0, y: 0, width: 400, height: 300 },
   style = {},
-  onEdit, 
+  onEdit,
   onDelete,
   onResize,
   onMove,
   onSelect,
-  isEditing, 
+  onRowSelect,
+  isEditing,
   setIsEditing,
   isSelected = false,
   campaign = null
@@ -27,7 +28,7 @@ const TableComponent = ({
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState(title);
   const [isEditingCell, setIsEditingCell] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const tableRef = useRef(null);
   const titleInputRef = useRef(null);
 
@@ -220,18 +221,62 @@ const TableComponent = ({
     const newData = [...tableData];
     newData[rowIndex][colIndex] = value;
     setTableData(newData);
-    onEdit?.(id, { data: newData });
-  }, [tableData, onEdit, id]);
+
+    // Update the config to save the data properly
+    // Save with headers and rows separated to prevent duplication
+    const updatedConfig = {
+      ...config,
+      customData: {
+        headers: newData[0],
+        rows: newData.slice(1)
+      }
+    };
+
+    onEdit?.(id, { config: updatedConfig });
+  }, [tableData, onEdit, id, config]);
 
   const handleDeleteRow = useCallback((rowIndex) => {
-    if (rowIndex === 0) return; 
-    if (tableData.length <= 2) return; 
-    
+    if (rowIndex === 0) return;
+    if (tableData.length <= 2) return;
+
     const newData = tableData.filter((_, index) => index !== rowIndex);
     setTableData(newData);
-    onEdit?.(id, { data: newData });
-    setContextMenu(null);
-  }, [tableData, onEdit, id]);
+
+    // Update the config to save the data properly
+    const updatedConfig = {
+      ...config,
+      customData: {
+        headers: newData[0],
+        rows: newData.slice(1)
+      }
+    };
+
+    onEdit?.(id, { config: updatedConfig });
+  }, [tableData, onEdit, id, config]);
+
+  const handleAddRow = useCallback((afterRowIndex) => {
+    const numCols = tableData[0]?.length || 3;
+    const newRow = Array(numCols).fill('New');
+
+    const newData = [
+      ...tableData.slice(0, afterRowIndex + 1),
+      newRow,
+      ...tableData.slice(afterRowIndex + 1)
+    ];
+
+    setTableData(newData);
+
+    // Update the config to save the data properly
+    const updatedConfig = {
+      ...config,
+      customData: {
+        headers: newData[0],
+        rows: newData.slice(1)
+      }
+    };
+
+    onEdit?.(id, { config: updatedConfig });
+  }, [tableData, onEdit, id, config]);
 
   const handleTitleEdit = useCallback((newTitle) => {
     setTableTitle(newTitle);
@@ -242,23 +287,12 @@ const TableComponent = ({
     setIsEditingCell({ row: rowIndex, col: colIndex });
   }, []);
 
-  const handleRowRightClick = useCallback((e, rowIndex) => {
-    if (rowIndex === 0) return;
-    
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      rowIndex
-    });
-  }, []);
-
-  const handleCloseContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
   const handleCellKeyDown = useCallback((e, rowIndex, colIndex) => {
+    const input = e.target;
+    const cursorAtStart = input.selectionStart === 0;
+    const cursorAtEnd = input.selectionStart === input.value.length;
+    const hasSelection = input.selectionStart !== input.selectionEnd;
+
     if (e.key === 'Enter') {
       e.preventDefault();
       handleCellEdit(rowIndex, colIndex, editValue);
@@ -289,19 +323,23 @@ const TableComponent = ({
         setIsEditingCell({ row: rowIndex - 1, col: colIndex });
       }
     } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      handleCellEdit(rowIndex, colIndex, editValue);
-      if (colIndex < tableData[rowIndex].length - 1) {
+      // Only navigate to next cell if cursor is at the end and no text is selected
+      if ((cursorAtEnd || hasSelection) && colIndex < tableData[rowIndex].length - 1) {
+        e.preventDefault();
+        handleCellEdit(rowIndex, colIndex, editValue);
         setEditValue(tableData[rowIndex][colIndex + 1]);
         setIsEditingCell({ row: rowIndex, col: colIndex + 1 });
       }
+      // Otherwise allow default cursor movement within the input
     } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      handleCellEdit(rowIndex, colIndex, editValue);
-      if (colIndex > 0) {
+      // Only navigate to previous cell if cursor is at the start and no text is selected
+      if ((cursorAtStart || hasSelection) && colIndex > 0) {
+        e.preventDefault();
+        handleCellEdit(rowIndex, colIndex, editValue);
         setEditValue(tableData[rowIndex][colIndex - 1]);
         setIsEditingCell({ row: rowIndex, col: colIndex - 1 });
       }
+      // Otherwise allow default cursor movement within the input
     }
   }, [tableData, editValue, handleCellEdit]);
 
@@ -405,12 +443,14 @@ const TableComponent = ({
 
   const getCellStyle = (rowIndex, colIndex) => {
     const isHeader = rowIndex === 0;
+    const isSelectedRow = selectedRowIndex === rowIndex && rowIndex > 0;
     return {
       ...dataCellStyle,
-      backgroundColor: rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff',
+      backgroundColor: isSelectedRow ? '#d1e7ff' : (rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'),
       width: getColumnWidth(colIndex),
       fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal',
-      color: '#1f2937'
+      color: '#1f2937',
+      cursor: rowIndex > 0 ? 'pointer' : 'default'
     };
   };
 
@@ -430,16 +470,16 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
+  // Clear row selection when table is deselected
   useEffect(() => {
-    if (contextMenu) {
-      const handleClickOutside = () => setContextMenu(null);
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+    if (!isSelected) {
+      setSelectedRowIndex(null);
+      onRowSelect?.(null);
     }
-  }, [contextMenu]);
+  }, [isSelected, onRowSelect]);
 
   return (
-    <div 
+    <div
       ref={(node) => {
         tableRef.current = node;
         drag(node);
@@ -517,17 +557,30 @@ const TableComponent = ({
               const isHeader = rowIndex === 0;
               
               return (
-                <tr 
-                  key={rowIndex} 
-                  style={{ position: 'relative' }}
-                  onContextMenu={(e) => handleRowRightClick(e, rowIndex)}
+                <tr
+                  key={rowIndex}
+                  style={{
+                    position: 'relative',
+                    backgroundColor: selectedRowIndex === rowIndex && rowIndex > 0 ? '#d1e7ff' : 'transparent'
+                  }}
+                  onClick={(e) => {
+                    if (rowIndex > 0 && !e.target.closest('input')) {
+                      setSelectedRowIndex(rowIndex);
+                      onRowSelect?.({
+                        tableId: id,
+                        rowIndex: rowIndex,
+                        deleteRow: () => handleDeleteRow(rowIndex),
+                        addRowBelow: () => handleAddRow(rowIndex)
+                      });
+                    }
+                  }}
                 >
                   {row.map((cell, colIndex) => {
                     const isEditingThisCell = isEditingCell?.row === rowIndex && isEditingCell?.col === colIndex;
-                    
+
                     return (
-                      <td 
-                        key={colIndex} 
+                      <td
+                        key={colIndex}
                         style={getCellStyle(rowIndex, colIndex)}
                         onDoubleClick={() => {
                           setEditValue(cell);
@@ -588,39 +641,6 @@ const TableComponent = ({
           transition: 'opacity 0.2s ease'
         }}
       />
-
-      {/* Context Menu for row deletion */}
-      {contextMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 1000,
-            minWidth: '120px'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            style={{
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: '#dc3545',
-              borderRadius: '4px'
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-            onClick={() => handleDeleteRow(contextMenu.rowIndex)}
-          >
-            Delete Row
-          </div>
-        </div>
-      )}
     </div>
   );
 };

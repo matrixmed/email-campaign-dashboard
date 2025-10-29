@@ -8,6 +8,7 @@ const SpecialtySection = () => {
   const [activeBucket, setActiveBucket] = useState(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState(null);
   const [combineSubSpecialties, setCombineSubSpecialties] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const layoverRef = useRef(null);
 
   useEffect(() => {
@@ -212,15 +213,20 @@ const SpecialtySection = () => {
     };
   };
 
-  const getSortedSpecialties = (topic) => {
+  const getSortedSpecialties = (topic, searchFilter = '') => {
     if (!activeBucket || !specialtyData[activeBucket][topic] || !specialtyData[activeBucket][topic].Specialties) {
       return [];
     }
-    
+
     const specialties = specialtyData[activeBucket][topic].Specialties;
-    
+    const lowerSearchFilter = searchFilter.toLowerCase().trim();
+
     if (!combineSubSpecialties) {
       return Object.entries(specialties)
+        .filter(([name]) => {
+          if (!lowerSearchFilter) return true;
+          return name.toLowerCase().includes(lowerSearchFilter);
+        })
         .map(([name, data]) => ({
           name,
           ...data,
@@ -228,12 +234,17 @@ const SpecialtySection = () => {
         }))
         .sort((a, b) => b.openRate - a.openRate);
     }
-    
+
     const grouped = {};
-    
+
     Object.entries(specialties).forEach(([name, data]) => {
       const groupName = groupSpecialties(name);
-      
+
+      // Apply search filter
+      if (lowerSearchFilter && !name.toLowerCase().includes(lowerSearchFilter)) {
+        return;
+      }
+
       if (!grouped[groupName]) {
         grouped[groupName] = {
           name: groupName,
@@ -245,30 +256,30 @@ const SpecialtySection = () => {
           subSpecialties: []
         };
       }
-      
+
       grouped[groupName].Sent += data.Sent || 0;
       grouped[groupName].Delivered += data.Delivered || 0;
       grouped[groupName].Unique_Opens += data.Unique_Opens || 0;
-      
+
       const delivered = data.Delivered || 0;
       const rate = data.Unique_Open_Rate || 0;
       if (delivered > 0) {
         grouped[groupName].weightedRateSum += rate * delivered;
         grouped[groupName].totalWeight += delivered;
       }
-      
+
       grouped[groupName].subSpecialties.push({
         name,
         ...data,
         openRate: data.Unique_Open_Rate || 0
       });
     });
-    
+
     Object.values(grouped).forEach(group => {
-      group.openRate = group.totalWeight > 0 ? 
+      group.openRate = group.totalWeight > 0 ?
         group.weightedRateSum / group.totalWeight : 0;
     });
-    
+
     return Object.values(grouped).sort((a, b) => b.openRate - a.openRate);
   };
 
@@ -313,27 +324,39 @@ const SpecialtySection = () => {
     <div className="specialty-section">
       <div className="page-header">
         <h1>Specialty Metrics</h1>
-        <div className="specialty-controls">
-          <div className="specialty-bucket-toggles">
-            {buckets.map((bucket) => (
-              <button
-                key={bucket}
-                className={`specialty-bucket-toggle ${activeBucket === bucket ? 'specialty-active' : ''}`}
-                onClick={() => toggleBucket(bucket)}
-              >
-                {bucket}
-              </button>
-            ))}
-          </div>
-          <label className="specialty-combine-toggle">
-            <input
-              type="checkbox"
-              checked={combineSubSpecialties}
-              onChange={(e) => setCombineSubSpecialties(e.target.checked)}
-            />
-            <span className="specialty-toggle-slider"></span>
-            <span className="specialty-toggle-label">Merge Specialties</span>
-          </label>
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search specialties"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+      </div>
+
+      <div className="specialty-tabs-container">
+        <div className="specialty-tabs">
+          {buckets.map((bucket) => (
+            <button
+              key={bucket}
+              className={`tab-button ${activeBucket === bucket ? 'active' : ''}`}
+              onClick={() => toggleBucket(bucket)}
+            >
+              <span>{bucket}</span>
+            </button>
+          ))}
+        </div>
+        <div className="specialty-merge-selector">
+          <label htmlFor="merge-select">Merge Specialties:</label>
+          <select
+            id="merge-select"
+            value={combineSubSpecialties ? 'merged' : 'separate'}
+            onChange={(e) => setCombineSubSpecialties(e.target.value === 'merged')}
+          >
+            <option value="separate">Separate</option>
+            <option value="merged">Merged</option>
+          </select>
         </div>
       </div>
 
@@ -363,15 +386,20 @@ const SpecialtySection = () => {
               .filter(key => key !== 'Aggregate')
               .map((topic) => {
                 const topicTotals = getTopicTotals(specialtyData[activeBucket], topic);
-                const sortedSpecialties = getSortedSpecialties(topic);
-                
+                const sortedSpecialties = getSortedSpecialties(topic, searchQuery);
+
+                // Hide topic if no specialties match the search
+                if (searchQuery && sortedSpecialties.length === 0) {
+                  return null;
+                }
+
                 return (
                   <div className="specialty-topic-section" key={topic}>
                     <h3 className="specialty-topic-heading">{topic}</h3>
-                    
+
                     <div className="specialty-metrics-grid">
-                      <div 
-                        className="specialty-metric-card specialty-total-card" 
+                      <div
+                        className="specialty-metric-card specialty-total-card"
                         onClick={() => handleSpecialtyClick(topic, {
                           name: "Total Average",
                           Sent: topicTotals.Sent,
@@ -383,9 +411,9 @@ const SpecialtySection = () => {
                         <div className="specialty-name">Total Avg</div>
                         <div className="specialty-open-rate">{formatPercent(topicTotals.Unique_Open_Rate)}</div>
                       </div>
-                      
+
                       {sortedSpecialties.map((specialty) => (
-                        <div 
+                        <div
                           className={`specialty-metric-card ${combineSubSpecialties && specialty.subSpecialties ? 'specialty-grouped-card' : ''}`}
                           key={specialty.name}
                           onClick={() => handleSpecialtyClick(topic, specialty)}

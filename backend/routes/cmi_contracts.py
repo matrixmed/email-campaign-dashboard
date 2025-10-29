@@ -17,8 +17,15 @@ def get_session():
 @cmi_contracts_bp.route('', methods=['GET'])
 def get_all_contracts():
     try:
+        year = request.args.get('year', type=int)
+
         session = get_session()
-        contracts = session.query(CMIContractValue).order_by(CMIContractValue.id.asc()).all()
+        query = session.query(CMIContractValue)
+
+        if year:
+            query = query.filter(CMIContractValue.year == year)
+
+        contracts = query.order_by(CMIContractValue.id.asc()).all()
 
         result = [{
             'id': c.id,
@@ -30,7 +37,8 @@ def get_all_contracts():
             'placement_description': c.placement_description,
             'buy_component_type': c.buy_component_type,
             'data_type': c.data_type,
-            'notes': c.notes
+            'notes': c.notes,
+            'year': c.year
         } for c in contracts]
 
         session.close()
@@ -76,7 +84,8 @@ def create_contract():
             placement_description=data.get('placement_description'),
             buy_component_type=data.get('buy_component_type'),
             data_type=data.get('data_type'),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            year=data.get('year', 2025)
         )
 
         session.add(contract)
@@ -130,6 +139,7 @@ def update_contract(contract_id):
         contract.buy_component_type = data.get('buy_component_type', contract.buy_component_type)
         contract.data_type = data.get('data_type', contract.data_type)
         contract.notes = data.get('notes', contract.notes)
+        contract.year = data.get('year', contract.year)
         contract.updated_at = datetime.utcnow()
 
         session.commit()
@@ -177,8 +187,15 @@ def delete_contract(contract_id):
 @cmi_contracts_bp.route('/export', methods=['GET'])
 def export_contracts():
     try:
+        year = request.args.get('year', type=int)
+
         session = get_session()
-        contracts = session.query(CMIContractValue).order_by(CMIContractValue.id.asc()).all()
+        query = session.query(CMIContractValue)
+
+        if year:
+            query = query.filter(CMIContractValue.year == year)
+
+        contracts = query.order_by(CMIContractValue.id.asc()).all()
 
         output = StringIO()
         writer = csv.writer(output)
@@ -186,7 +203,7 @@ def export_contracts():
         writer.writerow([
             'Contract #', 'Client', 'Brand', 'Vehicle',
             'Placement ID', 'Placement Description',
-            'Buy Component Type', 'Data Type', 'Notes'
+            'Buy Component Type', 'Data Type', 'Notes', 'Year'
         ])
 
         for c in contracts:
@@ -199,7 +216,8 @@ def export_contracts():
                 c.placement_description or '',
                 c.buy_component_type or '',
                 c.data_type or '',
-                c.notes or ''
+                c.notes or '',
+                c.year or ''
             ])
 
         session.close()

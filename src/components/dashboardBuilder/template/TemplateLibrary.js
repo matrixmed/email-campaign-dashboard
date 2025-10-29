@@ -1,15 +1,18 @@
 import { TEMPLATE_TYPES, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS } from './LayoutTemplates';
 
 // Helper function to add Matrix logo
-const addMatrixLogo = (components) => {
-  components.push({
-    id: 'matrix-logo-bottom',
-    type: 'image',
-    src: `${process.env.PUBLIC_URL}/matrix.png`,
-    position: { x: 905, y: 520, width: 90, height: 36 },
-    isLogo: true,
-    style: { pointerEvents: 'none' }
-  });
+const addMatrixLogo = (components, theme) => {
+  // Only add the bottom-right logo when theme is NOT 'matrix' to avoid duplicate logos
+  if (theme !== 'matrix') {
+    components.push({
+      id: 'matrix-logo-bottom',
+      type: 'image',
+      src: `${process.env.PUBLIC_URL}/matrix.png`,
+      position: { x: 905, y: 520, width: 90, height: 36 },
+      isLogo: true,
+      style: { pointerEvents: 'none' }
+    });
+  }
 };
 
 export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
@@ -202,7 +205,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     style: { background: 'transparent' }
   });
 
-  addMatrixLogo(components);
+  addMatrixLogo(components, theme);
   return components;
 };
 
@@ -235,7 +238,7 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
-  addMatrixLogo(components);
+  addMatrixLogo(components, theme);
   return components;
 };
 
@@ -619,7 +622,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
   table2.position = { x: 464, y: 228, width: 261, height: 140 };
   components.push(table2);
 
-  addMatrixLogo(components);
+  addMatrixLogo(components, theme);
   return components;
 };
 
@@ -773,7 +776,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     style: { background: 'transparent' }
   });
 
-  addMatrixLogo(components);
+  addMatrixLogo(components, theme);
   return components;
 };
 

@@ -104,6 +104,7 @@ def analyze_list():
             query = f"""
                 SELECT
                     up.email,
+                    up.npi,
                     up.first_name,
                     up.last_name,
                     up.specialty,
@@ -114,13 +115,14 @@ def analyze_list():
                 LEFT JOIN campaign_interactions ci ON up.email = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.email IN ({placeholders})
-                GROUP BY up.email, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
                 ORDER BY up.email, cd.full_campaign_name
             """
         else:  # NPI
             query = f"""
                 SELECT
                     up.email,
+                    up.npi,
                     up.first_name,
                     up.last_name,
                     up.specialty,
@@ -130,8 +132,8 @@ def analyze_list():
                 FROM user_profiles up
                 LEFT JOIN campaign_interactions ci ON up.email = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE up.contact_id IN ({placeholders})
-                GROUP BY up.email, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
+                WHERE up.npi IN ({placeholders})
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
                 ORDER BY up.email, cd.full_campaign_name
             """
 
@@ -150,6 +152,7 @@ def analyze_list():
             if email not in users_data:
                 users_data[email] = {
                     'email': email,
+                    'npi': row['npi'],
                     'first_name': row['first_name'],
                     'last_name': row['last_name'],
                     'specialty': row['specialty'],
@@ -309,6 +312,7 @@ def engagement_query():
             query = """
                 SELECT
                     up.email,
+                    up.npi,
                     up.first_name,
                     up.last_name,
                     up.specialty,
@@ -344,7 +348,7 @@ def engagement_query():
                 query += f" AND ({' OR '.join(campaign_conditions)})"
 
             query += """
-                GROUP BY up.email, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
 
@@ -354,6 +358,7 @@ def engagement_query():
             query = """
                 SELECT
                     up.email,
+                    up.npi,
                     up.first_name,
                     up.last_name,
                     up.specialty,
@@ -376,7 +381,7 @@ def engagement_query():
                 query += f" AND ({' OR '.join(campaign_conditions)})"
 
             query += """
-                GROUP BY up.email, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
 
@@ -412,6 +417,7 @@ def engagement_query():
 
                 users_data[email] = {
                     'email': email,
+                    'npi': row['npi'],
                     'first_name': row['first_name'],
                     'last_name': row['last_name'],
                     'specialty': user_specialty,

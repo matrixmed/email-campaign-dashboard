@@ -373,15 +373,15 @@ def engagement_by_tier():
                     up.first_name,
                     up.last_name,
                     up.specialty,
-                    up.contact_id as npi,
+                    up.npi,
                     cd.campaign_base_name,
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
                 LEFT JOIN campaign_interactions ci ON up.email = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE up.contact_id IN ({placeholders})
-                GROUP BY up.email, up.first_name, up.last_name, up.specialty, up.contact_id, cd.campaign_base_name, ci.event_type
+                WHERE up.npi IN ({placeholders})
+                GROUP BY up.email, up.first_name, up.last_name, up.specialty, up.npi, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """, npis_in_tier)
 
@@ -529,9 +529,8 @@ def engagement_by_tier():
                 (aggregate_stats['total_clicks'] / aggregate_stats['total_opens'] * 100), 2
             ) if aggregate_stats['total_opens'] > 0 else 0
 
-            # Sort users by unique_open_rate descending (top 10 most engaged)
+            # Sort users by unique_open_rate descending
             enriched_users.sort(key=lambda x: x['unique_open_rate'], reverse=True)
-            top_10_users = enriched_users[:10]
 
             # Convert sets to sorted lists for JSON serialization
             aggregate_stats['specialties'] = sorted(list(aggregate_stats['specialties']))
@@ -542,7 +541,7 @@ def engagement_by_tier():
                 'user_count': len(npis_in_tier),
                 'matched_count': len(enriched_users),
                 'aggregate': aggregate_stats,
-                'users': top_10_users
+                'users': enriched_users  # Return all users, let frontend handle pagination
             })
 
         # Calculate high-level engagement summary for all users on at least one target list
@@ -559,10 +558,10 @@ def engagement_by_tier():
         if all_target_list_npis:
             placeholders = ','.join(['%s'] * len(all_target_list_npis))
             cursor.execute(f"""
-                SELECT DISTINCT up.contact_id as npi
+                SELECT DISTINCT up.npi
                 FROM user_profiles up
                 JOIN campaign_interactions ci ON up.email = ci.email
-                WHERE up.contact_id IN ({placeholders})
+                WHERE up.npi IN ({placeholders})
                 AND ci.event_type = 'open'
             """, all_target_list_npis)
 

@@ -1,14 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import '../../styles/AudienceQueryBuilder.css';
 import { API_BASE_URL } from '../../config/api';
 
-const AudienceQueryBuilder = () => {
+const AudienceQueryBuilder = forwardRef((props, ref) => {
+    // Load persisted state from localStorage on mount
+    const loadPersistedState = () => {
+        try {
+            const saved = localStorage.getItem('audienceQueryState');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return {
+                    selectedSpecialties: parsed.selectedSpecialties || [],
+                    selectedCampaigns: parsed.selectedCampaigns || [],
+                    searchMode: parsed.searchMode || 'specialty',
+                    engagementType: parsed.engagementType || 'all',
+                    specialtyMergeMode: parsed.specialtyMergeMode || false
+                };
+            }
+        } catch (e) {
+            console.error('Error loading persisted state:', e);
+            localStorage.removeItem('audienceQueryState');
+        }
+        return {
+            selectedSpecialties: [],
+            selectedCampaigns: [],
+            searchMode: 'specialty',
+            engagementType: 'all',
+            specialtyMergeMode: false
+        };
+    };
+
+    const persisted = loadPersistedState();
+
     // Form state
-    const [searchMode, setSearchMode] = useState('specialty'); // 'specialty' or 'campaign'
-    const [selectedSpecialties, setSelectedSpecialties] = useState([]);
-    const [selectedCampaigns, setSelectedCampaigns] = useState([]);
-    const [engagementType, setEngagementType] = useState('all'); // 'opened', 'unopened', 'all'
-    const [specialtyMergeMode, setSpecialtyMergeMode] = useState(false);
+    const [searchMode, setSearchMode] = useState(persisted.searchMode);
+    const [selectedSpecialties, setSelectedSpecialties] = useState(persisted.selectedSpecialties);
+    const [selectedCampaigns, setSelectedCampaigns] = useState(persisted.selectedCampaigns);
+    const [engagementType, setEngagementType] = useState(persisted.engagementType);
+    const [specialtyMergeMode, setSpecialtyMergeMode] = useState(persisted.specialtyMergeMode);
 
     // Data
     const [specialties, setSpecialties] = useState([]);
@@ -25,7 +54,15 @@ const AudienceQueryBuilder = () => {
     const [results, setResults] = useState(null);
     const [error, setError] = useState('');
 
-    // Analysis form state (keep existing analyze users functionality)
+    // Table state for Find Users section
+    const [findUsersTableState, setFindUsersTableState] = useState({
+        displayCount: 10,
+        sortColumn: null,
+        sortDirection: null,
+        isFullyExpanded: false
+    });
+
+    // Analysis form state
     const [analysisForm, setAnalysisForm] = useState({
         userInput: '',
         inputType: 'email'
@@ -35,7 +72,35 @@ const AudienceQueryBuilder = () => {
     const [analysisError, setAnalysisError] = useState('');
     const [fileUpload, setFileUpload] = useState(null);
 
+    // Table state for Analyze Users section
+    const [analyzeUsersTableState, setAnalyzeUsersTableState] = useState({
+        displayCount: 10,
+        sortColumn: null,
+        sortDirection: null,
+        isFullyExpanded: false
+    });
+
     const API_BASE = `${API_BASE_URL}/api`;
+
+    // Persist only query parameters to localStorage (not results - they're too large)
+    useEffect(() => {
+        try {
+            const stateToPersist = {
+                selectedSpecialties,
+                selectedCampaigns,
+                searchMode,
+                engagementType,
+                specialtyMergeMode
+            };
+            localStorage.setItem('audienceQueryState', JSON.stringify(stateToPersist));
+        } catch (error) {
+            console.warn('Failed to save state to localStorage:', error);
+            // If quota exceeded, clear old state and try again
+            if (error.name === 'QuotaExceededError') {
+                localStorage.removeItem('audienceQueryState');
+            }
+        }
+    }, [selectedSpecialties, selectedCampaigns, searchMode, engagementType, specialtyMergeMode]);
 
     useEffect(() => {
         fetchSpecialties();
@@ -75,6 +140,68 @@ const AudienceQueryBuilder = () => {
             console.error('Error fetching campaigns:', err);
         }
     };
+
+    const clearFindUsers = () => {
+        setResults(null);
+        setSelectedSpecialties([]);
+        setSelectedCampaigns([]);
+        setEngagementType('all');
+        setError('');
+        setFindUsersTableState({
+            displayCount: 10,
+            sortColumn: null,
+            sortDirection: null,
+            isFullyExpanded: false
+        });
+    };
+
+    const clearAnalyzeUsers = () => {
+        setAnalysisResults(null);
+        setAnalysisForm({ userInput: '', inputType: 'email' });
+        setFileUpload(null);
+        setAnalysisError('');
+        setAnalyzeUsersTableState({
+            displayCount: 10,
+            sortColumn: null,
+            sortDirection: null,
+            isFullyExpanded: false
+        });
+    };
+
+    const clearAll = () => {
+        // Clear Find Users
+        setResults(null);
+        setSelectedSpecialties([]);
+        setSelectedCampaigns([]);
+        setEngagementType('all');
+        setError('');
+        setFindUsersTableState({
+            displayCount: 10,
+            sortColumn: null,
+            sortDirection: null,
+            isFullyExpanded: false
+        });
+
+        // Clear Analyze Users
+        setAnalysisResults(null);
+        setAnalysisForm({ userInput: '', inputType: 'email' });
+        setFileUpload(null);
+        setAnalysisError('');
+        setAnalyzeUsersTableState({
+            displayCount: 10,
+            sortColumn: null,
+            sortDirection: null,
+            isFullyExpanded: false
+        });
+
+        // Clear localStorage
+        localStorage.removeItem('audienceQueryState');
+    };
+
+    // Expose clearAll to parent component via ref
+    useImperativeHandle(ref, () => ({
+        clearAll
+    }));
 
     const handleSpecialtyToggle = (specialty) => {
         setSelectedSpecialties(prev => {
@@ -135,7 +262,7 @@ const AudienceQueryBuilder = () => {
 
             console.log('Request data:', requestData);
 
-            // Validation - only check what's required based on search mode
+            // Validation
             if (searchMode === 'specialty') {
                 if (selectedSpecialties.length === 0) {
                     throw new Error('Please select at least one specialty');
@@ -179,47 +306,50 @@ const AudienceQueryBuilder = () => {
         }
     };
 
-    const handleExportCSV = async () => {
-        try {
-            const requestData = {
-                search_mode: searchMode,
-                specialty_list: searchMode === 'specialty' ? selectedSpecialties : [],
-                campaign_list: selectedCampaigns,
-                engagement_type: engagementType,
-                specialty_merge_mode: specialtyMergeMode,
-                export_csv: true
-            };
+    const handleExportFindUsers = () => {
+        if (!results || !results.users) return;
 
-            const response = await fetch(`${API_BASE}/users/engagement-query`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData)
-            });
+        const headers = [
+            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty',
+            'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
+            'UOR %', 'TOR %', 'UCR %', 'TCR %'
+        ];
 
-            if (!response.ok) {
-                throw new Error('Failed to export CSV');
-            }
+        const rows = results.users.map(user => [
+            user.email,
+            user.npi || '',
+            user.first_name || '',
+            user.last_name || '',
+            user.specialty || '',
+            user.campaign_count || 0,
+            user.unique_opens || 0,
+            user.total_opens || 0,
+            user.unique_clicks || 0,
+            user.total_clicks || 0,
+            user.unique_open_rate || 0,
+            user.total_open_rate || 0,
+            user.unique_click_rate || 0,
+            user.total_click_rate || 0
+        ]);
 
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const filename = response.headers.get('content-disposition')?.split('filename=')[1] || 'user_engagement.csv';
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
 
-        } catch (err) {
-            console.error('Error exporting CSV:', err);
-            alert('Failed to export CSV');
-        }
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'audience_query_results.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
-    // Analysis functions (keeping existing functionality)
+    // Analysis functions
     const handleAnalysisChange = (e) => {
         const { name, value } = e.target;
         setAnalysisForm(prev => ({
@@ -348,6 +478,105 @@ const AudienceQueryBuilder = () => {
         }
     };
 
+    const handleExportAnalyzeUsers = () => {
+        if (!analysisResults || !analysisResults.users) return;
+
+        const headers = [
+            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty',
+            'Sends', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
+            'UOR %', 'TOR %', 'UCR %', 'TCR %'
+        ];
+
+        const rows = analysisResults.users.map(user => [
+            user.email,
+            user.npi || '',
+            user.first_name || '',
+            user.last_name || '',
+            user.specialty || '',
+            user.total_sends || 0,
+            user.unique_opens || 0,
+            user.total_opens || 0,
+            user.unique_clicks || 0,
+            user.total_clicks || 0,
+            user.unique_open_rate || 0,
+            user.total_open_rate || 0,
+            user.unique_click_rate || 0,
+            user.total_click_rate || 0
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'user_analysis_results.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Sort users by column
+    const sortUsers = useCallback((users, column, direction) => {
+        if (!column || !direction) return users;
+
+        const sorted = [...users];
+        sorted.sort((a, b) => {
+            let aVal = a[column];
+            let bVal = b[column];
+
+            // Handle name specially
+            if (column === 'name') {
+                aVal = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
+                bVal = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+            } else if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = (bVal || '').toLowerCase();
+            }
+
+            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return sorted;
+    }, []);
+
+    // Handle column header click for sorting (Find Users)
+    const handleFindUsersSort = useCallback((column) => {
+        let newDirection = 'desc';
+
+        if (findUsersTableState.sortColumn === column) {
+            newDirection = findUsersTableState.sortDirection === 'asc' ? 'desc' : 'asc';
+        }
+
+        setFindUsersTableState(prev => ({
+            ...prev,
+            sortColumn: column,
+            sortDirection: newDirection
+        }));
+    }, [findUsersTableState]);
+
+    // Handle column header click for sorting (Analyze Users)
+    const handleAnalyzeUsersSort = useCallback((column) => {
+        let newDirection = 'desc';
+
+        if (analyzeUsersTableState.sortColumn === column) {
+            newDirection = analyzeUsersTableState.sortDirection === 'asc' ? 'desc' : 'asc';
+        }
+
+        setAnalyzeUsersTableState(prev => ({
+            ...prev,
+            sortColumn: column,
+            sortDirection: newDirection
+        }));
+    }, [analyzeUsersTableState]);
+
     const filteredSpecialties = specialties.filter(spec =>
         spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
     );
@@ -355,6 +584,38 @@ const AudienceQueryBuilder = () => {
     const filteredCampaigns = campaigns.filter(campaign =>
         campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
     );
+
+    // Process Find Users table data
+    let findUsersDisplayData = [];
+    let findUsersVisibleData = [];
+    let findUsersHasMore = false;
+    if (results && results.users) {
+        findUsersDisplayData = results.users;
+        if (findUsersTableState.sortColumn) {
+            findUsersDisplayData = sortUsers(findUsersDisplayData, findUsersTableState.sortColumn, findUsersTableState.sortDirection);
+        }
+        // Limit to 1,000 for expand
+        const maxDisplay = Math.min(findUsersDisplayData.length, 1000);
+        const displayLimit = findUsersTableState.isFullyExpanded ? maxDisplay : findUsersTableState.displayCount;
+        findUsersVisibleData = findUsersDisplayData.slice(0, displayLimit);
+        findUsersHasMore = findUsersDisplayData.length > findUsersVisibleData.length;
+    }
+
+    // Process Analyze Users table data
+    let analyzeUsersDisplayData = [];
+    let analyzeUsersVisibleData = [];
+    let analyzeUsersHasMore = false;
+    if (analysisResults && analysisResults.users) {
+        analyzeUsersDisplayData = analysisResults.users;
+        if (analyzeUsersTableState.sortColumn) {
+            analyzeUsersDisplayData = sortUsers(analyzeUsersDisplayData, analyzeUsersTableState.sortColumn, analyzeUsersTableState.sortDirection);
+        }
+        // Limit to 1,000 for expand
+        const maxDisplay = Math.min(analyzeUsersDisplayData.length, 1000);
+        const displayLimit = analyzeUsersTableState.isFullyExpanded ? maxDisplay : analyzeUsersTableState.displayCount;
+        analyzeUsersVisibleData = analyzeUsersDisplayData.slice(0, displayLimit);
+        analyzeUsersHasMore = analyzeUsersDisplayData.length > analyzeUsersVisibleData.length;
+    }
 
     return (
         <div className="audience-query-builder">
@@ -515,39 +776,81 @@ const AudienceQueryBuilder = () => {
                                 {/* Sample Data Table */}
                                 {results.users && results.users.length > 0 && (
                                     <div className="sample-data-section">
-                                        <div className="sample-data-header">
-                                            <h4>Sample Data (First 10 Users)</h4>
-                                            <button
-                                                type="button"
-                                                className="export-button"
-                                                onClick={handleExportCSV}
-                                            >
-                                                Export All to CSV
-                                            </button>
+                                        <div className="table-header-row">
+                                            <h4>User Data ({findUsersDisplayData.length.toLocaleString()} users{findUsersDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
+                                            <div className="table-action-buttons">
+                                                {findUsersDisplayData.length > 10 && (
+                                                    <button
+                                                        className="btn-expand-table"
+                                                        onClick={() => setFindUsersTableState(prev => ({
+                                                            ...prev,
+                                                            isFullyExpanded: !prev.isFullyExpanded,
+                                                            displayCount: prev.isFullyExpanded ? 10 : Math.min(findUsersDisplayData.length, 1000)
+                                                        }))}
+                                                    >
+                                                        {findUsersTableState.isFullyExpanded ? 'Collapse' : `Expand All${findUsersDisplayData.length > 1000 ? ' (Max 1,000)' : ''}`}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="btn-export"
+                                                    onClick={handleExportFindUsers}
+                                                >
+                                                    Export
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="table-container">
                                             <table className="results-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>Email</th>
-                                                        <th>Name</th>
-                                                        <th>Specialty</th>
-                                                        <th>Campaigns</th>
-                                                        <th>U Opens</th>
-                                                        <th>T Opens</th>
-                                                        <th>U Clicks</th>
-                                                        <th>T Clicks</th>
-                                                        <th>UOR %</th>
-                                                        <th>TOR %</th>
-                                                        <th>UCR %</th>
-                                                        <th>TCR %</th>
+                                                        <th onClick={() => handleFindUsersSort('email')} className="sortable">
+                                                            Email {findUsersTableState.sortColumn === 'email' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('npi')} className="sortable">
+                                                            NPI {findUsersTableState.sortColumn === 'npi' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('name')} className="sortable">
+                                                            Name {findUsersTableState.sortColumn === 'name' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('specialty')} className="sortable">
+                                                            Specialty {findUsersTableState.sortColumn === 'specialty' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('campaign_count')} className="sortable">
+                                                            Campaigns {findUsersTableState.sortColumn === 'campaign_count' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('unique_opens')} className="sortable">
+                                                            U Opens {findUsersTableState.sortColumn === 'unique_opens' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('total_opens')} className="sortable">
+                                                            T Opens {findUsersTableState.sortColumn === 'total_opens' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('unique_clicks')} className="sortable">
+                                                            U Clicks {findUsersTableState.sortColumn === 'unique_clicks' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('total_clicks')} className="sortable">
+                                                            T Clicks {findUsersTableState.sortColumn === 'total_clicks' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('unique_open_rate')} className="sortable">
+                                                            UOR % {findUsersTableState.sortColumn === 'unique_open_rate' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('total_open_rate')} className="sortable">
+                                                            TOR % {findUsersTableState.sortColumn === 'total_open_rate' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('unique_click_rate')} className="sortable">
+                                                            UCR % {findUsersTableState.sortColumn === 'unique_click_rate' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('total_click_rate')} className="sortable">
+                                                            TCR % {findUsersTableState.sortColumn === 'total_click_rate' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {results.users.slice(0, 10).map((user, idx) => (
+                                                    {findUsersVisibleData.map((user, idx) => (
                                                         <tr key={idx}>
                                                             <td>{user.email}</td>
+                                                            <td>{user.npi || ''}</td>
                                                             <td>{user.first_name} {user.last_name}</td>
                                                             <td>{user.specialty}</td>
                                                             <td title={(user.campaigns_sent || []).join(', ')}>
@@ -567,9 +870,17 @@ const AudienceQueryBuilder = () => {
                                             </table>
                                         </div>
 
-                                        {results.users.length > 10 && (
-                                            <div className="sample-note">
-                                                Showing 10 of {(results.total_count || 0).toLocaleString()} users. Export to CSV to view all results.
+                                        {findUsersHasMore && !findUsersTableState.isFullyExpanded && (
+                                            <div className="load-more-container">
+                                                <button
+                                                    className="btn-load-more"
+                                                    onClick={() => setFindUsersTableState(prev => ({
+                                                        ...prev,
+                                                        displayCount: prev.displayCount + 10
+                                                    }))}
+                                                >
+                                                    Load More ({findUsersVisibleData.length} of {Math.min(findUsersDisplayData.length, 1000)})
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -585,7 +896,7 @@ const AudienceQueryBuilder = () => {
                     </div>
                 </div>
 
-                {/* ANALYZE USERS SECTION - Keep existing functionality */}
+                {/* ANALYZE USERS SECTION */}
                 <div className="query-section analysis-section">
                     <div className="query-section-title">
                         <h3>Analyze Users</h3>
@@ -673,32 +984,81 @@ const AudienceQueryBuilder = () => {
                                     </div>
                                 ) : analysisResults.success && analysisResults.users ? (
                                     <div className="sample-data-section">
-                                        <div className="sample-data-header">
-                                            <h4>Results ({analysisResults.total_count} users)</h4>
+                                        <div className="table-header-row">
+                                            <h4>Results ({analyzeUsersDisplayData.length} users{analyzeUsersDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
+                                            <div className="table-action-buttons">
+                                                {analyzeUsersDisplayData.length > 10 && (
+                                                    <button
+                                                        className="btn-expand-table"
+                                                        onClick={() => setAnalyzeUsersTableState(prev => ({
+                                                            ...prev,
+                                                            isFullyExpanded: !prev.isFullyExpanded,
+                                                            displayCount: prev.isFullyExpanded ? 10 : Math.min(analyzeUsersDisplayData.length, 1000)
+                                                        }))}
+                                                    >
+                                                        {analyzeUsersTableState.isFullyExpanded ? 'Collapse' : `Expand All${analyzeUsersDisplayData.length > 1000 ? ' (Max 1,000)' : ''}`}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="btn-export"
+                                                    onClick={handleExportAnalyzeUsers}
+                                                >
+                                                    Export
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="table-container">
                                             <table className="results-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>Email</th>
-                                                        <th>Name</th>
-                                                        <th>Specialty</th>
-                                                        <th>Sends</th>
-                                                        <th>U Opens</th>
-                                                        <th>T Opens</th>
-                                                        <th>U Clicks</th>
-                                                        <th>T Clicks</th>
-                                                        <th>UOR %</th>
-                                                        <th>TOR %</th>
-                                                        <th>UCR %</th>
-                                                        <th>TCR %</th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('email')} className="sortable">
+                                                            Email {analyzeUsersTableState.sortColumn === 'email' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('npi')} className="sortable">
+                                                            NPI {analyzeUsersTableState.sortColumn === 'npi' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('name')} className="sortable">
+                                                            Name {analyzeUsersTableState.sortColumn === 'name' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('specialty')} className="sortable">
+                                                            Specialty {analyzeUsersTableState.sortColumn === 'specialty' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('total_sends')} className="sortable">
+                                                            Sends {analyzeUsersTableState.sortColumn === 'total_sends' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('unique_opens')} className="sortable">
+                                                            U Opens {analyzeUsersTableState.sortColumn === 'unique_opens' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('total_opens')} className="sortable">
+                                                            T Opens {analyzeUsersTableState.sortColumn === 'total_opens' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('unique_clicks')} className="sortable">
+                                                            U Clicks {analyzeUsersTableState.sortColumn === 'unique_clicks' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('total_clicks')} className="sortable">
+                                                            T Clicks {analyzeUsersTableState.sortColumn === 'total_clicks' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('unique_open_rate')} className="sortable">
+                                                            UOR % {analyzeUsersTableState.sortColumn === 'unique_open_rate' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('total_open_rate')} className="sortable">
+                                                            TOR % {analyzeUsersTableState.sortColumn === 'total_open_rate' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('unique_click_rate')} className="sortable">
+                                                            UCR % {analyzeUsersTableState.sortColumn === 'unique_click_rate' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('total_click_rate')} className="sortable">
+                                                            TCR % {analyzeUsersTableState.sortColumn === 'total_click_rate' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {analysisResults.users.map((user, idx) => (
+                                                    {analyzeUsersVisibleData.map((user, idx) => (
                                                         <tr key={idx}>
                                                             <td>{user.email}</td>
+                                                            <td>{user.npi || ''}</td>
                                                             <td>{user.first_name} {user.last_name}</td>
                                                             <td>{user.specialty}</td>
                                                             <td>{user.total_sends}</td>
@@ -715,6 +1075,20 @@ const AudienceQueryBuilder = () => {
                                                 </tbody>
                                             </table>
                                         </div>
+
+                                        {analyzeUsersHasMore && !analyzeUsersTableState.isFullyExpanded && (
+                                            <div className="load-more-container">
+                                                <button
+                                                    className="btn-load-more"
+                                                    onClick={() => setAnalyzeUsersTableState(prev => ({
+                                                        ...prev,
+                                                        displayCount: prev.displayCount + 10
+                                                    }))}
+                                                >
+                                                    Load More ({analyzeUsersVisibleData.length} of {Math.min(analyzeUsersDisplayData.length, 1000)})
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : null}
                             </div>
@@ -898,6 +1272,6 @@ const AudienceQueryBuilder = () => {
             )}
         </div>
     );
-};
+});
 
 export default AudienceQueryBuilder;

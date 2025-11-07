@@ -1,20 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
 import '../../styles/ListEfficiencyAnalysis.css';
 
 import { API_BASE_URL } from '../../config/api';
 
-const ListEfficiencyAnalysis = () => {
+const ListEfficiencyAnalysis = forwardRef((props, ref) => {
+    // Load persisted state from localStorage on mount
+    const loadPersistedState = () => {
+        try {
+            const saved = localStorage.getItem('listAnalysisState');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return {
+                    uploadedData: parsed.uploadedData || null,
+                    crossoverData: parsed.crossoverData || null,
+                    engagementByTier: parsed.engagementByTier || null,
+                    iqviaFileName: parsed.iqviaFileName || null,
+                    targetFileNames: parsed.targetFileNames || []
+                };
+            }
+        } catch (e) {
+            console.error('Error loading persisted state:', e);
+        }
+        return {
+            uploadedData: null,
+            crossoverData: null,
+            engagementByTier: null,
+            iqviaFileName: null,
+            targetFileNames: []
+        };
+    };
+
+    const persisted = loadPersistedState();
+
     const [iqviaFile, setIqviaFile] = useState(null);
     const [targetFiles, setTargetFiles] = useState([]);
-    const [uploadedData, setUploadedData] = useState(null);
-    const [crossoverData, setCrossoverData] = useState(null);
-    const [engagementByTier, setEngagementByTier] = useState(null);
+    const [iqviaFileName, setIqviaFileName] = useState(persisted.iqviaFileName);
+    const [targetFileNames, setTargetFileNames] = useState(persisted.targetFileNames);
+    const [uploadedData, setUploadedData] = useState(persisted.uploadedData);
+    const [crossoverData, setCrossoverData] = useState(persisted.crossoverData);
+    const [engagementByTier, setEngagementByTier] = useState(persisted.engagementByTier);
     const [expandedTiers, setExpandedTiers] = useState(new Set());
     const [uploadLoading, setUploadLoading] = useState(false);
     const [crossoverLoading, setCrossoverLoading] = useState(false);
     const [engagementLoading, setEngagementLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Table state for each tier
+    const [tierTableState, setTierTableState] = useState({});
+
+    // Persist state to localStorage whenever it changes
+    useEffect(() => {
+        const stateToPersist = {
+            uploadedData,
+            crossoverData,
+            engagementByTier,
+            iqviaFileName,
+            targetFileNames
+        };
+        localStorage.setItem('listAnalysisState', JSON.stringify(stateToPersist));
+    }, [uploadedData, crossoverData, engagementByTier, iqviaFileName, targetFileNames]);
 
     const handleIqviaUpload = (e) => {
         const file = e.target.files[0];
@@ -47,6 +91,25 @@ const ListEfficiencyAnalysis = () => {
         e.stopPropagation();
     };
 
+    const clearAnalysis = () => {
+        setIqviaFile(null);
+        setTargetFiles([]);
+        setIqviaFileName(null);
+        setTargetFileNames([]);
+        setUploadedData(null);
+        setCrossoverData(null);
+        setEngagementByTier(null);
+        setExpandedTiers(new Set());
+        setTierTableState({});
+        setError(null);
+        localStorage.removeItem('listAnalysisState');
+    };
+
+    // Expose clearAnalysis to parent component via ref
+    useImperativeHandle(ref, () => ({
+        clearAnalysis
+    }));
+
     const uploadLists = async () => {
         if (!iqviaFile || targetFiles.length === 0) {
             setError('Please upload IQVIA list and at least one target list');
@@ -75,6 +138,8 @@ const ListEfficiencyAnalysis = () => {
 
             const data = await response.json();
             setUploadedData(data);
+            setIqviaFileName(iqviaFile.name);
+            setTargetFileNames(targetFiles.map(f => f.name));
         } catch (err) {
             setError(err.message);
         } finally {
@@ -148,13 +213,125 @@ const ListEfficiencyAnalysis = () => {
         }
     };
 
+    // Get or initialize table state for a tier
+    const getTierTableState = useCallback((tierKey) => {
+        if (!tierTableState[tierKey]) {
+            return {
+                displayCount: 10,
+                sortColumn: null,
+                sortDirection: null,
+                isFullyExpanded: false
+            };
+        }
+        return tierTableState[tierKey];
+    }, [tierTableState]);
+
+    // Update table state for a tier
+    const updateTierTableState = useCallback((tierKey, updates) => {
+        setTierTableState(prev => ({
+            ...prev,
+            [tierKey]: {
+                ...getTierTableState(tierKey),
+                ...updates
+            }
+        }));
+    }, [getTierTableState]);
+
+    // Export tier data to CSV
+    const exportTierData = useCallback((tier) => {
+        if (!tier.users || tier.users.length === 0) return;
+
+        // CSV headers
+        const headers = [
+            'Email', 'First Name', 'Last Name', 'Specialty', 'NPI',
+            'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
+            'UOR %', 'TOR %', 'UCR %', 'TCR %'
+        ];
+
+        // CSV rows
+        const rows = tier.users.map(user => [
+            user.email,
+            user.first_name || '',
+            user.last_name || '',
+            user.specialty || '',
+            user.npi || '',
+            user.campaign_count || 0,
+            user.unique_opens || 0,
+            user.total_opens || 0,
+            user.unique_clicks || 0,
+            user.total_clicks || 0,
+            user.unique_open_rate || 0,
+            user.total_open_rate || 0,
+            user.unique_click_rate || 0,
+            user.total_click_rate || 0
+        ]);
+
+        // Create CSV content
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        // Format filename as crossover_X_Y.csv
+        const filename = `crossover_${tier.tier.replace('/', '_')}.csv`;
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, []);
+
+    // Sort users by column
+    const sortUsers = useCallback((users, column, direction) => {
+        if (!column || !direction) return users;
+
+        const sorted = [...users];
+        sorted.sort((a, b) => {
+            let aVal = a[column];
+            let bVal = b[column];
+
+            // Handle name specially
+            if (column === 'name') {
+                aVal = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
+                bVal = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+            } else if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = (bVal || '').toLowerCase();
+            }
+
+            if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return sorted;
+    }, []);
+
+    // Handle column header click for sorting
+    const handleSort = useCallback((tierKey, column) => {
+        const state = getTierTableState(tierKey);
+        let newDirection = 'desc';
+
+        if (state.sortColumn === column) {
+            // Toggle direction
+            newDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        }
+
+        updateTierTableState(tierKey, {
+            sortColumn: column,
+            sortDirection: newDirection
+        });
+    }, [getTierTableState, updateTierTableState]);
+
     return (
         <div className="list-analysis-container">
-            <div className="page-header">
-                <h1>List Efficiency Analysis</h1>
-                <div className="header-spacer"></div>
-            </div>
-
             <div className="analysis-content">
                 {error && (
                     <div className="error-message">
@@ -180,6 +357,8 @@ const ListEfficiencyAnalysis = () => {
                         <label htmlFor="iqvia-file-input" className="drop-zone-label">
                             {iqviaFile ? (
                                 <span className="file-name-display">{iqviaFile.name}</span>
+                            ) : iqviaFileName ? (
+                                <span className="file-name-display">{iqviaFileName} (previously uploaded)</span>
                             ) : (
                                 <div className="drop-zone-content">
                                     <p>Drag and drop IQVIA file here</p>
@@ -211,6 +390,12 @@ const ListEfficiencyAnalysis = () => {
                                 <div className="file-list">
                                     {targetFiles.map((file, idx) => (
                                         <div key={idx} className="file-item">{file.name}</div>
+                                    ))}
+                                </div>
+                            ) : targetFileNames.length > 0 ? (
+                                <div className="file-list">
+                                    {targetFileNames.map((name, idx) => (
+                                        <div key={idx} className="file-item">{name} (previously uploaded)</div>
                                     ))}
                                 </div>
                             ) : (
@@ -319,6 +504,17 @@ const ListEfficiencyAnalysis = () => {
                     <div className="tier-summary">
                         {engagementByTier.tiers.map((tier, idx) => {
                             const isExpanded = expandedTiers.has(tier.tier);
+                            const tierKey = tier.tier;
+                            const tableState = getTierTableState(tierKey);
+
+                            // Sort and paginate users
+                            let displayUsers = tier.users || [];
+                            if (tableState.sortColumn) {
+                                displayUsers = sortUsers(displayUsers, tableState.sortColumn, tableState.sortDirection);
+                            }
+                            const visibleUsers = tableState.isFullyExpanded ? displayUsers : displayUsers.slice(0, tableState.displayCount);
+                            const hasMore = displayUsers.length > visibleUsers.length;
+
                             return (
                             <div
                                 key={idx}
@@ -408,29 +604,76 @@ const ListEfficiencyAnalysis = () => {
                                         {/* Sample Data Table - matching Audience Analysis style */}
                                         {tier.users && tier.users.length > 0 ? (
                                             <div className="sample-data-section">
-                                                <h5>Top 10 Most Engaged Users</h5>
+                                                <div className="table-header-row">
+                                                    <h5>Top {displayUsers.length} Most Engaged Users</h5>
+                                                    <div className="table-action-buttons">
+                                                        <button
+                                                            className="btn-expand-table"
+                                                            onClick={() => updateTierTableState(tierKey, {
+                                                                isFullyExpanded: !tableState.isFullyExpanded,
+                                                                displayCount: tableState.isFullyExpanded ? 10 : displayUsers.length
+                                                            })}
+                                                        >
+                                                            {tableState.isFullyExpanded ? 'Collapse' : 'Expand All'}
+                                                        </button>
+                                                        <button
+                                                            className="btn-export"
+                                                            onClick={() => exportTierData(tier)}
+                                                        >
+                                                            Export
+                                                        </button>
+                                                    </div>
+                                                </div>
                                                 <div className="table-container">
                                                     <table className="results-table">
                                                         <thead>
                                                             <tr>
-                                                                <th>Email</th>
-                                                                <th>Name</th>
-                                                                <th>Specialty</th>
-                                                                <th>Campaigns</th>
-                                                                <th>U Opens</th>
-                                                                <th>T Opens</th>
-                                                                <th>U Clicks</th>
-                                                                <th>T Clicks</th>
-                                                                <th>UOR %</th>
-                                                                <th>TOR %</th>
-                                                                <th>UCR %</th>
-                                                                <th>TCR %</th>
+                                                                <th onClick={() => handleSort(tierKey, 'email')} className="sortable">
+                                                                    Email {tableState.sortColumn === 'email' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'npi')} className="sortable">
+                                                                    NPI {tableState.sortColumn === 'npi' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'name')} className="sortable">
+                                                                    Name {tableState.sortColumn === 'name' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'specialty')} className="sortable">
+                                                                    Specialty {tableState.sortColumn === 'specialty' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'campaign_count')} className="sortable">
+                                                                    Campaigns {tableState.sortColumn === 'campaign_count' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'unique_opens')} className="sortable">
+                                                                    U Opens {tableState.sortColumn === 'unique_opens' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'total_opens')} className="sortable">
+                                                                    T Opens {tableState.sortColumn === 'total_opens' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'unique_clicks')} className="sortable">
+                                                                    U Clicks {tableState.sortColumn === 'unique_clicks' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'total_clicks')} className="sortable">
+                                                                    T Clicks {tableState.sortColumn === 'total_clicks' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'unique_open_rate')} className="sortable">
+                                                                    UOR % {tableState.sortColumn === 'unique_open_rate' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'total_open_rate')} className="sortable">
+                                                                    TOR % {tableState.sortColumn === 'total_open_rate' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'unique_click_rate')} className="sortable">
+                                                                    UCR % {tableState.sortColumn === 'unique_click_rate' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handleSort(tierKey, 'total_click_rate')} className="sortable">
+                                                                    TCR % {tableState.sortColumn === 'total_click_rate' && (tableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {tier.users.map((user, userIdx) => (
+                                                            {visibleUsers.map((user, userIdx) => (
                                                                 <tr key={userIdx}>
                                                                     <td>{user.email}</td>
+                                                                    <td>{user.npi || ''}</td>
                                                                     <td>{user.first_name} {user.last_name}</td>
                                                                     <td>{user.specialty}</td>
                                                                     <td title={(user.campaigns_sent || []).join(', ')}>
@@ -449,6 +692,18 @@ const ListEfficiencyAnalysis = () => {
                                                         </tbody>
                                                     </table>
                                                 </div>
+                                                {hasMore && !tableState.isFullyExpanded && (
+                                                    <div className="load-more-container">
+                                                        <button
+                                                            className="btn-load-more"
+                                                            onClick={() => updateTierTableState(tierKey, {
+                                                                displayCount: tableState.displayCount + 10
+                                                            })}
+                                                        >
+                                                            Load More ({visibleUsers.length} of {displayUsers.length})
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="no-data-message">
@@ -470,6 +725,6 @@ const ListEfficiencyAnalysis = () => {
             </div>
         </div>
     );
-};
+});
 
 export default ListEfficiencyAnalysis;

@@ -1042,3 +1042,145 @@ body.light .engagement-summary-stat .summary-percentage {
 body.light .engagement-summary-stat .summary-detail {
     color: #666;
 }
+
+/* Clear button in header */
+.btn-clear {
+    padding: 8px 20px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-clear:hover {
+    background-color: #c82333;
+}
+
+/* Table header row with action buttons */
+.table-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.table-header-row h5 {
+    margin: 0;
+    color: #0ff;
+    font-size: 16px;
+}
+
+.table-action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-expand-table,
+.btn-export {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin: 0;
+}
+
+.btn-expand-table {
+    background-color: var(--color-table-header, #1a4d7a);
+    color: white;
+}
+
+.btn-expand-table:hover {
+    background-color: var(--color-primary-hover, #143d61);
+}
+
+.btn-export {
+    background-color: #28a745;
+    color: white;
+    padding: 8px 16px;
+    margin: 0;
+}
+
+.btn-export:hover {
+    background-color: #218838;
+}
+
+/* Load More button */
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0 10px 0;
+}
+
+.btn-load-more {
+    padding: 10px 24px;
+    background-color: var(--color-table-header, #1a4d7a);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-load-more:hover {
+    background-color: var(--color-primary-hover, #143d61);
+}
+
+/* Sortable table headers */
+.results-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.results-table th.sortable:hover {
+    background-color: #555 !important;
+}
+
+body.light .results-table th.sortable:hover {
+    background-color: #dee2e6 !important;
+}
+
+/* Light mode button styles */
+body.light .btn-clear {
+    background-color: #dc3545;
+}
+
+body.light .btn-clear:hover {
+    background-color: #c82333;
+}
+
+body.light .table-header-row h5 {
+    color: #0077ff;
+}
+
+body.light .btn-expand-table {
+    background-color: #0077ff;
+}
+
+body.light .btn-expand-table:hover {
+    background-color: #0056b3;
+}
+
+body.light .btn-export {
+    background-color: #28a745;
+}
+
+body.light .btn-export:hover {
+    background-color: #218838;
+}
+
+body.light .btn-load-more {
+    background-color: #0077ff;
+}
+
+body.light .btn-load-more:hover {
+    background-color: #0056b3;
+}

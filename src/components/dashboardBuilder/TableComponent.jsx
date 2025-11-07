@@ -236,8 +236,7 @@ const TableComponent = ({
   }, [tableData, onEdit, id, config]);
 
   const handleDeleteRow = useCallback((rowIndex) => {
-    if (rowIndex === 0) return;
-    if (tableData.length <= 2) return;
+    if (tableData.length <= 1) return; // Keep at least 1 row
 
     const newData = tableData.filter((_, index) => index !== rowIndex);
     setTableData(newData);
@@ -252,7 +251,9 @@ const TableComponent = ({
     };
 
     onEdit?.(id, { config: updatedConfig });
-  }, [tableData, onEdit, id, config]);
+    setSelectedRowIndex(null);
+    onRowSelect?.(null);
+  }, [tableData, onEdit, id, config, onRowSelect]);
 
   const handleAddRow = useCallback((afterRowIndex) => {
     const numCols = tableData[0]?.length || 3;
@@ -443,14 +444,14 @@ const TableComponent = ({
 
   const getCellStyle = (rowIndex, colIndex) => {
     const isHeader = rowIndex === 0;
-    const isSelectedRow = selectedRowIndex === rowIndex && rowIndex > 0;
+    const isSelectedRow = selectedRowIndex === rowIndex;
     return {
       ...dataCellStyle,
       backgroundColor: isSelectedRow ? '#d1e7ff' : (rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'),
       width: getColumnWidth(colIndex),
       fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal',
       color: '#1f2937',
-      cursor: rowIndex > 0 ? 'pointer' : 'default'
+      cursor: 'pointer'
     };
   };
 
@@ -470,13 +471,13 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
-  // Clear row selection when table is deselected
-  useEffect(() => {
-    if (!isSelected) {
-      setSelectedRowIndex(null);
-      onRowSelect?.(null);
-    }
-  }, [isSelected, onRowSelect]);
+  // Don't clear row selection when table is deselected - keep it persistent
+  // useEffect(() => {
+  //   if (!isSelected) {
+  //     setSelectedRowIndex(null);
+  //     onRowSelect?.(null);
+  //   }
+  // }, [isSelected, onRowSelect]);
 
   return (
     <div
@@ -561,10 +562,13 @@ const TableComponent = ({
                   key={rowIndex}
                   style={{
                     position: 'relative',
-                    backgroundColor: selectedRowIndex === rowIndex && rowIndex > 0 ? '#d1e7ff' : 'transparent'
+                    backgroundColor: selectedRowIndex === rowIndex ? '#d1e7ff' : 'transparent'
                   }}
                   onClick={(e) => {
-                    if (rowIndex > 0 && !e.target.closest('input')) {
+                    if (!e.target.closest('input')) {
+                      e.stopPropagation();
+                      // Select the table first to ensure it's active
+                      onSelect?.(e);
                       setSelectedRowIndex(rowIndex);
                       onRowSelect?.({
                         tableId: id,

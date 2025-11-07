@@ -760,7 +760,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                             </div>
                                         </div>
                                         <div className="clicks-links">
-                                            {campaignMetadata.what_was_clicked.links.slice(0, 5).map((link, index) => (
+                                            {campaignMetadata.what_was_clicked.links.map((link, index) => (
                                                 <div key={index} className="click-link-card">
                                                     <div className="link-url">
                                                         <a href={link.url} target="_blank" rel="noopener noreferrer">

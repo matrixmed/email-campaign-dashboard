@@ -216,6 +216,7 @@ def analyze_list():
 
             enriched_users.append({
                 'email': user_data['email'],
+                'npi': user_data['npi'],
                 'first_name': user_data['first_name'],
                 'last_name': user_data['last_name'],
                 'specialty': user_data['specialty'],
@@ -415,6 +416,8 @@ def engagement_query():
                 if specialty_merge_mode and user_specialty:
                     user_specialty = user_specialty.split(' - ')[0].strip()
 
+                print(f"[DEBUG] Creating user {email}, NPI from DB: {row.get('npi')}")
+
                 users_data[email] = {
                     'email': email,
                     'npi': row['npi'],
@@ -511,6 +514,7 @@ def engagement_query():
 
             enriched_users.append({
                 'email': user_data['email'],
+                'npi': user_data['npi'],
                 'first_name': user_data['first_name'],
                 'last_name': user_data['last_name'],
                 'specialty': user_data['specialty'],

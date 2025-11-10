@@ -296,6 +296,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
             const data = await response.json();
             console.log('Response data:', data);
+            console.log('First user sample:', data.users?.[0]);
             setResults(data);
 
         } catch (err) {

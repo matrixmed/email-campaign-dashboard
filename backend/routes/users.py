@@ -108,15 +108,15 @@ def analyze_list():
                     up.first_name,
                     up.last_name,
                     up.specialty,
-                    cd.full_campaign_name as campaign_name,
+                    cd.campaign_base_name as campaign_name,
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
                 LEFT JOIN campaign_interactions ci ON up.email = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.email IN ({placeholders})
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
-                ORDER BY up.email, cd.full_campaign_name
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                ORDER BY up.email, cd.campaign_base_name
             """
         else:  # NPI
             query = f"""
@@ -126,15 +126,15 @@ def analyze_list():
                     up.first_name,
                     up.last_name,
                     up.specialty,
-                    cd.full_campaign_name as campaign_name,
+                    cd.campaign_base_name as campaign_name,
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
                 LEFT JOIN campaign_interactions ci ON up.email = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.npi IN ({placeholders})
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.full_campaign_name, ci.event_type
-                ORDER BY up.email, cd.full_campaign_name
+                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                ORDER BY up.email, cd.campaign_base_name
             """
 
         cursor.execute(query, user_list)
@@ -196,9 +196,11 @@ def analyze_list():
 
         for email, user_data in users_data.items():
             # Calculate metrics from campaign data
+            user_campaigns = []
             for campaign_name, camp_stats in user_data['campaigns'].items():
                 if camp_stats['sent']:
                     user_data['total_sends'] += 1
+                    user_campaigns.append(campaign_name)
 
                     if camp_stats['opened']:
                         user_data['unique_opens'] += 1
@@ -220,6 +222,8 @@ def analyze_list():
                 'first_name': user_data['first_name'],
                 'last_name': user_data['last_name'],
                 'specialty': user_data['specialty'],
+                'campaigns_sent': user_campaigns,
+                'campaign_count': user_data['total_sends'],
                 'total_sends': user_data['total_sends'],
                 'unique_opens': user_data['unique_opens'],
                 'total_opens': user_data['total_opens'],

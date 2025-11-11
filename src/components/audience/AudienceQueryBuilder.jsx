@@ -484,7 +484,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
         const headers = [
             'Email', 'NPI', 'First Name', 'Last Name', 'Specialty',
-            'Sends', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
+            'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
             'UOR %', 'TOR %', 'UCR %', 'TCR %'
         ];
 
@@ -494,7 +494,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             user.first_name || '',
             user.last_name || '',
             user.specialty || '',
-            user.total_sends || 0,
+            user.campaign_count || 0,
             user.unique_opens || 0,
             user.total_opens || 0,
             user.unique_clicks || 0,
@@ -1026,8 +1026,8 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                                         <th onClick={() => handleAnalyzeUsersSort('specialty')} className="sortable">
                                                             Specialty {analyzeUsersTableState.sortColumn === 'specialty' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
                                                         </th>
-                                                        <th onClick={() => handleAnalyzeUsersSort('total_sends')} className="sortable">
-                                                            Sends {analyzeUsersTableState.sortColumn === 'total_sends' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        <th onClick={() => handleAnalyzeUsersSort('campaign_count')} className="sortable">
+                                                            Campaigns {analyzeUsersTableState.sortColumn === 'campaign_count' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
                                                         </th>
                                                         <th onClick={() => handleAnalyzeUsersSort('unique_opens')} className="sortable">
                                                             U Opens {analyzeUsersTableState.sortColumn === 'unique_opens' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
@@ -1062,7 +1062,9 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                                             <td>{user.npi || ''}</td>
                                                             <td>{user.first_name} {user.last_name}</td>
                                                             <td>{user.specialty}</td>
-                                                            <td>{user.total_sends}</td>
+                                                            <td title={(user.campaigns_sent || []).join(', ')}>
+                                                                {user.campaign_count || 0} campaign{user.campaign_count !== 1 ? 's' : ''}
+                                                            </td>
                                                             <td>{user.unique_opens}</td>
                                                             <td>{user.total_opens}</td>
                                                             <td>{user.unique_clicks}</td>

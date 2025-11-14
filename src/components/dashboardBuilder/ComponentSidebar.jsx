@@ -453,7 +453,7 @@ const ComponentSidebar = ({
                 </h3>
               </div>
 
-              {/* Table Row Controls - Only show when a row is selected */}
+              {/* Table Row/Column Controls - Only show when a cell is selected */}
               {selectedRowInfo && (
                 <div style={{
                   marginBottom: '24px',
@@ -463,44 +463,98 @@ const ComponentSidebar = ({
                   borderRadius: '8px'
                 }}>
                   <div style={{ color: 'white', fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>
-                    Row {selectedRowInfo.rowIndex} Selected
+                    {selectedRowInfo.colIndex !== null && selectedRowInfo.colIndex !== undefined
+                      ? `Cell [${selectedRowInfo.rowIndex}, ${selectedRowInfo.colIndex}] Selected`
+                      : `Row ${selectedRowInfo.rowIndex} Selected`}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        selectedRowInfo.addRowBelow();
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        background: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        fontSize: '14px'
-                      }}
-                    >
-                      ➕ Add Row Below
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedRowInfo.deleteRow();
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        background: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        fontSize: '14px'
-                      }}
-                    >
-                      🗑️ Delete Row
-                    </button>
+
+                  {/* Row Controls */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '8px' }}>
+                      Row Operations:
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          selectedRowInfo.addRowBelow();
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          fontSize: '14px'
+                        }}
+                      >
+                        ➕ Add Row Below
+                      </button>
+                      <button
+                        onClick={() => {
+                          selectedRowInfo.deleteRow();
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          fontSize: '14px'
+                        }}
+                      >
+                        🗑️ Delete Row
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Column Controls - Only show when a specific cell is selected */}
+                  {selectedRowInfo.colIndex !== null && selectedRowInfo.colIndex !== undefined && (
+                    <div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '8px' }}>
+                        Column Operations:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            selectedRowInfo.addColumnRight?.();
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '14px'
+                          }}
+                        >
+                          ➕ Add Column Right
+                        </button>
+                        <button
+                          onClick={() => {
+                            selectedRowInfo.deleteColumn?.();
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '14px'
+                          }}
+                        >
+                          🗑️ Delete Column
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

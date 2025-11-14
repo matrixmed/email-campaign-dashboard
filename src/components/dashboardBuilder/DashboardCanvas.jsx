@@ -195,17 +195,24 @@ const DashboardCanvasContent = () => {
         try {
           // Get existing custom components BEFORE regeneration
           const existingCards = [...cards];
-          
-          // Identify custom components by ID pattern (section property gets lost during card operations)
+
+          // Identify custom components by section property or ID pattern
           const isCustomComponent = (comp) => {
-            return (comp.id.startsWith('table-') || 
-                    comp.id.startsWith('chart-') || 
+            // Check if component has section 'custom' (primary indicator)
+            if (comp.section === 'custom') {
+              return !deletedCardIds.has(comp.id);
+            }
+            // Fall back to ID pattern matching for backwards compatibility
+            return (comp.id.startsWith('table-') ||
+                    comp.id.startsWith('chart-') ||
                     comp.id.startsWith('custom-') ||
+                    comp.id.startsWith('image-') ||
                     comp.id.startsWith('authority-') ||
-                    comp.id.startsWith('geographic-')) && 
-                   !deletedCardIds.has(comp.id);
+                    comp.id.startsWith('geographic-')) &&
+                   !deletedCardIds.has(comp.id) &&
+                   comp.section !== 'template'; // Explicitly exclude template components
           };
-          
+
           const customComponents = existingCards.filter(isCustomComponent);
           
           // Apply current theme to custom components
@@ -600,7 +607,12 @@ const DashboardCanvasContent = () => {
 
   const handleAddMetric = useCallback((item) => {
     if (item.id && item.type && item.position) {
-      setCards(prev => [...prev, item]);
+      // Ensure section property is set for all custom components
+      const itemWithSection = {
+        ...item,
+        section: item.section || 'custom'
+      };
+      setCards(prev => [...prev, itemWithSection]);
       return;
     }
 
@@ -680,7 +692,12 @@ const DashboardCanvasContent = () => {
   }, [selectedCampaign, getGeographicData, getAuthorityMetrics, handleAddCard, cards.length]);
 
   const handleRestoreCard = useCallback((card) => {
-    setCards(prev => [...prev, card]);
+    // Ensure section property is preserved when restoring
+    const cardWithSection = {
+      ...card,
+      section: card.section || 'custom'
+    };
+    setCards(prev => [...prev, cardWithSection]);
     setDeletedCards(prev => prev.filter(c => c.id !== card.id));
     setDeletedCardIds(prev => {
       const newSet = new Set([...prev]);

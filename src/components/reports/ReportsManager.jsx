@@ -18,17 +18,69 @@ const ReportsManager = () => {
     const [futureRowsPerPage, setFutureRowsPerPage] = useState(10);
     const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(10);
 
+    // Clean campaign name by removing "Deployment X" suffix
+    const cleanCampaignName = (name) => {
+        if (!name) return name;
+        return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
+    };
+
+    // Extract deployment number from campaign name
+    const getDeploymentNumber = (name) => {
+        if (!name) return 0;
+        const match = name.match(/[-–—\s]+deployment\s+#?(\d+)/i);
+        return match ? parseInt(match[1]) : 0;
+    };
+
+    // Deduplicate reports by standardized name, prioritizing Deployment 1
+    const deduplicateReports = (reports) => {
+        // Group by standardized campaign name
+        const groups = {};
+        reports.forEach(report => {
+            const stdName = report.standardized_campaign_name || cleanCampaignName(report.campaign_name);
+            if (!groups[stdName]) {
+                groups[stdName] = [];
+            }
+            groups[stdName].push(report);
+        });
+
+        // For each group, select only Deployment 1 or campaigns without deployment number
+        const deduplicated = [];
+        Object.values(groups).forEach(group => {
+            if (group.length === 1) {
+                deduplicated.push(group[0]);
+            } else {
+                // Multiple deployments - prioritize Deployment 1 or campaigns without deployment number
+                const deployment1 = group.find(r => getDeploymentNumber(r.campaign_name) === 1);
+                const noDeployment = group.find(r => getDeploymentNumber(r.campaign_name) === 0);
+
+                if (noDeployment) {
+                    deduplicated.push(noDeployment);
+                } else if (deployment1) {
+                    deduplicated.push(deployment1);
+                } else {
+                    // Fallback - use first one
+                    deduplicated.push(group[0]);
+                }
+            }
+        });
+
+        return deduplicated;
+    };
+
     useEffect(() => {
         const fetchReportsData = async () => {
             try {
-                // Fetch from database API instead of blob storage
-                const response = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=21`);
+                // Fetch from database API - get last 90 days to populate archive
+                const response = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=90`);
                 const data = await response.json();
-                setReportsData(data);
+
+                // Deduplicate by standardized campaign name, keeping only base campaigns (Deployment 1 or no deployment)
+                const deduplicatedData = deduplicateReports(data);
+                setReportsData(deduplicatedData);
 
                 // Initialize checked states from the fetched data
                 const newCheckedStates = {};
-                data.forEach(report => {
+                deduplicatedData.forEach(report => {
                     if (report.is_submitted && report.id) {
                         const reportId = report.id;
                         // Mark all weeks as submitted if the report is submitted
@@ -397,7 +449,8 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+        const cleanedCampaignName = report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '');
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         const previousMonday = new Date(currentTimeframe.start);
@@ -414,7 +467,7 @@ const ReportsManager = () => {
             "mondaydate": formatDateSlash(currentTimeframe.start),
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
-            "internal_campaign_name": report.campaign_name || "",
+            "internal_campaign_name": cleanedCampaignName,
             "client_campaign_name": report.cmi_metadata?.client_campaign_name || "",
             "TargetListID": report.cmi_metadata?.target_list_id || "",
             "CMI_PlacementID": report.cmi_metadata?.placement_id || "",
@@ -436,7 +489,7 @@ const ReportsManager = () => {
 
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -447,13 +500,13 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
             "campaigns": [
                 {
-                    "campaign_name": cleanCampaignName,
+                    "campaign_name": cleanedCampaignName,
                     "topic_brand": (report.brand || '').toUpperCase(),
                     "topic_therapeutic_area": "IMMUNOLOGY",
                     "topic_asset_ids": ["1339853"]
@@ -470,7 +523,7 @@ const ReportsManager = () => {
 
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -488,14 +541,14 @@ const ReportsManager = () => {
             return `${year}${month}${day}`;
         };
 
-        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
             "folder": month,
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
-            "internal_campaign_name": cleanCampaignName,
+            "internal_campaign_name": cleanedCampaignName,
             "channel_partner": "Matrix_Medical",
             "channel": "EM",
             "brand_name": (report.brand || '').toUpperCase(),
@@ -515,7 +568,7 @@ const ReportsManager = () => {
 
     const generateOrthoJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -533,11 +586,11 @@ const ReportsManager = () => {
             return `${month}${day}${year}`;
         };
 
-        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
-            "internal_campaign_name": cleanCampaignName,
+            "internal_campaign_name": cleanedCampaignName,
             "folder": month,
             "finalFileName": "Ortho_PLD_",
             "aggFileName": "Ortho_AGG_",
@@ -551,7 +604,7 @@ const ReportsManager = () => {
 
     const generateDefaultJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanCampaignName = (report.campaign_name || '').replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -562,12 +615,12 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
             "folder": month,
-            "internal_campaign_name": cleanCampaignName,
+            "internal_campaign_name": cleanedCampaignName,
             "brand_name": report.brand,
             "agency": report.agency,
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -653,7 +706,7 @@ const ReportsManager = () => {
                         title={report.campaign_name}
                     >
                         <span className="campaign-name no-data-campaign" title={report.campaign_name}>
-                            {report.campaign_name}
+                            {cleanCampaignName(report.campaign_name)}
                         </span>
                         {isCMI && (
                             <div className="cmi-info">
@@ -697,7 +750,7 @@ const ReportsManager = () => {
                         title={report.campaign_name}
                     >
                         <span className="reports-campaign-name" title={report.campaign_name}>
-                            {report.campaign_name}
+                            {cleanCampaignName(report.campaign_name)}
                         </span>
                         {isCMI && (
                             <div className="cmi-info">
@@ -1025,7 +1078,7 @@ const ReportsManager = () => {
                                                                     title={report.campaign_name}
                                                                 >
                                                                     <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
-                                                                        {report.campaign_name}
+                                                                        {cleanCampaignName(report.campaign_name)}
                                                                         {report.is_no_data_report && <span className="no-data-indicator">(No Data)</span>}
                                                                     </span>
                                                                     {isCMI && (

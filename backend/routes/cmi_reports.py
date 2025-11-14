@@ -334,6 +334,7 @@ def get_all_reports():
                 'id': r.id,  # Database ID for submissions
                 'campaign_id': r.campaign_id or r.campaign_name,
                 'campaign_name': r.campaign_name,
+                'standardized_campaign_name': r.standardized_campaign_name,  # Add standardized name for frontend grouping
                 'brand': r.brand_name,
                 'agency': r.agency,
                 'send_date': r.send_date.strftime('%Y-%m-%d') if r.send_date else None,

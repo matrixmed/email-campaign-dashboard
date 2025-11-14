@@ -1,11 +1,21 @@
 const EXPORT_CONFIG = {
-  width: 1280,
-  height: 720,
-  scale: 2,
+  width: 1024,
+  height: 576,
+  scale: 3, // High quality
   useCORS: true,
   allowTaint: false,
-  backgroundColor: '#e8e9ea',
-  logging: false
+  backgroundColor: '#ffffff', // White background
+  logging: false,
+  imageTimeout: 15000,
+  removeContainer: false,
+  windowWidth: 1024,
+  windowHeight: 576,
+  ignoreElements: (element) => {
+    // Ignore alignment guides, selection boxes, and other UI elements
+    return element.classList?.contains('alignment-guide') ||
+           element.classList?.contains('selection-box') ||
+           element.classList?.contains('multi-select-toolbar');
+  }
 };
 
 const ERROR_MESSAGES = {
@@ -33,10 +43,63 @@ async function renderCanvas(element, options = {}) {
   }
 
   const config = { ...EXPORT_CONFIG, ...options };
-  
+
   try {
     const html2canvas = await loadHtml2Canvas();
-    return await html2canvas(element, config);
+
+    // Ensure all images are loaded before rendering
+    const images = element.querySelectorAll('img');
+    await Promise.all(
+      Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve; // Continue even if image fails
+          setTimeout(resolve, config.imageTimeout || 15000); // Timeout fallback
+        });
+      })
+    );
+
+    // Wait a bit for any animations to settle
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Render with html2canvas
+    const canvas = await html2canvas(element, config);
+
+    // Apply post-processing for quality and rounded corners
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Create a new canvas with rounded corners
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    const finalCtx = finalCanvas.getContext('2d');
+
+    // Fill with white background
+    finalCtx.fillStyle = '#ffffff';
+    finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+    // Apply rounded corners (16px * scale)
+    const cornerRadius = 16 * config.scale;
+    finalCtx.beginPath();
+    finalCtx.moveTo(cornerRadius, 0);
+    finalCtx.lineTo(finalCanvas.width - cornerRadius, 0);
+    finalCtx.quadraticCurveTo(finalCanvas.width, 0, finalCanvas.width, cornerRadius);
+    finalCtx.lineTo(finalCanvas.width, finalCanvas.height - cornerRadius);
+    finalCtx.quadraticCurveTo(finalCanvas.width, finalCanvas.height, finalCanvas.width - cornerRadius, finalCanvas.height);
+    finalCtx.lineTo(cornerRadius, finalCanvas.height);
+    finalCtx.quadraticCurveTo(0, finalCanvas.height, 0, finalCanvas.height - cornerRadius);
+    finalCtx.lineTo(0, cornerRadius);
+    finalCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    finalCtx.closePath();
+    finalCtx.clip();
+
+    // Draw the original canvas onto the clipped canvas
+    finalCtx.drawImage(canvas, 0, 0);
+
+    return finalCanvas;
   } catch (error) {
     if (error.message === ERROR_MESSAGES.HTML2CANVAS_MISSING) {
       throw error;
@@ -49,11 +112,20 @@ function downloadCanvasAsImage(canvas, filename = 'dashboard') {
   try {
     const link = document.createElement('a');
     link.download = `${filename}.png`;
+
+    // Use maximum quality PNG export
+    // The quality parameter doesn't apply to PNG (lossless format)
+    // but we ensure we're using PNG for best quality
     link.href = canvas.toDataURL('image/png');
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // Clean up the blob URL after a short delay
+    setTimeout(() => {
+      URL.revokeObjectURL(link.href);
+    }, 100);
   } catch (error) {
     throw new Error(`${ERROR_MESSAGES.DOWNLOAD_FAILED}: ${error.message}`);
   }
@@ -114,15 +186,21 @@ export function previewImage(canvasRef, onPreview, options = {}) {
 
 export const EXPORT_PRESETS = {
   high_quality: {
-    scale: 3,
+    width: 1024,
+    height: 576,
+    scale: 4, // Very high quality for printing
     backgroundColor: '#ffffff'
   },
   presentation: {
-    scale: 2,
-    backgroundColor: '#e8e9ea'
+    width: 1024,
+    height: 576,
+    scale: 3, // Good balance of quality and file size
+    backgroundColor: '#ffffff'
   },
   web_optimized: {
-    scale: 1,
-    backgroundColor: '#e8e9ea'
+    width: 1024,
+    height: 576,
+    scale: 2, // Smaller file size for web
+    backgroundColor: '#ffffff'
   }
 };

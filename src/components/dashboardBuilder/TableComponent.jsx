@@ -29,6 +29,7 @@ const TableComponent = ({
   const [tableTitle, setTableTitle] = useState(title);
   const [isEditingCell, setIsEditingCell] = useState(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [selectedColIndex, setSelectedColIndex] = useState(null);
   const tableRef = useRef(null);
   const titleInputRef = useRef(null);
 
@@ -255,6 +256,26 @@ const TableComponent = ({
     onRowSelect?.(null);
   }, [tableData, onEdit, id, config, onRowSelect]);
 
+  const handleDeleteColumn = useCallback((colIndex) => {
+    if (tableData[0]?.length <= 1) return; // Keep at least 1 column
+
+    const newData = tableData.map(row => row.filter((_, index) => index !== colIndex));
+    setTableData(newData);
+
+    // Update the config to save the data properly
+    const updatedConfig = {
+      ...config,
+      customData: {
+        headers: newData[0],
+        rows: newData.slice(1)
+      }
+    };
+
+    onEdit?.(id, { config: updatedConfig });
+    setSelectedColIndex(null);
+    onRowSelect?.(null);
+  }, [tableData, onEdit, id, config, onRowSelect]);
+
   const handleAddRow = useCallback((afterRowIndex) => {
     const numCols = tableData[0]?.length || 3;
     const newRow = Array(numCols).fill('New');
@@ -264,6 +285,29 @@ const TableComponent = ({
       newRow,
       ...tableData.slice(afterRowIndex + 1)
     ];
+
+    setTableData(newData);
+
+    // Update the config to save the data properly
+    const updatedConfig = {
+      ...config,
+      customData: {
+        headers: newData[0],
+        rows: newData.slice(1)
+      }
+    };
+
+    onEdit?.(id, { config: updatedConfig });
+  }, [tableData, onEdit, id, config]);
+
+  const handleAddColumn = useCallback((afterColIndex) => {
+    const numRows = tableData.length || 5;
+    const newData = tableData.map((row, rowIndex) => {
+      const newRow = [...row];
+      const newValue = rowIndex === 0 ? 'New Header' : 'New';
+      newRow.splice(afterColIndex + 1, 0, newValue);
+      return newRow;
+    });
 
     setTableData(newData);
 
@@ -445,9 +489,22 @@ const TableComponent = ({
   const getCellStyle = (rowIndex, colIndex) => {
     const isHeader = rowIndex === 0;
     const isSelectedRow = selectedRowIndex === rowIndex;
+    const isSelectedCol = selectedColIndex === colIndex;
+    const isSelectedCell = isSelectedRow && isSelectedCol;
+
+    // Determine background color based on selection state
+    let backgroundColor;
+    if (isSelectedCell) {
+      backgroundColor = '#b3d9ff'; // Darker blue for selected cell
+    } else if (isSelectedRow || isSelectedCol) {
+      backgroundColor = '#d1e7ff'; // Light blue for selected row or column
+    } else {
+      backgroundColor = rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'; // Alternating rows
+    }
+
     return {
       ...dataCellStyle,
-      backgroundColor: isSelectedRow ? '#d1e7ff' : (rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'),
+      backgroundColor,
       width: getColumnWidth(colIndex),
       fontWeight: isCampaignComparisonTable && isHeader ? 'bold' : 'normal',
       color: '#1f2937',
@@ -471,13 +528,14 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
-  // Don't clear row selection when table is deselected - keep it persistent
-  // useEffect(() => {
-  //   if (!isSelected) {
-  //     setSelectedRowIndex(null);
-  //     onRowSelect?.(null);
-  //   }
-  // }, [isSelected, onRowSelect]);
+  // Clear row and column selection when table is deselected
+  useEffect(() => {
+    if (!isSelected) {
+      setSelectedRowIndex(null);
+      setSelectedColIndex(null);
+      onRowSelect?.(null);
+    }
+  }, [isSelected, onRowSelect]);
 
   return (
     <div
@@ -569,12 +627,19 @@ const TableComponent = ({
                       e.stopPropagation();
                       // Select the table first to ensure it's active
                       onSelect?.(e);
+                      // Determine which cell was clicked
+                      const clickedCell = e.target.closest('td');
+                      const clickedColIndex = clickedCell ? Array.from(clickedCell.parentElement.children).indexOf(clickedCell) : null;
                       setSelectedRowIndex(rowIndex);
+                      setSelectedColIndex(clickedColIndex);
                       onRowSelect?.({
                         tableId: id,
                         rowIndex: rowIndex,
+                        colIndex: clickedColIndex,
                         deleteRow: () => handleDeleteRow(rowIndex),
-                        addRowBelow: () => handleAddRow(rowIndex)
+                        addRowBelow: () => handleAddRow(rowIndex),
+                        deleteColumn: clickedColIndex !== null ? () => handleDeleteColumn(clickedColIndex) : null,
+                        addColumnRight: clickedColIndex !== null ? () => handleAddColumn(clickedColIndex) : null
                       });
                     }
                   }}

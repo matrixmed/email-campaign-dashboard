@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
-import MatrixSignIn from './components/MatrixSignIn';
 import './App.css';
 import './styles/Dashboard.css';
 import './styles/MatrixSignIn.css';
 import './styles/ReportsManager.css';
-import './themes/SpaceTheme.css';
-import './themes/MarbleTheme.css';
-import './themes/CyberpunkTheme.css';
-import './themes/HolographicTheme.css';
-import './themes/CompanyTheme.css';
-import './themes/SynthwaveTheme.css';
 
 const SESSION_DURATION = 10 * 60 * 60 * 1000;
 

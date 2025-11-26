@@ -240,7 +240,6 @@ const SpecialtySection = () => {
     Object.entries(specialties).forEach(([name, data]) => {
       const groupName = groupSpecialties(name);
 
-      // Apply search filter
       if (lowerSearchFilter && !name.toLowerCase().includes(lowerSearchFilter)) {
         return;
       }
@@ -388,7 +387,6 @@ const SpecialtySection = () => {
                 const topicTotals = getTopicTotals(specialtyData[activeBucket], topic);
                 const sortedSpecialties = getSortedSpecialties(topic, searchQuery);
 
-                // Hide topic if no specialties match the search
                 if (searchQuery && sortedSpecialties.length === 0) {
                   return null;
                 }

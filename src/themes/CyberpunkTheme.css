@@ -1,7 +1,5 @@
-/* Cyberpunk Theme CSS */
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;700&family=Share+Tech+Mono&display=swap');
 
-/* Base styles for cyberpunk theme */
 body.cyberpunk-theme {
   background-color: #0a0a0f !important;
   color: #f0f0f0 !important;
@@ -10,7 +8,6 @@ body.cyberpunk-theme {
   overflow-x: hidden;
 }
 
-/* Cyberpunk grid background */
 body.cyberpunk-theme::before {
   content: '';
   position: fixed;
@@ -29,7 +26,6 @@ body.cyberpunk-theme::before {
   pointer-events: none;
 }
 
-/* Create a scanline effect */
 @keyframes scanline {
   0% {
     transform: translateY(0%);
@@ -52,7 +48,6 @@ body.cyberpunk-theme::after {
   animation: scanline 8s linear infinite;
 }
 
-/* Neon text effect */
 @keyframes flicker {
   0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100% {
     opacity: 1;
@@ -62,7 +57,6 @@ body.cyberpunk-theme::after {
   }
 }
 
-/* Cyberpunk header */
 body.cyberpunk-theme .dashboard-header {
   background: rgba(10, 10, 15, 0.7);
   box-shadow: 0 0 20px rgba(255, 0, 170, 0.3), 0 0 30px rgba(0, 255, 255, 0.1);
@@ -118,7 +112,6 @@ body.cyberpunk-theme h2 {
   position: relative;
 }
 
-/* Cyberpunk sections with angular cutouts */
 body.cyberpunk-theme .chart-section,
 body.cyberpunk-theme .table-section,
 body.cyberpunk-theme .insights-section,
@@ -144,7 +137,6 @@ body.cyberpunk-theme .chat-interface {
   );
 }
 
-/* Glowing borders */
 body.cyberpunk-theme .chart-section::before,
 body.cyberpunk-theme .table-section::before,
 body.cyberpunk-theme .insights-section::before,
@@ -176,7 +168,6 @@ body.cyberpunk-theme .chat-interface::before {
   }
 }
 
-/* Cyberpunk tables */
 body.cyberpunk-theme table {
   width: 100%;
   border-collapse: separate;
@@ -211,7 +202,6 @@ body.cyberpunk-theme tr:hover td {
   background-color: rgba(255, 0, 170, 0.1);
 }
 
-/* Neon buttons */
 body.cyberpunk-theme button,
 body.cyberpunk-theme .space-button,
 body.cyberpunk-theme .pagination button,
@@ -250,7 +240,6 @@ body.cyberpunk-theme .query-button:hover {
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
 }
 
-/* Button glitch effect */
 body.cyberpunk-theme button::before,
 body.cyberpunk-theme .space-button::before,
 body.cyberpunk-theme .pagination button::before,
@@ -272,7 +261,6 @@ body.cyberpunk-theme .query-button:hover::before {
   left: 100%;
 }
 
-/* Inputs and selects */
 body.cyberpunk-theme input,
 body.cyberpunk-theme select,
 body.cyberpunk-theme .deployment-select,
@@ -306,7 +294,6 @@ body.cyberpunk-theme .query-input:focus {
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
 }
 
-/* Dropdown styling */
 body.cyberpunk-theme .dropdown {
   background-color: rgba(10, 10, 20, 0.9);
   border: 1px solid #ff00aa;
@@ -337,7 +324,6 @@ body.cyberpunk-theme .dropdown-arrow svg {
   color: #ff00aa;
 }
 
-/* Theme selector styling */
 body.cyberpunk-theme .theme-select {
   background-color: rgba(10, 10, 20, 0.7);
   color: #00ffff;
@@ -358,7 +344,6 @@ body.cyberpunk-theme .theme-select {
   );
 }
 
-/* Search box styling */
 body.cyberpunk-theme .search-box,
 body.cyberpunk-theme .digital-journals-search-box {
   background-color: rgba(10, 10, 20, 0.7);
@@ -385,7 +370,6 @@ body.cyberpunk-theme .digital-journals-search-box:focus {
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
 }
 
-/* Campaign boxes */
 body.cyberpunk-theme .campaign-box {
   background: rgba(15, 15, 25, 0.8);
   border: 1px solid rgba(255, 0, 170, 0.3);
@@ -410,7 +394,6 @@ body.cyberpunk-theme .campaign-box h3 {
   text-shadow: 0 0 5px rgba(255, 0, 170, 0.5);
 }
 
-/* Tooltips */
 body.cyberpunk-theme .attached-tooltip {
   background-color: rgba(10, 10, 20, 0.9);
   border: 1px solid #00ffff;
@@ -435,7 +418,6 @@ body.cyberpunk-theme .tooltip-top::before {
   border-color: #00ffff;
 }
 
-/* Scrollbars */
 body.cyberpunk-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -455,7 +437,6 @@ body.cyberpunk-theme ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Sample query lists */
 body.cyberpunk-theme .sample-queries h3 {
   color: #00ffff;
   font-family: 'Rajdhani', sans-serif;
@@ -486,7 +467,6 @@ body.cyberpunk-theme .sample-queries li:hover {
   box-shadow: 0 0 10px rgba(255, 0, 170, 0.3);
 }
 
-/* Toggle switch */
 body.cyberpunk-theme .toggle-switch {
   --light: #00ffff;
   --dark: #ff00aa;
@@ -523,7 +503,6 @@ body.cyberpunk-theme .checkbox:checked ~ .slider::before {
   background-color: var(--dark);
 }
 
-/* Terminal-like glitch effect for text */
 @keyframes glitch {
   0% {
     transform: translate(0);

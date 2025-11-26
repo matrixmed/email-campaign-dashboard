@@ -16,6 +16,7 @@ const AppLayout = ({ children }) => {
   const navItems = [
     { path: '/campaigns', label: 'Campaign Performance' },
     { path: '/analytics', label: 'Campaign Analytics' },
+    //{ path: '/basis', label: 'Basis Optimization' },
     { path: '/dashboard-builder', label: 'Dashboard Builder' },
     { path: '/reports', label: 'Reports Manager' },
     { path: '/brands', label: 'Brand Management' },

@@ -80,7 +80,8 @@ const DigitalJournals = () => {
     const [aggregateMetrics, setAggregateMetrics] = useState({
         totalUsers: 0,
         avgDuration: 0,
-        bounceRate: 0
+        bounceRate: 0,
+        mobileToDesktopRatio: 0
     });
     const modalRef = useRef(null);
 
@@ -177,32 +178,72 @@ const DigitalJournals = () => {
         };
     }
 
+    const calculateMobileToDesktopRatio = (journal) => {
+        if (!journal.devices) return 0;
+
+        let mobileCount = 0;
+        let desktopCount = 0;
+
+        Object.entries(journal.devices).forEach(([device, count]) => {
+            const deviceLower = device.toLowerCase();
+            if (deviceLower === 'mobile' || deviceLower === 'tablet') {
+                mobileCount += count;
+            } else if (deviceLower === 'desktop') {
+                desktopCount += count;
+            }
+        });
+
+        if (desktopCount === 0) return mobileCount > 0 ? 999 : 0;
+        return mobileCount / desktopCount;
+    };
+
+    const formatMobileToDesktopRatio = (ratio) => {
+        if (ratio === 0) return "0:1";
+        if (ratio === 999) return "∞:1";
+        return `${ratio.toFixed(2)}:1`;
+    };
+
     const calculateAggregateMetrics = (data, timeframe) => {
         let totalUsers = 0;
         let totalDuration = 0;
         let totalBounces = 0;
         let totalSessions = 0;
-        
+        let totalMobile = 0;
+        let totalDesktop = 0;
+
         data.forEach(journal => {
             if (!journal.timeData) return;
-            
+
             const timeData = getTimeframeData(journal, timeframe);
-            
+
             timeData.forEach(monthData => {
                 totalUsers += monthData.users || 0;
                 totalDuration += (monthData.avgDuration || 0) * (monthData.users || 0);
                 totalBounces += (monthData.bounceRate / 100 || 0) * (monthData.users || 0);
                 totalSessions += monthData.users || 0;
             });
+
+            if (journal.devices) {
+                Object.entries(journal.devices).forEach(([device, count]) => {
+                    const deviceLower = device.toLowerCase();
+                    if (deviceLower === 'mobile' || deviceLower === 'tablet') {
+                        totalMobile += count;
+                    } else if (deviceLower === 'desktop') {
+                        totalDesktop += count;
+                    }
+                });
+            }
         });
-        
+
         const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
         const avgBounceRate = totalSessions > 0 ? (totalBounces / totalSessions) : 0;
-        
+        const mobileToDesktopRatio = totalDesktop > 0 ? totalMobile / totalDesktop : (totalMobile > 0 ? 999 : 0);
+
         setAggregateMetrics({
             totalUsers,
             avgDuration,
-            bounceRate: avgBounceRate
+            bounceRate: avgBounceRate,
+            mobileToDesktopRatio
         });
     };
 
@@ -411,6 +452,25 @@ const DigitalJournals = () => {
                 </div>
             </div>
 
+            <div className="journal-metrics-summary">
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Total Users</div>
+                    <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalUsers)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Avg Duration</div>
+                    <div className="metric-summary-value">{formatEngagement(aggregateMetrics.avgDuration)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Bounce Rate</div>
+                    <div className="metric-summary-value">{formatBounceRate(aggregateMetrics.bounceRate)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Mobile:Desktop Ratio</div>
+                    <div className="metric-summary-value">{formatMobileToDesktopRatio(aggregateMetrics.mobileToDesktopRatio)}</div>
+                </div>
+            </div>
+
             <div className="table-section">
                 <div className="table-controls">
                     <div className="digital-journals-toggles">
@@ -458,6 +518,7 @@ const DigitalJournals = () => {
                             <th>Total Users</th>
                             <th>Avg Duration</th>
                             <th>Bounce Rate</th>
+                            <th>Mobile:Desktop</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -472,6 +533,7 @@ const DigitalJournals = () => {
                                 <td>{formatNumber(calculateJournalMetricsForTimeframe(item).users)}</td>
                                 <td>{formatEngagement(calculateJournalMetricsForTimeframe(item).avgDuration)}</td>
                                 <td>{formatBounceRate(calculateJournalMetricsForTimeframe(item).bounceRate)}</td>
+                                <td>{formatMobileToDesktopRatio(calculateMobileToDesktopRatio(item))}</td>
                             </tr>
                         ))}
                     </tbody>

@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import '../../styles/AnomalyDetection.css';
 
-const AnomalyDetection = () => {
+const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
   const [anomalies, setAnomalies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [categories, setCategories] = useState([]);
+  const [showOverperforming, setShowOverperforming] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     fetchAndAnalyzeAnomalies();
-  }, []);
+  }, [detectBySubtopic, showOverperforming]);
 
   const cleanCampaignName = (name) => {
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
@@ -30,7 +30,8 @@ const AnomalyDetection = () => {
       "Neonatology", "Neuroscience", "Oncology", "Ophthalmology", "Acne"
     ],
     "Expert Perspectives": [
-      "RCC", "Vitiligo", "Skincare science", "Melanoma", "GPP", "Atopic Dermatitis"
+      "RCC", "Vitiligo", "Skincare science", "Melanoma", "GPP", "Atopic Dermatitis",
+      "Multiple Myeloma"
     ],
     "Hot Topics": [
       "Alzheimers", "Breast Cancer", "MCL", "NSCLC", "Melanoma",
@@ -131,7 +132,13 @@ const AnomalyDetection = () => {
       const response = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
       const campaignsData = await response.json();
 
-      const validDeliveries = campaignsData.filter(item => (item.Delivered || 0) >= 100);
+      const cutoffDate = new Date('2025-02-01');
+      const validDeliveries = campaignsData.filter(item => {
+        if ((item.Delivered || 0) < 100) return false;
+        if (!item.Send_Date) return false;
+        const sendDate = new Date(item.Send_Date);
+        return sendDate >= cutoffDate;
+      });
       const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
 
       const combinedCampaigns = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
@@ -158,79 +165,78 @@ const AnomalyDetection = () => {
         };
       });
 
-      const campaignsWithBucket = combinedCampaigns.map(c => {
-        const { bucket, topic } = extractBucketAndTopic(c.CleanedName);
-        return { ...c, Bucket: bucket, Topic: topic };
-      });
+      const campaignsWithBucket = combinedCampaigns
+        .map(c => {
+          const { bucket, topic } = extractBucketAndTopic(c.CleanedName);
+          return { ...c, Bucket: bucket, Topic: topic };
+        })
+        .filter(c => c.Topic !== 'Other');
 
       const bucketized = _.groupBy(campaignsWithBucket, 'Bucket');
-      const allBuckets = ['Custom Email', 'Clinical Updates', 'Expert Perspectives', 'Hot Topics'];
-
       const allAnomalies = [];
-      const bucketTopicMap = {};
+
+      const zThreshold = showOverperforming ? 1.5 : -1.5;
 
       Object.entries(bucketized).forEach(([bucket, bucketCampaigns]) => {
         const topicGroups = _.groupBy(bucketCampaigns, 'Topic');
 
-        Object.entries(topicGroups).forEach(([topic, campaigns]) => {
-          console.log(`Topic: ${topic} (${bucket}) - ${campaigns.length} campaigns`);
+        if (detectBySubtopic) {
+          Object.entries(topicGroups).forEach(([topic, campaigns]) => {
+            if (campaigns.length < 5) return;
 
-          if (campaigns.length < 5) return;
+            const openRates = campaigns.map(c => c.Unique_Open_Rate).filter(r => r != null);
+            const mean = _.mean(openRates);
+            const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
 
-          const openRates = campaigns.map(c => c.Unique_Open_Rate).filter(r => r != null);
-          const mean = _.mean(openRates);
-          const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
-
-          console.log(`  Mean: ${mean.toFixed(2)}%, StdDev: ${stdDev.toFixed(2)}%`);
-
-          let anomaliesInTopic = 0;
-          campaigns.forEach(campaign => {
-            const zScore = (campaign.Unique_Open_Rate - mean) / (stdDev || 1);
-            if (zScore < -1.5) {
-              anomaliesInTopic++;
-              allAnomalies.push({
-                ...campaign,
-                topicMean: mean,
-                topicStdDev: stdDev,
-                zScore: zScore,
-                deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100
-              });
-            }
+            campaigns.forEach(campaign => {
+              const zScore = (campaign.Unique_Open_Rate - mean) / (stdDev || 1);
+              const isAnomaly = showOverperforming ? zScore > zThreshold : zScore < zThreshold;
+              if (isAnomaly) {
+                allAnomalies.push({
+                  ...campaign,
+                  topicMean: mean,
+                  topicStdDev: stdDev,
+                  zScore: zScore,
+                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100
+                });
+              }
+            });
           });
+        } else {
+          if (bucketCampaigns.length >= 5) {
+            const openRates = bucketCampaigns.map(c => c.Unique_Open_Rate).filter(r => r != null);
+            const mean = _.mean(openRates);
+            const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
 
-          if (anomaliesInTopic > 0) {
-            console.log(`  Found ${anomaliesInTopic} anomalies in this topic`);
+            bucketCampaigns.forEach(campaign => {
+              const zScore = (campaign.Unique_Open_Rate - mean) / (stdDev || 1);
+              const isAnomaly = showOverperforming ? zScore > zThreshold : zScore < zThreshold;
+              if (isAnomaly) {
+                allAnomalies.push({
+                  ...campaign,
+                  topicMean: mean,
+                  topicStdDev: stdDev,
+                  zScore: zScore,
+                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100
+                });
+              }
+            });
           }
-
-          if (!bucketTopicMap[bucket]) {
-            bucketTopicMap[bucket] = [];
-          }
-          if (campaigns.length >= 5) {
-            bucketTopicMap[bucket].push(topic);
-          }
-        });
+        }
       });
 
-      console.log(`Total anomalies found: ${allAnomalies.length}`);
+      if (showOverperforming) {
+        allAnomalies.sort((a, b) => b.zScore - a.zScore);
+      } else {
+        allAnomalies.sort((a, b) => a.zScore - b.zScore);
+      }
 
-      allAnomalies.sort((a, b) => a.zScore - b.zScore);
-
-      const filterOptions = ['all', ...allBuckets];
-      Object.entries(bucketTopicMap).forEach(([bucket, topics]) => {
-        topics.sort().forEach(topic => filterOptions.push(topic));
-      });
-
-      setCategories(filterOptions);
       setAnomalies(allAnomalies);
     } catch (error) {
       console.error('Failed to fetch anomaly data:', error);
     }
     setIsLoading(false);
   };
-
-  const filteredAnomalies = selectedCategory === 'all'
-    ? anomalies
-    : anomalies.filter(a => a.Bucket === selectedCategory || a.Topic === selectedCategory);
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -239,41 +245,100 @@ const AnomalyDetection = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const matchesSearch = (anomaly) => {
+    if (!searchTerm) return true;
+
+    const searchWords = searchTerm.toLowerCase().split(' ').filter(w => w.length > 0);
+    const campaignName = anomaly.CleanedName.toLowerCase();
+    const topic = anomaly.Topic.toLowerCase();
+    const bucket = anomaly.Bucket.toLowerCase();
+    const sendDate = formatDate(anomaly.Send_Date).toLowerCase();
+
+    return searchWords.every(word =>
+      campaignName.includes(word) ||
+      topic.includes(word) ||
+      bucket.includes(word) ||
+      sendDate.includes(word)
+    );
+  };
+
+  const filteredAnomalies = searchTerm
+    ? anomalies.filter(matchesSearch)
+    : anomalies;
+
+  const getSeverityLabel = (zScore) => {
+    const absZ = Math.abs(zScore);
+    if (absZ > 2.5) return showOverperforming ? 'Exceptional' : 'Severe';
+    if (absZ > 2) return showOverperforming ? 'Strong' : 'Moderate';
+    return showOverperforming ? 'Notable' : 'Mild';
+  };
+
   return (
     <div className="anomaly-detection-container">
       <div className="anomaly-header">
-        <div className="anomaly-title">
-          <h2>Underperforming Campaigns</h2>
-          <p className="anomaly-subtitle">
-            Campaigns performing significantly below their category average (≥1.5 standard deviations)
-          </p>
-        </div>
-        <div className="category-filter">
-          <label htmlFor="category-select">Category:</label>
-          <select
-            id="category-select"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="category-select"
+        <div className="anomaly-title-row">
+          <h2>{showOverperforming ? 'Overperforming Campaigns' : 'Underperforming Campaigns'}</h2>
+          <div
+            className="info-icon-wrapper"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
           >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat === 'all' ? 'All Categories' : cat}
-              </option>
-            ))}
-          </select>
+            <svg className="info-icon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {showTooltip && (
+              <div className="topics-tooltip">
+                <div className="tooltip-title">Topics & Subtopics</div>
+                <div className="tooltip-section">
+                  <div className="tooltip-topic-header">Clinical Updates</div>
+                  <div className="tooltip-subtopics">Allergy & Pulmonology, Breast Cancer, Cardiology, Colorectal Surgery, Diabetes, Gastroenterology, GPP, Infectious Disease, Neonatology, Neuroscience, Oncology, Ophthalmology, Acne</div>
+                </div>
+                <div className="tooltip-section">
+                  <div className="tooltip-topic-header">Expert Perspectives</div>
+                  <div className="tooltip-subtopics">RCC, Vitiligo, Skincare Science, Melanoma, GPP, Atopic Dermatitis, Multiple Myeloma</div>
+                </div>
+                <div className="tooltip-section">
+                  <div className="tooltip-topic-header">Hot Topics</div>
+                  <div className="tooltip-subtopics">Alzheimers, Breast Cancer, MCL, NSCLC, Melanoma, Multiple Myeloma, Ophthalmology, Pigmented Lesions, CLL, Inflammatory Diseases, Metastatic Breast Cancer</div>
+                </div>
+                <div className="tooltip-section">
+                  <div className="tooltip-topic-header">Custom Email</div>
+                  <div className="tooltip-subtopics">Brand-specific campaigns</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="performance-toggle">
+          <button
+            className={`toggle-btn ${!showOverperforming ? 'active' : ''}`}
+            onClick={() => setShowOverperforming(false)}
+          >
+            Underperforming
+          </button>
+          <button
+            className={`toggle-btn ${showOverperforming ? 'active' : ''}`}
+            onClick={() => setShowOverperforming(true)}
+          >
+            Overperforming
+          </button>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="loading">Analyzing campaigns...</div>
+        <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <p>Analyzing campaigns...</p>
+        </div>
       ) : filteredAnomalies.length > 0 ? (
         <div className="anomalies-grid">
           {filteredAnomalies.map((anomaly, idx) => (
-            <div key={idx} className="anomaly-card">
+            <div key={idx} className={`anomaly-card ${showOverperforming ? 'overperforming' : ''}`}>
               <div className="anomaly-card-header">
-                <span className="anomaly-severity">
-                  {anomaly.zScore < -2.5 ? 'Severe' : anomaly.zScore < -2 ? 'Moderate' : 'Mild'}
+                <span className={`anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
+                  {getSeverityLabel(anomaly.zScore)}
                 </span>
                 <span className="anomaly-bucket">{anomaly.Bucket}</span>
               </div>
@@ -283,33 +348,33 @@ const AnomalyDetection = () => {
 
               <div className="anomaly-metrics">
                 <div className="anomaly-metric">
-                  <span className="metric-label">Campaign Performance</span>
-                  <span className="metric-value campaign-value">
+                  <span className="anomaly-metric-label">Campaign Performance</span>
+                  <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
                     {anomaly.Unique_Open_Rate.toFixed(2)}%
                   </span>
                 </div>
                 <div className="anomaly-metric">
-                  <span className="metric-label">Topic Average</span>
-                  <span className="metric-value">
+                  <span className="anomaly-metric-label">{detectBySubtopic ? 'Subtopic' : 'Topic'} Average</span>
+                  <span className="anomaly-metric-value">
                     {anomaly.topicMean.toFixed(2)}%
                   </span>
                 </div>
                 <div className="anomaly-metric highlight">
-                  <span className="metric-label">Deviation</span>
-                  <span className="metric-value deviation-value">
-                    {anomaly.deviationPercent.toFixed(1)}%
+                  <span className="anomaly-metric-label">Deviation</span>
+                  <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
+                    {showOverperforming ? '+' : ''}{anomaly.deviationPercent.toFixed(1)}%
                   </span>
                 </div>
               </div>
 
               <div className="anomaly-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Delivered:</span>
-                  <span className="stat-value">{anomaly.Delivered.toLocaleString()}</span>
+                <div className="anomaly-stat-item">
+                  <span className="anomaly-stat-label">Delivered</span>
+                  <span className="anomaly-stat-value">{anomaly.Delivered.toLocaleString()}</span>
                 </div>
-                <div className="stat-item">
-                  <span className="stat-label">Z-Score:</span>
-                  <span className="stat-value">{anomaly.zScore.toFixed(2)}</span>
+                <div className="anomaly-stat-item">
+                  <span className="anomaly-stat-label">Z-Score</span>
+                  <span className="anomaly-stat-value">{showOverperforming ? '+' : ''}{anomaly.zScore.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -317,8 +382,12 @@ const AnomalyDetection = () => {
         </div>
       ) : (
         <div className="no-anomalies">
-          <p>No significant anomalies detected in the selected category.</p>
-          <p className="no-anomalies-subtitle">All campaigns are performing within expected ranges.</p>
+          <p>No significant {showOverperforming ? 'overperformers' : 'anomalies'} detected{searchTerm ? ' matching search' : ''}.</p>
+          <p className="no-anomalies-subtitle">
+            {showOverperforming
+              ? 'No campaigns are significantly exceeding expected performance.'
+              : 'All campaigns are performing within expected ranges.'}
+          </p>
         </div>
       )}
     </div>

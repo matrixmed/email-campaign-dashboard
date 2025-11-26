@@ -14,7 +14,7 @@ const AudiencePage = () => {
   return (
     <div className="audience-page">
       <div className="audience-page-header">
-        <h1>Audience Insights</h1>
+        <h1>Audience Analysis</h1>
         <button onClick={handleClear} className="btn-clear-header">
           Clear
         </button>

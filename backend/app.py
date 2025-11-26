@@ -26,6 +26,8 @@ from routes.brand_management import brand_management_bp
 from routes.users import users_bp
 from routes.list_analysis import list_analysis_bp
 from routes.analytics import analytics_bp
+from routes.npi import npi_bp
+from routes.basis import basis_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
@@ -36,6 +38,8 @@ app.register_blueprint(brand_management_bp, url_prefix='/api/brand-management')
 app.register_blueprint(users_bp, url_prefix='/api/users')
 app.register_blueprint(list_analysis_bp, url_prefix='/api/list-analysis')
 app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
+app.register_blueprint(npi_bp, url_prefix='/api/npi')
+app.register_blueprint(basis_bp, url_prefix='/api/basis')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

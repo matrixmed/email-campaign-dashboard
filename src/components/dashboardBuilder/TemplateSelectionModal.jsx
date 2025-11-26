@@ -239,9 +239,9 @@ const TemplateSelectionModal = ({
             </div>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
               {
-                step === 1 ? 'Choose Your Theme' :
+                step === 1 ? 'Select Theme' :
                 step === 2 ? 'Select Campaign Type' :
-                step === 3 ? 'Pick Your Campaigns' :
+                step === 3 ? 'Select Campaigns' :
                 'Choose Template Layout'
               }
             </h2>

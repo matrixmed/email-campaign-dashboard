@@ -4,7 +4,6 @@ import '../../styles/ListEfficiencyAnalysis.css';
 import { API_BASE_URL } from '../../config/api';
 
 const ListEfficiencyAnalysis = forwardRef((props, ref) => {
-    // Load persisted state from localStorage on mount
     const loadPersistedState = () => {
         try {
             const saved = localStorage.getItem('listAnalysisState');
@@ -45,10 +44,8 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
     const [engagementLoading, setEngagementLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Table state for each tier
     const [tierTableState, setTierTableState] = useState({});
 
-    // Persist state to localStorage whenever it changes
     useEffect(() => {
         const stateToPersist = {
             uploadedData,
@@ -105,7 +102,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         localStorage.removeItem('listAnalysisState');
     };
 
-    // Expose clearAnalysis to parent component via ref
     useImperativeHandle(ref, () => ({
         clearAnalysis
     }));
@@ -213,7 +209,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         }
     };
 
-    // Get or initialize table state for a tier
     const getTierTableState = useCallback((tierKey) => {
         if (!tierTableState[tierKey]) {
             return {
@@ -226,7 +221,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         return tierTableState[tierKey];
     }, [tierTableState]);
 
-    // Update table state for a tier
     const updateTierTableState = useCallback((tierKey, updates) => {
         setTierTableState(prev => ({
             ...prev,
@@ -237,18 +231,15 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         }));
     }, [getTierTableState]);
 
-    // Export tier data to CSV
     const exportTierData = useCallback((tier) => {
         if (!tier.users || tier.users.length === 0) return;
 
-        // CSV headers
         const headers = [
             'Email', 'First Name', 'Last Name', 'Specialty', 'NPI',
             'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
             'UOR %', 'TOR %', 'UCR %', 'TCR %'
         ];
 
-        // CSV rows
         const rows = tier.users.map(user => [
             user.email,
             user.first_name || '',
@@ -266,18 +257,15 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
             user.total_click_rate || 0
         ]);
 
-        // Create CSV content
         const csvContent = [
             headers.join(','),
             ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
         ].join('\n');
 
-        // Create download link
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
 
-        // Format filename as crossover_X_Y.csv
         const filename = `crossover_${tier.tier.replace('/', '_')}.csv`;
 
         link.setAttribute('href', url);
@@ -288,7 +276,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         document.body.removeChild(link);
     }, []);
 
-    // Sort users by column
     const sortUsers = useCallback((users, column, direction) => {
         if (!column || !direction) return users;
 
@@ -297,7 +284,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
             let aVal = a[column];
             let bVal = b[column];
 
-            // Handle name specially
             if (column === 'name') {
                 aVal = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
                 bVal = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
@@ -314,13 +300,11 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         return sorted;
     }, []);
 
-    // Handle column header click for sorting
     const handleSort = useCallback((tierKey, column) => {
         const state = getTierTableState(tierKey);
         let newDirection = 'desc';
 
         if (state.sortColumn === column) {
-            // Toggle direction
             newDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
         }
 
@@ -459,7 +443,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
                         </table>
                     </div>
 
-                    {/* High-level summary of target list coverage */}
                     <div className="crossover-summary">
                         <p>
                             <strong>{crossoverData.users_on_at_least_one_list?.toLocaleString() || 0}</strong> / <strong>{crossoverData.total_iqvia_users?.toLocaleString() || 0}</strong> ({crossoverData.percentage_on_at_least_one_list || 0}%)
@@ -479,7 +462,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
                 <div className="engagement-tier-results">
                     <h3>Engagement Analysis by List Coverage</h3>
 
-                    {/* High-level engagement summary */}
                     {engagementByTier.engagement_summary && (
                         <div className="engagement-summary">
                             <div className="engagement-summary-stats">
@@ -507,7 +489,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
                             const tierKey = tier.tier;
                             const tableState = getTierTableState(tierKey);
 
-                            // Sort and paginate users
                             let displayUsers = tier.users || [];
                             if (tableState.sortColumn) {
                                 displayUsers = sortUsers(displayUsers, tableState.sortColumn, tableState.sortDirection);
@@ -560,7 +541,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
 
                                 {isExpanded && (
                                     <div className="tier-detail-view">
-                                        {/* Aggregate Overview - matching Audience Analysis style */}
                                         <div className="aggregate-overview">
                                             <h5>Overview</h5>
                                             <div className="aggregate-grid">
@@ -601,7 +581,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
                                             </div>
                                         </div>
 
-                                        {/* Sample Data Table - matching Audience Analysis style */}
                                         {tier.users && tier.users.length > 0 ? (
                                             <div className="sample-data-section">
                                                 <div className="table-header-row">

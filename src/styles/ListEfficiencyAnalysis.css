@@ -657,7 +657,6 @@ body.light .tier-users-detail tr:hover {
     background-color: #f8f9fa;
 }
 
-/* New styles for expandable tier cards */
 .tier-header-clickable {
     padding: 12px 20px;
     cursor: pointer;
@@ -853,7 +852,6 @@ body.light .tier-users-detail tr:hover {
     margin-top: 15px;
 }
 
-/* Light mode styles for new components */
 body.light .tier-header-clickable {
     background-color: #fff;
 }
@@ -941,7 +939,6 @@ body.light .no-data-message .help-text {
     color: #888;
 }
 
-/* Crossover summary section */
 .crossover-summary {
     margin-top: 20px;
     padding: 15px 20px;
@@ -962,7 +959,6 @@ body.light .no-data-message .help-text {
     font-weight: 600;
 }
 
-/* Engagement summary section */
 .engagement-summary {
     margin-bottom: 25px;
     padding: 20px;
@@ -1008,7 +1004,6 @@ body.light .no-data-message .help-text {
     font-weight: 400;
 }
 
-/* Light mode styles for summaries */
 body.light .crossover-summary {
     background-color: #f0f8ff;
     border-left-color: #0077ff;
@@ -1043,7 +1038,6 @@ body.light .engagement-summary-stat .summary-detail {
     color: #666;
 }
 
-/* Clear button in header */
 .btn-clear {
     padding: 8px 20px;
     background-color: #dc3545;
@@ -1060,7 +1054,6 @@ body.light .engagement-summary-stat .summary-detail {
     background-color: #c82333;
 }
 
-/* Table header row with action buttons */
 .table-header-row {
     display: flex;
     justify-content: space-between;
@@ -1111,7 +1104,6 @@ body.light .engagement-summary-stat .summary-detail {
     background-color: #218838;
 }
 
-/* Load More button */
 .load-more-container {
     display: flex;
     justify-content: center;
@@ -1134,7 +1126,6 @@ body.light .engagement-summary-stat .summary-detail {
     background-color: var(--color-primary-hover, #143d61);
 }
 
-/* Sortable table headers */
 .results-table th.sortable {
     cursor: pointer;
     user-select: none;
@@ -1148,7 +1139,6 @@ body.light .results-table th.sortable:hover {
     background-color: #dee2e6 !important;
 }
 
-/* Light mode button styles */
 body.light .btn-clear {
     background-color: #dc3545;
 }

@@ -1,7 +1,5 @@
-/* Corporate Brand Theme CSS */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Montserrat:wght@400;500;600&display=swap');
 
-/* Base styles for corporate theme */
 body.company-theme {
   background-color: #f8f9fa !important;
   color: #212529 !important;
@@ -9,9 +7,6 @@ body.company-theme {
   font-family: 'Poppins', sans-serif;
 }
 
-/* Corporate primary colors - Customizable 
- * These can be changed to match specific corporate brand colors
- */
 :root {
   --company-primary: #0056b3;       /* Main brand color */
   --company-secondary: #6c757d;     /* Secondary brand color */
@@ -26,7 +21,6 @@ body.company-theme {
   --company-gradient-end: #007bff;  /* Gradient end color */
 }
 
-/* Corporate header */
 body.company-theme .dashboard-header {
   background: var(--company-white);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -48,7 +42,6 @@ body.company-theme h2 {
   letter-spacing: 0;
 }
 
-/* Corporate sections */
 body.company-theme .chart-section,
 body.company-theme .table-section,
 body.company-theme .insights-section,
@@ -65,7 +58,6 @@ body.company-theme .chat-interface {
   margin-bottom: 20px;
 }
 
-/* Section headers */
 body.company-theme .chart-section h2,
 body.company-theme .table-section h2,
 body.company-theme .insights-section h2,
@@ -79,7 +71,6 @@ body.company-theme .chat-interface h2 {
   margin-bottom: 15px;
 }
 
-/* Corporate tables */
 body.company-theme table {
   width: 100%;
   border-collapse: separate;
@@ -114,7 +105,6 @@ body.company-theme tr:hover td {
   background-color: rgba(0, 86, 179, 0.05);
 }
 
-/* Corporate buttons */
 body.company-theme button,
 body.company-theme .space-button,
 body.company-theme .pagination button,
@@ -142,7 +132,6 @@ body.company-theme .query-button:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Disabled buttons */
 body.company-theme button:disabled,
 body.company-theme .space-button:disabled,
 body.company-theme .pagination button:disabled,
@@ -152,7 +141,6 @@ body.company-theme .query-button:disabled {
   opacity: 0.7;
 }
 
-/* Secondary buttons */
 body.company-theme .secondary-button {
   background: var(--company-white);
   color: var(--company-primary);
@@ -164,7 +152,6 @@ body.company-theme .secondary-button:hover {
   color: var(--company-hover);
 }
 
-/* Inputs and selects */
 body.company-theme input,
 body.company-theme select,
 body.company-theme .deployment-select,
@@ -188,7 +175,6 @@ body.company-theme .query-input:focus {
   box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
 }
 
-/* Dropdown styling */
 body.company-theme .dropdown {
   background-color: var(--company-white);
   border: 1px solid var(--company-border);
@@ -209,7 +195,6 @@ body.company-theme .dropdown-arrow svg {
   color: var(--company-primary);
 }
 
-/* Theme selector styling */
 body.company-theme .theme-select {
   background-color: var(--company-white);
   color: var(--company-dark);
@@ -219,7 +204,6 @@ body.company-theme .theme-select {
   border-radius: 4px;
 }
 
-/* Search box styling */
 body.company-theme .search-box,
 body.company-theme .digital-journals-search-box {
   background-color: var(--company-white);
@@ -236,7 +220,6 @@ body.company-theme .digital-journals-search-box:focus {
   box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
 }
 
-/* Campaign boxes */
 body.company-theme .campaign-box {
   background: var(--company-white);
   border: 1px solid var(--company-border);
@@ -252,7 +235,6 @@ body.company-theme .campaign-box h3 {
   border-bottom: 1px solid var(--company-border);
 }
 
-/* Tooltips */
 body.company-theme .attached-tooltip {
   background-color: var(--company-white);
   border: 1px solid var(--company-border);
@@ -268,7 +250,6 @@ body.company-theme .tooltip-top::before {
   border-color: var(--company-border);
 }
 
-/* Scrollbars */
 body.company-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -288,7 +269,6 @@ body.company-theme ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Sample query lists */
 body.company-theme .sample-queries h3 {
   color: var(--company-primary);
   font-family: 'Montserrat', sans-serif;
@@ -309,7 +289,6 @@ body.company-theme .sample-queries li:hover {
   border-color: var(--company-primary);
 }
 
-/* Toggle switch */
 body.company-theme .toggle-switch {
   --light: var(--company-primary);
   --dark: var(--company-white);
@@ -335,7 +314,6 @@ body.company-theme .checkbox:checked ~ .slider::before {
   background-color: var(--company-white);
 }
 
-/* Pagination */
 body.company-theme .pagination {
   display: flex;
   justify-content: center;
@@ -352,7 +330,6 @@ body.company-theme .pagination button.active {
   background-color: var(--company-secondary);
 }
 
-/* Corporate card layouts */
 body.company-theme .card {
   background: var(--company-white);
   border-radius: 6px;
@@ -378,14 +355,12 @@ body.company-theme .card-body {
   padding: 20px;
 }
 
-/* Data visualization enhancements */
 body.company-theme canvas {
   background-color: var(--company-white);
   border: 1px solid var(--company-border);
   border-radius: 6px;
 }
 
-/* Progress bars */
 body.company-theme .progress {
   height: 8px;
   background-color: var(--company-muted);
@@ -400,7 +375,6 @@ body.company-theme .progress-bar {
   border-radius: 4px;
 }
 
-/* Badges */
 body.company-theme .badge {
   display: inline-block;
   padding: 3px 8px;
@@ -425,7 +399,6 @@ body.company-theme .badge-success {
   color: var(--company-white);
 }
 
-/* Consistent brand header */
 body.company-theme .brand-header {
   background: linear-gradient(to right, var(--company-gradient-start), var(--company-gradient-end));
   color: var(--company-white);
@@ -437,20 +410,14 @@ body.company-theme .brand-header {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Company logos and branding
- * Add custom logos by setting the background-image
- */
 body.company-theme .company-logo {
   height: 40px;
   width: 150px;
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  /* Set your company logo here */
-  /* background-image: url('your-logo-url.png'); */
 }
 
-/* Dark mode company variant */
 body.company-theme.dark-variant {
   background-color: #1e2229 !important;
   color: #f8f9fa !important;
@@ -499,7 +466,6 @@ body.company-theme.dark-variant .digital-journals-search-box {
   color: #f8f9fa;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   body.company-theme .dashboard-header {
     flex-direction: column;

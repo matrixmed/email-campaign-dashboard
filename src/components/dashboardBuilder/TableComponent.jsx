@@ -223,8 +223,6 @@ const TableComponent = ({
     newData[rowIndex][colIndex] = value;
     setTableData(newData);
 
-    // Update the config to save the data properly
-    // Save with headers and rows separated to prevent duplication
     const updatedConfig = {
       ...config,
       customData: {
@@ -237,12 +235,11 @@ const TableComponent = ({
   }, [tableData, onEdit, id, config]);
 
   const handleDeleteRow = useCallback((rowIndex) => {
-    if (tableData.length <= 1) return; // Keep at least 1 row
+    if (tableData.length <= 1) return;
 
     const newData = tableData.filter((_, index) => index !== rowIndex);
     setTableData(newData);
 
-    // Update the config to save the data properly
     const updatedConfig = {
       ...config,
       customData: {
@@ -257,12 +254,11 @@ const TableComponent = ({
   }, [tableData, onEdit, id, config, onRowSelect]);
 
   const handleDeleteColumn = useCallback((colIndex) => {
-    if (tableData[0]?.length <= 1) return; // Keep at least 1 column
+    if (tableData[0]?.length <= 1) return;
 
     const newData = tableData.map(row => row.filter((_, index) => index !== colIndex));
     setTableData(newData);
 
-    // Update the config to save the data properly
     const updatedConfig = {
       ...config,
       customData: {
@@ -288,7 +284,6 @@ const TableComponent = ({
 
     setTableData(newData);
 
-    // Update the config to save the data properly
     const updatedConfig = {
       ...config,
       customData: {
@@ -311,7 +306,6 @@ const TableComponent = ({
 
     setTableData(newData);
 
-    // Update the config to save the data properly
     const updatedConfig = {
       ...config,
       customData: {
@@ -341,7 +335,6 @@ const TableComponent = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       handleCellEdit(rowIndex, colIndex, editValue);
-      // Move to cell below
       if (rowIndex < tableData.length - 1) {
         setEditValue(tableData[rowIndex + 1][colIndex]);
         setIsEditingCell({ row: rowIndex + 1, col: colIndex });
@@ -368,23 +361,19 @@ const TableComponent = ({
         setIsEditingCell({ row: rowIndex - 1, col: colIndex });
       }
     } else if (e.key === 'ArrowRight') {
-      // Only navigate to next cell if cursor is at the end and no text is selected
       if ((cursorAtEnd || hasSelection) && colIndex < tableData[rowIndex].length - 1) {
         e.preventDefault();
         handleCellEdit(rowIndex, colIndex, editValue);
         setEditValue(tableData[rowIndex][colIndex + 1]);
         setIsEditingCell({ row: rowIndex, col: colIndex + 1 });
       }
-      // Otherwise allow default cursor movement within the input
     } else if (e.key === 'ArrowLeft') {
-      // Only navigate to previous cell if cursor is at the start and no text is selected
       if ((cursorAtStart || hasSelection) && colIndex > 0) {
         e.preventDefault();
         handleCellEdit(rowIndex, colIndex, editValue);
         setEditValue(tableData[rowIndex][colIndex - 1]);
         setIsEditingCell({ row: rowIndex, col: colIndex - 1 });
       }
-      // Otherwise allow default cursor movement within the input
     }
   }, [tableData, editValue, handleCellEdit]);
 
@@ -492,14 +481,13 @@ const TableComponent = ({
     const isSelectedCol = selectedColIndex === colIndex;
     const isSelectedCell = isSelectedRow && isSelectedCol;
 
-    // Determine background color based on selection state
     let backgroundColor;
     if (isSelectedCell) {
-      backgroundColor = '#b3d9ff'; // Darker blue for selected cell
+      backgroundColor = '#b3d9ff';
     } else if (isSelectedRow || isSelectedCol) {
-      backgroundColor = '#d1e7ff'; // Light blue for selected row or column
+      backgroundColor = '#d1e7ff';
     } else {
-      backgroundColor = rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff'; // Alternating rows
+      backgroundColor = rowIndex % 2 === 0 ? '#f9f9f9' : '#ffffff';
     }
 
     return {
@@ -528,7 +516,6 @@ const TableComponent = ({
     }
   }, [isEditing, id]);
 
-  // Clear row and column selection when table is deselected
   useEffect(() => {
     if (!isSelected) {
       setSelectedRowIndex(null);
@@ -625,9 +612,7 @@ const TableComponent = ({
                   onClick={(e) => {
                     if (!e.target.closest('input')) {
                       e.stopPropagation();
-                      // Select the table first to ensure it's active
                       onSelect?.(e);
-                      // Determine which cell was clicked
                       const clickedCell = e.target.closest('td');
                       const clickedColIndex = clickedCell ? Array.from(clickedCell.parentElement.children).indexOf(clickedCell) : null;
                       setSelectedRowIndex(rowIndex);

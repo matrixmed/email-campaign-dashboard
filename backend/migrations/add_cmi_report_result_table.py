@@ -1,13 +1,7 @@
-"""
-Migration script to add CMIReportResult table to the database
-Run this script to create the new table for CMI report tracking
-"""
-
 import os
 import sys
 from sqlalchemy import create_engine, text
 
-# Add parent directory to path to import models
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from models import Base, CMIReportResult
@@ -16,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def run_migration():
-    """Create the CMIReportResult table"""
     database_url = os.getenv('DATABASE_URL')
 
     if not database_url:
@@ -27,12 +20,10 @@ def run_migration():
     engine = create_engine(database_url)
 
     try:
-        # Create only the CMIReportResult table
         print("Creating cmi_report_results table...")
         CMIReportResult.__table__.create(engine, checkfirst=True)
-        print("✓ Table created successfully!")
+        print("Table created successfully!")
 
-        # Verify table exists
         with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT EXISTS (
@@ -44,9 +35,8 @@ def run_migration():
             exists = result.scalar()
 
             if exists:
-                print("✓ Table verification successful!")
+                print("Table verification successful!")
 
-                # Show table structure
                 result = conn.execute(text("""
                     SELECT column_name, data_type, is_nullable
                     FROM information_schema.columns

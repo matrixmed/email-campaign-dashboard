@@ -1,6 +1,0 @@
-flask==2.3.3
-flask-cors==4.0.0
-pandas>=2.0.0
-azure-storage-blob>=12.19.0
-azure-storage-file-datalake>=12.14.0
-werkzeug==2.3.7

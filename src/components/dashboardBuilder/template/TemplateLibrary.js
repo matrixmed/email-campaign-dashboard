@@ -1,8 +1,6 @@
 import { TEMPLATE_TYPES, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS } from './LayoutTemplates';
 
-// Helper function to add Matrix logo
 const addMatrixLogo = (components, theme) => {
-  // Only add the bottom-right logo when theme is NOT 'matrix' to avoid duplicate logos
   if (theme !== 'matrix') {
     components.push({
       id: 'matrix-logo-bottom',
@@ -396,7 +394,6 @@ const generateTableForType = (tableType, position, themeColors) => {
   const tableDefinition = TABLE_DEFINITIONS[tableType];
   
   if (!tableDefinition) {
-    // Fallback to default table
     return {
       id: `table-${position}`,
       type: 'table',
@@ -610,13 +607,11 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     style: { background: 'transparent' }
   });
 
-  // Generate Table 1 (position 395)
   const table1Type = selectedTableTypes.table1 || TABLE_TYPES.VIDEO_METRICS;
   const table1 = generateTableForType(table1Type, 1, themeColors);
   table1.position = { x: 463, y: 395, width: 261, height: 140 };
   components.push(table1);
 
-  // Generate Table 2 (position 228)
   const table2Type = selectedTableTypes.table2 || TABLE_TYPES.ONLINE_JOURNAL;
   const table2 = generateTableForType(table2Type, 2, themeColors);
   table2.position = { x: 464, y: 228, width: 261, height: 140 };
@@ -630,13 +625,11 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
   const themeColors = getThemeColors(theme);
 
-  // Remove the Matrix logo since we're adding a third table
   const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
   if (matrixLogoIndex !== -1) {
     components.splice(matrixLogoIndex, 1);
   }
 
-  // Generate Table 3
   const table3Type = selectedTableTypes.table3 || TABLE_TYPES.SOCIAL_MEDIA;
   const table3 = generateTableForType(table3Type, 3, themeColors);
   table3.position = { x: 752, y: 431, width: 225, height: 104 };
@@ -809,7 +802,6 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
     }
   });
 
-  // Logo already added by generateMultiNoneTemplate, don't add again
   return components;
 };
 
@@ -817,7 +809,6 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
   const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
 
-  // Remove the Matrix logo for multi-two (table would overlap)
   const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
   if (matrixLogoIndex !== -1) {
     components.splice(matrixLogoIndex, 1);
@@ -854,8 +845,6 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
 export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
   const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
   const themeColors = getThemeColors(theme);
-
-  // Matrix logo is already removed in generateMultiTwoTemplate
 
   const secondTable = components.find(c => c.id === 'additional-table-2');
   if (secondTable) {

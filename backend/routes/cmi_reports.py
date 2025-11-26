@@ -16,11 +16,9 @@ def get_session():
 @cmi_reports_bp.route('/reports/week/<week_start>', methods=['GET'])
 @cross_origin()
 def get_reports_by_week(week_start):
-    """Get all CMI reports for a specific week"""
     try:
         session = get_session()
 
-        # Parse the week_start date (format: YYYY-MM-DD)
         week_date = datetime.strptime(week_start, '%Y-%m-%d').date()
 
         reports = session.query(CMIReportResult).filter(
@@ -83,7 +81,6 @@ def get_reports_by_week(week_start):
 @cmi_reports_bp.route('/reports/<int:report_id>/submit', methods=['PUT', 'OPTIONS'])
 @cross_origin()
 def update_submission_status(report_id):
-    """Update the submission status of a CMI report"""
     try:
         data = request.json
         session = get_session()
@@ -97,7 +94,6 @@ def update_submission_status(report_id):
                 'message': 'Report not found'
             }), 404
 
-        # Update submission status
         is_submitted = data.get('is_submitted', False)
         report.is_submitted = is_submitted
 
@@ -105,13 +101,11 @@ def update_submission_status(report_id):
             report.submitted_at = datetime.utcnow()
             report.submitted_by = data.get('submitted_by', 'user')
         else:
-            # If unmarking as submitted, clear the submission data
             report.submitted_at = None
             report.submitted_by = None
 
         report.updated_at = datetime.utcnow()
 
-        # Get values before closing session
         result_data = {
             'status': 'success',
             'message': 'Submission status updated successfully',
@@ -133,7 +127,6 @@ def update_submission_status(report_id):
 @cmi_reports_bp.route('/reports/week/<week_start>/submit', methods=['PUT', 'OPTIONS'])
 @cross_origin()
 def submit_entire_week(week_start):
-    """Mark all reports for a specific week as submitted"""
     try:
         data = request.json
         session = get_session()
@@ -185,7 +178,6 @@ def submit_entire_week(week_start):
 @cmi_reports_bp.route('/reports/category/<category>', methods=['GET'])
 @cross_origin()
 def get_reports_by_category(category):
-    """Get all reports by category (confirmed_match, no_data, aggregate_investigation)"""
     try:
         session = get_session()
 
@@ -226,11 +218,9 @@ def get_reports_by_category(category):
 @cmi_reports_bp.route('/reports/stats', methods=['GET'])
 @cross_origin()
 def get_reports_stats():
-    """Get statistics about CMI reports"""
     try:
         session = get_session()
 
-        # Get counts by category
         confirmed = session.query(CMIReportResult).filter(
             CMIReportResult.report_category == 'confirmed_match'
         ).count()
@@ -243,7 +233,6 @@ def get_reports_stats():
             CMIReportResult.report_category == 'aggregate_investigation'
         ).count()
 
-        # Get submission stats
         total_reports = session.query(CMIReportResult).count()
         submitted_reports = session.query(CMIReportResult).filter(
             CMIReportResult.is_submitted == True
@@ -278,30 +267,18 @@ def get_reports_stats():
 @cmi_reports_bp.route('/reports/all', methods=['GET'])
 @cross_origin()
 def get_all_reports():
-    """
-    Get all reports with optional filtering
-    Query params:
-    - days_back: Number of days to look back (default: 21)
-    - brand: Filter by brand name
-    - agency: Filter by agency
-    - batch: Filter by batch (validated, no_data, investigation, unexpected, non_cmi)
-    - is_cmi: Filter CMI brands only (true/false)
-    """
     try:
         from datetime import datetime, timedelta
         session = get_session()
 
-        # Get query parameters
         days_back = request.args.get('days_back', 21, type=int)
         brand_filter = request.args.get('brand')
         agency_filter = request.args.get('agency')
         batch_filter = request.args.get('batch')
         is_cmi_filter = request.args.get('is_cmi')
 
-        # Calculate date cutoff - use reporting week, not send date
         cutoff_date = (datetime.now() - timedelta(days=days_back)).date()
 
-        # Build query - filter by reporting_week_start
         from sqlalchemy import or_
         query = session.query(CMIReportResult).filter(
             or_(
@@ -310,7 +287,6 @@ def get_all_reports():
             )
         )
 
-        # Apply filters
         if brand_filter:
             query = query.filter(CMIReportResult.brand_name.ilike(f'%{brand_filter}%'))
         if agency_filter:
@@ -321,20 +297,18 @@ def get_all_reports():
             is_cmi_bool = is_cmi_filter.lower() == 'true'
             query = query.filter(CMIReportResult.is_cmi_brand == is_cmi_bool)
 
-        # Order by reporting week descending, then send date
         reports = query.order_by(
             CMIReportResult.reporting_week_start.desc().nullslast(),
             CMIReportResult.send_date.desc().nullslast()
         ).all()
 
-        # Format for frontend (matching old JSON structure)
         result = []
         for r in reports:
             report_data = {
-                'id': r.id,  # Database ID for submissions
+                'id': r.id,
                 'campaign_id': r.campaign_id or r.campaign_name,
                 'campaign_name': r.campaign_name,
-                'standardized_campaign_name': r.standardized_campaign_name,  # Add standardized name for frontend grouping
+                'standardized_campaign_name': r.standardized_campaign_name,
                 'brand': r.brand_name,
                 'agency': r.agency,
                 'send_date': r.send_date.strftime('%Y-%m-%d') if r.send_date else None,
@@ -344,12 +318,11 @@ def get_all_reports():
                 'is_cmi_brand': r.is_cmi_brand,
                 'match_confidence': r.match_confidence,
                 'is_submitted': r.is_submitted,
-                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None
+                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                'data_type': r.data_type
             }
 
-            # Add CMI metadata if this is a CMI brand
             if r.is_cmi_brand and r.cmi_placement_id:
-                # Calculate dates for CMI metadata
                 if r.reporting_week_start and r.reporting_week_end:
                     week_start = r.reporting_week_start
                     week_end = r.reporting_week_end

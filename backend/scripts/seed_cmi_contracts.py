@@ -29,7 +29,6 @@ def seed_cmi_contracts():
         for row in csv_reader:
             placement_id = row.get('Placement ID', '').strip()
 
-            # Skip duplicates
             if placement_id in seen_ids:
                 print(f"Skipping duplicate placement_id: {placement_id}")
                 continue

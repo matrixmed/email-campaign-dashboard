@@ -13,19 +13,11 @@ def get_db_connection():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 
 def find_npi_column(df):
-    """
-    Find NPI column by checking:
-    1. Exact matches: 'NPI', 'NPI_ID', 'NPI NUMBER'
-    2. Partial matches: any column containing 'NPI'
-    3. Validation: Check if values are mostly 10-digit strings starting with '1'
-    """
-    # First pass: exact matches
     for col in df.columns:
         if col.upper() in ['NPI', 'NPI_ID', 'NPI NUMBER', 'NPI_NUM']:
             if validate_npi_column(df[col]):
                 return col
 
-    # Second pass: partial matches containing 'NPI'
     potential_cols = [col for col in df.columns if 'NPI' in col.upper()]
     for col in potential_cols:
         if validate_npi_column(df[col]):
@@ -34,42 +26,27 @@ def find_npi_column(df):
     return None
 
 def validate_npi_column(series):
-    """
-    Validate if a column contains NPI values:
-    - Check if majority of non-null values are 10 characters
-    - Check if majority start with '1'
-    """
     non_null = series.dropna().astype(str)
     if len(non_null) == 0:
         return False
 
-    # Check length (NPIs are 10 digits)
     ten_char_count = sum(1 for val in non_null if len(val.strip()) == 10)
     starts_with_one = sum(1 for val in non_null if val.strip().startswith('1'))
     is_numeric = sum(1 for val in non_null if val.strip().isdigit())
 
     total = len(non_null)
 
-    # At least 80% should be 10 characters, start with 1, and be numeric
     return (ten_char_count / total >= 0.8 and
             starts_with_one / total >= 0.8 and
             is_numeric / total >= 0.8)
 
 def find_email_column(df):
-    """
-    Find email column by checking:
-    1. Exact matches: 'EMAIL', 'EMAIL_ADDRESS', 'EMAILADDRESS'
-    2. Partial matches: any column containing 'EMAIL' or 'MAIL'
-    3. Validation: Check if values contain '@'
-    """
-    # First pass: exact matches
     for col in df.columns:
         col_upper = col.upper().replace(' ', '').replace('_', '')
         if col_upper in ['EMAIL', 'EMAILADDRESS', 'MAIL']:
             if validate_email_column(df[col]):
                 return col
 
-    # Second pass: partial matches
     potential_cols = [col for col in df.columns if 'EMAIL' in col.upper() or 'MAIL' in col.upper()]
     for col in potential_cols:
         if validate_email_column(df[col]):
@@ -78,10 +55,6 @@ def find_email_column(df):
     return None
 
 def validate_email_column(series):
-    """
-    Validate if a column contains email addresses:
-    - Check if majority of non-null values contain '@'
-    """
     non_null = series.dropna().astype(str)
     if len(non_null) == 0:
         return False
@@ -89,37 +62,21 @@ def validate_email_column(series):
     has_at_sign = sum(1 for val in non_null if '@' in val)
     total = len(non_null)
 
-    # At least 80% should contain '@'
     return has_at_sign / total >= 0.8
 
 def read_file_to_dataframe(file):
-    """
-    Read a file (CSV or Excel) into a pandas DataFrame with robust error handling.
-    Supports:
-    - CSV files with multiple encodings (UTF-8, Latin-1, CP1252)
-    - Excel files (.xlsx, .xls) with automatic first sheet selection
-
-    Returns:
-        tuple: (DataFrame, error_message)
-        - If successful: (df, None)
-        - If failed: (None, error_message)
-    """
     filename = file.filename
     file_extension = filename.lower().split('.')[-1] if '.' in filename else ''
 
-    # Validate file type
     allowed_extensions = ['csv', 'xlsx', 'xls']
     if file_extension not in allowed_extensions:
         return None, f"Unsupported file type '.{file_extension}'. Please upload CSV (.csv) or Excel (.xlsx, .xls) files only."
 
     try:
-        # Handle Excel files
         if file_extension in ['xlsx', 'xls']:
             try:
-                # Read first sheet only
                 df = pd.read_excel(file, sheet_name=0, engine='openpyxl' if file_extension == 'xlsx' else None)
 
-                # Check if DataFrame is empty
                 if df.empty or len(df.columns) == 0:
                     return None, f"File '{filename}' appears to be empty or has no data in the first sheet."
 
@@ -128,7 +85,6 @@ def read_file_to_dataframe(file):
             except Exception as excel_error:
                 return None, f"Failed to read Excel file '{filename}': {str(excel_error)}. The file may be corrupted or password-protected."
 
-        # Handle CSV files with multiple encoding attempts
         elif file_extension == 'csv':
             encodings_to_try = [
                 ('utf-8', 'UTF-8'),
@@ -140,10 +96,9 @@ def read_file_to_dataframe(file):
             last_error = None
             for encoding, encoding_name in encodings_to_try:
                 try:
-                    file.seek(0)  # Reset file pointer
+                    file.seek(0)
                     df = pd.read_csv(file, encoding=encoding, low_memory=False)
 
-                    # Check if DataFrame is empty
                     if df.empty or len(df.columns) == 0:
                         return None, f"File '{filename}' appears to be empty or has no columns."
 
@@ -151,11 +106,10 @@ def read_file_to_dataframe(file):
 
                 except UnicodeDecodeError as e:
                     last_error = e
-                    continue  # Try next encoding
+                    continue 
                 except Exception as e:
                     return None, f"Failed to read CSV file '{filename}': {str(e)}"
 
-            # If all encodings failed
             return None, f"Failed to read CSV file '{filename}'. Unable to detect proper encoding. Tried: UTF-8, Latin-1, Windows-1252. Please ensure the file is properly formatted."
 
     except Exception as e:
@@ -164,27 +118,22 @@ def read_file_to_dataframe(file):
 @list_analysis_bp.route('/upload', methods=['POST'])
 def upload_lists():
     try:
-        # Validate IQVIA file is present
         if 'iqvia_list' not in request.files:
             return jsonify({'error': 'IQVIA list is required'}), 400
 
         iqvia_file = request.files['iqvia_list']
         target_files = request.files.getlist('target_lists')
 
-        # Validate at least one target list
         if not target_files or len(target_files) == 0:
             return jsonify({'error': 'At least one target list is required'}), 400
 
-        # Check for empty filename (no file selected)
         if not iqvia_file.filename:
             return jsonify({'error': 'No IQVIA file selected'}), 400
 
-        # Read IQVIA file
         iqvia_df, error = read_file_to_dataframe(iqvia_file)
         if error:
             return jsonify({'error': error}), 400
 
-        # Find NPI column in IQVIA list
         npi_column = find_npi_column(iqvia_df)
         if not npi_column:
             available_columns = ', '.join(iqvia_df.columns.tolist()[:10])
@@ -195,25 +144,20 @@ def upload_lists():
                          f'Please ensure the file contains a valid NPI column with 10-digit numbers starting with "1".'
             }), 400
 
-        # Extract NPIs from IQVIA list
         iqvia_npis = set(iqvia_df[npi_column].dropna().astype(str).str.strip().tolist())
 
         if len(iqvia_npis) == 0:
             return jsonify({'error': f'IQVIA list "{iqvia_file.filename}" contains no valid NPIs'}), 400
 
-        # Process target lists
         target_lists_data = []
         for idx, target_file in enumerate(target_files):
-            # Check for empty filename
             if not target_file.filename:
                 return jsonify({'error': f'Target list #{idx + 1} has no filename (no file selected)'}), 400
 
-            # Read target file
             target_df, error = read_file_to_dataframe(target_file)
             if error:
                 return jsonify({'error': error}), 400
 
-            # Find NPI column in target list
             target_npi_column = find_npi_column(target_df)
             if not target_npi_column:
                 available_columns = ', '.join(target_df.columns.tolist()[:10])
@@ -224,7 +168,6 @@ def upload_lists():
                              f'Please ensure the file contains a valid NPI column with 10-digit numbers starting with "1".'
                 }), 400
 
-            # Extract NPIs from target list
             target_npis = set(target_df[target_npi_column].dropna().astype(str).str.strip().tolist())
 
             if len(target_npis) == 0:
@@ -236,7 +179,6 @@ def upload_lists():
                 'count': len(target_npis)
             })
 
-        # Generate session ID
         session_id = str(hash(frozenset(iqvia_npis)))
 
         return jsonify({
@@ -249,7 +191,7 @@ def upload_lists():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Upload error: {error_trace}")  # Log to server console for debugging
+        print(f"Upload error: {error_trace}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @list_analysis_bp.route('/calculate-crossover', methods=['POST'])
@@ -287,7 +229,6 @@ def calculate_crossover():
 
         distribution_list.reverse()
 
-        # Calculate users on at least one list (any tier except 0/total_lists)
         users_on_at_least_one_list = sum(dist['users_count'] for dist in distribution_list if dist['lists_count'] != f'0/{total_lists}')
         percentage_on_at_least_one_list = round((users_on_at_least_one_list / len(iqvia_npis) * 100), 2) if len(iqvia_npis) > 0 else 0
 
@@ -304,10 +245,6 @@ def calculate_crossover():
 
 @list_analysis_bp.route('/engagement-by-tier', methods=['POST'])
 def engagement_by_tier():
-    """
-    Enhanced engagement analysis by tier with comprehensive metrics matching Audience Analysis.
-    Groups NPIs by crossover tier and analyzes their full engagement across all campaigns.
-    """
     try:
         data = request.json
         iqvia_npis = set(data.get('iqvia_npis', []))
@@ -316,14 +253,12 @@ def engagement_by_tier():
         if not iqvia_npis or not target_lists:
             return jsonify({'error': 'Missing required data'}), 400
 
-        # Build NPI to lists count mapping
         npi_to_lists = defaultdict(set)
         for idx, target_list in enumerate(target_lists):
             for npi in target_list.get('npis', []):
                 if npi in iqvia_npis:
                     npi_to_lists[npi].add(idx)
 
-        # Group NPIs by tier (12/12, 11/12, etc.)
         total_lists = len(target_lists)
         tier_to_npis = defaultdict(list)
 
@@ -331,7 +266,6 @@ def engagement_by_tier():
             count = len(npi_to_lists.get(npi, set()))
             tier_to_npis[count].append(npi)
 
-        # Query user_profiles and campaign_interactions for full engagement data
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -362,11 +296,8 @@ def engagement_by_tier():
                 })
                 continue
 
-            # Query user_profiles and campaign_interactions by NPI
-            # Match the logic from AudienceQueryBuilder - get full engagement data
             placeholders = ','.join(['%s'] * len(npis_in_tier))
 
-            # Get all interaction data for these NPIs
             cursor.execute(f"""
                 SELECT
                     up.email,
@@ -387,7 +318,6 @@ def engagement_by_tier():
 
             raw_data = cursor.fetchall()
 
-            # Process results into user-level metrics (same logic as engagement-query)
             users_data = {}
 
             for row in raw_data:
@@ -395,7 +325,6 @@ def engagement_by_tier():
                 campaign_name = row['campaign_base_name']
                 event_type = row['event_type']
 
-                # Initialize user if not exists
                 if email not in users_data:
                     users_data[email] = {
                         'email': email,
@@ -411,14 +340,12 @@ def engagement_by_tier():
                         'total_clicks': 0
                     }
 
-                # Skip if no campaign data (user exists but no interactions)
                 if not campaign_name or not event_type:
                     continue
 
                 event_type_lower = event_type.lower()
                 event_count = row['event_count']
 
-                # Initialize campaign for user if not exists
                 if campaign_name not in users_data[email]['campaigns']:
                     users_data[email]['campaigns'][campaign_name] = {
                         'sent': False,
@@ -429,7 +356,6 @@ def engagement_by_tier():
                         'click_count': 0
                     }
 
-                # Record event
                 if event_type_lower == 'sent':
                     users_data[email]['campaigns'][campaign_name]['sent'] = True
                 elif event_type_lower == 'bounce':
@@ -441,7 +367,6 @@ def engagement_by_tier():
                     users_data[email]['campaigns'][campaign_name]['clicked'] = True
                     users_data[email]['campaigns'][campaign_name]['click_count'] = event_count
 
-            # Calculate user-level totals and aggregate metrics
             enriched_users = []
             aggregate_stats = {
                 'total_delivered': 0,
@@ -457,10 +382,8 @@ def engagement_by_tier():
                 user_campaigns = []
                 total_delivered = 0
 
-                # Calculate metrics from campaign data
                 for campaign_name, camp_stats in user_data['campaigns'].items():
                     if camp_stats['sent']:
-                        # Delivered = sent and (not bounced OR opened)
                         is_delivered = not camp_stats['bounced'] or camp_stats['opened']
 
                         if is_delivered:
@@ -475,11 +398,9 @@ def engagement_by_tier():
                                 user_data['unique_clicks'] += 1
                                 user_data['total_clicks'] += camp_stats['click_count']
 
-                # Skip if no delivered campaigns
                 if total_delivered == 0:
                     continue
 
-                # Calculate rates
                 unique_open_rate = round((user_data['unique_opens'] / total_delivered * 100), 2) if total_delivered > 0 else 0
                 total_open_rate = round((user_data['total_opens'] / total_delivered * 100), 2) if total_delivered > 0 else 0
                 unique_click_rate = round((user_data['unique_clicks'] / user_data['unique_opens'] * 100), 2) if user_data['unique_opens'] > 0 else 0
@@ -503,7 +424,6 @@ def engagement_by_tier():
                     'total_click_rate': total_click_rate
                 })
 
-                # Update aggregate stats
                 aggregate_stats['total_delivered'] += total_delivered
                 aggregate_stats['total_unique_opens'] += user_data['unique_opens']
                 aggregate_stats['total_opens'] += user_data['total_opens']
@@ -512,7 +432,6 @@ def engagement_by_tier():
                 aggregate_stats['specialties'].add(user_data['specialty'])
                 aggregate_stats['campaigns'].update(user_campaigns)
 
-            # Calculate aggregate rates
             aggregate_stats['avg_unique_open_rate'] = round(
                 (aggregate_stats['total_unique_opens'] / aggregate_stats['total_delivered'] * 100), 2
             ) if aggregate_stats['total_delivered'] > 0 else 0
@@ -529,10 +448,8 @@ def engagement_by_tier():
                 (aggregate_stats['total_clicks'] / aggregate_stats['total_opens'] * 100), 2
             ) if aggregate_stats['total_opens'] > 0 else 0
 
-            # Sort users by unique_open_rate descending
             enriched_users.sort(key=lambda x: x['unique_open_rate'], reverse=True)
 
-            # Convert sets to sorted lists for JSON serialization
             aggregate_stats['specialties'] = sorted(list(aggregate_stats['specialties']))
             aggregate_stats['campaigns'] = sorted(list(aggregate_stats['campaigns']))
 
@@ -541,20 +458,16 @@ def engagement_by_tier():
                 'user_count': len(npis_in_tier),
                 'matched_count': len(enriched_users),
                 'aggregate': aggregate_stats,
-                'users': enriched_users  # Return all users, let frontend handle pagination
+                'users': enriched_users
             })
 
-        # Calculate high-level engagement summary for all users on at least one target list
-        # Get all NPIs that are on at least one target list (tier > 0)
         all_target_list_npis = []
         for tier_count in range(1, total_lists + 1):
             npis_in_tier = tier_to_npis.get(tier_count, [])
             all_target_list_npis.extend(npis_in_tier)
 
-        # Total count of NPIs on at least one target list (from IQVIA list)
         total_npis_on_target_lists = len(all_target_list_npis)
 
-        # Query engagement data for all users on target lists
         if all_target_list_npis:
             placeholders = ','.join(['%s'] * len(all_target_list_npis))
             cursor.execute(f"""
@@ -570,26 +483,22 @@ def engagement_by_tier():
         else:
             users_who_opened_at_least_one = 0
 
-        # Aggregate stats from tier results (matched in DB)
         total_matched_in_db = 0
         total_delivered_overall = 0
         total_unique_opens_overall = 0
 
         for tier in tier_results:
-            # Skip the 0/total_lists tier (users not on any target list)
             if tier['tier'] != f'0/{total_lists}':
                 total_matched_in_db += tier['matched_count']
                 total_delivered_overall += tier['aggregate']['total_delivered']
                 total_unique_opens_overall += tier['aggregate']['total_unique_opens']
 
-        # Calculate percentages
-        # Percentage who opened is based on total NPIs on target lists (not just matched in DB)
         percentage_who_opened = round((users_who_opened_at_least_one / total_npis_on_target_lists * 100), 2) if total_npis_on_target_lists > 0 else 0
         avg_unique_open_rate_overall = round((total_unique_opens_overall / total_delivered_overall * 100), 2) if total_delivered_overall > 0 else 0
 
         engagement_summary = {
-            'total_npis_on_target_lists': total_npis_on_target_lists,  # Total NPIs from IQVIA on target lists
-            'total_matched_in_db': total_matched_in_db,  # How many we found in the database
+            'total_npis_on_target_lists': total_npis_on_target_lists,
+            'total_matched_in_db': total_matched_in_db,
             'users_who_opened_at_least_one': users_who_opened_at_least_one,
             'percentage_who_opened': percentage_who_opened,
             'avg_unique_open_rate': avg_unique_open_rate_overall,

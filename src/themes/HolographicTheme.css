@@ -1,7 +1,5 @@
-/* Enhanced Holographic/AR Theme CSS */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@300;400;500;700&display=swap');
 
-/* Base styles for enhanced holographic theme */
 body.holographic-theme {
   background-color: #0c0c1d !important;
   color: #e3f2fd !important;
@@ -10,7 +8,6 @@ body.holographic-theme {
   overflow-x: hidden;
 }
 
-/* Holographic futuristic background */
 body.holographic-theme::before {
   content: '';
   position: fixed;
@@ -26,7 +23,6 @@ body.holographic-theme::before {
   pointer-events: none;
 }
 
-/* Grid lines for holographic effect */
 body.holographic-theme::after {
   content: '';
   position: fixed;
@@ -42,7 +38,6 @@ body.holographic-theme::after {
   pointer-events: none;
 }
 
-/* Holographic panel glow effect */
 @keyframes panel-pulse {
   0% {
     box-shadow: 
@@ -82,7 +77,6 @@ body.holographic-theme::after {
   }
 }
 
-/* Neon border animation */
 @keyframes neon-border-pulse {
   0% {
     border-color: rgba(80, 150, 255, 0.7);
@@ -107,7 +101,6 @@ body.holographic-theme::after {
   }
 }
 
-/* Enhanced holographic header */
 body.holographic-theme .dashboard-header {
   background: rgba(15, 15, 35, 0.6);
   border: 2px solid rgba(80, 150, 255, 0.6);
@@ -143,7 +136,6 @@ body.holographic-theme h2 {
   animation: text-glow 4s infinite alternate;
 }
 
-/* Enhanced holographic sections */
 body.holographic-theme .chart-section,
 body.holographic-theme .table-section,
 body.holographic-theme .insights-section,
@@ -165,7 +157,6 @@ body.holographic-theme .chat-interface {
   overflow: hidden;
 }
 
-/* Corner accents on sections */
 body.holographic-theme .chart-section::before,
 body.holographic-theme .table-section::before,
 body.holographic-theme .insights-section::before,
@@ -198,7 +189,6 @@ body.holographic-theme .chat-interface::after {
   border-right: 2px solid rgba(255, 84, 175, 0.8);
 }
 
-/* Holographic scanning effect */
 @keyframes scan-line {
   0% {
     transform: translateY(-100%);
@@ -228,7 +218,6 @@ body.holographic-theme .chat-interface:hover::before {
   animation: scan-line 1.5s ease-in-out;
 }
 
-/* Enhanced tables */
 body.holographic-theme table {
   width: 100%;
   border-collapse: separate;
@@ -276,14 +265,12 @@ body.holographic-theme tr:hover td {
   background-color: rgba(80, 150, 255, 0.2);
 }
 
-/* First column special styling */
 body.holographic-theme td:first-child {
   border-left: 2px solid rgba(255, 84, 175, 0.5);
   color: #fff;
   font-weight: 500;
 }
 
-/* Enhanced buttons */
 body.holographic-theme button,
 body.holographic-theme .space-button,
 body.holographic-theme .pagination button,
@@ -317,7 +304,6 @@ body.holographic-theme .query-button:hover {
   transform: translateY(-2px);
 }
 
-/* Button scan effect */
 body.holographic-theme button::after,
 body.holographic-theme .space-button::after,
 body.holographic-theme .pagination button::after,
@@ -342,7 +328,6 @@ body.holographic-theme .query-button:hover::after {
   left: 100%;
 }
 
-/* Enhanced inputs and selects */
 body.holographic-theme input,
 body.holographic-theme select,
 body.holographic-theme .deployment-select,
@@ -369,7 +354,6 @@ body.holographic-theme .query-input:focus {
     0 0 20px rgba(255, 84, 175, 0.3);
 }
 
-/* Enhanced dropdown styling */
 body.holographic-theme .dropdown {
   background-color: rgba(15, 15, 35, 0.95);
   border: 2px solid rgba(80, 150, 255, 0.7);
@@ -396,7 +380,6 @@ body.holographic-theme .dropdown-arrow svg {
   filter: drop-shadow(0 0 2px rgba(80, 150, 255, 0.5));
 }
 
-/* Enhanced theme selector */
 body.holographic-theme .theme-select {
   background-color: rgba(19, 19, 44, 0.7);
   color: #e3f2fd;
@@ -410,7 +393,6 @@ body.holographic-theme .theme-select {
   text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
 }
 
-/* Enhanced search box */
 body.holographic-theme .search-box,
 body.holographic-theme .digital-journals-search-box {
   background-color: rgba(19, 19, 44, 0.7);
@@ -431,7 +413,6 @@ body.holographic-theme .digital-journals-search-box:focus {
     0 0 20px rgba(255, 84, 175, 0.3);
 }
 
-/* Enhanced campaign boxes */
 body.holographic-theme .campaign-box {
   background: rgba(15, 15, 35, 0.6);
   border: 2px solid rgba(80, 150, 255, 0.6);
@@ -455,7 +436,6 @@ body.holographic-theme .campaign-box h3 {
   text-shadow: 0 0 5px rgba(80, 150, 255, 0.5);
 }
 
-/* Enhanced tooltips */
 body.holographic-theme .attached-tooltip {
   background-color: rgba(15, 15, 35, 0.95);
   border: 2px solid rgba(255, 84, 175, 0.7);
@@ -475,7 +455,6 @@ body.holographic-theme .tooltip-top::before {
   border-color: rgba(255, 84, 175, 0.7);
 }
 
-/* Enhanced scrollbars */
 body.holographic-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -495,7 +474,6 @@ body.holographic-theme ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Enhanced sample queries */
 body.holographic-theme .sample-queries h3 {
   color: #e3f2fd;
   font-family: 'Orbitron', sans-serif;
@@ -525,7 +503,6 @@ body.holographic-theme .sample-queries li:hover {
   transform: translateY(-2px);
 }
 
-/* Enhanced toggle switch */
 body.holographic-theme .toggle-switch {
   --light: rgba(255, 84, 175, 0.7);
   --dark: rgba(19, 19, 44, 0.7);
@@ -552,7 +529,6 @@ body.holographic-theme .checkbox:checked ~ .slider::before {
   background-color: var(--light);
 }
 
-/* Enhanced data visualizations */
 body.holographic-theme canvas {
   border: 2px solid rgba(80, 150, 255, 0.6);
   border-radius: 8px;
@@ -562,7 +538,6 @@ body.holographic-theme canvas {
     0 0 20px rgba(80, 150, 255, 0.3);
 }
 
-/* Enhanced pagination */
 body.holographic-theme .pagination {
   display: flex;
   justify-content: center;
@@ -575,7 +550,6 @@ body.holographic-theme .pagination button {
   text-align: center;
 }
 
-/* Glowing text for metrics values */
 body.holographic-theme td:nth-child(2),
 body.holographic-theme td:nth-child(3),
 body.holographic-theme td:nth-child(4),
@@ -585,12 +559,10 @@ body.holographic-theme td:nth-child(5) {
   font-weight: 500;
 }
 
-/* Alternate column colors for better visibility */
 body.holographic-theme td:nth-child(2n) {
   text-shadow: 0 0 5px rgba(255, 84, 175, 0.8);
 }
 
-/* Add a futuristic linear loading bar to the top of the page */
 @keyframes progress {
   0% {
     width: 0;
@@ -619,7 +591,6 @@ body.holographic-theme::before {
   animation: progress 2s ease-out forwards;
 }
 
-/* Additional corner brackets on dashboard container for HUD feel */
 body.holographic-theme .dashboard-container {
   position: relative;
   padding: 10px;

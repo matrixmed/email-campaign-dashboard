@@ -2,6 +2,45 @@
   padding: 0;
 }
 
+.journal-metrics-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md, 16px);
+  margin-bottom: var(--spacing-lg, 24px);
+}
+
+.metric-summary-card {
+  background: var(--color-bg-card, #2a2a2d);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-lg, 24px) var(--spacing-md, 16px);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.metric-summary-card:hover {
+  border-color: var(--color-border-light, #44444a);
+  box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.4));
+}
+
+.metric-summary-label {
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #b8b8b8);
+  margin-bottom: var(--spacing-xs, 4px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.metric-summary-value {
+  font-family: var(--font-heading, 'Lora', serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-accent, #0ff);
+  line-height: 1.2;
+}
+
 .digital-journals-container .search-container {
   width: 384px !important;
   margin-right: 6px;

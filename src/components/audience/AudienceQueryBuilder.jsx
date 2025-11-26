@@ -3,7 +3,6 @@ import '../../styles/AudienceQueryBuilder.css';
 import { API_BASE_URL } from '../../config/api';
 
 const AudienceQueryBuilder = forwardRef((props, ref) => {
-    // Load persisted state from localStorage on mount
     const loadPersistedState = () => {
         try {
             const saved = localStorage.getItem('audienceQueryState');
@@ -32,29 +31,21 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
     const persisted = loadPersistedState();
 
-    // Form state
     const [searchMode, setSearchMode] = useState(persisted.searchMode);
     const [selectedSpecialties, setSelectedSpecialties] = useState(persisted.selectedSpecialties);
     const [selectedCampaigns, setSelectedCampaigns] = useState(persisted.selectedCampaigns);
     const [engagementType, setEngagementType] = useState(persisted.engagementType);
     const [specialtyMergeMode, setSpecialtyMergeMode] = useState(persisted.specialtyMergeMode);
-
-    // Data
     const [specialties, setSpecialties] = useState([]);
     const [campaigns, setCampaigns] = useState([]);
-
-    // UI state
     const [showSpecialtySelector, setShowSpecialtySelector] = useState(false);
     const [showCampaignSelector, setShowCampaignSelector] = useState(false);
     const [specialtySearchTerm, setSpecialtySearchTerm] = useState('');
     const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
-
-    // Results
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState(null);
     const [error, setError] = useState('');
 
-    // Table state for Find Users section
     const [findUsersTableState, setFindUsersTableState] = useState({
         displayCount: 10,
         sortColumn: null,
@@ -62,7 +53,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         isFullyExpanded: false
     });
 
-    // Analysis form state
     const [analysisForm, setAnalysisForm] = useState({
         userInput: '',
         inputType: 'email'
@@ -72,8 +62,25 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     const [analysisError, setAnalysisError] = useState('');
     const [fileUpload, setFileUpload] = useState(null);
 
-    // Table state for Analyze Users section
     const [analyzeUsersTableState, setAnalyzeUsersTableState] = useState({
+        displayCount: 10,
+        sortColumn: null,
+        sortDirection: null,
+        isFullyExpanded: false
+    });
+
+    const [patternForm, setPatternForm] = useState({
+        pattern_type: 'infrequent_responders',
+        min_campaigns: 15,
+        infrequent_threshold: 10,
+        hyper_engaged_threshold: 65,
+        fast_open_minutes: 30
+    });
+    const [patternLoading, setPatternLoading] = useState(false);
+    const [patternResults, setPatternResults] = useState(null);
+    const [patternError, setPatternError] = useState('');
+
+    const [patternTableState, setPatternTableState] = useState({
         displayCount: 10,
         sortColumn: null,
         sortDirection: null,
@@ -82,7 +89,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
     const API_BASE = `${API_BASE_URL}/api`;
 
-    // Persist only query parameters to localStorage (not results - they're too large)
     useEffect(() => {
         try {
             const stateToPersist = {
@@ -95,7 +101,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             localStorage.setItem('audienceQueryState', JSON.stringify(stateToPersist));
         } catch (error) {
             console.warn('Failed to save state to localStorage:', error);
-            // If quota exceeded, clear old state and try again
             if (error.name === 'QuotaExceededError') {
                 localStorage.removeItem('audienceQueryState');
             }
@@ -168,8 +173,25 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         });
     };
 
+    const clearEngagementPatterns = () => {
+        setPatternResults(null);
+        setPatternForm({
+            pattern_type: 'infrequent_responders',
+            min_campaigns: 5,
+            infrequent_threshold: 30,
+            hyper_engaged_threshold: 70,
+            fast_open_minutes: 30
+        });
+        setPatternError('');
+        setPatternTableState({
+            displayCount: 10,
+            sortColumn: null,
+            sortDirection: null,
+            isFullyExpanded: false
+        });
+    };
+
     const clearAll = () => {
-        // Clear Find Users
         setResults(null);
         setSelectedSpecialties([]);
         setSelectedCampaigns([]);
@@ -182,7 +204,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             isFullyExpanded: false
         });
 
-        // Clear Analyze Users
         setAnalysisResults(null);
         setAnalysisForm({ userInput: '', inputType: 'email' });
         setFileUpload(null);
@@ -194,11 +215,11 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             isFullyExpanded: false
         });
 
-        // Clear localStorage
+        clearEngagementPatterns();
+
         localStorage.removeItem('audienceQueryState');
     };
 
-    // Expose clearAll to parent component via ref
     useImperativeHandle(ref, () => ({
         clearAll
     }));
@@ -262,7 +283,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
             console.log('Request data:', requestData);
 
-            // Validation
             if (searchMode === 'specialty') {
                 if (selectedSpecialties.length === 0) {
                     throw new Error('Please select at least one specialty');
@@ -350,7 +370,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         document.body.removeChild(link);
     };
 
-    // Analysis functions
     const handleAnalysisChange = (e) => {
         const { name, value } = e.target;
         setAnalysisForm(prev => ({
@@ -522,7 +541,145 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         document.body.removeChild(link);
     };
 
-    // Sort users by column
+    const handlePatternChange = (e) => {
+        const { name, value } = e.target;
+        setPatternForm(prev => ({
+            ...prev,
+            [name]: name === 'pattern_type' ? value : Number(value)
+        }));
+        if (patternResults) {
+            setPatternResults(null);
+        }
+    };
+
+    const handlePatternSubmit = async (e) => {
+        e.preventDefault();
+        setPatternLoading(true);
+        setPatternError('');
+        setPatternResults(null);
+
+        try {
+            const requestData = {
+                pattern_type: patternForm.pattern_type,
+                min_campaigns: patternForm.min_campaigns,
+                infrequent_threshold: patternForm.infrequent_threshold,
+                hyper_engaged_threshold: patternForm.hyper_engaged_threshold,
+                fast_open_minutes: patternForm.fast_open_minutes,
+                export_csv: false
+            };
+
+            const response = await fetch(`${API_BASE}/users/engagement-patterns`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            setPatternResults(data);
+
+        } catch (err) {
+            console.error('Error analyzing engagement patterns:', err);
+            setPatternError(err.message || 'Failed to process request');
+        } finally {
+            setPatternLoading(false);
+        }
+    };
+
+    const handleExportPatterns = () => {
+        if (!patternResults || !patternResults.users) return;
+
+        const pattern_type = patternResults.summary.pattern_type;
+
+        let headers, rows;
+
+        if (pattern_type === 'declining_engagement') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Campaigns',
+                      'Early Open Rate (%)', 'Late Open Rate (%)', 'Engagement Decline (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_campaigns || 0, user.early_open_rate || 0, user.late_open_rate || 0, user.engagement_decline || 0
+            ]);
+        } else if (pattern_type === 'fast_openers') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Campaigns Opened',
+                      'Fast Opens', 'Avg Minutes to Open', 'Fast Open Rate (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.campaigns_opened || 0, user.fast_opens || 0, user.avg_minutes_to_open || 0, user.fast_open_rate || 0
+            ]);
+        } else if (pattern_type === 'recently_reengaged') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Campaigns',
+                      'Recent Opens', 'Historical Opens', 'Recent Open Rate (%)', 'Historical Open Rate (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_campaigns || 0, user.recent_opens || 0, user.historical_opens || 0,
+                user.recent_open_rate || 0, user.historical_open_rate || 0
+            ]);
+        } else if (pattern_type === 'weekend_warriors') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Opens',
+                      'Weekend Opens', 'Weekday Opens', 'Weekend Rate (%)', 'Weekday Rate (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_delayed_opens || 0, user.weekend_opens || 0, user.weekday_opens || 0,
+                user.weekend_open_rate || 0, user.weekday_open_rate || 0
+            ]);
+        } else if (pattern_type === 'binge_readers') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Opens',
+                      'Rapid Opens', 'Binge Sessions', 'Binge Rate (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_opens || 0, user.rapid_opens || 0, user.binge_sessions || 0, user.binge_rate || 0
+            ]);
+        } else if (pattern_type === 'one_and_done') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Campaigns',
+                      'First 3 Opens', 'Later Opens', 'Early Rate (%)'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_campaigns || 0, user.first_three_opens || 0, user.later_opens || 0, user.early_open_rate || 0
+            ]);
+        } else if (pattern_type === 'early_birds_night_owls') {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Opens',
+                      'Avg Hour', 'Early Morning Opens', 'Night Opens', 'Reader Type'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.total_delayed_opens || 0, user.avg_hour || 0, user.early_morning_opens || 0,
+                user.night_opens || 0, user.reader_type || ''
+            ]);
+        } else {
+            headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Campaigns Received',
+                      'Campaigns Opened', 'Campaigns Clicked', 'Total Opens', 'Total Clicks',
+                      'UOR %', 'TOR %', 'UCR %', 'TCR %'];
+            rows = patternResults.users.map(user => [
+                user.email, user.npi || '', user.first_name || '', user.last_name || '', user.specialty || '',
+                user.campaigns_received || 0, user.campaigns_opened || 0, user.campaigns_clicked || 0,
+                user.total_opens || 0, user.total_clicks || 0, user.unique_open_rate || 0,
+                user.total_open_rate || 0, user.unique_click_rate || 0, user.total_click_rate || 0
+            ]);
+        }
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', `engagement_pattern_${pattern_type}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const sortUsers = useCallback((users, column, direction) => {
         if (!column || !direction) return users;
 
@@ -531,7 +688,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             let aVal = a[column];
             let bVal = b[column];
 
-            // Handle name specially
             if (column === 'name') {
                 aVal = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
                 bVal = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
@@ -548,7 +704,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         return sorted;
     }, []);
 
-    // Handle column header click for sorting (Find Users)
     const handleFindUsersSort = useCallback((column) => {
         let newDirection = 'desc';
 
@@ -563,7 +718,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         }));
     }, [findUsersTableState]);
 
-    // Handle column header click for sorting (Analyze Users)
     const handleAnalyzeUsersSort = useCallback((column) => {
         let newDirection = 'desc';
 
@@ -578,6 +732,20 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         }));
     }, [analyzeUsersTableState]);
 
+    const handlePatternSort = useCallback((column) => {
+        let newDirection = 'desc';
+
+        if (patternTableState.sortColumn === column) {
+            newDirection = patternTableState.sortDirection === 'asc' ? 'desc' : 'asc';
+        }
+
+        setPatternTableState(prev => ({
+            ...prev,
+            sortColumn: column,
+            sortDirection: newDirection
+        }));
+    }, [patternTableState]);
+
     const filteredSpecialties = specialties.filter(spec =>
         spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
     );
@@ -586,7 +754,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
     );
 
-    // Process Find Users table data
     let findUsersDisplayData = [];
     let findUsersVisibleData = [];
     let findUsersHasMore = false;
@@ -595,14 +762,12 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         if (findUsersTableState.sortColumn) {
             findUsersDisplayData = sortUsers(findUsersDisplayData, findUsersTableState.sortColumn, findUsersTableState.sortDirection);
         }
-        // Limit to 1,000 for expand
         const maxDisplay = Math.min(findUsersDisplayData.length, 1000);
         const displayLimit = findUsersTableState.isFullyExpanded ? maxDisplay : findUsersTableState.displayCount;
         findUsersVisibleData = findUsersDisplayData.slice(0, displayLimit);
         findUsersHasMore = findUsersDisplayData.length > findUsersVisibleData.length;
     }
 
-    // Process Analyze Users table data
     let analyzeUsersDisplayData = [];
     let analyzeUsersVisibleData = [];
     let analyzeUsersHasMore = false;
@@ -611,25 +776,35 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         if (analyzeUsersTableState.sortColumn) {
             analyzeUsersDisplayData = sortUsers(analyzeUsersDisplayData, analyzeUsersTableState.sortColumn, analyzeUsersTableState.sortDirection);
         }
-        // Limit to 1,000 for expand
         const maxDisplay = Math.min(analyzeUsersDisplayData.length, 1000);
         const displayLimit = analyzeUsersTableState.isFullyExpanded ? maxDisplay : analyzeUsersTableState.displayCount;
         analyzeUsersVisibleData = analyzeUsersDisplayData.slice(0, displayLimit);
         analyzeUsersHasMore = analyzeUsersDisplayData.length > analyzeUsersVisibleData.length;
     }
 
+    let patternDisplayData = [];
+    let patternVisibleData = [];
+    let patternHasMore = false;
+    if (patternResults && patternResults.users) {
+        patternDisplayData = patternResults.users;
+        if (patternTableState.sortColumn) {
+            patternDisplayData = sortUsers(patternDisplayData, patternTableState.sortColumn, patternTableState.sortDirection);
+        }
+        const maxDisplay = Math.min(patternDisplayData.length, 1000);
+        const displayLimit = patternTableState.isFullyExpanded ? maxDisplay : patternTableState.displayCount;
+        patternVisibleData = patternDisplayData.slice(0, displayLimit);
+        patternHasMore = patternDisplayData.length > patternVisibleData.length;
+    }
+
     return (
         <div className="audience-query-builder">
             <div className="query-sections-wrapper">
-                {/* FIND USERS SECTION */}
                 <div className="query-section discovery-section">
                     <div className="query-section-title">
                         <h3>Find Users</h3>
-                        <p className="section-subtitle">Discover users by specialty or campaign with engagement filtering</p>
                     </div>
                     <div className="query-section-content">
                         <div className="query-form">
-                            {/* Search Mode Toggle */}
                             <div className="form-group full-width">
                                 <label>Search By</label>
                                 <div className="search-mode-toggle">
@@ -651,7 +826,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                             </div>
 
                             <div className="form-grid">
-                                {/* Specialty Selection */}
                                 {searchMode === 'specialty' && (
                                     <div className="form-group full-width">
                                         <div className="form-group-header">
@@ -681,7 +855,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     </div>
                                 )}
 
-                                {/* Campaign Selection */}
                                 <div className="form-group full-width">
                                     <label>
                                         {searchMode === 'campaign' ? 'Select Campaigns' : 'Filter by Campaigns'}
@@ -698,7 +871,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     </button>
                                 </div>
 
-                                {/* Engagement Type */}
                                 <div className="form-group">
                                     <label htmlFor="engagement_type">Engagement Status</label>
                                     <select
@@ -734,33 +906,32 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
                         {results && results.success && results.aggregate && (
                             <div className="results-section">
-                                {/* Aggregate Overview */}
                                 <div className="aggregate-overview">
                                     <h4>Overview</h4>
                                     <div className="aggregate-grid">
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Total Delivered</span>
-                                            <span className="stat-value">{(results.aggregate.total_delivered || 0).toLocaleString()}</span>
+                                            <span className="aqb-stat-label">Total Delivered</span>
+                                            <span className="aqb-stat-value">{(results.aggregate.total_delivered || 0).toLocaleString()}</span>
                                         </div>
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Unique Opens</span>
-                                            <span className="stat-value">{(results.aggregate.total_unique_opens || 0).toLocaleString()}</span>
+                                            <span className="aqb-stat-label">Unique Opens</span>
+                                            <span className="aqb-stat-value">{(results.aggregate.total_unique_opens || 0).toLocaleString()}</span>
                                         </div>
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Unique Open Rate</span>
-                                            <span className="stat-value">{results.aggregate.avg_unique_open_rate || 0}%</span>
+                                            <span className="aqb-stat-label">Unique Open Rate</span>
+                                            <span className="aqb-stat-value">{results.aggregate.avg_unique_open_rate || 0}%</span>
                                         </div>
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Total Open Rate</span>
-                                            <span className="stat-value">{results.aggregate.avg_total_open_rate || 0}%</span>
+                                            <span className="aqb-stat-label">Total Open Rate</span>
+                                            <span className="aqb-stat-value">{results.aggregate.avg_total_open_rate || 0}%</span>
                                         </div>
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Unique Click Rate</span>
-                                            <span className="stat-value">{results.aggregate.avg_unique_click_rate || 0}%</span>
+                                            <span className="aqb-stat-label">Unique Click Rate</span>
+                                            <span className="aqb-stat-value">{results.aggregate.avg_unique_click_rate || 0}%</span>
                                         </div>
                                         <div className="aggregate-stat">
-                                            <span className="stat-label">Total Click Rate</span>
-                                            <span className="stat-value">{results.aggregate.avg_total_click_rate || 0}%</span>
+                                            <span className="aqb-stat-label">Total Click Rate</span>
+                                            <span className="aqb-stat-value">{results.aggregate.avg_total_click_rate || 0}%</span>
                                         </div>
                                     </div>
                                     <div className="aggregate-lists">
@@ -774,7 +945,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     </div>
                                 </div>
 
-                                {/* Sample Data Table */}
                                 {results.users && results.users.length > 0 && (
                                     <div className="sample-data-section">
                                         <div className="table-header-row">
@@ -897,11 +1067,9 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                     </div>
                 </div>
 
-                {/* ANALYZE USERS SECTION */}
                 <div className="query-section analysis-section">
                     <div className="query-section-title">
                         <h3>Analyze Users</h3>
-                        <p className="section-subtitle">Analyze specific users by email or NPI</p>
                     </div>
                     <div className="query-section-content">
                         <form onSubmit={handleAnalysisSubmit} className="query-form">
@@ -926,7 +1094,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     name="userInput"
                                     value={analysisForm.userInput}
                                     onChange={handleAnalysisChange}
-                                    placeholder="user@example.com&#10;another@example.com&#10;..."
+                                    placeholder=""
                                     rows="6"
                                 />
                                 <small>One per line, comma, or semicolon separated</small>
@@ -1098,64 +1266,470 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                         )}
                     </div>
                 </div>
-            </div>
+                {/*
+                <div className="query-section patterns-section">
+                    <div className="query-section-title">
+                        <h3>Engagement Patterns</h3>
+                    </div>
+                    <div className="query-section-content">
+                        <form onSubmit={handlePatternSubmit} className="query-form">
+                            <div className="form-group">
+                                <label htmlFor="pattern_type">Pattern Type</label>
+                                <select
+                                    id="pattern_type"
+                                    name="pattern_type"
+                                    value={patternForm.pattern_type}
+                                    onChange={handlePatternChange}
+                                    className="form-select"
+                                >
+                                    <option value="infrequent_responders">Infrequent Responders</option>
+                                    <option value="hyper_engaged">Hyper-Engaged</option>
+                                    <option value="heavy_inactive">Heavy Inactive</option>
+                                    <option value="click_champions">Click Champions</option>
+                                    <option value="declining_engagement">Declining Engagement</option>
+                                    <option value="fast_openers">Fast Openers</option>
+                                    <option value="recently_reengaged">Recently Re-engaged</option>
+                                    <option value="weekend_warriors">Weekend Warriors</option>
+                                    <option value="binge_readers">Binge Readers</option>
+                                    <option value="one_and_done">One and Done</option>
+                                    <option value="early_birds_night_owls">Early Birds vs Night Owls</option>
+                                </select>
+                            </div>
 
-            {/* Specialty Selector Modal */}
+                            <div className="form-group">
+                                <label htmlFor="min_campaigns">Minimum Campaigns</label>
+                                <input
+                                    type="number"
+                                    id="min_campaigns"
+                                    name="min_campaigns"
+                                    value={patternForm.min_campaigns}
+                                    onChange={handlePatternChange}
+                                    min="1"
+                                    max="100"
+                                    className="form-input"
+                                />
+                                <small>Minimum campaigns received to be included</small>
+                            </div>
+
+                            {patternForm.pattern_type === 'infrequent_responders' && (
+                                <div className="form-group">
+                                    <label htmlFor="infrequent_threshold">Max Open Rate (%)</label>
+                                    <input
+                                        type="number"
+                                        id="infrequent_threshold"
+                                        name="infrequent_threshold"
+                                        value={patternForm.infrequent_threshold}
+                                        onChange={handlePatternChange}
+                                        min="1"
+                                        max="100"
+                                        className="form-input"
+                                    />
+                                    <small>Users who open {patternForm.infrequent_threshold}% or less of emails</small>
+                                </div>
+                            )}
+
+                            {patternForm.pattern_type === 'hyper_engaged' && (
+                                <div className="form-group">
+                                    <label htmlFor="hyper_engaged_threshold">Min Open Rate (%)</label>
+                                    <input
+                                        type="number"
+                                        id="hyper_engaged_threshold"
+                                        name="hyper_engaged_threshold"
+                                        value={patternForm.hyper_engaged_threshold}
+                                        onChange={handlePatternChange}
+                                        min="1"
+                                        max="100"
+                                        className="form-input"
+                                    />
+                                    <small>Users who open {patternForm.hyper_engaged_threshold}% or more of emails</small>
+                                </div>
+                            )}
+
+                            {patternForm.pattern_type === 'fast_openers' && (
+                                <div className="form-group">
+                                    <label htmlFor="fast_open_minutes">Fast Open Window (minutes)</label>
+                                    <input
+                                        type="number"
+                                        id="fast_open_minutes"
+                                        name="fast_open_minutes"
+                                        value={patternForm.fast_open_minutes}
+                                        onChange={handlePatternChange}
+                                        min="1"
+                                        max="120"
+                                        className="form-input"
+                                    />
+                                    <small>Users who open within {patternForm.fast_open_minutes} minutes at least 50% of the time</small>
+                                </div>
+                            )}
+
+                            <div className="form-actions">
+                                <button
+                                    type="submit"
+                                    className="submit-button"
+                                    disabled={patternLoading}
+                                >
+                                    {patternLoading ? 'Analyzing...' : 'Find Pattern'}
+                                </button>
+                            </div>
+                        </form>
+
+                        {patternError && (
+                            <div className="error-message">
+                                <p>{patternError}</p>
+                            </div>
+                        )}
+
+                        {patternResults && (
+                            <div className="results-section">
+                                <div className="pattern-summary">
+                                    <h4>Pattern: {patternResults.summary.pattern_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h4>
+                                    <p>Found {patternResults.summary.total_users} users matching this pattern</p>
+                                </div>
+
+                                {patternResults.users && patternResults.users.length > 0 && (
+                                    <div className="sample-data-section">
+                                        <div className="table-header-row">
+                                            <h4>Results ({patternDisplayData.length.toLocaleString()} users{patternDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
+                                            <div className="table-action-buttons">
+                                                {patternDisplayData.length > 10 && (
+                                                    <button
+                                                        className="btn-expand-table"
+                                                        onClick={() => setPatternTableState(prev => ({
+                                                            ...prev,
+                                                            isFullyExpanded: !prev.isFullyExpanded,
+                                                            displayCount: prev.isFullyExpanded ? 10 : Math.min(patternDisplayData.length, 1000)
+                                                        }))}
+                                                    >
+                                                        {patternTableState.isFullyExpanded ? 'Collapse' : `Expand All${patternDisplayData.length > 1000 ? ' (Max 1,000)' : ''}`}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="btn-export"
+                                                    onClick={handleExportPatterns}
+                                                >
+                                                    Export
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="table-container">
+                                            <table className="results-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th onClick={() => handlePatternSort('email')} className="sortable">
+                                                            Email {patternTableState.sortColumn === 'email' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handlePatternSort('npi')} className="sortable">
+                                                            NPI {patternTableState.sortColumn === 'npi' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handlePatternSort('name')} className="sortable">
+                                                            Name {patternTableState.sortColumn === 'name' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handlePatternSort('specialty')} className="sortable">
+                                                            Specialty {patternTableState.sortColumn === 'specialty' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        {patternForm.pattern_type === 'declining_engagement' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_campaigns')} className="sortable">
+                                                                    Campaigns {patternTableState.sortColumn === 'total_campaigns' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('early_open_rate')} className="sortable">
+                                                                    Early OR % {patternTableState.sortColumn === 'early_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('late_open_rate')} className="sortable">
+                                                                    Late OR % {patternTableState.sortColumn === 'late_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('engagement_decline')} className="sortable">
+                                                                    Decline % {patternTableState.sortColumn === 'engagement_decline' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'fast_openers' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('campaigns_opened')} className="sortable">
+                                                                    Opened {patternTableState.sortColumn === 'campaigns_opened' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('fast_opens')} className="sortable">
+                                                                    Fast Opens {patternTableState.sortColumn === 'fast_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('avg_minutes_to_open')} className="sortable">
+                                                                    Avg Minutes {patternTableState.sortColumn === 'avg_minutes_to_open' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('fast_open_rate')} className="sortable">
+                                                                    Fast Rate % {patternTableState.sortColumn === 'fast_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'recently_reengaged' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_campaigns')} className="sortable">
+                                                                    Total Campaigns {patternTableState.sortColumn === 'total_campaigns' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('recent_opens')} className="sortable">
+                                                                    Recent Opens {patternTableState.sortColumn === 'recent_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('historical_opens')} className="sortable">
+                                                                    Historical Opens {patternTableState.sortColumn === 'historical_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('recent_open_rate')} className="sortable">
+                                                                    Recent OR % {patternTableState.sortColumn === 'recent_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('historical_open_rate')} className="sortable">
+                                                                    Historical OR % {patternTableState.sortColumn === 'historical_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'weekend_warriors' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_delayed_opens')} className="sortable">
+                                                                    Total Opens {patternTableState.sortColumn === 'total_delayed_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('weekend_opens')} className="sortable">
+                                                                    Weekend {patternTableState.sortColumn === 'weekend_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('weekday_opens')} className="sortable">
+                                                                    Weekday {patternTableState.sortColumn === 'weekday_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('weekend_open_rate')} className="sortable">
+                                                                    Weekend % {patternTableState.sortColumn === 'weekend_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('weekday_open_rate')} className="sortable">
+                                                                    Weekday % {patternTableState.sortColumn === 'weekday_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'binge_readers' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_opens')} className="sortable">
+                                                                    Total Opens {patternTableState.sortColumn === 'total_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('rapid_opens')} className="sortable">
+                                                                    Rapid Opens {patternTableState.sortColumn === 'rapid_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('binge_sessions')} className="sortable">
+                                                                    Binge Sessions {patternTableState.sortColumn === 'binge_sessions' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('binge_rate')} className="sortable">
+                                                                    Binge Rate % {patternTableState.sortColumn === 'binge_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'one_and_done' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_campaigns')} className="sortable">
+                                                                    Total Campaigns {patternTableState.sortColumn === 'total_campaigns' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('first_three_opens')} className="sortable">
+                                                                    First 3 Opens {patternTableState.sortColumn === 'first_three_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('later_opens')} className="sortable">
+                                                                    Later Opens {patternTableState.sortColumn === 'later_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('early_open_rate')} className="sortable">
+                                                                    Early Rate % {patternTableState.sortColumn === 'early_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : patternForm.pattern_type === 'early_birds_night_owls' ? (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('total_delayed_opens')} className="sortable">
+                                                                    Opens {patternTableState.sortColumn === 'total_delayed_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('avg_hour')} className="sortable">
+                                                                    Avg Hour {patternTableState.sortColumn === 'avg_hour' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('early_morning_opens')} className="sortable">
+                                                                    Early (5-9am) {patternTableState.sortColumn === 'early_morning_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('night_opens')} className="sortable">
+                                                                    Night (8-11pm) {patternTableState.sortColumn === 'night_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('reader_type')} className="sortable">
+                                                                    Type {patternTableState.sortColumn === 'reader_type' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <th onClick={() => handlePatternSort('campaigns_received')} className="sortable">
+                                                                    Campaigns {patternTableState.sortColumn === 'campaigns_received' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('unique_opens')} className="sortable">
+                                                                    U Opens {patternTableState.sortColumn === 'unique_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('total_opens')} className="sortable">
+                                                                    T Opens {patternTableState.sortColumn === 'total_opens' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('unique_clicks')} className="sortable">
+                                                                    U Clicks {patternTableState.sortColumn === 'unique_clicks' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('total_clicks')} className="sortable">
+                                                                    T Clicks {patternTableState.sortColumn === 'total_clicks' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('unique_open_rate')} className="sortable">
+                                                                    UOR % {patternTableState.sortColumn === 'unique_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                                <th onClick={() => handlePatternSort('total_open_rate')} className="sortable">
+                                                                    TOR % {patternTableState.sortColumn === 'total_open_rate' && (patternTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                                </th>
+                                                            </>
+                                                        )}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {patternVisibleData.map((user, idx) => (
+                                                        <tr key={idx}>
+                                                            <td>{user.email}</td>
+                                                            <td>{user.npi || ''}</td>
+                                                            <td>{user.first_name} {user.last_name}</td>
+                                                            <td>{user.specialty}</td>
+                                                            {patternForm.pattern_type === 'declining_engagement' ? (
+                                                                <>
+                                                                    <td>{user.total_campaigns || 0}</td>
+                                                                    <td>{user.early_open_rate || 0}%</td>
+                                                                    <td>{user.late_open_rate || 0}%</td>
+                                                                    <td>{user.engagement_decline || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'fast_openers' ? (
+                                                                <>
+                                                                    <td>{user.campaigns_opened || 0}</td>
+                                                                    <td>{user.fast_opens || 0}</td>
+                                                                    <td>{user.avg_minutes_to_open || 0}</td>
+                                                                    <td>{user.fast_open_rate || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'recently_reengaged' ? (
+                                                                <>
+                                                                    <td>{user.total_campaigns || 0}</td>
+                                                                    <td>{user.recent_opens || 0}</td>
+                                                                    <td>{user.historical_opens || 0}</td>
+                                                                    <td>{user.recent_open_rate || 0}%</td>
+                                                                    <td>{user.historical_open_rate || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'weekend_warriors' ? (
+                                                                <>
+                                                                    <td>{user.total_delayed_opens || 0}</td>
+                                                                    <td>{user.weekend_opens || 0}</td>
+                                                                    <td>{user.weekday_opens || 0}</td>
+                                                                    <td>{user.weekend_open_rate || 0}%</td>
+                                                                    <td>{user.weekday_open_rate || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'binge_readers' ? (
+                                                                <>
+                                                                    <td>{user.total_opens || 0}</td>
+                                                                    <td>{user.rapid_opens || 0}</td>
+                                                                    <td>{user.binge_sessions || 0}</td>
+                                                                    <td>{user.binge_rate || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'one_and_done' ? (
+                                                                <>
+                                                                    <td>{user.total_campaigns || 0}</td>
+                                                                    <td>{user.first_three_opens || 0}</td>
+                                                                    <td>{user.later_opens || 0}</td>
+                                                                    <td>{user.early_open_rate || 0}%</td>
+                                                                </>
+                                                            ) : patternForm.pattern_type === 'early_birds_night_owls' ? (
+                                                                <>
+                                                                    <td>{user.total_delayed_opens || 0}</td>
+                                                                    <td>{user.avg_hour || 0}</td>
+                                                                    <td>{user.early_morning_opens || 0}</td>
+                                                                    <td>{user.night_opens || 0}</td>
+                                                                    <td>{user.reader_type || ''}</td>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <td>{user.campaigns_received || 0}</td>
+                                                                    <td>{user.campaigns_opened || user.unique_opens || 0}</td>
+                                                                    <td>{user.total_opens || 0}</td>
+                                                                    <td>{user.campaigns_clicked || user.unique_clicks || 0}</td>
+                                                                    <td>{user.total_clicks || 0}</td>
+                                                                    <td>{user.unique_open_rate || 0}%</td>
+                                                                    <td>{user.total_open_rate || 0}%</td>
+                                                                </>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {patternHasMore && !patternTableState.isFullyExpanded && (
+                                            <div className="load-more-container">
+                                                <button
+                                                    className="btn-load-more"
+                                                    onClick={() => setPatternTableState(prev => ({
+                                                        ...prev,
+                                                        displayCount: prev.displayCount + 10
+                                                    }))}
+                                                >
+                                                    Load More ({patternVisibleData.length} of {Math.min(patternDisplayData.length, 1000)})
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {patternResults.users && patternResults.users.length === 0 && (
+                                    <div className="sample-note">
+                                        No users found matching this pattern.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                */}
+            </div>
+            
+
             {showSpecialtySelector && (
-                <div className="modal-overlay" onClick={() => setShowSpecialtySelector(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
+                <div className="aqb-modal-overlay" onClick={() => setShowSpecialtySelector(false)}>
+                    <div className="aqb-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="aqb-modal-header">
                             <h2>Select Specialties</h2>
                             <button
-                                className="modal-close"
+                                className="aqb-modal-close"
                                 onClick={() => setShowSpecialtySelector(false)}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <div className="modal-search">
+                        <div className="aqb-modal-search">
                             <input
                                 type="text"
-                                placeholder="Search specialties..."
+                                placeholder="Search specialties"
                                 value={specialtySearchTerm}
                                 onChange={(e) => setSpecialtySearchTerm(e.target.value)}
-                                className="search-input"
+                                className="aqb-search-input"
                             />
                         </div>
 
-                        <div className="modal-actions">
+                        <div className="aqb-modal-actions">
                             <button
                                 type="button"
                                 onClick={handleSelectAllSpecialties}
-                                className="action-button select-all"
+                                className="aqb-action-button select-all"
                             >
                                 Select All
                             </button>
                             <button
                                 type="button"
                                 onClick={handleClearAllSpecialties}
-                                className="action-button clear-all"
+                                className="aqb-action-button clear-all"
                             >
                                 Clear All
                             </button>
-                            <div className="selection-count">
+                            <div className="aqb-selection-count">
                                 {selectedSpecialties.length} selected
                             </div>
                         </div>
 
-                        <div className="modal-list">
+                        <div className="aqb-modal-list">
                             {filteredSpecialties.length === 0 ? (
-                                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
+                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
                                     {specialties.length === 0 ? (
                                         <>
                                             <p>No specialties found in the database.</p>
                                             <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
-                                                Please check your database connection and ensure the user_profiles table has specialty data.
+                                                Database connection error. Ensure the user_profiles table has specialty data.
                                             </p>
                                         </>
                                     ) : (
-                                        <p>No specialties match your search.</p>
+                                        <p>No matching specialties.</p>
                                     )}
                                 </div>
                             ) : (
@@ -1164,14 +1738,14 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     return (
                                         <div
                                             key={specialty}
-                                            className={`modal-list-item ${isSelected ? 'selected' : ''}`}
+                                            className={`aqb-modal-list-item ${isSelected ? 'selected' : ''}`}
                                             onClick={() => handleSpecialtyToggle(specialty)}
                                         >
-                                            <div className="item-checkbox">
+                                            <div className="aqb-item-checkbox">
                                                 {isSelected && <span className="checkmark">✓</span>}
                                             </div>
-                                            <div className="item-info">
-                                                <div className="item-name">{specialty}</div>
+                                            <div className="aqb-item-info">
+                                                <div className="aqb-item-name">{specialty}</div>
                                             </div>
                                         </div>
                                     );
@@ -1179,11 +1753,11 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                             )}
                         </div>
 
-                        <div className="modal-footer">
+                        <div className="aqb-modal-footer">
                             <button
                                 type="button"
                                 onClick={() => setShowSpecialtySelector(false)}
-                                className="done-button"
+                                className="aqb-done-button"
                             >
                                 Done
                             </button>
@@ -1192,65 +1766,64 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 </div>
             )}
 
-            {/* Campaign Selector Modal */}
             {showCampaignSelector && (
-                <div className="modal-overlay" onClick={() => setShowCampaignSelector(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
+                <div className="aqb-modal-overlay" onClick={() => setShowCampaignSelector(false)}>
+                    <div className="aqb-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="aqb-modal-header">
                             <h2>Select Campaigns</h2>
                             <button
-                                className="modal-close"
+                                className="aqb-modal-close"
                                 onClick={() => setShowCampaignSelector(false)}
                             >
                                 ×
                             </button>
                         </div>
 
-                        <div className="modal-search">
+                        <div className="aqb-modal-search">
                             <input
                                 type="text"
-                                placeholder="Search campaigns..."
+                                placeholder="Search campaigns"
                                 value={campaignSearchTerm}
                                 onChange={(e) => setCampaignSearchTerm(e.target.value)}
-                                className="search-input"
+                                className="aqb-search-input"
                             />
                         </div>
 
-                        <div className="modal-actions">
+                        <div className="aqb-modal-actions">
                             <button
                                 type="button"
                                 onClick={handleSelectAllCampaigns}
-                                className="action-button select-all"
+                                className="aqb-action-button select-all"
                             >
                                 Select All
                             </button>
                             <button
                                 type="button"
                                 onClick={handleClearAllCampaigns}
-                                className="action-button clear-all"
+                                className="aqb-action-button clear-all"
                             >
                                 Clear All
                             </button>
-                            <div className="selection-count">
+                            <div className="aqb-selection-count">
                                 {selectedCampaigns.length} selected
                             </div>
                         </div>
 
-                        <div className="modal-list">
+                        <div className="aqb-modal-list">
                             {filteredCampaigns.map(campaign => {
                                 const isSelected = selectedCampaigns.includes(campaign.campaign_name);
                                 return (
                                     <div
                                         key={campaign.campaign_name}
-                                        className={`modal-list-item ${isSelected ? 'selected' : ''}`}
+                                        className={`aqb-modal-list-item ${isSelected ? 'selected' : ''}`}
                                         onClick={() => handleCampaignToggle(campaign)}
                                     >
-                                        <div className="item-checkbox">
+                                        <div className="aqb-item-checkbox">
                                             {isSelected && <span className="checkmark">✓</span>}
                                         </div>
-                                        <div className="item-info">
-                                            <div className="item-name">{campaign.campaign_name}</div>
-                                            <div className="item-stats">
+                                        <div className="aqb-item-info">
+                                            <div className="aqb-item-name">{campaign.campaign_name}</div>
+                                            <div className="aqb-item-stats">
                                                 <span>Opens: {campaign.volume_metrics?.unique_opens?.toLocaleString() || 'N/A'}</span>
                                                 <span>Rate: {campaign.core_metrics?.unique_open_rate?.toFixed(1) || 'N/A'}%</span>
                                                 <span>Delivered: {campaign.volume_metrics?.delivered?.toLocaleString() || 'N/A'}</span>
@@ -1261,11 +1834,11 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                             })}
                         </div>
 
-                        <div className="modal-footer">
+                        <div className="aqb-modal-footer">
                             <button
                                 type="button"
                                 onClick={() => setShowCampaignSelector(false)}
-                                className="done-button"
+                                className="aqb-done-button"
                             >
                                 Done
                             </button>

@@ -1,19 +1,13 @@
-"""
-Initialize Basis optimization tables in the database.
-This script is safe to run multiple times - it only creates missing tables.
-"""
 import os
 import sys
 from dotenv import load_dotenv
 
-# Add backend to path so we can import models
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models import Base
 from sqlalchemy import create_engine, inspect, text
 
 def check_existing_tables(engine):
-    """Check which Basis tables already exist"""
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
 
@@ -37,13 +31,12 @@ def check_existing_tables(engine):
     return missing, existing_tables
 
 def fix_duplicate_indexes(engine):
-    """Drop old duplicate index names if they exist"""
     old_indexes = [
-        'idx_campaign_status',  # was duplicated between line_items and recommendations
-        'idx_type_priority',    # old name in recommendations
-        'idx_impact_tracking',  # old name in recommendations
-        'idx_vendor_property',  # old name in line_items
-        'idx_pacing',           # old name in line_items
+        'idx_campaign_status',
+        'idx_type_priority',
+        'idx_impact_tracking',
+        'idx_vendor_property',
+        'idx_pacing',
     ]
 
     with engine.connect() as conn:
@@ -56,7 +49,6 @@ def fix_duplicate_indexes(engine):
                 print(f"  Could not drop {idx}: {e}")
 
 def main():
-    # Load environment variables
     load_dotenv()
 
     db_url = os.getenv('DATABASE_URL')
@@ -72,15 +64,12 @@ def main():
         engine = create_engine(db_url)
         print("\nDatabase connection successful")
 
-        # Check which tables exist
         missing_tables, existing_tables = check_existing_tables(engine)
 
-        # Fix old duplicate indexes if any Basis tables already exist
         if any(t in existing_tables for t in ['basis_line_items', 'basis_recommendations']):
             print("\nFixing old index names...")
             fix_duplicate_indexes(engine)
 
-        # Create missing tables
         print("\nCreating missing tables...")
         Base.metadata.create_all(engine)
 

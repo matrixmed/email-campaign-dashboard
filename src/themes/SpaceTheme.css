@@ -1,7 +1,5 @@
-/* Space Theme CSS */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap');
 
-/* Base styles for space theme */
 body.space-theme {
   background-color: #050a1f;
   color: white;
@@ -9,7 +7,6 @@ body.space-theme {
   font-family: 'Space Mono', monospace;
 }
 
-/* Starry background */
 .starry-background {
   position: fixed;
   top: 0;
@@ -55,7 +52,6 @@ body.modal-open {
   100% { transform: translateX(calc(100vw + 100px)) translateY(calc(100vh + 100px)) rotate(30deg); opacity: 0; }
 }
 
-/* Space theme header */
 body.space-theme .dashboard-header {
   background: linear-gradient(135deg, #f44336, #9c27b0, #ff9800);
   color: white;
@@ -80,7 +76,6 @@ body.space-theme h2 {
   letter-spacing: 1px;
 }
 
-/* Space theme search box */
 body.space-theme .search-box,
 body.space-theme .digital-journals-search-box {
   background-color: rgba(40, 40, 50, 0.7);
@@ -96,7 +91,6 @@ body.space-theme .digital-journals-search-box:focus {
   box-shadow: 0 0 15px rgba(100, 100, 255, 0.4);
 }
 
-/* Space theme sections */
 body.space-theme .chart-section,
 body.space-theme .table-section,
 body.space-theme .insights-section,
@@ -113,7 +107,6 @@ body.space-theme .chat-interface {
   z-index: 1;
 }
 
-/* Space theme section borders */
 body.space-theme .chart-section::before,
 body.space-theme .table-section::before,
 body.space-theme .insights-section::before,
@@ -143,12 +136,10 @@ body.space-theme .chart-container {
   z-index: auto !important;
 }
 
-/* Force any fixed elements to appear below modal */
 body.space-theme .fixed-position-element {
   z-index: 10 !important;
 }
 
-/* Space Theme Modal Styles - FIXED Z-INDEX */
 body.space-theme .campaign-modal-overlay {
   position: fixed;
   top: 0;
@@ -230,7 +221,6 @@ body.space-theme .modal-close-button:hover {
   transform: scale(1.1);
 }
 
-/* Campaign Modal Info */
 body.space-theme .campaign-modal-info {
   display: flex;
   flex-wrap: wrap;
@@ -248,7 +238,6 @@ body.space-theme .deployment-info {
   padding: 10px 15px;
 }
 
-/* Metrics Cards */
 body.space-theme .campaign-modal-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -285,7 +274,6 @@ body.space-theme .metric-value {
   font-weight: bold;
 }
 
-/* Details Sections */
 body.space-theme .campaign-modal-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -315,7 +303,6 @@ body.space-theme h4 {
   font-size: 18px;
 }
 
-/* Detail Tables */
 body.space-theme .detail-table {
   width: 100%;
   border-collapse: collapse;
@@ -345,7 +332,6 @@ body.space-theme .metric-name {
   font-weight: bold;
 }
 
-/* Chart Section */
 body.space-theme .campaign-chart-section {
   background-color: rgba(40, 40, 60, 0.5);
   border-radius: 6px;
@@ -358,7 +344,6 @@ body.space-theme .campaign-chart {
   height: 300px;
 }
 
-/* Campaign List */
 body.space-theme .campaign-list {
   background-color: rgba(40, 40, 60, 0.5);
   border-radius: 6px;
@@ -399,7 +384,6 @@ body.space-theme .campaign-details {
   font-size: 14px;
 }
 
-/* Scrollbar Styling - IMPROVED FOR MODAL */
 body.space-theme .campaign-modal::-webkit-scrollbar {
   width: 10px;
 }
@@ -418,7 +402,6 @@ body.space-theme .campaign-modal::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Deployment number */
 body.space-theme .deployment-number {
   color: #999;
   display: block;
@@ -426,7 +409,6 @@ body.space-theme .deployment-number {
   font-weight: normal;
 }
 
-/* Animation Keyframes */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -437,7 +419,6 @@ body.space-theme .deployment-number {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Space theme tables */
 body.space-theme table {
   width: 100%;
   border-collapse: separate;
@@ -467,7 +448,6 @@ body.space-theme tr:hover td {
   background-color: rgba(60, 60, 100, 0.5);
 }
 
-/* Space theme buttons */
 body.space-theme button,
 body.space-theme .space-button,
 body.space-theme .pagination button,
@@ -513,7 +493,6 @@ body.space-theme .query-button:hover::after {
   left: 100%;
 }
 
-/* Space theme inputs and selects */
 body.space-theme input,
 body.space-theme select,
 body.space-theme .deployment-select,
@@ -533,7 +512,6 @@ body.space-theme select:focus {
   box-shadow: 0 0 10px rgba(100, 100, 255, 0.2);
 }
 
-/* Space theme dropdown */
 body.space-theme .dropdown {
   background-color: rgba(30, 30, 50, 0.95);
   border: 1px solid rgba(100, 100, 255, 0.3);
@@ -549,7 +527,6 @@ body.space-theme .dropdown-arrow svg {
   color: #0ff;
 }
 
-/* Space theme toggle */
 body.space-theme .toggle-switch {
   --light: #d8dbe0;
   --dark: #050a1f;
@@ -570,7 +547,6 @@ body.space-theme .slider::before {
   background-color: var(--dark);
 }
 
-/* Chat interface */
 body.space-theme .query-input {
   background-color: rgba(40, 40, 50, 0.7);
   border: 1px solid rgba(80, 80, 100, 0.4);
@@ -598,7 +574,6 @@ body.space-theme .sample-queries li:hover {
   box-shadow: 0 0 15px rgba(100, 100, 255, 0.2);
 }
 
-/* Space theme scrollbars */
 body.space-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -618,7 +593,6 @@ body.space-theme ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Theme selector dropdown */
 .theme-controls {
   display: flex;
   align-items: center;
@@ -644,13 +618,11 @@ body.space-theme .theme-select {
   font-family: 'Orbitron', sans-serif;
 }
 
-/* Loader spinner */
 body.space-theme .spinner div {
   border-color: #0ff;
   background-color: rgba(0, 255, 255, 0.1);
 }
 
-/* Any additional adjustments for specific components */
 body.space-theme .campaign-box {
   background: rgba(40, 40, 60, 0.5);
   border: 1px solid rgba(80, 80, 100, 0.4);
@@ -673,18 +645,15 @@ body.space-theme .tooltip-top::before {
   border-color: rgba(100, 100, 255, 0.3);
 }
 
-/* Fix for z-index issues with chart sections */
 body.space-theme .chart-container {
   position: relative;
   z-index: 1;
 }
 
-/* Fix for sticky positioning in components under modal */
 body.space-theme .sticky-header {
   z-index: 5;
 }
 
-/* Responsive adjustments for space theme */
 @media (max-width: 768px) {
   body.space-theme .dashboard-header {
     flex-direction: column;

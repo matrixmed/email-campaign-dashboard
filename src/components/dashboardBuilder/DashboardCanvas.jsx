@@ -20,7 +20,6 @@ import { getThemeLogo, getMetricValue, getThemeColors, TABLE_TYPES, TABLE_DEFINI
 import { API_BASE_URL } from '../../config/api';
 
 const DashboardCanvasContent = () => {
-  // Load initial state from localStorage
   const loadInitialState = () => {
     const saved = localStorage.getItem('dashboard-canvas-state');
     if (saved) {
@@ -65,7 +64,6 @@ const DashboardCanvasContent = () => {
   const [deletedCardIds, setDeletedCardIds] = useState(new Set(initialState?.deletedCardIds || []));
   const [selectedRowInfo, setSelectedRowInfo] = useState(null);
 
-  // Table selection state
   const [selectedTableTypes, setSelectedTableTypes] = useState(initialState?.selectedTableTypes || {
     table1: TABLE_TYPES.ONLINE_JOURNAL,
     table2: TABLE_TYPES.VIDEO_METRICS,
@@ -112,14 +110,12 @@ const DashboardCanvasContent = () => {
           subtitle: edits.subtitle !== undefined ? edits.subtitle : component.subtitle
         };
         
-        // Handle table data preservation
         if (edits.config?.customData) {
           updatedComponent.config = {
             ...component.config,
             customData: edits.config.customData
           };
         } else if (edits.data) {
-          // Legacy support for old data format
           updatedComponent.config = {
             ...component.config,
             customData: edits.data
@@ -136,7 +132,6 @@ const DashboardCanvasContent = () => {
     localStorage.setItem('dashboard-user-edits', JSON.stringify(userEdits));
   }, [userEdits]);
 
-  // Save dashboard state to localStorage whenever it changes
   useEffect(() => {
     const stateToSave = {
       cards,
@@ -156,14 +151,11 @@ const DashboardCanvasContent = () => {
     localStorage.setItem('dashboard-canvas-state', JSON.stringify(stateToSave));
   }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, deletedCardIds]);
 
-  // Template regeneration should only happen for specific triggers, not card edits
   const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
 
   useEffect(() => {
     const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showPatientImpact}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
     
-    
-    // Only regenerate if this is a new trigger, not just a card edit
     if (triggerKey !== lastRegenerationTrigger && cards.length > 0 && currentTemplate) {
       let templateConfig;
       
@@ -193,16 +185,12 @@ const DashboardCanvasContent = () => {
       
       if (templateConfig) {
         try {
-          // Get existing custom components BEFORE regeneration
           const existingCards = [...cards];
 
-          // Identify custom components by section property or ID pattern
           const isCustomComponent = (comp) => {
-            // Check if component has section 'custom' (primary indicator)
             if (comp.section === 'custom') {
               return !deletedCardIds.has(comp.id);
             }
-            // Fall back to ID pattern matching for backwards compatibility
             return (comp.id.startsWith('table-') ||
                     comp.id.startsWith('chart-') ||
                     comp.id.startsWith('custom-') ||
@@ -210,12 +198,11 @@ const DashboardCanvasContent = () => {
                     comp.id.startsWith('authority-') ||
                     comp.id.startsWith('geographic-')) &&
                    !deletedCardIds.has(comp.id) &&
-                   comp.section !== 'template'; // Explicitly exclude template components
+                   comp.section !== 'template';
           };
 
           const customComponents = existingCards.filter(isCustomComponent);
           
-          // Apply current theme to custom components
           const themeColors = getThemeColors(currentTheme);
           const themedCustomComponents = customComponents.map(comp => ({
             ...comp,
@@ -230,13 +217,10 @@ const DashboardCanvasContent = () => {
           const regeneratedComponents = generateTemplate(templateConfig);
           const preservedComponents = applyPreservedEdits(regeneratedComponents);
           
-          // Preserve user deletions - filter out deleted components from template
           const filteredComponents = preservedComponents.filter(comp => 
             !deletedCardIds.has(comp.id)
           );
           
-          // Only preserve positions if the template layout hasn't fundamentally changed
-          // (i.e., only theme changes, not structural changes like patient impact/cost)
           const structuralChangeKeys = ['costComparisonMode', 'showPatientImpact'];
           const currentStructuralState = `${costComparisonMode}-${showPatientImpact}`;
           const lastStructuralState = lastRegenerationTrigger.split('-').slice(1, 3).join('-');
@@ -245,11 +229,9 @@ const DashboardCanvasContent = () => {
           const updatedCards = filteredComponents.map(newComp => {
             const existingComp = existingCards.find(existing => existing.id === newComp.id);
             if (existingComp && !isStructuralChange) {
-              // Only preserve position for theme-only changes, not structural changes
               return {
                 ...newComp,
-                position: existingComp.position, // Preserve position
-                // Update only theme-related style properties
+                position: existingComp.position,
                 style: {
                   ...existingComp.style,
                   background: newComp.style?.background || existingComp.style?.background,
@@ -258,7 +240,7 @@ const DashboardCanvasContent = () => {
                 }
               };
             }
-            return newComp; // Use new position for structural changes or new components
+            return newComp; 
           });
           
           const finalCards = [...updatedCards, ...themedCustomComponents];
@@ -272,7 +254,6 @@ const DashboardCanvasContent = () => {
   }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
-    // Normalize table data format - convert data to config.customData if needed
     const normalizedData = { ...newData };
     if (newData.data && !newData.config) {
       normalizedData.config = { customData: newData.data };
@@ -347,7 +328,7 @@ const DashboardCanvasContent = () => {
     const cardToDelete = cards.find(card => card.id === cardId);
     if (cardToDelete) {
       setDeletedCards(prev => [...prev, cardToDelete]);
-      setDeletedCardIds(prev => new Set([...prev, cardId])); // Track deleted IDs permanently
+      setDeletedCardIds(prev => new Set([...prev, cardId]));
       setCards(prev => prev.filter(card => card.id !== cardId));
     }
   }, [cards]);
@@ -405,7 +386,7 @@ const DashboardCanvasContent = () => {
       setCurrentTheme(templateConfig.theme);
       setCurrentTemplate(templateConfig.template);
       setDeletedCards([]);
-      setDeletedCardIds(new Set()); // Reset deleted card tracking
+      setDeletedCardIds(new Set());
       setUploadedImages([]);
       
       if (templateConfig.type === 'single' && templateConfig.campaigns.length > 0) {
@@ -422,13 +403,11 @@ const DashboardCanvasContent = () => {
 
   const handleThemeChange = useCallback((newTheme) => {
     setCurrentTheme(newTheme);
-    // Template regeneration useEffect will handle updating the cards with new theme
   }, []);
 
   const handleCampaignChange = useCallback((newCampaign) => {
     setSelectedCampaign(newCampaign);
     
-    // Smart table selection based on campaign title
     if (newCampaign?.campaign_name) {
       const smartOrder = getSmartTableSelection(newCampaign.campaign_name);
       setSelectedTableTypes({
@@ -607,7 +586,6 @@ const DashboardCanvasContent = () => {
 
   const handleAddMetric = useCallback((item) => {
     if (item.id && item.type && item.position) {
-      // Ensure section property is set for all custom components
       const itemWithSection = {
         ...item,
         section: item.section || 'custom'
@@ -692,7 +670,6 @@ const DashboardCanvasContent = () => {
   }, [selectedCampaign, getGeographicData, getAuthorityMetrics, handleAddCard, cards.length]);
 
   const handleRestoreCard = useCallback((card) => {
-    // Ensure section property is preserved when restoring
     const cardWithSection = {
       ...card,
       section: card.section || 'custom'
@@ -1021,7 +998,6 @@ const DashboardCanvasContent = () => {
 
           <button
             onClick={() => {
-              // Clear all dashboard state
               setCards([]);
               setUploadedImages([]);
               setSelectedCampaign(null);
@@ -1359,7 +1335,6 @@ const DashboardCanvasContent = () => {
                       );
                     }
 
-                    // Skip rendering image types here - they're rendered separately below
                     if (card.type === 'image') {
                       return null;
                     }
@@ -1393,7 +1368,6 @@ const DashboardCanvasContent = () => {
                     />
                   ))}
 
-                  {/* Render logo images from template */}
                   {cards.filter(card => card.type === 'image').map(image => (
                     <img
                       key={image.id}
@@ -1439,7 +1413,7 @@ const DashboardCanvasContent = () => {
                   fontSize: '16px',
                   lineHeight: '1.6'
                 }}>
-                  <h2 style={{ margin: '0 0 16px 0', color: '#2c3e50' }}>Create Your Dashboard</h2>
+                  <h2 style={{ margin: '0 0 16px 0', color: '#2c3e50' }}>Create Dashboard</h2>
                   <p style={{ margin: '8px 0', opacity: 0.8 }}>Click "Generate" to get started with templates</p>
                 </div>
               )}

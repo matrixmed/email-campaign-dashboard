@@ -5,7 +5,7 @@ import { getComponentStyle, getTypographyStyle, MATRIX_COLORS } from './template
 const TitleComponent = ({ 
   id, 
   title = 'Campaign Title',
-  position = { x: 0, y: 0, width: 800, height: 80 }, // Increased default width but safe from logo collision
+  position = { x: 0, y: 0, width: 800, height: 80 },
   style = {},
   currentTheme = 'matrix',
   onEdit, 
@@ -32,11 +32,10 @@ const TitleComponent = ({
   useEffect(() => {
     if (isEditing === id && titleInputRef.current) {
       const input = titleInputRef.current;
-      // Set focus and select all text after a small delay to ensure visibility
       setTimeout(() => {
         input.focus();
         input.select();
-        input.setSelectionRange(0, input.value.length); // Ensure full selection
+        input.setSelectionRange(0, input.value.length);
       }, 10);
     }
   }, [isEditing, id]);
@@ -74,8 +73,8 @@ const TitleComponent = ({
     const rawX = e.clientX - dragStart.x;
     const rawY = e.clientY - dragStart.y;
     
-    const newX = Math.max(-50, Math.round(rawX / 8) * 8); // Allow negative X for closer to edge
-    const newY = Math.max(-50, Math.round(rawY / 8) * 8); // Allow negative Y to move above canvas
+    const newX = Math.max(-50, Math.round(rawX / 8) * 8);
+    const newY = Math.max(-50, Math.round(rawY / 8) * 8);
     
     const maxX = 1024 - position.width;
     const maxY = 576 - position.height;
@@ -158,11 +157,10 @@ const TitleComponent = ({
   }, [id, setIsEditing]);
 
   const handleSave = useCallback(() => {
-    // Trim whitespace but preserve the actual edited content
     const trimmedTitle = localTitle.trim();
-    if (trimmedTitle !== title.trim()) { // Only save if actually changed
+    if (trimmedTitle !== title.trim()) { 
       onEdit?.(id, { 
-        title: trimmedTitle || 'Untitled' // Prevent empty titles
+        title: trimmedTitle || 'Untitled' 
       });
     }
     setIsEditing(null);
@@ -174,7 +172,7 @@ const TitleComponent = ({
   }, [title, setIsEditing]);
 
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { // Enter saves, Shift+Enter for line breaks if needed
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
       handleSave();
@@ -235,7 +233,7 @@ const TitleComponent = ({
     background: style.background || 'transparent',
     cursor: isDragging ? 'move' : 'pointer',
     transition: isDragging || isResizing ? 'none' : 'all 0.2s ease',
-    padding: '4px', // Reduced padding from 16px to 4px
+    padding: '4px',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -315,7 +313,7 @@ const TitleComponent = ({
         display: 'flex', 
         flexDirection: 'column', 
         justifyContent: 'center',
-        minWidth: 0 // Allow flex item to shrink below content size
+        minWidth: 0
       }}>
         {editing ? (
           <input
@@ -333,14 +331,14 @@ const TitleComponent = ({
               borderRadius: '4px',
               padding: '8px 12px',
               width: '100%',
-              minWidth: '300px', // Ensure minimum readable width
+              minWidth: '300px',
               outline: 'none',
               WebkitBackgroundClip: 'unset',
               WebkitTextFillColor: '#1f2937',
               backgroundClip: 'unset',
               color: '#1f2937',
               boxSizing: 'border-box',
-              resize: 'horizontal', // Allow user to resize width if needed
+              resize: 'horizontal',
               overflow: 'visible'
             }}
             autoFocus

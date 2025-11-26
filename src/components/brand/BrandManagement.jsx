@@ -86,7 +86,6 @@ const BrandManagement = () => {
   };
 
   const handleAddBrand = async (editor) => {
-    // Generate unique brand name
     let brandName = 'Brand1';
     let counter = 1;
     const existingBrandNames = brands.map(b => (b.brand || '').toLowerCase());
@@ -284,8 +283,11 @@ const BrandManagement = () => {
 
   if (loading) {
     return (
-      <div className="reports-manager">
+      <div className="brand-management">
         <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
           <p>Loading brands...</p>
         </div>
       </div>

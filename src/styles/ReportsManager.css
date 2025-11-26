@@ -298,6 +298,19 @@
   font-family: 'Courier New', monospace;
 }
 
+td.date-column-report.overdue-date {
+  color: #ff4444 !important;
+  font-weight: 700 !important;
+}
+
+tr.overdue-row {
+  background-color: rgba(255, 68, 68, 0.05) !important;
+}
+
+tr.overdue-row:hover {
+  background-color: rgba(255, 68, 68, 0.1) !important;
+}
+
 .days-column {
   width: auto;
   text-align: center;

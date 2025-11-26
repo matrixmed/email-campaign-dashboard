@@ -17,23 +17,50 @@ const ReportsManager = () => {
     const [rowsPerPage, setRowsPerPage] = useState(100);
     const [futureRowsPerPage, setFutureRowsPerPage] = useState(10);
     const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(10);
+    const [sortBy, setSortBy] = useState('send_date');
+    const [sortDirection, setSortDirection] = useState('asc');
 
-    // Clean campaign name by removing "Deployment X" suffix
     const cleanCampaignName = (name) => {
         if (!name) return name;
-        return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
+        return name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
     };
 
-    // Extract deployment number from campaign name
     const getDeploymentNumber = (name) => {
         if (!name) return 0;
-        const match = name.match(/[-–—\s]+deployment\s+#?(\d+)/i);
+        const match = name.match(/[-–—\s]*[-–—]\s*deployment\s+#?(\d+)/i);
         return match ? parseInt(match[1]) : 0;
     };
 
-    // Deduplicate reports by standardized name, prioritizing Deployment 1
+    const handleSort = (column) => {
+        if (sortBy === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortDirection('asc');
+        }
+    };
+
+    const sortReports = (reports) => {
+        if (!reports || reports.length === 0) return reports;
+
+        return [...reports].sort((a, b) => {
+            let aVal, bVal;
+
+            if (sortBy === 'brand') {
+                aVal = (a.brand || '').toLowerCase();
+                bVal = (b.brand || '').toLowerCase();
+            } else if (sortBy === 'send_date') {
+                aVal = a.send_date || '';
+                bVal = b.send_date || '';
+            }
+
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
     const deduplicateReports = (reports) => {
-        // Group by standardized campaign name
         const groups = {};
         reports.forEach(report => {
             const stdName = report.standardized_campaign_name || cleanCampaignName(report.campaign_name);
@@ -43,13 +70,11 @@ const ReportsManager = () => {
             groups[stdName].push(report);
         });
 
-        // For each group, select only Deployment 1 or campaigns without deployment number
         const deduplicated = [];
         Object.values(groups).forEach(group => {
             if (group.length === 1) {
                 deduplicated.push(group[0]);
             } else {
-                // Multiple deployments - prioritize Deployment 1 or campaigns without deployment number
                 const deployment1 = group.find(r => getDeploymentNumber(r.campaign_name) === 1);
                 const noDeployment = group.find(r => getDeploymentNumber(r.campaign_name) === 0);
 
@@ -58,7 +83,6 @@ const ReportsManager = () => {
                 } else if (deployment1) {
                     deduplicated.push(deployment1);
                 } else {
-                    // Fallback - use first one
                     deduplicated.push(group[0]);
                 }
             }
@@ -70,20 +94,16 @@ const ReportsManager = () => {
     useEffect(() => {
         const fetchReportsData = async () => {
             try {
-                // Fetch from database API - get last 90 days to populate archive
                 const response = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=90`);
                 const data = await response.json();
 
-                // Deduplicate by standardized campaign name, keeping only base campaigns (Deployment 1 or no deployment)
                 const deduplicatedData = deduplicateReports(data);
                 setReportsData(deduplicatedData);
 
-                // Initialize checked states from the fetched data
                 const newCheckedStates = {};
                 deduplicatedData.forEach(report => {
                     if (report.is_submitted && report.id) {
                         const reportId = report.id;
-                        // Mark all weeks as submitted if the report is submitted
                         newCheckedStates[`${reportId}_week_1`] = true;
                         newCheckedStates[`${reportId}_week_2`] = true;
                         newCheckedStates[`${reportId}_week_3`] = true;
@@ -171,7 +191,63 @@ const ReportsManager = () => {
         sunday.setDate(reportingMonday.getDate() + 6);
         return { start: reportingMonday, end: sunday };
     };
-    
+
+    const isFirstWeekOfMonth = () => {
+        const reportingMonday = getCurrentWeekMonday();
+        reportingMonday.setDate(reportingMonday.getDate() - 7);
+
+        const dayOfMonth = reportingMonday.getDate();
+        return dayOfMonth <= 7;
+    };
+
+    const getMonthlyReports = () => {
+        if (!isFirstWeekOfMonth()) return [];
+
+        const reportingMonday = getCurrentWeekMonday();
+        reportingMonday.setDate(reportingMonday.getDate() - 7);
+
+        const prevMonth = new Date(reportingMonday);
+        prevMonth.setMonth(prevMonth.getMonth() - 1);
+
+        const monthName = prevMonth.toLocaleString('default', { month: 'long' });
+        const year = prevMonth.getFullYear();
+
+        const monthlyReports = [];
+
+        const castleCampaigns = reportsData.filter(report => {
+            if (!report.send_date || report.is_no_data_report) return false;
+
+            const agency = (report.agency || '').toLowerCase();
+            if (agency !== 'castle') return false;
+
+            const sendDate = parseSendDate(report.send_date);
+            if (!sendDate) return false;
+
+            return sendDate.getMonth() === prevMonth.getMonth() &&
+                   sendDate.getFullYear() === prevMonth.getFullYear();
+        });
+
+        castleCampaigns.forEach(campaign => {
+            monthlyReports.push({
+                ...campaign,
+                is_monthly_castle: true,
+                unique_key: `${campaign.id}_castle_monthly`
+            });
+        });
+
+        monthlyReports.push({
+            id: `iqvia_monthly_${year}_${prevMonth.getMonth()}`,
+            campaign_name: `IQVIA Monthly Report - ${monthName} ${year}`,
+            brand: 'IQVIA',
+            agency: 'IQVIA',
+            send_date: reportingMonday.toISOString().split('T')[0],
+            is_monthly: true,
+            unique_key: `iqvia_monthly_${year}_${prevMonth.getMonth()}`
+        });
+
+        return monthlyReports;
+    };
+
     const formatDateRange = (start, end) => {
         if (!start || !end) return '-';
         const formatDate = (date) => {
@@ -199,18 +275,60 @@ const ReportsManager = () => {
             if (report.is_no_data_report) return;
 
             const week = getReportWeek(report.send_date);
+
             if (week !== null) {
                 reports.push({
                     ...report,
                     week_number: week,
                     week_range: currentTimeframe,
-                    unique_key: `${report.id}_week_${week}`
+                    unique_key: `${report.id}_week_${week}`,
+                    is_overdue: false
                 });
+            }
+
+            if (week === null && report.send_date) {
+                const sendDate = parseSendDate(report.send_date);
+                if (sendDate) {
+                    const reportingMonday = getCurrentWeekMonday();
+                    reportingMonday.setDate(reportingMonday.getDate() - 7);
+
+                    const threeWeeksBeforeReporting = new Date(reportingMonday);
+                    threeWeeksBeforeReporting.setDate(reportingMonday.getDate() - 14); 
+
+                    if (sendDate < threeWeeksBeforeReporting) {
+                        const reportId = report.id;
+
+                        for (let w = 1; w <= 3; w++) {
+                            const checkKey = `${reportId}_week_${w}`;
+                            const isChecked = checkedReports[checkKey];
+
+                            if (!isChecked) {
+                                reports.push({
+                                    ...report,
+                                    week_number: w,
+                                    week_range: currentTimeframe,
+                                    unique_key: `${reportId}_week_${w}_overdue`,
+                                    is_overdue: true
+                                });
+                            }
+                        }
+                    }
+                }
             }
         });
 
+        const monthlyReports = getMonthlyReports();
+        monthlyReports.forEach(monthlyReport => {
+            reports.push({
+                ...monthlyReport,
+                week_number: 1,
+                week_range: currentTimeframe,
+                is_overdue: false
+            });
+        });
+
         return filterReports(reports);
-    }, [reportsData, searchTerm]);
+    }, [reportsData, searchTerm, checkedReports]);
 
     const getCurrentWeekNoDataReports = useMemo(() => {
         const currentTimeframe = getCurrentWeekTimeframe();
@@ -225,13 +343,50 @@ const ReportsManager = () => {
                     ...report,
                     week_number: week,
                     week_range: currentTimeframe,
-                    unique_key: `${report.id}_no_data`
+                    unique_key: `${report.id}_no_data`,
+                    data_type: report.cmi_metadata?.data_type || report.data_type || 'Unknown'
                 });
             }
         });
 
         return filterReports(reports);
     }, [reportsData, searchTerm]);
+
+    const getNoDataReportsByType = useMemo(() => {
+        const noDataReports = getCurrentWeekNoDataReports;
+
+        const grouped = {};
+        noDataReports.forEach(report => {
+            const key = `${report.brand || 'Unknown'}_${report.campaign_name}`;
+            if (!grouped[key]) {
+                grouped[key] = {
+                    reports: [],
+                    dataTypes: new Set()
+                };
+            }
+            grouped[key].reports.push(report);
+            grouped[key].dataTypes.add((report.data_type || '').toUpperCase());
+        });
+
+        const pldAndAgg = [];
+        const pldOnly = [];
+        const aggOnly = [];
+
+        Object.values(grouped).forEach(group => {
+            const hasPLD = group.dataTypes.has('PLD') || group.dataTypes.has('DETAIL');
+            const hasAGG = group.dataTypes.has('AGG') || group.dataTypes.has('AGGREGATE');
+
+            if (hasPLD && hasAGG) {
+                pldAndAgg.push(...group.reports);
+            } else if (hasPLD) {
+                pldOnly.push(...group.reports);
+            } else if (hasAGG) {
+                aggOnly.push(...group.reports);
+            }
+        });
+
+        return { pldAndAgg, pldOnly, aggOnly };
+    }, [getCurrentWeekNoDataReports]);
 
     const getPastReports = useMemo(() => {
         const expandedReports = [];
@@ -425,6 +580,7 @@ const ReportsManager = () => {
 
     const generateCMIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
+        const isNoDataReport = report.is_no_data_report || false;
 
         const formatDate = (date) => {
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -460,6 +616,8 @@ const ReportsManager = () => {
         const vehicleName = report.cmi_metadata?.Vehicle_Name || "";
         const contractNumber = report.cmi_metadata?.contract_number || "";
 
+        const internalCampaignName = isNoDataReport ? "No Data" : cleanedCampaignName;
+
         return {
             "folder": month.toLowerCase(),
             "dateOfSubmission": formatDate(currentTimeframe.end),
@@ -467,23 +625,23 @@ const ReportsManager = () => {
             "mondaydate": formatDateSlash(currentTimeframe.start),
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
-            "internal_campaign_name": cleanedCampaignName,
+            "internal_campaign_name": internalCampaignName,
             "client_campaign_name": report.cmi_metadata?.client_campaign_name || "",
-            "TargetListID": report.cmi_metadata?.target_list_id || "",
-            "CMI_PlacementID": report.cmi_metadata?.placement_id || "",
+            "TargetListID": report.cmi_metadata?.target_list_id || report.cmi_metadata?.TargetListID || "",
+            "CMI_PlacementID": report.cmi_metadata?.placement_id || report.cmi_metadata?.CMI_PlacementID || "",
             "Client_PlacementID": report.cmi_metadata?.Client_PlacementID || "",
-            "Creative_Code": report.cmi_metadata?.creative_code || "",
+            "Creative_Code": report.cmi_metadata?.creative_code || report.cmi_metadata?.Creative_Code || "",
             "GCM_Placement_ID": report.cmi_metadata?.GCM_Placement_ID || "",
             "GCM_Placement_ID2": report.cmi_metadata?.GCM_Placement_ID2 || "",
-            "Client_ID": "",
+            "Client_ID": report.cmi_metadata?.Client_ID || "",
             "finalFileName": `${brandName}_PLD_${vehicleName}_${contractNumber}`,
             "aggFileName": `${brandName}_AGG_${vehicleName}_${contractNumber}`,
             "Brand_Name": brandName,
-            "Supplier": report.cmi_metadata?.Supplier || "",
+            "Supplier": report.cmi_metadata?.Supplier || report.cmi_metadata?.supplier || "",
             "Vehicle_Name": vehicleName,
-            "Placement_Description": report.cmi_metadata?.Placement_Description || "",
-            "Buy_Component_Type": report.cmi_metadata?.Buy_Component_Type || "",
-            "Campaign_Type": report.cmi_metadata?.Campaign_Type || ""
+            "Placement_Description": report.cmi_metadata?.Placement_Description || report.cmi_metadata?.placement_description || "",
+            "Buy_Component_Type": report.cmi_metadata?.Buy_Component_Type || report.cmi_metadata?.buy_component_type || "Email- Re-contact / Trigger",
+            "Campaign_Type": report.cmi_metadata?.Campaign_Type || "email"
         };
     };
 
@@ -696,6 +854,7 @@ const ReportsManager = () => {
 
     const renderNoDataReportRow = (report, rowIndex) => {
         const isCMI = report.agency === 'CMI';
+        const dataType = report.data_type || 'Unknown';
 
         return (
             <tr key={report.unique_key} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
@@ -717,8 +876,8 @@ const ReportsManager = () => {
                 </td>
                 <td className="brand-column">{report.brand || '-'}</td>
                 <td className="agency-column">
-                    <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
-                        {report.agency || '-'}
+                    <span className={`agency-badge ${dataType.toLowerCase()}`}>
+                        {dataType}
                     </span>
                 </td>
                 <td className="date-column-report">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
@@ -738,11 +897,12 @@ const ReportsManager = () => {
 
     const renderCurrentReportRow = (report, rowIndex, allReports) => {
         const isCMI = report.agency === 'CMI';
+        const isOverdue = report.is_overdue || false;
 
         const brandCount = isCMI ? allReports.filter(r => r.agency === 'CMI' && r.brand === report.brand).length : 0;
 
         return (
-            <tr key={report.unique_key} className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
+            <tr key={report.unique_key} className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${isOverdue ? 'overdue-row' : ''}`}>
                 <td className="campaign-column">
                     <div
                         className="reports-campaign-text clickable-campaign"
@@ -770,7 +930,9 @@ const ReportsManager = () => {
                         {report.agency || '-'}
                     </span>
                 </td>
-                <td className="date-column-report">{formatSendDate(report.send_date)}</td>
+                <td className={`date-column-report ${isOverdue ? 'overdue-date' : ''}`}>
+                    {formatSendDate(report.send_date)}
+                </td>
                 <td className="week-column">
                     {report.week_number === 1 ? (
                         <label className="checkbox-container">
@@ -853,14 +1015,12 @@ const ReportsManager = () => {
                         className={`tab-button ${activeTab === 'current' ? 'active' : ''}`}
                         onClick={() => handleTabChange('current')}
                     >
-                        <Clock size={16} />
                         <span>Current Week ({getCurrentWeekReports.length})</span>
                     </button>
                     <button
                         className={`tab-button ${activeTab === 'archive' ? 'active' : ''}`}
                         onClick={() => handleTabChange('archive')}
                     >
-                        <FileText size={16} />
                         <span>Archive ({getPastReports.length})</span>
                     </button>
                     <div className="rows-control">
@@ -910,9 +1070,21 @@ const ReportsManager = () => {
                                 <thead>
                                     <tr>
                                         <th className="campaign-header">Campaign</th>
-                                        <th className="brand-header">Brand</th>
+                                        <th
+                                            className={`brand-header sortable ${sortBy === 'brand' ? 'sorted' : ''}`}
+                                            onClick={() => handleSort('brand')}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            Brand {sortBy === 'brand' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                        </th>
                                         <th className="agency-header">Agency</th>
-                                        <th className="date-header">Send Date</th>
+                                        <th
+                                            className={`date-header sortable ${sortBy === 'send_date' ? 'sorted' : ''}`}
+                                            onClick={() => handleSort('send_date')}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            Send Date {sortBy === 'send_date' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                        </th>
                                         <th className="week-header">Week 1</th>
                                         <th className="week-header">Week 2</th>
                                         <th className="week-header">Week 3</th>
@@ -924,19 +1096,15 @@ const ReportsManager = () => {
                                             return (
                                                 <tr>
                                                     <td colSpan="7" className="empty-state">
-                                                        {searchTerm ? 'No reports match your search' : 'No reports due this week'}
+                                                        {searchTerm ? 'No matching reports' : 'No reports due this week'}
                                                     </td>
                                                 </tr>
                                             );
                                         }
 
-                                        const groupedReports = paginatedCurrentReports
-                                            .sort((a, b) => {
-                                                const dateA = parseSendDate(a.send_date);
-                                                const dateB = parseSendDate(b.send_date);
-                                                return dateA - dateB;
-                                            })
-                                            .reduce((acc, report) => {
+                                        const sortedReports = sortReports(paginatedCurrentReports);
+
+                                        const groupedReports = sortedReports.reduce((acc, report) => {
                                                 const agency = report.agency;
                                                 if (!acc[agency]) acc[agency] = [];
                                                 acc[agency].push(report);
@@ -976,39 +1144,102 @@ const ReportsManager = () => {
                         </div>
                         {renderPaginationButtons(currentPage, totalPages, 'current')}
 
-                        {allNoDataReports.length > 0 && (
-                            <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
-                                <div className="section-header">
-                                    <h3>No Data Reports Due This Week</h3>
-                                    <div className="section-stats">
-                                        <span className="stat-item">
-                                            <span className="stat-label">Total:</span>
-                                            <span className="stat-value">{allNoDataReports.length}</span>
-                                        </span>
+                        {(getNoDataReportsByType.pldAndAgg.length > 0 || getNoDataReportsByType.pldOnly.length > 0 || getNoDataReportsByType.aggOnly.length > 0) && (
+                            <>
+                                {getNoDataReportsByType.pldAndAgg.length > 0 && (
+                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
+                                        <div className="section-header">
+                                            <h3>No Data Reports - PLD & AGG (Both Required)</h3>
+                                            <div className="section-stats">
+                                                <span className="stat-item">
+                                                    <span className="stat-label">Total:</span>
+                                                    <span className="stat-value">{getNoDataReportsByType.pldAndAgg.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container">
+                                            <table className="reports-table no-data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">No Data Report</th>
+                                                        <th className="brand-header">Brand</th>
+                                                        <th className="agency-header">Type</th>
+                                                        <th className="timeframe-header">Week Timeframe</th>
+                                                        <th className="status-header">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getNoDataReportsByType.pldAndAgg.map((report, index) => renderNoDataReportRow(report, index))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="table-container">
-                                    <table className="reports-table no-data-table">
-                                        <thead>
-                                            <tr>
-                                                <th className="campaign-header">No Data Report</th>
-                                                <th className="brand-header">Brand</th>
-                                                <th className="agency-header">Agency</th>
-                                                <th className="timeframe-header">Week Timeframe</th>
-                                                <th className="status-header">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {allNoDataReports.map((report, index) => renderNoDataReportRow(report, index))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                                )}
+
+                                {getNoDataReportsByType.pldOnly.length > 0 && (
+                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
+                                        <div className="section-header">
+                                            <h3>No Data Reports - PLD Only</h3>
+                                            <div className="section-stats">
+                                                <span className="stat-item">
+                                                    <span className="stat-label">Total:</span>
+                                                    <span className="stat-value">{getNoDataReportsByType.pldOnly.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container">
+                                            <table className="reports-table no-data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">No Data Report</th>
+                                                        <th className="brand-header">Brand</th>
+                                                        <th className="agency-header">Type</th>
+                                                        <th className="timeframe-header">Week Timeframe</th>
+                                                        <th className="status-header">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getNoDataReportsByType.pldOnly.map((report, index) => renderNoDataReportRow(report, index))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {getNoDataReportsByType.aggOnly.length > 0 && (
+                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
+                                        <div className="section-header">
+                                            <h3>No Data Reports - AGG Only</h3>
+                                            <div className="section-stats">
+                                                <span className="stat-item">
+                                                    <span className="stat-label">Total:</span>
+                                                    <span className="stat-value">{getNoDataReportsByType.aggOnly.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container">
+                                            <table className="reports-table no-data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">No Data Report</th>
+                                                        <th className="brand-header">Brand</th>
+                                                        <th className="agency-header">Type</th>
+                                                        <th className="timeframe-header">Week Timeframe</th>
+                                                        <th className="status-header">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getNoDataReportsByType.aggOnly.map((report, index) => renderNoDataReportRow(report, index))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 );
             })()}
-
 
             {activeTab === 'archive' && (() => {
                 const allArchiveReports = getPastReports;
@@ -1039,7 +1270,7 @@ const ReportsManager = () => {
                                             return (
                                                 <tr>
                                                     <td colSpan="7" className="empty-state">
-                                                        {searchTerm ? 'No past reports match your search' : 'No past reports found'}
+                                                        {searchTerm ? 'No matching past reports' : 'No past reports found'}
                                                     </td>
                                                 </tr>
                                             );

@@ -32,7 +32,6 @@ def allowed_file(filename, file_type):
     return ext in ALLOWED_EXTENSIONS
 
 def get_pharma_company_for_brand(brand_name):
-    """Get pharma company from BrandEditorAgency database"""
     try:
         session = get_session()
         brand_mapping = session.query(BrandEditorAgency).filter(
@@ -63,7 +62,6 @@ def extract_target_list_data(file_path):
             if header:
                 row_data[header] = cell_value
 
-        # Get pharma company from database instead of hardcoded mapping
         client_id_value = row_data.get('Client_ID')
         brand_name = row_data.get('Brand_Name', '')
 
@@ -90,7 +88,6 @@ def extract_target_list_data(file_path):
         return {'error': str(e)}
 
 def extract_month_from_campaign_name(campaign_name):
-    """Extract month from campaign name"""
     months = {
         'january': 'January', 'jan': 'January',
         'february': 'February', 'feb': 'February',
@@ -113,14 +110,12 @@ def extract_month_from_campaign_name(campaign_name):
     return None
 
 def extract_creative_code_from_placement_name(placement_name):
-    """Extract creative code from placement name (format: PP-DN-US-0438)"""
     match = re.search(r'([A-Z]{2,3}-[A-Z]{2,3}-[A-Z]{2,3}-\d+)', placement_name, re.IGNORECASE)
     if match:
         return match.group(1).upper()
     return None
 
 def extract_ad_size_from_placement_name(placement_name):
-    """Extract ad size from placement name (e.g., 300x250, 728x90)"""
     match = re.search(r'(\d+x\d+)', placement_name, re.IGNORECASE)
     if match:
         return match.group(1)
@@ -131,13 +126,11 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         wb = openpyxl.load_workbook(file_path, data_only=True)
         sheet = wb.active
 
-        # Find the header row
         headers = None
         header_row_idx = None
 
         for row_idx in range(1, min(sheet.max_row + 1, 20)):
             row_values = [sheet.cell(row=row_idx, column=col).value for col in range(1, sheet.max_column + 1)]
-            # Look for "Placement ID" in the row
             if any('Placement ID' in str(cell) for cell in row_values if cell):
                 headers = row_values
                 header_row_idx = row_idx
@@ -146,7 +139,6 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         if not headers or header_row_idx is None:
             return {'error': 'Could not find header row with "Placement ID"'}
 
-        # Find column indices
         placement_id_col = None
         placement_name_col = None
         ad_name_col = None
@@ -162,7 +154,6 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         if not placement_id_col:
             return {'error': 'Could not find "Placement ID" column'}
 
-        # Extract all tags
         all_tags = []
         for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
             placement_id = sheet.cell(row=row_idx, column=placement_id_col).value
@@ -182,18 +173,14 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         if not all_tags:
             return {'error': 'No placement IDs found'}
 
-        # Extract month from campaign name
         target_month = extract_month_from_campaign_name(campaign_name) if campaign_name else None
 
-        # Try to filter tags intelligently
         filtered_tags = all_tags
         if target_month:
-            # Filter by month
             month_filtered = [tag for tag in all_tags if target_month[:3] in tag['placement_name']]
             if month_filtered:
                 filtered_tags = month_filtered
 
-        # Return all tags for user review, but highlight suggested ones
         return {
             'all_tags': all_tags,
             'suggested_tags': filtered_tags[:ad_images_count] if ad_images_count > 0 else filtered_tags[:2],
@@ -205,23 +192,17 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         return {'error': str(e)}
 
 def extract_creative_code_from_image(filename):
-    """Extract creative code from image filename (format: PP-DN-US-0438)"""
     match = re.search(r'([A-Z]{2,3}-[A-Z]{2,3}-[A-Z]{2,3}-\d+)', filename, re.IGNORECASE)
     if match:
         return match.group(1).upper()
     return None
 
 def normalize_client_id(client_id):
-    """
-    Normalize client ID to match the 7 valid values from CMI reporting script
-    Valid values: Lilly, J&J, AstraZeneca, Abbvie, BI, DG, DSI
-    """
     if not client_id:
         return None
 
     client_id_str = str(client_id).lower().strip()
 
-    # Normalization mappings
     normalizations = {
         'eli lilly': 'Lilly',
         'lilly': 'Lilly',
@@ -247,10 +228,6 @@ def normalize_client_id(client_id):
     return client_id
 
 def validate_and_enrich_with_cmi_contracts(extracted_data):
-    """
-    CMI Contracts database is the SOURCE OF TRUTH
-    Always override extracted data with CMI contract values when found
-    """
     try:
         session = get_session()
         cmi_placement_id = extracted_data.get('CMI_PlacementID')
@@ -259,19 +236,15 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
             session.close()
             return extracted_data
 
-        # Query CMI contracts for this placement ID
         contract = session.query(CMIContractValue).filter(
             CMIContractValue.placement_id == str(cmi_placement_id)
         ).first()
 
         if contract:
-            # CMI CONTRACT IS SOURCE OF TRUTH - Override ALL values
             print(f"CMI Contract found for placement {cmi_placement_id} - using as source of truth")
 
-            # Get normalized client ID
             normalized_client_id = normalize_client_id(contract.client)
 
-            # OVERRIDE with CMI contract values (not merge, REPLACE)
             extracted_data['CMI_PlacementID'] = contract.placement_id
             extracted_data['Placement_Description'] = contract.placement_description
             extracted_data['contract_number'] = contract.contract_number
@@ -279,7 +252,7 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
             extracted_data['Vehicle_Name'] = contract.vehicle
             extracted_data['Buy_Component_Type'] = contract.buy_component_type
             extracted_data['Client_ID'] = normalized_client_id
-            extracted_data['Supplier'] = extracted_data.get('Supplier')  # Keep from target list
+            extracted_data['Supplier'] = extracted_data.get('Supplier')
             extracted_data['cmi_validated'] = True
 
             print(f"  Overriding with CMI contract values:")
@@ -288,12 +261,10 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
             print(f"    Contract #: {contract.contract_number}")
             print(f"    Buy Component: {contract.buy_component_type}")
         else:
-            # No contract found - mark as unvalidated but keep extracted values
             print(f"WARNING: No CMI contract found for placement {cmi_placement_id}")
             extracted_data['contract_number'] = None
             extracted_data['cmi_validated'] = False
 
-            # Still normalize whatever Client_ID we have
             if extracted_data.get('Client_ID'):
                 extracted_data['Client_ID'] = normalize_client_id(extracted_data['Client_ID'])
 
@@ -322,7 +293,6 @@ def upload_campaign_metadata(campaign_id):
         ad_images_paths = []
         extracted_data = {}
 
-        # Step 1: Extract target list data
         if 'target_list' in request.files:
             file = request.files['target_list']
             if file and allowed_file(file.filename, 'excel'):
@@ -331,7 +301,6 @@ def upload_campaign_metadata(campaign_id):
                 file.save(target_list_path)
                 extracted_data.update(extract_target_list_data(target_list_path))
 
-        # Step 2: Process ad images first to count them and extract creative codes
         ad_count = 0
         creative_codes_from_images = []
         ad_sizes_from_images = []
@@ -341,23 +310,19 @@ def upload_campaign_metadata(campaign_id):
             ad_count = len(files)
             for file in files:
                 if file and allowed_file(file.filename, 'image'):
-                    # Extract creative code and ad size from filename
                     creative_code = extract_creative_code_from_image(file.filename)
                     if creative_code:
                         creative_codes_from_images.append(creative_code)
 
-                    # Extract ad size (e.g., 300x250)
                     ad_size_match = re.search(r'(\d+x\d+)', file.filename, re.IGNORECASE)
                     if ad_size_match:
                         ad_sizes_from_images.append(ad_size_match.group(1))
 
-                    # Save the image
                     filename = secure_filename(f"{campaign_id}_ad_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
                     file_path = os.path.join(UPLOAD_FOLDER, filename)
                     file.save(file_path)
                     ad_images_paths.append(file_path)
 
-        # Step 3: Extract tags data with campaign name and ad count for intelligent filtering
         tags_data = None
         gcm_ids = []
         final_creative_code = None
@@ -370,14 +335,11 @@ def upload_campaign_metadata(campaign_id):
                 file.save(tags_path)
                 tags_data = extract_tags_data(tags_path, campaign_name=campaign_name, ad_images_count=ad_count)
 
-                # If tags extraction successful and not an error
                 if not isinstance(tags_data, dict) or 'error' not in tags_data:
                     extracted_data['tags'] = tags_data
 
-                    # Use suggested tags if available
                     suggested_tags = tags_data.get('suggested_tags', [])
                     if suggested_tags:
-                        # Match tags by ad size if we have ad sizes from images
                         if ad_sizes_from_images:
                             for ad_size in ad_sizes_from_images:
                                 matching_tag = next((tag for tag in suggested_tags if tag['ad_size'] == ad_size), None)
@@ -386,7 +348,6 @@ def upload_campaign_metadata(campaign_id):
                                     if not final_creative_code and matching_tag['creative_code']:
                                         final_creative_code = matching_tag['creative_code']
 
-                        # If we couldn't match by size, just take the first few suggested
                         if len(gcm_ids) < ad_count:
                             for tag in suggested_tags[:ad_count]:
                                 if tag['placement_id'] not in gcm_ids:
@@ -396,19 +357,15 @@ def upload_campaign_metadata(campaign_id):
                 else:
                     extracted_data['tags'] = tags_data
 
-        # Use creative code from tags if found, otherwise from images
         if not final_creative_code and creative_codes_from_images:
             final_creative_code = creative_codes_from_images[0]
 
-        # Step 4: Validate and enrich with CMI contracts database (source of truth)
         extracted_data = validate_and_enrich_with_cmi_contracts(extracted_data)
 
-        # Step 5: Save to database
         session = get_session()
         existing = session.query(CampaignReportingMetadata).filter_by(campaign_id=campaign_id).first()
 
         if existing:
-            # Update existing record
             existing.client_id = extracted_data.get('Client_ID') or existing.client_id
             existing.cmi_placement_id = extracted_data.get('CMI_PlacementID') or existing.cmi_placement_id
             existing.client_placement_id = extracted_data.get('Client_PlacementID') or existing.client_placement_id
@@ -429,7 +386,6 @@ def upload_campaign_metadata(campaign_id):
             existing.uploaded_by = uploaded_by
             existing.updated_at = datetime.utcnow()
         else:
-            # Create new record
             metadata = CampaignReportingMetadata(
                 campaign_id=campaign_id,
                 campaign_name=campaign_name,
@@ -457,7 +413,6 @@ def upload_campaign_metadata(campaign_id):
         session.commit()
         session.close()
 
-        # Prepare response with detailed information
         response_data = {
             'status': 'success',
             'message': 'Metadata uploaded and extracted successfully',
@@ -478,7 +433,6 @@ def upload_campaign_metadata(campaign_id):
             }
         }
 
-        # Include tags data for user review if available
         if tags_data and isinstance(tags_data, dict) and 'all_tags' in tags_data:
             response_data['tags_review'] = {
                 'total_tags_found': tags_data.get('total_count', 0),

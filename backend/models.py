@@ -21,9 +21,9 @@ class UserProfile(Base):
     state = Column(String(50))
     zipcode = Column(String(20))
     country = Column(String(100))
-    campaigns_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    npi = Column(String(50), index=True)
 
     __table_args__ = (
         Index('idx_email_specialty', 'email', 'specialty'),
@@ -132,14 +132,12 @@ class CMIReportResult(Base):
     reporting_week_start = Column(Date, index=True)
     reporting_week_end = Column(Date)
 
-    # Report categorization
-    report_category = Column(String(50), index=True)  # 'confirmed_match', 'no_data', 'aggregate_investigation', 'unexpected'
-    batch = Column(String(50), index=True)  # 'validated', 'no_data', 'investigation', 'unexpected', 'non_cmi'
+    report_category = Column(String(50), index=True)
+    batch = Column(String(50), index=True)
     match_confidence = Column(Float)
     is_cmi_brand = Column(Boolean, default=True, index=True)
     agency = Column(String(255))
 
-    # CMI contract data (from SQL database)
     cmi_placement_id = Column(String(100))
     client_id = Column(String(100))
     client_placement_id = Column(String(100))
@@ -152,35 +150,28 @@ class CMIReportResult(Base):
     gcm_placement_id = Column(String(100))
     gcm_placement_id2 = Column(String(100))
 
-    # CMI spec data (from SFTP files)
     contract_number = Column(String(100))
     data_type = Column(String(50))
     expected_data_frequency = Column(String(50))
     buy_component_type = Column(String(100))
 
-    # Status and notes
     is_reportable = Column(Boolean, default=True)
     notes = Column(Text)
     requires_manual_review = Column(Boolean, default=False)
 
-    # Submission tracking
     is_submitted = Column(Boolean, default=False, index=True)
     submitted_at = Column(DateTime)
     submitted_by = Column(String(100))
 
-    # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    processed_by = Column(String(100))  # 'automated' or user identifier
+    processed_by = Column(String(100))
 
     __table_args__ = (
         Index('idx_campaign_week', 'campaign_name', 'reporting_week_start'),
         Index('idx_category_brand', 'report_category', 'brand_name'),
     )
 
-# ============================================================================
-# BASIS OPTIMIZATION MODELS
-# ============================================================================
 
 class BasisCampaign(Base):
     __tablename__ = 'basis_campaigns'
@@ -191,22 +182,19 @@ class BasisCampaign(Base):
     ugcid = Column(String(100))
     initiative_name = Column(String(500))
 
-    # Client/Brand references
     client_id = Column(String(100), index=True)
     client_name = Column(String(255))
     brand_id = Column(String(100), index=True)
     brand_name = Column(String(255), index=True)
 
-    # Campaign details
-    status = Column(String(50), index=True)  # live, approved, completed
+    status = Column(String(50), index=True)
     approved_budget = Column(Float)
     start_date = Column(Date, index=True)
     end_date = Column(Date, index=True)
 
-    # Metadata
-    objectives = Column(JSON)  # campaign objectives
-    account_team = Column(JSON)  # team members
-    raw_response = Column(JSON)  # full API response
+    objectives = Column(JSON)
+    account_team = Column(JSON)  
+    raw_response = Column(JSON)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -225,21 +213,18 @@ class BasisLineItem(Base):
     basis_campaign_id = Column(String(100), nullable=False, index=True)
     line_item_name = Column(String(500), nullable=False, index=True)
 
-    # Line item details
     status = Column(String(50), index=True)
     start_date = Column(Date, index=True)
     end_date = Column(Date, index=True)
     budget = Column(Float)
-    pacing_percentage = Column(Float, index=True)  # for pacing alerts
+    pacing_percentage = Column(Float, index=True) 
     delivery_goal = Column(String(100))
 
-    # Vendor/Property associations
     vendor_id = Column(String(100), index=True)
     vendor_name = Column(String(255), index=True)
     property_id = Column(String(100), index=True)
     property_name = Column(String(255), index=True)
 
-    # Targeting and configuration
     targeting_criteria = Column(JSON)
     kpis = Column(JSON)
     raw_response = Column(JSON)
@@ -282,17 +267,14 @@ class BasisProperty(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class BasisDailyStats(Base):
-    """Main performance data table - this is where optimization analysis happens"""
     __tablename__ = 'basis_daily_stats'
 
     id = Column(Integer, primary_key=True)
     report_date = Column(Date, nullable=False, index=True)
 
-    # Foreign keys
     basis_campaign_id = Column(String(100), nullable=False, index=True)
     basis_line_item_id = Column(String(100), nullable=False, index=True)
 
-    # Dimensional attributes (denormalized for query performance)
     campaign_name = Column(String(500), index=True)
     line_item_name = Column(String(500))
     vendor_id = Column(String(100), index=True)
@@ -300,7 +282,6 @@ class BasisDailyStats(Base):
     property_id = Column(String(100), index=True)
     property_name = Column(String(255), index=True)
 
-    # Performance metrics (from Basis API)
     impressions = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     viewable_impressions = Column(Integer, default=0)
@@ -308,20 +289,17 @@ class BasisDailyStats(Base):
     view_conversions = Column(Integer, default=0)
     click_conversions = Column(Integer, default=0)
 
-    # Calculated metrics
-    ecpm = Column(Float)  # effective cost per thousand impressions
-    ecpc = Column(Float)  # effective cost per click
-    ecpa = Column(Float)  # effective cost per acquisition
-    ctr = Column(Float, index=True)  # click-through rate
-    viewability_rate = Column(Float)  # viewable_impressions / impressions
-    conversion_rate = Column(Float)  # conversions / clicks
+    ecpm = Column(Float) 
+    ecpc = Column(Float)
+    ecpa = Column(Float)
+    ctr = Column(Float, index=True) 
+    viewability_rate = Column(Float) 
+    conversion_rate = Column(Float) 
 
-    # Cost data
     spend = Column(Float)
     pacing_percentage = Column(Float)
 
-    # Time dimensions (for pattern analysis)
-    day_of_week = Column(String(10), index=True)  # Monday, Tuesday, etc.
+    day_of_week = Column(String(10), index=True) 
     week_of_year = Column(Integer)
     month = Column(Integer)
 
@@ -338,22 +316,16 @@ class BasisDailyStats(Base):
     )
 
 class BasisRecommendation(Base):
-    """Optimization recommendations with implementation tracking and feedback loop"""
     __tablename__ = 'basis_recommendations'
 
     id = Column(Integer, primary_key=True)
     recommendation_date = Column(Date, nullable=False, index=True)
 
-    # Recommendation classification
     recommendation_type = Column(String(100), nullable=False, index=True)
-    # Types: 'bid_adjustment', 'budget_reallocation', 'vendor_exclusion',
-    #        'property_optimization', 'time_targeting', 'pacing_alert',
-    #        'creative_refresh', 'underperformance', 'high_performer'
 
-    category = Column(String(100), index=True)  # cost_reduction, performance_improvement, budget_efficiency
-    priority = Column(String(50), index=True)  # high, medium, low
+    category = Column(String(100), index=True)
+    priority = Column(String(50), index=True) 
 
-    # Context - what this recommendation is about
     basis_campaign_id = Column(String(100), index=True)
     campaign_name = Column(String(500))
     basis_line_item_id = Column(String(100), index=True)
@@ -361,43 +333,37 @@ class BasisRecommendation(Base):
     vendor_name = Column(String(255), index=True)
     property_name = Column(String(255), index=True)
 
-    # Recommendation content
-    title = Column(String(500), nullable=False)  # "Reduce bids in Territory X by 15%"
-    description = Column(Text, nullable=False)  # detailed explanation
-    rationale = Column(Text, nullable=False)  # "CPC is 40% above average with below-average CTR"
-    action_items = Column(JSON)  # structured list of actions to take
-    expected_impact = Column(String(500))  # "Could save $5,000/month"
+    title = Column(String(500), nullable=False) 
+    description = Column(Text, nullable=False)  
+    rationale = Column(Text, nullable=False) 
+    action_items = Column(JSON) 
+    expected_impact = Column(String(500)) 
 
-    # Supporting data
-    baseline_metrics = Column(JSON)  # metrics when recommendation was created
-    benchmark_metrics = Column(JSON)  # average/comparison metrics
-    confidence_score = Column(Float)  # 0-1, how confident we are in this recommendation
+    baseline_metrics = Column(JSON) 
+    benchmark_metrics = Column(JSON) 
+    confidence_score = Column(Float)
 
-    # Implementation tracking
     status = Column(String(50), nullable=False, default='pending', index=True)
-    # Status: 'pending', 'in_review', 'approved', 'implemented', 'dismissed', 'archived', 'failed'
 
     approved_at = Column(DateTime)
     approved_by = Column(String(100))
 
     implemented_at = Column(DateTime, index=True)
     implemented_by = Column(String(100))
-    implementation_notes = Column(Text)  # user notes about implementation
+    implementation_notes = Column(Text)
 
     dismissed_at = Column(DateTime)
     dismissed_by = Column(String(100))
     dismissed_reason = Column(Text)
 
-    # Impact tracking (for the feedback loop)
     impact_measured = Column(Boolean, default=False, index=True)
     impact_measurement_date = Column(Date)
-    impact_status = Column(String(50))  # 'positive', 'negative', 'neutral', 'not_implemented', 'inconclusive'
-    impact_summary = Column(Text)  # AI-generated summary of what happened
+    impact_status = Column(String(50))
+    impact_summary = Column(Text) 
 
-    # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(String(100), default='system')  # 'system' or user_id
+    created_by = Column(String(100), default='system') 
 
     __table_args__ = (
         Index('idx_rec_date_status', 'recommendation_date', 'status'),
@@ -407,43 +373,36 @@ class BasisRecommendation(Base):
     )
 
 class BasisRecommendationImpact(Base):
-    """Track the actual impact of implemented recommendations (the feedback loop!)"""
     __tablename__ = 'basis_recommendation_impacts'
 
     id = Column(Integer, primary_key=True)
-    recommendation_id = Column(Integer, nullable=False, index=True)  # FK to basis_recommendations
+    recommendation_id = Column(Integer, nullable=False, index=True) 
     measurement_date = Column(Date, nullable=False, index=True)
-    measurement_period = Column(String(50))  # '7_days', '14_days', '30_days'
+    measurement_period = Column(String(50)) 
 
-    # What we expected vs what actually happened
-    expected_outcome = Column(JSON)  # what we predicted would happen
-    actual_outcome = Column(JSON)  # what actually happened
+    expected_outcome = Column(JSON) 
+    actual_outcome = Column(JSON) 
 
-    # Validation: did they actually implement it?
     implementation_validated = Column(Boolean, default=False)
-    validation_method = Column(String(100))  # 'data_analysis', 'manual_confirmation'
+    validation_method = Column(String(100))
     validation_details = Column(Text)
 
-    # Performance comparison (before vs after implementation)
     baseline_period_start = Column(Date)
     baseline_period_end = Column(Date)
-    baseline_metrics = Column(JSON)  # metrics before implementation
+    baseline_metrics = Column(JSON)
 
     post_implementation_period_start = Column(Date)
     post_implementation_period_end = Column(Date)
-    post_implementation_metrics = Column(JSON)  # metrics after implementation
+    post_implementation_metrics = Column(JSON) 
 
-    # Impact analysis
-    metric_changes = Column(JSON)  # {ecpc: {before: 2.5, after: 1.8, change_pct: -28}, ...}
-    impact_score = Column(Float)  # -1 to 1 (negative to positive impact)
-    impact_category = Column(String(50))  # 'highly_positive', 'positive', 'neutral', 'negative', 'highly_negative'
+    metric_changes = Column(JSON) 
+    impact_score = Column(Float) 
+    impact_category = Column(String(50))  
 
-    # AI-generated insights
-    success_summary = Column(Text)  # "Implementation successful - eCPC reduced by 28%..."
-    lessons_learned = Column(Text)  # what we learned for future recommendations
-    follow_up_recommendations = Column(JSON)  # suggested next steps
+    success_summary = Column(Text) 
+    lessons_learned = Column(Text) 
+    follow_up_recommendations = Column(JSON) 
 
-    # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     analyzed_by = Column(String(100), default='system')
@@ -454,16 +413,15 @@ class BasisRecommendationImpact(Base):
     )
 
 class BasisSyncLog(Base):
-    """Track API sync history for debugging and monitoring"""
     __tablename__ = 'basis_sync_logs'
 
     id = Column(Integer, primary_key=True)
     sync_started_at = Column(DateTime, nullable=False, index=True)
     sync_completed_at = Column(DateTime)
-    sync_status = Column(String(50), index=True)  # success, partial, failed
+    sync_status = Column(String(50), index=True)
 
-    endpoint = Column(String(255))  # which API endpoint was called
-    sync_type = Column(String(100))  # 'full_sync', 'daily_update', 'metadata_refresh'
+    endpoint = Column(String(255)) 
+    sync_type = Column(String(100)) 
 
     records_processed = Column(Integer, default=0)
     records_inserted = Column(Integer, default=0)
@@ -483,12 +441,93 @@ class BasisSyncLog(Base):
         Index('idx_sync_status_date', 'sync_status', 'sync_started_at'),
     )
 
+class UniversalProfile(Base):
+    __tablename__ = 'universal_profiles'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(10), unique=True, nullable=False, index=True)
+    entity_type = Column(String(1))
+
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    middle_name = Column(String(100))
+    organization_name = Column(String(255))
+    credential = Column(String(50))
+
+    mailing_address_1 = Column(String(255))
+    mailing_address_2 = Column(String(255))
+    mailing_city = Column(String(100))
+    mailing_state = Column(String(50))
+    mailing_zipcode = Column(String(20))
+    mailing_country = Column(String(100))
+
+    practice_address_1 = Column(String(255))
+    practice_address_2 = Column(String(255))
+    practice_city = Column(String(100))
+    practice_state = Column(String(50))
+    practice_zipcode = Column(String(20))
+    practice_country = Column(String(100))
+
+    primary_taxonomy_code = Column(String(50))
+    primary_specialty = Column(String(255), index=True)
+
+    enumeration_date = Column(Date)
+    last_update_date = Column(Date)
+    deactivation_date = Column(Date)
+    is_active = Column(Boolean, default=True, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced_at = Column(DateTime, index=True)
+
+    __table_args__ = (
+        Index('idx_npi_active', 'npi', 'is_active'),
+        Index('idx_state_specialty', 'practice_state', 'primary_specialty'),
+        Index('idx_last_synced', 'last_synced_at'),
+    )
+
+class NPISyncProgress(Base):
+    __tablename__ = 'npi_sync_progress'
+
+    id = Column(Integer, primary_key=True)
+    sync_id = Column(String(100), unique=True, nullable=False, index=True)
+    status = Column(String(50), nullable=False, index=True) 
+
+    file_url = Column(String(500))
+    file_size_mb = Column(Float)
+    csv_path = Column(String(500))
+
+    total_rows = Column(Integer)
+    rows_processed = Column(Integer, default=0)
+    rows_inserted = Column(Integer, default=0)
+    rows_updated = Column(Integer, default=0)
+
+    current_chunk = Column(Integer, default=0)
+    chunk_size = Column(Integer, default=50000)
+    last_processed_line = Column(Integer, default=0)  
+
+    started_at = Column(DateTime, default=datetime.utcnow)
+    last_chunk_at = Column(DateTime)
+    completed_at = Column(DateTime)
+
+    error_message = Column(Text)
+    retry_count = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_sync_status', 'sync_id', 'status'),
+    )
+
 def init_db():
-    engine = create_engine(os.getenv('DATABASE_URL'))
+    DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'
+    engine = create_engine(DATABASE_URL)
     Base.metadata.create_all(engine)
     return engine
 
 def get_session():
-    engine = create_engine(os.getenv('DATABASE_URL'))
+    DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     return Session()

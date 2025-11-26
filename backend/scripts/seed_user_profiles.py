@@ -8,7 +8,6 @@ import math
 load_dotenv()
 
 def clean_nan(obj):
-    """Recursively clean NaN values from dictionaries and lists"""
     if isinstance(obj, dict):
         return {k: clean_nan(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -38,7 +37,6 @@ def seed_user_profiles():
             if not isinstance(user_data, dict):
                 continue
 
-            # Clean NaN values from campaigns data
             campaigns_data = clean_nan(user_data.get('campaigns', {}))
 
             user_profile = UserProfile(

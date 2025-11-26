@@ -10,12 +10,10 @@ def deduplicate_users():
     print("Starting user deduplication...")
     session = get_session()
 
-    # Count before
     result = session.execute(text("SELECT COUNT(*) FROM user_profiles"))
     before_count = result.scalar()
     print(f"Total records before: {before_count}")
 
-    # Delete duplicates keeping only the first occurrence (lowest id) for each email
     print("Deleting duplicate records (keeping first occurrence for each email)...")
     result = session.execute(text("""
         DELETE FROM user_profiles
@@ -34,7 +32,6 @@ def deduplicate_users():
     session.commit()
     print(f"Deleted {deleted_count} duplicate records")
 
-    # Count after
     result = session.execute(text("SELECT COUNT(*) FROM user_profiles"))
     after_count = result.scalar()
     result = session.execute(text("SELECT COUNT(DISTINCT email) FROM user_profiles"))

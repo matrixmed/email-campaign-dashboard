@@ -36,8 +36,11 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
 
       let filteredCampaigns = campaignsData;
       if (searchTerm) {
+        const searchWords = searchTerm.toLowerCase().split(' ').filter(w => w.length > 0);
         filteredCampaigns = campaignsData.filter(campaign =>
-          campaign.Campaign && campaign.Campaign.toLowerCase().includes(searchTerm.toLowerCase())
+          campaign.Campaign && searchWords.every(word =>
+            campaign.Campaign.toLowerCase().includes(word)
+          )
         );
       }
 
@@ -173,7 +176,12 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
   return (
     <div className="monthly-chart-container" ref={chartContainerRef}>
       {isLoading ? (
-        <div className="chart-loading">Loading data...</div>
+        <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <p>Loading data...</p>
+        </div>
       ) : yearData && Object.keys(yearData).length > 0 ? (
         <div className="chart-wrapper">
           <svg width={chartWidth} height={chartHeight} className="line-chart">

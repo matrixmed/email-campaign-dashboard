@@ -3,62 +3,55 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import '../../styles/video.css';
 
 const VideoModal = ({ video, onClose }) => {
-    const [timeframeFilter, setTimeframeFilter] = useState('7');
-    const [lifetimeMetrics, setLifetimeMetrics] = useState({});
+    const [timeframeFilter, setTimeframeFilter] = useState('all');
     const [displayMetrics, setDisplayMetrics] = useState({});
     const modalRef = useRef(null);
     const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
 
     useEffect(() => {
         const thumbnails = video.fullData?.snippet?.thumbnails;
-        const isVimeo = thumbnails && 
-                      (typeof thumbnails.default === 'string' || 
+        const isVimeo = thumbnails &&
+                      (typeof thumbnails.default === 'string' ||
                        thumbnails.default?.url?.includes('vumbnail.com'));
         setIsYoutubeVideo(!isVimeo);
-        
-        if (video.totals) {
-            const allTimeMetrics = {
-                views: video.totals.views || 0,
-                impressions: video.totals.impressions || 0,
-                watchTimeHours: video.totals.watchTimeHours || 0,
-                averageViewDuration: video.totals.averageViewDuration || 0,
-                averageViewPercentage: video.totals.averageViewPercentage || 0
-            };
-            setLifetimeMetrics(allTimeMetrics);
-            setDisplayMetrics(allTimeMetrics);
-        }
     }, [video]);
 
     useEffect(() => {
         if (timeframeFilter === 'all') {
             setDisplayMetrics({
-                views: video.views || 0,
-                impressions: video.impressions || 0,
-                watchTimeHours: video.watchTimeHours || 0,
-                averageViewDuration: video.averageViewDuration || 0,
-                averageViewPercentage: video.averageViewPercentage || 0
+                views: video.totals?.views || video.views || 0,
+                impressions: video.totals?.impressions || video.impressions || 0,
+                watchTimeHours: video.totals?.watchTimeHours || video.watchTimeHours || 0,
+                averageViewDuration: video.totals?.averageViewDuration || video.averageViewDuration || 0,
+                averageViewPercentage: video.totals?.averageViewPercentage || video.averageViewPercentage || 0,
+                impressionsCtr: video.totals?.impressionsCtr || video.impressionsCtr || 0,
+                likes: video.totals?.likes || video.likes || 0
             });
         } else if (video.history) {
             const timeframeData = getTimeframeData();
-            
+
             const views = timeframeData.reduce((sum, day) => sum + (day.views || 0), 0);
             const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
             const impressions = timeframeData.reduce((sum, day) => sum + (day.impressions || 0), 0);
-            
-            const avgViewDuration = views > 0 
-                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewDuration || 0) * (day.views || 0)), 0) / views 
+
+            const avgViewDuration = views > 0
+                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewDuration || 0) * (day.views || 0)), 0) / views
                 : 0;
-            
-            const avgViewPercentage = views > 0 
-                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewPercentage || 0) * (day.views || 0)), 0) / views 
+
+            const avgViewPercentage = views > 0
+                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewPercentage || 0) * (day.views || 0)), 0) / views
                 : 0;
-            
+
+            const impressionsCtr = impressions > 0 ? (views / impressions * 100) : 0;
+
             setDisplayMetrics({
                 views,
                 impressions,
                 watchTimeHours,
                 averageViewDuration: avgViewDuration,
-                averageViewPercentage: avgViewPercentage
+                averageViewPercentage: avgViewPercentage,
+                impressionsCtr: impressionsCtr,
+                likes: video.totals?.likes || video.likes || 0 
             });
         }
     }, [timeframeFilter, video.history, video]);
@@ -110,10 +103,26 @@ const VideoModal = ({ video, onClose }) => {
 
     const formatWatchTime = (hours) => {
         if (hours === undefined || isNaN(hours)) return "0h";
-        if (hours < 1) {
-            return Math.round(hours * 60) + 'm';
+
+        const totalSeconds = Math.round(hours * 3600);
+        const d = Math.floor(totalSeconds / 86400);
+        const h = Math.floor((totalSeconds % 86400) / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        if (d > 0) {
+            const parts = [`${d}d`];
+            if (h > 0) parts.push(`${h}h`);
+            if (m > 0) parts.push(`${m}m`);
+            if (s > 0) parts.push(`${s}s`);
+            return parts.join(' ');
+        } else if (h > 0) {
+            return m > 0 ? `${h}h ${m}m` : `${h}h`;
+        } else if (m > 0) {
+            return `${m}m`;
+        } else {
+            return `${s}s`;
         }
-        return hours.toFixed(1) + 'h';
     };
 
     const formatDuration = (ytDuration) => {
@@ -416,14 +425,7 @@ const VideoModal = ({ video, onClose }) => {
     };
     
     const getMetricCardClass = (metricType) => {
-        if (isYoutubeVideo && metricType === 'impressions') {
-            return 'metric-card hidden';
-        }
-        
-        const baseClassName = 'metric-card';
-        const width = isYoutubeVideo ? 'youtube-width' : '';
-        
-        return width ? `${baseClassName} ${width}` : baseClassName;
+        return 'metric-card';
     };
 
     return (
@@ -484,41 +486,47 @@ const VideoModal = ({ video, onClose }) => {
                     </div>
                 </div>
                 
-                <div className="video-modal-controls">
-                    <div className="timeframe-filter">
-                        <label htmlFor="videoTimeframeFilter">Timeframe:</label>
-                        <select
-                            id="videoTimeframeFilter"
-                            value={timeframeFilter}
-                            onChange={handleTimeframeChange}
-                        >
-                            <option value="all">All Time</option>
-                            <option value="60">Last 60 Days</option>
-                            <option value="30">Last 30 Days</option>
-                            <option value="14">Last 14 Days</option>
-                            <option value="7">Last 7 Days</option>
-                        </select>
+                {isYoutubeVideo && hasData && (
+                    <div className="video-modal-controls">
+                        <div className="timeframe-filter">
+                            <label htmlFor="videoTimeframeFilter">Timeframe:</label>
+                            <select
+                                id="videoTimeframeFilter"
+                                value={timeframeFilter}
+                                onChange={handleTimeframeChange}
+                            >
+                                <option value="all">All Time</option>
+                                <option value="60">Last 60 Days</option>
+                                <option value="30">Last 30 Days</option>
+                                <option value="14">Last 14 Days</option>
+                                <option value="7">Last 7 Days</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
+                )}
                 
                 <div className="video-modal-metrics">
-                    <div className={getMetricCardClass('views')}>
-                        <div className="metric-label">Views</div>
-                        <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
-                    </div>
-                    <div className={getMetricCardClass('impressions')}>
+                    <div className="metric-card large-card">
                         <div className="metric-label">Impressions</div>
-                        <div className="metric-value">{isYoutubeVideo ? "N/A" : formatNumber(displayMetrics.impressions)}</div>
+                        <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
                     </div>
-                    <div className={getMetricCardClass('watchTime')}>
+                    <div className="metric-card large-card">
+                        <div className="metric-label">Impressions CTR</div>
+                        <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
+                    </div>
+                    <div className="metric-card">
                         <div className="metric-label">Watch Time</div>
                         <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
                     </div>
-                    <div className={getMetricCardClass('averageViewDuration')}>
+                    <div className="metric-card">
+                        <div className="metric-label">Views</div>
+                        <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
+                    </div>
+                    <div className="metric-card">
                         <div className="metric-label">Avg. View Duration</div>
                         <div className="metric-value">{formatTime(displayMetrics.averageViewDuration)}</div>
                     </div>
-                    <div className={getMetricCardClass('averageViewPercentage')}>
+                    <div className="metric-card">
                         <div className="metric-label">Avg. View Percentage</div>
                         <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
                     </div>
@@ -579,36 +587,47 @@ const VideoModal = ({ video, onClose }) => {
                                     <thead>
                                         <tr>
                                             <th>Date</th>
+                                            <th>Impressions</th>
                                             <th>Views</th>
                                             <th>Watch Time</th>
-                                            <th>Avg Duration</th>
-                                            <th>Subscribers +/-</th>
+                                            <th>Avg Duration %</th>
+                                            <th>Impressions CTR</th>
+                                            {isYoutubeVideo && <th>Subscribers +/-</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {timeframeData
                                             .slice()
                                             .reverse()
-                                            .map((data, index) => (
-                                                <tr key={index}>
-                                                    <td>{formatDate(data.date)}</td>
-                                                    <td>{formatNumber(data.views)}</td>
-                                                    <td>{formatWatchTime(data.watchTimeHours)}</td>
-                                                    <td>{formatTime(data.averageViewDuration)}</td>
-                                                    <td>
-                                                        {data.subscribersGained || data.subscribersLost ? (
-                                                            <span className={
-                                                                (data.subscribersGained - data.subscribersLost) >= 0 
-                                                                ? "positive-subs" 
-                                                                : "negative-subs"
-                                                            }>
-                                                                {(data.subscribersGained || 0) - (data.subscribersLost || 0) > 0 ? '+' : ''}
-                                                                {(data.subscribersGained || 0) - (data.subscribersLost || 0)}
-                                                            </span>
-                                                        ) : '-'}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            .map((data, index) => {
+                                                const impressionsCtr = (data.impressions || 0) > 0
+                                                    ? ((data.views || 0) / data.impressions * 100)
+                                                    : 0;
+                                                return (
+                                                    <tr key={index}>
+                                                        <td>{formatDate(data.date)}</td>
+                                                        <td>{formatNumber(data.impressions)}</td>
+                                                        <td>{formatNumber(data.views)}</td>
+                                                        <td>{formatWatchTime(data.watchTimeHours)}</td>
+                                                        <td>{formatPercent(data.averageViewPercentage)}</td>
+                                                        <td>{formatPercent(impressionsCtr)}</td>
+                                                        {isYoutubeVideo && (
+                                                            <td>
+                                                                {data.subscribersGained || data.subscribersLost ? (
+                                                                    <span className={
+                                                                        (data.subscribersGained - data.subscribersLost) >= 0
+                                                                        ? "positive-subs"
+                                                                        : "negative-subs"
+                                                                    }>
+                                                                        {(data.subscribersGained || 0) - (data.subscribersLost || 0) > 0 ? '+' : ''}
+                                                                        {(data.subscribersGained || 0) - (data.subscribersLost || 0)}
+                                                                    </span>
+                                                                ) : '-'}
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                );
+                                            })}
                                     </tbody>
                                 </table>
                             </div>

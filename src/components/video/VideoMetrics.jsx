@@ -7,7 +7,7 @@ const metricDisplayNames = {
   impressions: "Impressions",
   averageViewDuration: "Avg. Watch Time",
   averageViewPercentage: "Avg. Completion %",
-  watchTimeHours: "Watch Time (hrs)",
+  watchTimeHours: "Total Watch Time",
   likes: "Likes",
   comments: "Comments",
   shares: "Shares",
@@ -26,11 +26,15 @@ const VideoMetrics = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVideo, setSelectedVideo] = useState(null);
+    const [sortColumn, setSortColumn] = useState('views');
+    const [sortDirection, setSortDirection] = useState('desc');
 
     const displayMetrics = [
+        'source',
         'impressions',
-        'views',
-        'averageViewDuration'
+        'watchTimeHours',
+        'averageViewPercentage',
+        'impressionsCtr'
     ];
 
     useEffect(() => {
@@ -44,22 +48,37 @@ const VideoMetrics = () => {
                 const videoIds = Object.keys(jsonData.videos || {});
                 const videos = videoIds.map(id => {
                     const video = jsonData.videos[id];
-                    
+
                     let thumbnail;
                     if (video.snippet?.thumbnails?.default && typeof video.snippet.thumbnails.default === 'string') {
                         thumbnail = video.snippet.thumbnails.default;
                     } else {
-                        thumbnail = video.snippet?.thumbnails?.medium?.url || 
+                        thumbnail = video.snippet?.thumbnails?.medium?.url ||
                                    video.snippet?.thumbnails?.default?.url;
                     }
-                    
+
+                    const playlists = video.playlists || [];
+                    const playlistNames = playlists.map(p => p.title).join(' ');
+
+                    const internalGroups = video.internalGroups || [];
+                    const groupNames = internalGroups.join(' ');
+
+                    const impressions = video.totals?.impressions || 0;
+                    const views = video.totals?.views || 0;
+                    const calculatedCtr = impressions > 0 ? (views / impressions * 100) : 0;
+
                     return {
                         id,
                         title: video.snippet?.title || 'Untitled',
                         thumbnail: thumbnail,
                         publishedAt: video.snippet?.publishedAt,
                         ...video.totals,
-                        history: video.history
+                        impressionsCtr: calculatedCtr,
+                        history: video.history,
+                        playlists: playlists,
+                        playlist: playlistNames,
+                        internalGroups: internalGroups,
+                        groupTags: groupNames
                     };
                 });
                 
@@ -75,12 +94,88 @@ const VideoMetrics = () => {
     const handleSearchChange = (e) => {
         const searchValue = e.target.value.toLowerCase();
         setSearch(searchValue);
-        setFilteredData(videosList.filter(item =>
-            searchValue.split(' ').every(word => 
-                item.title?.toLowerCase().includes(word) || false
+        const filtered = videosList.filter(item =>
+            searchValue.split(' ').every(word =>
+                item.title?.toLowerCase().includes(word) ||
+                item.playlist?.toLowerCase().includes(word) ||
+                item.groupTags?.toLowerCase().includes(word) ||
+                false
             )
-        ));
+        );
+        setFilteredData(filtered);
         setCurrentPage(1);
+    };
+
+    const handleSort = (column) => {
+        let newDirection = 'desc';
+        if (sortColumn === column && sortDirection === 'desc') {
+            newDirection = 'asc';
+        }
+
+        setSortColumn(column);
+        setSortDirection(newDirection);
+
+        const sorted = [...filteredData].sort((a, b) => {
+            if (column === 'source') {
+                const aIsYoutube = isYouTubeVideo(a);
+                const bIsYoutube = isYouTubeVideo(b);
+
+                if (newDirection === 'asc') {
+                    return aIsYoutube === bIsYoutube ? 0 : aIsYoutube ? -1 : 1;
+                } else {
+                    return aIsYoutube === bIsYoutube ? 0 : aIsYoutube ? 1 : -1;
+                }
+            } else {
+                const aVal = a[column] || 0;
+                const bVal = b[column] || 0;
+
+                if (newDirection === 'asc') {
+                    return aVal - bVal;
+                } else {
+                    return bVal - aVal;
+                }
+            }
+        });
+
+        setFilteredData(sorted);
+    };
+
+    const calculateAggregateMetrics = () => {
+        if (!filteredData || filteredData.length === 0) {
+            return {
+                totalImpressions: 0,
+                totalWatchTime: 0,
+                avgPercentViewed: 0,
+                impressionsCtr: 0
+            };
+        }
+
+        const totalImpressions = filteredData.reduce((sum, video) => {
+            return sum + (video.impressions || 0);
+        }, 0);
+
+        const totalWatchTime = filteredData.reduce((sum, video) => {
+            return sum + (video.watchTimeHours || 0);
+        }, 0);
+
+        const avgPercentViewed = filteredData.reduce((sum, video) => {
+            return sum + (video.averageViewPercentage || 0);
+        }, 0) / filteredData.length;
+
+        const totalViews = filteredData.reduce((sum, video) => {
+            return sum + (video.views || 0);
+        }, 0);
+
+        const impressionsCtr = totalImpressions > 0
+            ? (totalViews / totalImpressions * 100)
+            : 0;
+
+        return {
+            totalImpressions,
+            totalWatchTime,
+            avgPercentViewed,
+            impressionsCtr
+        };
     };
 
     const handleRowsPerPageChange = (e) => {
@@ -137,17 +232,33 @@ const VideoMetrics = () => {
 
     const formatWatchTime = (hours) => {
         if (hours === undefined || isNaN(hours)) return "0h";
-        if (hours < 1) {
-            return Math.round(hours * 60) + 'm';
+
+        const totalSeconds = Math.round(hours * 3600);
+        const d = Math.floor(totalSeconds / 86400);
+        const h = Math.floor((totalSeconds % 86400) / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        if (d > 0) {
+            const parts = [`${d}d`];
+            if (h > 0) parts.push(`${h}h`);
+            if (m > 0) parts.push(`${m}m`);
+            if (s > 0) parts.push(`${s}s`);
+            return parts.join(' ');
+        } else if (h > 0) {
+            return m > 0 ? `${h}h ${m}m` : `${h}h`;
+        } else if (m > 0) {
+            return `${m}m`;
+        } else {
+            return `${s}s`;
         }
-        return hours.toFixed(1) + 'h';
     };
 
     const formatMetric = (metric, value, video) => {
-        if (metric === 'impressions' && isYouTubeVideo(video)) {
-            return "N/A";
+        if (metric === 'source') {
+            return getSourceBadge(video);
         }
-        
+
         if (metric === 'averageViewPercentage' || metric === 'impressionsCtr') {
             return formatPercent(value);
         } else if (metric === 'averageViewDuration') {
@@ -170,15 +281,17 @@ const VideoMetrics = () => {
     };
 
     const exportToCSV = () => {
-        const header = ['Title', 'Source', ...displayMetrics.map(metric => metricDisplayNames[metric])];
+        const header = ['Title', ...displayMetrics.map(metric => metric === 'source' ? 'Source' : metricDisplayNames[metric])];
         const rows = filteredData.map(item => {
             const source = isYouTubeVideo(item) ? 'YouTube' : 'Vimeo';
             return [
                 item.title,
-                source,
                 ...displayMetrics.map(metric => {
-                    if (metric === 'impressions' && isYouTubeVideo(item)) {
-                        return 'N/A';
+                    if (metric === 'source') {
+                        return source;
+                    }
+                    if (metric === 'impressionsCtr') {
+                        return item[metric]?.toFixed(2) || '0';
                     }
                     return item[metric];
                 })
@@ -186,7 +299,7 @@ const VideoMetrics = () => {
         });
 
         const csvContent = [header, ...rows]
-            .map(row => row.map(field => 
+            .map(row => row.map(field =>
                 `"${String(field || '').replace(/"/g, '""')}"`
             ).join(","))
             .join("\n");
@@ -211,6 +324,8 @@ const VideoMetrics = () => {
     const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
     const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
+    const aggregateMetrics = calculateAggregateMetrics();
+
     return (
         <div className="video-metrics-container">
             <div className="page-header">
@@ -219,10 +334,29 @@ const VideoMetrics = () => {
                     <input
                         type="text"
                         className="search-input"
-                        placeholder="Search by Title"
+                        placeholder="Search by Title, Playlist, or Group"
                         value={search}
                         onChange={handleSearchChange}
                     />
+                </div>
+            </div>
+
+            <div className="video-metrics-summary">
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Total Impressions</div>
+                    <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalImpressions)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Total Watch Time</div>
+                    <div className="metric-summary-value">{formatWatchTime(aggregateMetrics.totalWatchTime)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Avg % Viewed</div>
+                    <div className="metric-summary-value">{formatPercent(aggregateMetrics.avgPercentViewed)}</div>
+                </div>
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Impressions CTR</div>
+                    <div className="metric-summary-value">{formatPercent(aggregateMetrics.impressionsCtr)}</div>
                 </div>
             </div>
 
@@ -244,10 +378,16 @@ const VideoMetrics = () => {
                     <thead>
                         <tr>
                             <th className="title-column">Title</th>
-                            <th className="source-column">Source</th>
                             {displayMetrics.map((metric) => (
-                                <th key={metric} className="metric-column">
-                                    {metricDisplayNames[metric]}
+                                <th
+                                    key={metric}
+                                    className={`${metric === 'source' ? 'source-column' : 'metric-column'} sortable`}
+                                    onClick={() => handleSort(metric)}
+                                >
+                                    {metric === 'source' ? 'Source' : metricDisplayNames[metric]}
+                                    {sortColumn === metric && (
+                                        <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>
+                                    )}
                                 </th>
                             ))}
                         </tr>
@@ -261,9 +401,8 @@ const VideoMetrics = () => {
                                 >
                                     {item.title}
                                 </td>
-                                <td className="source-column">{getSourceBadge(item)}</td>
                                 {displayMetrics.map((metric) => (
-                                    <td key={metric} className="metric-column">
+                                    <td key={metric} className={metric === 'source' ? 'source-column' : 'metric-column'}>
                                         {formatMetric(metric, item[metric], item)}
                                     </td>
                                 ))}

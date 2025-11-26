@@ -12,6 +12,7 @@ import ListAnalysisPage from '../pages/ListAnalysisPage';
 import SpecialtyPage from '../pages/SpecialtyPage';
 import VideoMetricsPage from '../pages/VideoMetricsPage';
 import DigitalJournalsPage from '../pages/DigitalJournalsPage';
+import BasisOptimizationPage from '../pages/BasisOptimizationPage';
 import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
 
 const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
@@ -33,6 +34,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/specialty" element={<SpecialtyPage />} />
           <Route path="/video" element={<VideoMetricsPage />} />
           <Route path="/journals" element={<DigitalJournalsPage />} />
+          <Route path="/basis" element={<BasisOptimizationPage />} />
         </Routes>
       )}
     </AppLayout>

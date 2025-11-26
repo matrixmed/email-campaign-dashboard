@@ -28,7 +28,6 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex >= 0 && currentIndex < allCampaigns.length - 1;
 
-    // Reset upload modal state when campaign changes
     useEffect(() => {
         if (isOpen && campaign) {
             setShowUploadModal(false);
@@ -38,11 +37,9 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
 
     useEffect(() => {
         function handleClickOutside(event) {
-            // Don't close modal if upload modal is showing
             if (showUploadModal) return;
 
             if (modalRef.current && !modalRef.current.contains(event.target)) {
-                // Don't close if clicking on navigation arrows
                 if (!event.target.closest('.modal-nav-arrow')) {
                     onClose();
                 }
@@ -160,7 +157,6 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
 
         const combined = { ...deployments[0] };
         
-        // Time-based open rates: weighted average by total_unique_opens
         if (deployments[0].time_based_open_rates) {
             let totalUniqueOpens = 0;
             let weighted1Hour = 0;
@@ -184,16 +180,13 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             };
         }
 
-        // Audience breakdown: use combined opens, deployment 1 delivered for rates
         if (deployments[0].audience_breakdown) {
             combined.audience_breakdown = {};
             const allAudienceTypes = new Set();
             deployments.forEach(d => Object.keys(d.audience_breakdown || {}).forEach(key => allAudienceTypes.add(key)));
             
-            // Get deployment 1 data (first deployment chronologically or marked as deployment 1)
             const deployment1 = deployments.find(d => d.campaign_name && /deployment\s*#?\s*1\s*$/i.test(d.campaign_name)) || deployments[0];
             
-            // Calculate total delivered from deployment 1 only
             const totalDeliveredDeployment1 = Object.values(deployment1.audience_breakdown || {}).reduce((sum, audience) => sum + (audience.delivered || 0), 0);
             
             allAudienceTypes.forEach(audienceType => {
@@ -209,15 +202,12 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             });
         }
 
-        // Geographic breakdown: use combined opens, deployment 1 delivered for rates  
         if (deployments[0].geographic_breakdown) {
             combined.geographic_breakdown = {};
             const regions = Object.keys(deployments[0].geographic_breakdown);
             
-            // Get deployment 1 data
             const deployment1 = deployments.find(d => d.campaign_name && /deployment\s*#?\s*1\s*$/i.test(d.campaign_name)) || deployments[0];
             
-            // Calculate total delivered from deployment 1 only
             const totalDeliveredDeployment1 = Object.values(deployment1.geographic_breakdown || {}).reduce((sum, region) => sum + (region.delivered || 0), 0);
             
             regions.forEach(region => {
@@ -233,7 +223,6 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             });
         }
 
-        // Device breakdown: weighted average by total_opens
         if (deployments[0].device_breakdown) {
             let totalOpens = 0;
             let weightedMobile = 0;
@@ -253,12 +242,11 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             combined.device_breakdown = {
                 mobile_rate: mobileRate,
                 desktop_rate: desktopRate,
-                unknown_rate: Math.max(0, unknownRate), // Ensure non-negative
+                unknown_rate: Math.max(0, unknownRate),
                 total_opens: totalOpens
             };
         }
 
-        // What was clicked: aggregate clicks and recalculate percentages
         if (deployments[0].what_was_clicked) {
             const allLinks = {};
             let totalClicksAfterFiltering = 0;

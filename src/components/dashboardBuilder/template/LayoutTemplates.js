@@ -154,7 +154,6 @@ export const ONCOLOGY_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #f8fbfc 0%, #efefef 100%)'
 };
 
-// Theme configuration
 export const THEMES = {
   MATRIX: 'matrix',
   JCAD: 'jcad',
@@ -163,7 +162,6 @@ export const THEMES = {
   ONCOLOGY: 'oncology'
 };
 
-// Theme metadata for UI display
 export const THEME_INFO = {
   [THEMES.MATRIX]: {
     name: 'Matrix',
@@ -213,7 +211,6 @@ export const getThemeLogo = (theme) => {
   return `${process.env.PUBLIC_URL}/${themeInfo?.logo || 'matrix.png'}`;
 };
 
-// Table type definitions
 export const TABLE_TYPES = {
   ONLINE_JOURNAL: 'online-journal',
   VIDEO_METRICS: 'video-metrics', 
@@ -250,28 +247,23 @@ export const TABLE_DEFINITIONS = {
   }
 };
 
-// Smart table selection based on campaign title
 export const getSmartTableSelection = (campaignTitle) => {
-  if (!campaignTitle) return [TABLE_TYPES.ONLINE_JOURNAL]; // Default fallback
+  if (!campaignTitle) return [TABLE_TYPES.ONLINE_JOURNAL];
   
   const title = campaignTitle.toLowerCase();
   
-  // Check for video content indicators
   if (title.includes('jcadtv') || title.includes('video') || title.includes('tv')) {
     return [TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.SOCIAL_MEDIA];
   }
   
-  // Check for journal/hot topics indicators  
   if (title.includes('hot topics') || title.includes('ht') || title.includes('journal')) {
     return [TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.SOCIAL_MEDIA];
   }
   
-  // Check for social media indicators
   if (title.includes('social') || title.includes('linkedin') || title.includes('twitter')) {
     return [TABLE_TYPES.SOCIAL_MEDIA, TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS];
   }
   
-  // Default fallback order
   return [TABLE_TYPES.ONLINE_JOURNAL, TABLE_TYPES.VIDEO_METRICS, TABLE_TYPES.SOCIAL_MEDIA];
 };
 
@@ -420,7 +412,6 @@ export const getTypographyStyle = (componentType, element, theme, isMulti = fals
   };
 };
 
-// Spacing constants
 export const SPACING = {
   canvas: { padding: 24 },
   section: { marginBottom: 32 },
@@ -429,7 +420,6 @@ export const SPACING = {
   component: { minGap: 0 }
 };
 
-// Component size defaults
 export const COMPONENT_SIZES = {
   hero: { width: 280, height: 120 },
   secondary: { width: 280, height: 120 },
@@ -441,7 +431,6 @@ export const COMPONENT_SIZES = {
   logo: { width: 150, height: 60 }
 };
 
-// Template types
 export const TEMPLATE_TYPES = {
   SINGLE_NONE: 'single-none',
   SINGLE_ONE: 'single-one', 
@@ -453,7 +442,6 @@ export const TEMPLATE_TYPES = {
   MULTI_THREE: 'multi-three'
 };
 
-// Available metrics from JSON data
 export const AVAILABLE_METRICS = [
   'unique_open_rate',
   'total_open_rate', 
@@ -476,8 +464,6 @@ export const AVAILABLE_METRICS = [
   'estimated_patient_impact'
 ];
 
-
-// Utility functions
 export const getMetricValue = (campaign, metricKey) => {
   const keys = metricKey.split('.');
   let value = campaign;

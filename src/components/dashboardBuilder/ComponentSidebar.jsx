@@ -453,7 +453,6 @@ const ComponentSidebar = ({
                 </h3>
               </div>
 
-              {/* Table Row/Column Controls - Only show when a cell is selected */}
               {selectedRowInfo && (
                 <div style={{
                   marginBottom: '24px',
@@ -468,7 +467,6 @@ const ComponentSidebar = ({
                       : `Row ${selectedRowInfo.rowIndex} Selected`}
                   </div>
 
-                  {/* Row Controls */}
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '8px' }}>
                       Row Operations:
@@ -511,7 +509,6 @@ const ComponentSidebar = ({
                     </div>
                   </div>
 
-                  {/* Column Controls - Only show when a specific cell is selected */}
                   {selectedRowInfo.colIndex !== null && selectedRowInfo.colIndex !== undefined && (
                     <div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '8px' }}>
@@ -1187,7 +1184,7 @@ const ComponentSidebar = ({
                   textAlign: 'center'
                 }}>
                   <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
-                    No dashboards match your search
+                    No matching dashboards
                   </div>
                 </div>
               ) : (

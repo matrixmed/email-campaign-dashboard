@@ -1,7 +1,5 @@
-/* Enhanced Synthwave Theme CSS */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=VT323&display=swap');
 
-/* Base styles for synthwave theme */
 body.synthwave-theme {
   background-color: #1f0033 !important;
   color: #f8f9fa !important;
@@ -11,7 +9,6 @@ body.synthwave-theme {
   overflow-x: hidden;
 }
 
-/* Create synthwave sunset and grid background */
 body.synthwave-theme::before {
   content: '';
   position: fixed;
@@ -30,7 +27,6 @@ body.synthwave-theme::before {
   pointer-events: none;
 }
 
-/* Synthwave sun */
 body.synthwave-theme::after {
   content: '';
   position: fixed;
@@ -50,7 +46,6 @@ body.synthwave-theme::after {
   opacity: 0.8;
 }
 
-/* Sun stripes */
 @keyframes sun-stripes {
   0% {
     opacity: 0.4;
@@ -94,7 +89,6 @@ body.synthwave-theme .dashboard-container::before {
   animation: sun-stripes 3s ease-in-out infinite;
 }
 
-/* Perspective grid lines */
 .synthwave-grid {
   position: fixed;
   bottom: 0;
@@ -122,7 +116,6 @@ body.synthwave-theme .dashboard-container::before {
   }
 }
 
-/* Neon text effects */
 @keyframes neon-pink-pulse {
   0%, 100% {
     text-shadow: 
@@ -161,7 +154,6 @@ body.synthwave-theme .dashboard-container::before {
   }
 }
 
-/* CRT scan line effect */
 @keyframes scan-line {
   0% {
     transform: translateY(-100%);
@@ -187,7 +179,6 @@ body.synthwave-theme .dashboard-container::after {
   z-index: 1000;
 }
 
-/* Synthwave header */
 body.synthwave-theme .dashboard-header {
   background: rgba(31, 0, 51, 0.7);
   box-shadow: 0 4px 30px rgba(255, 51, 102, 0.5);
@@ -218,7 +209,6 @@ body.synthwave-theme h2 {
   animation: neon-blue-pulse 2s ease-in-out infinite alternate;
 }
 
-/* Synthwave sections */
 body.synthwave-theme .chart-section,
 body.synthwave-theme .table-section,
 body.synthwave-theme .insights-section,
@@ -235,7 +225,6 @@ body.synthwave-theme .chat-interface {
   margin-bottom: 30px;
 }
 
-/* Neon borders */
 body.synthwave-theme .chart-section::before,
 body.synthwave-theme .table-section::before,
 body.synthwave-theme .insights-section::before,
@@ -268,7 +257,6 @@ body.synthwave-theme .chat-interface::after {
   z-index: 1;
 }
 
-/* Synthwave tables */
 body.synthwave-theme table {
   width: 100%;
   border-collapse: separate;
@@ -305,20 +293,17 @@ body.synthwave-theme tr:hover td {
   background-color: rgba(255, 51, 102, 0.2);
 }
 
-/* First column styling */
 body.synthwave-theme td:first-child {
   color: #ffffff;
   font-family: 'VT323', monospace;
 }
 
-/* Numeric value columns styling */
 body.synthwave-theme td:not(:first-child) {
   text-align: right;
   font-weight: bold;
   color: #ffffff;
 }
 
-/* Glowing buttons */
 body.synthwave-theme button,
 body.synthwave-theme .space-button,
 body.synthwave-theme .pagination button,
@@ -352,7 +337,6 @@ body.synthwave-theme .query-button:hover {
   animation: neon-pink-pulse 2s ease-in-out infinite;
 }
 
-/* Button glow effect */
 body.synthwave-theme button::after,
 body.synthwave-theme .space-button::after,
 body.synthwave-theme .pagination button::after,
@@ -375,7 +359,6 @@ body.synthwave-theme .query-button:hover::after {
   background: linear-gradient(90deg, transparent, rgba(255, 51, 102, 0.4), transparent);
 }
 
-/* Inputs and selects */
 body.synthwave-theme input,
 body.synthwave-theme select,
 body.synthwave-theme .deployment-select,
@@ -401,7 +384,6 @@ body.synthwave-theme .query-input:focus {
   box-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
 }
 
-/* Dropdown styling */
 body.synthwave-theme .dropdown {
   background-color: rgba(31, 0, 51, 0.95);
   border: 2px solid #00CCFF;
@@ -429,7 +411,6 @@ body.synthwave-theme .dropdown-arrow svg {
   filter: drop-shadow(0 0 5px rgba(0, 204, 255, 0.8));
 }
 
-/* Theme selector styling */
 body.synthwave-theme .theme-select {
   background-color: rgba(31, 0, 51, 0.7);
   color: #00CCFF;
@@ -443,7 +424,6 @@ body.synthwave-theme .theme-select {
   text-shadow: 0 0 5px rgba(0, 204, 255, 0.8);
 }
 
-/* Search box styling */
 body.synthwave-theme .search-box,
 body.synthwave-theme .digital-journals-search-box {
   background-color: rgba(31, 0, 51, 0.7);
@@ -462,7 +442,6 @@ body.synthwave-theme .digital-journals-search-box:focus {
   box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
 }
 
-/* Campaign boxes */
 body.synthwave-theme .campaign-box {
   background: rgba(31, 0, 51, 0.7);
   border: 2px solid #00CCFF;
@@ -480,7 +459,6 @@ body.synthwave-theme .campaign-box h3 {
   text-shadow: 0 0 5px rgba(0, 204, 255, 0.8);
 }
 
-/* Tooltips */
 body.synthwave-theme .attached-tooltip {
   background-color: rgba(31, 0, 51, 0.95);
   border: 2px solid #FF3366;
@@ -499,7 +477,6 @@ body.synthwave-theme .tooltip-top::before {
   border-color: #FF3366;
 }
 
-/* Scrollbars */
 body.synthwave-theme ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -519,7 +496,6 @@ body.synthwave-theme ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
 
-/* Sample query lists */
 body.synthwave-theme .sample-queries h3 {
   color: #00CCFF;
   font-family: 'Orbitron', sans-serif;
@@ -545,7 +521,6 @@ body.synthwave-theme .sample-queries li:hover {
   box-shadow: 0 0 15px rgba(255, 51, 102, 0.3);
 }
 
-/* Toggle switch */
 body.synthwave-theme .toggle-switch {
   --light: #FF3366;
   --dark: rgba(31, 0, 51, 0.7);
@@ -572,7 +547,6 @@ body.synthwave-theme .checkbox:checked ~ .slider::before {
   background-color: var(--light);
 }
 
-/* Data visualization */
 body.synthwave-theme canvas {
   border: 2px solid #00CCFF;
   border-radius: 4px;
@@ -580,7 +554,6 @@ body.synthwave-theme canvas {
   box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
 }
 
-/* Pagination */
 body.synthwave-theme .pagination {
   display: flex;
   justify-content: center;
@@ -593,7 +566,6 @@ body.synthwave-theme .pagination button {
   text-align: center;
 }
 
-/* Create grid lines for the synthetic feel */
 body.synthwave-theme .dashboard-container {
   position: relative;
 }

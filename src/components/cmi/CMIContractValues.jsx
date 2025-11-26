@@ -175,8 +175,13 @@ const CMIContractValues = () => {
 
   if (loading) {
     return (
-      <div className="cmi-container">
-        <div className="cmi-loading">Loading contracts...</div>
+      <div className="cmi-contract-values">
+        <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <p>Loading contracts...</p>
+        </div>
       </div>
     );
   }

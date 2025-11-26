@@ -194,7 +194,6 @@ const NPIQuickLookup = forwardRef((props, ref) => {
                 <tr>
                   <th>NPI</th>
                   <th>Name</th>
-                  <th>Credential</th>
                   <th>Specialty</th>
                   <th>Address</th>
                   <th>City</th>
@@ -218,7 +217,6 @@ const NPIQuickLookup = forwardRef((props, ref) => {
                         </>
                       )}
                     </td>
-                    <td>{profile.credential}</td>
                     <td>{profile.specialty || 'N/A'}</td>
                     <td>
                       {profile.address}

@@ -15,6 +15,10 @@ const NPIQuickLookup = forwardRef((props, ref) => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [tableState, setTableState] = useState({
+    displayCount: 10,
+    isFullyExpanded: false
+  });
 
   const handleLookup = async () => {
     if (!npiInput.trim()) {
@@ -56,13 +60,19 @@ const NPIQuickLookup = forwardRef((props, ref) => {
       return;
     }
 
+    // Helper to escape CSV values - wrap in quotes and escape internal quotes
+    const escapeCSV = (value) => {
+      if (value === null || value === undefined) return '""';
+      const str = String(value);
+      // Always wrap in quotes and escape any quotes inside
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
     const headers = [
       'NPI',
       'First Name',
       'Last Name',
       'Middle Name',
-      'Organization',
-      'Credential',
       'Specialty',
       'Taxonomy Code',
       'Address',
@@ -71,12 +81,10 @@ const NPIQuickLookup = forwardRef((props, ref) => {
       'State',
       'Zipcode',
       'Is Active',
-      'Source',
-      'Enumeration Date',
-      'Last Update Date'
+      'Source'
     ];
 
-    const csvRows = [headers.join(',')];
+    const csvRows = [headers.map(h => escapeCSV(h)).join(',')];
 
     results.results.forEach(profile => {
       const row = [
@@ -84,21 +92,17 @@ const NPIQuickLookup = forwardRef((props, ref) => {
         profile.first_name || '',
         profile.last_name || '',
         profile.middle_name || '',
-        profile.organization_name || '',
-        profile.credential || '',
         profile.specialty || '',
         profile.taxonomy_code || '',
-        (profile.address || '').replace(/,/g, ' '),
-        (profile.address_2 || '').replace(/,/g, ' '),
+        profile.address || '',
+        profile.address_2 || '',
         profile.city || '',
         profile.state || '',
         formatZipcode(profile.zipcode),
         profile.is_active ? 'Yes' : 'No',
-        profile.source || '',
-        profile.enumeration_date || '',
-        profile.last_update_date || ''
+        profile.source || ''
       ];
-      csvRows.push(row.join(','));
+      csvRows.push(row.map(cell => escapeCSV(cell)).join(','));
     });
 
     const csvContent = csvRows.join('\n');
@@ -120,6 +124,10 @@ const NPIQuickLookup = forwardRef((props, ref) => {
     setNpiInput('');
     setResults(null);
     setError(null);
+    setTableState({
+      displayCount: 10,
+      isFullyExpanded: false
+    });
   };
 
   useImperativeHandle(ref, () => ({
@@ -153,11 +161,16 @@ const NPIQuickLookup = forwardRef((props, ref) => {
         </div>
       )}
 
-      {results && (
-        <div className="npi-lookup-results">
-          <div className="results-header">
-            <div className="results-summary">
-              <h3>Results</h3>
+      {results && (() => {
+        const allResults = results.results || [];
+        const totalCount = allResults.length;
+        const displayLimit = tableState.isFullyExpanded ? totalCount : tableState.displayCount;
+        const visibleData = allResults.slice(0, displayLimit);
+        const hasMore = totalCount > visibleData.length;
+
+        return (
+          <div className="npi-lookup-results">
+            <div className="results-summary-section">
               <p>
                 Found <strong>{results.found}</strong> of <strong>{results.requested}</strong> NPIs
                 {results.missing > 0 && (
@@ -172,75 +185,111 @@ const NPIQuickLookup = forwardRef((props, ref) => {
                 </p>
               )}
             </div>
-            <button
-              className="btn-download"
-              onClick={handleDownloadCSV}
-              disabled={results.results.length === 0}
-            >
-              Download CSV
-            </button>
-          </div>
 
-          {results.missing_npis && results.missing_npis.length > 0 && (
-            <div className="missing-npis-notice">
-              <strong>Missing NPIs:</strong> {results.missing_npis.join(', ')}
-            </div>
-          )}
+            {results.missing_npis && results.missing_npis.length > 0 && (
+              <div className="missing-npis-notice">
+                <strong>Missing NPIs:</strong> {results.missing_npis.join(', ')}
+              </div>
+            )}
 
-          <div className="results-table-container">
-            <table className="results-table">
-              <thead>
-                <tr>
-                  <th>NPI</th>
-                  <th>Name</th>
-                  <th>Specialty</th>
-                  <th>Address</th>
-                  <th>City</th>
-                  <th>State</th>
-                  <th>Zipcode</th>
-                  <th>Status</th>
-                  <th>Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.results.map((profile, index) => (
-                  <tr key={index}>
-                    <td className="npi-cell">{profile.npi}</td>
-                    <td>
-                      {profile.organization_name ? (
-                        <strong>{profile.organization_name}</strong>
-                      ) : (
-                        <>
-                          {profile.first_name} {profile.last_name}
-                          {profile.middle_name && ` ${profile.middle_name}`}
-                        </>
-                      )}
-                    </td>
-                    <td>{profile.specialty || 'N/A'}</td>
-                    <td>
-                      {profile.address}
-                      {profile.address_2 && <>, {profile.address_2}</>}
-                    </td>
-                    <td>{profile.city}</td>
-                    <td>{profile.state}</td>
-                    <td>{formatZipcode(profile.zipcode)}</td>
-                    <td>
-                      <span className={`status-badge ${profile.is_active ? 'active' : 'inactive'}`}>
-                        {profile.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`source-badge ${profile.source === 'Audience' ? 'audience' : 'market'}`}>
-                        {profile.source || 'N/A'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {totalCount > 0 && (
+              <div className="results-data-section">
+                <div className="table-header-row">
+                  <h4>Results ({totalCount.toLocaleString()} profiles)</h4>
+                  <div className="table-action-buttons">
+                    {totalCount > 10 && (
+                      <button
+                        className="btn-expand-table"
+                        onClick={() => setTableState(prev => ({
+                          ...prev,
+                          isFullyExpanded: !prev.isFullyExpanded,
+                          displayCount: prev.isFullyExpanded ? 10 : totalCount
+                        }))}
+                      >
+                        {tableState.isFullyExpanded ? 'Collapse' : 'Expand All'}
+                      </button>
+                    )}
+                    <button
+                      className="btn-export"
+                      onClick={handleDownloadCSV}
+                      disabled={totalCount === 0}
+                    >
+                      Export
+                    </button>
+                  </div>
+                </div>
+
+                <div className="results-table-container">
+                  <table className="results-table">
+                    <thead>
+                      <tr>
+                        <th>NPI</th>
+                        <th>Name</th>
+                        <th>Specialty</th>
+                        <th>Address</th>
+                        <th>City</th>
+                        <th>State</th>
+                        <th>Zipcode</th>
+                        <th>Status</th>
+                        <th>Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleData.map((profile, index) => (
+                        <tr key={index}>
+                          <td className="npi-cell">{profile.npi}</td>
+                          <td>
+                            {profile.organization_name ? (
+                              <strong>{profile.organization_name}</strong>
+                            ) : (
+                              <>
+                                {profile.first_name} {profile.last_name}
+                                {profile.middle_name && ` ${profile.middle_name}`}
+                              </>
+                            )}
+                          </td>
+                          <td>{profile.specialty || 'N/A'}</td>
+                          <td>
+                            {profile.address}
+                            {profile.address_2 && <>, {profile.address_2}</>}
+                          </td>
+                          <td>{profile.city}</td>
+                          <td>{profile.state}</td>
+                          <td>{formatZipcode(profile.zipcode)}</td>
+                          <td>
+                            <span className={`status-badge ${profile.is_active ? 'active' : 'inactive'}`}>
+                              {profile.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`source-badge ${profile.source === 'Audience' ? 'audience' : 'market'}`}>
+                              {profile.source || 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {hasMore && !tableState.isFullyExpanded && (
+                  <div className="load-more-container">
+                    <button
+                      className="btn-load-more"
+                      onClick={() => setTableState(prev => ({
+                        ...prev,
+                        displayCount: prev.displayCount + 10
+                      }))}
+                    >
+                      Load More ({visibleData.length} of {totalCount})
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 });

@@ -1,13 +1,33 @@
 import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import '../../styles/NPIQuickLookup.css';
+import { getSpecialtyFromTaxonomy } from './taxonomyMapping';
 
+// Normalize zipcode to 5 digits
 const formatZipcode = (zip) => {
   if (!zip) return '';
   const cleaned = zip.toString().replace(/\D/g, '');
-  if (cleaned.length === 9) return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
   if (cleaned.length >= 5) return cleaned.slice(0, 5);
   return zip;
+};
+
+// Capitalize first letter of each word, rest lowercase
+const formatName = (name) => {
+  if (!name) return '';
+  return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+};
+
+// Combine address fields into single address
+const formatAddress = (address1, address2) => {
+  const parts = [address1, address2].filter(p => p && p.trim());
+  return parts.join(', ');
+};
+
+// Get specialty - use existing specialty or map from taxonomy code
+const getSpecialty = (profile) => {
+  if (profile.specialty) return profile.specialty;
+  if (profile.taxonomy_code) return getSpecialtyFromTaxonomy(profile.taxonomy_code);
+  return '';
 };
 
 const NPIQuickLookup = forwardRef((props, ref) => {
@@ -72,11 +92,8 @@ const NPIQuickLookup = forwardRef((props, ref) => {
       'NPI',
       'First Name',
       'Last Name',
-      'Middle Name',
       'Specialty',
-      'Taxonomy Code',
       'Address',
-      'Address 2',
       'City',
       'State',
       'Zipcode',
@@ -89,14 +106,11 @@ const NPIQuickLookup = forwardRef((props, ref) => {
     results.results.forEach(profile => {
       const row = [
         profile.npi || '',
-        profile.first_name || '',
-        profile.last_name || '',
-        profile.middle_name || '',
-        profile.specialty || '',
-        profile.taxonomy_code || '',
-        profile.address || '',
-        profile.address_2 || '',
-        profile.city || '',
+        formatName(profile.first_name),
+        formatName(profile.last_name),
+        getSpecialty(profile),
+        formatAddress(profile.address, profile.address_2),
+        formatName(profile.city),
         profile.state || '',
         formatZipcode(profile.zipcode),
         profile.is_active ? 'Yes' : 'No',
@@ -224,7 +238,8 @@ const NPIQuickLookup = forwardRef((props, ref) => {
                     <thead>
                       <tr>
                         <th>NPI</th>
-                        <th>Name</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
                         <th>Specialty</th>
                         <th>Address</th>
                         <th>City</th>
@@ -238,22 +253,11 @@ const NPIQuickLookup = forwardRef((props, ref) => {
                       {visibleData.map((profile, index) => (
                         <tr key={index}>
                           <td className="npi-cell">{profile.npi}</td>
-                          <td>
-                            {profile.organization_name ? (
-                              <strong>{profile.organization_name}</strong>
-                            ) : (
-                              <>
-                                {profile.first_name} {profile.last_name}
-                                {profile.middle_name && ` ${profile.middle_name}`}
-                              </>
-                            )}
-                          </td>
-                          <td>{profile.specialty || 'N/A'}</td>
-                          <td>
-                            {profile.address}
-                            {profile.address_2 && <>, {profile.address_2}</>}
-                          </td>
-                          <td>{profile.city}</td>
+                          <td>{formatName(profile.first_name)}</td>
+                          <td>{formatName(profile.last_name)}</td>
+                          <td>{getSpecialty(profile) || 'N/A'}</td>
+                          <td>{formatAddress(profile.address, profile.address_2)}</td>
+                          <td>{formatName(profile.city)}</td>
                           <td>{profile.state}</td>
                           <td>{formatZipcode(profile.zipcode)}</td>
                           <td>

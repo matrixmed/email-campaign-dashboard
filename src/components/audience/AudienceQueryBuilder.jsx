@@ -37,6 +37,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     const [engagementType, setEngagementType] = useState(persisted.engagementType);
     const [specialtyMergeMode, setSpecialtyMergeMode] = useState(persisted.specialtyMergeMode);
     const [specialties, setSpecialties] = useState([]);
+    const [specialtiesLoading, setSpecialtiesLoading] = useState(true);
     const [campaigns, setCampaigns] = useState([]);
     const [showSpecialtySelector, setShowSpecialtySelector] = useState(false);
     const [showCampaignSelector, setShowCampaignSelector] = useState(false);
@@ -60,7 +61,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisResults, setAnalysisResults] = useState(null);
     const [analysisError, setAnalysisError] = useState('');
-    const [fileUpload, setFileUpload] = useState(null);
 
     const [analyzeUsersTableState, setAnalyzeUsersTableState] = useState({
         displayCount: 10,
@@ -113,6 +113,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     }, [specialtyMergeMode]);
 
     const fetchSpecialties = async () => {
+        setSpecialtiesLoading(true);
         try {
             const url = `${API_BASE}/users/specialties?merge=${specialtyMergeMode}`;
             console.log('Fetching specialties from:', url);
@@ -129,6 +130,8 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             }
         } catch (err) {
             console.error('Error fetching specialties:', err);
+        } finally {
+            setSpecialtiesLoading(false);
         }
     };
 
@@ -163,7 +166,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     const clearAnalyzeUsers = () => {
         setAnalysisResults(null);
         setAnalysisForm({ userInput: '', inputType: 'email' });
-        setFileUpload(null);
         setAnalysisError('');
         setAnalyzeUsersTableState({
             displayCount: 10,
@@ -206,7 +208,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
         setAnalysisResults(null);
         setAnalysisForm({ userInput: '', inputType: 'email' });
-        setFileUpload(null);
         setAnalysisError('');
         setAnalyzeUsersTableState({
             displayCount: 10,
@@ -381,31 +382,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         }
     };
 
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        setFileUpload(file);
-        if (analysisResults) {
-            setAnalysisResults(null);
-        }
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0) {
-            setFileUpload(files[0]);
-            if (analysisResults) {
-                setAnalysisResults(null);
-            }
-        }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
     const handleAnalysisSubmit = async (e) => {
         e.preventDefault();
         setAnalysisLoading(true);
@@ -413,57 +389,25 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         setAnalysisResults(null);
 
         try {
-            let userList = [];
-
-            if (fileUpload) {
-                const text = await fileUpload.text();
-                const lines = text.split('\n').filter(line => line.trim());
-                const headers = lines[0].toLowerCase().split(',');
-
-                const npiIndex = headers.findIndex(h =>
-                    h.includes('npi') || h.includes('npi_id')
-                );
-                const emailIndex = headers.findIndex(h => h.includes('email'));
-
-                if (npiIndex === -1 && emailIndex === -1) {
-                    throw new Error('File must contain NPI or Email column');
-                }
-
-                const targetIndex = analysisForm.inputType === 'npi' ? npiIndex : emailIndex;
-
-                for (let i = 1; i < lines.length; i++) {
-                    const cols = lines[i].split(',');
-                    if (cols[targetIndex]) {
-                        userList.push(cols[targetIndex].trim());
-                    }
-                }
-            } else if (analysisForm.userInput.trim()) {
-                userList = analysisForm.userInput
-                    .split(/[\n,;]/)
-                    .map(item => item.trim())
-                    .filter(item => item);
-            }
+            const userList = analysisForm.userInput
+                .split(/[\n,;]/)
+                .map(item => item.trim())
+                .filter(item => item);
 
             if (userList.length === 0) {
                 throw new Error('Please provide user identifiers');
             }
-
-            if (userList.length > 100 && !fileUpload) {
-                throw new Error('For more than 100 users, please upload a file');
-            }
-
-            const requestData = {
-                user_list: userList,
-                input_type: analysisForm.inputType,
-                export_csv: fileUpload ? true : userList.length > 100
-            };
 
             const response = await fetch(`${API_BASE}/users/analyze-list`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(requestData)
+                body: JSON.stringify({
+                    user_list: userList,
+                    input_type: analysisForm.inputType,
+                    export_csv: false
+                })
             });
 
             if (!response.ok) {
@@ -471,25 +415,8 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 throw new Error(errorData.error || `HTTP ${response.status}`);
             }
 
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('text/csv')) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                const filename = response.headers.get('content-disposition')?.split('filename=')[1] || 'user_analysis.csv';
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-
-                setAnalysisResults({ type: 'download', message: 'Analysis downloaded successfully' });
-            } else {
-                const data = await response.json();
-                setAnalysisResults(data);
-            }
-
+            const data = await response.json();
+            setAnalysisResults(data);
         } catch (err) {
             console.error('Error analyzing users:', err);
             setAnalysisError(err.message || 'Failed to process request');
@@ -1088,7 +1015,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                             </div>
 
                             <div className="form-group full-width">
-                                <label htmlFor="userInput">Paste User Identifiers (Max 100)</label>
+                                <label htmlFor="userInput">Paste User Identifiers</label>
                                 <textarea
                                     id="userInput"
                                     name="userInput"
@@ -1097,37 +1024,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                     placeholder=""
                                     rows="6"
                                 />
-                                <small>One per line, comma, or semicolon separated</small>
                             </div>
-
-                            <div className="form-group full-width">
-                                <label>Or Upload File (CSV/Excel with NPI or Email column)</label>
-                                <div
-                                    className="drop-zone"
-                                    onDrop={handleDrop}
-                                    onDragOver={handleDragOver}
-                                >
-                                    <input
-                                        type="file"
-                                        accept=".csv,.xlsx,.xls"
-                                        onChange={handleFileUpload}
-                                        className="file-input-hidden"
-                                        id="analysis-file-input"
-                                    />
-                                    <label htmlFor="analysis-file-input" className="drop-zone-label">
-                                        {fileUpload ? (
-                                            <span className="file-name-display">{fileUpload.name}</span>
-                                        ) : (
-                                            <div className="drop-zone-content">
-                                                <p>Drag and drop file here</p>
-                                                <p className="drop-zone-or">or</p>
-                                                <span className="drop-zone-browse">Click to browse</span>
-                                            </div>
-                                        )}
-                                    </label>
-                                </div>
-                            </div>
-
                             <div className="form-actions">
                                 <button
                                     type="submit"
@@ -1145,14 +1042,9 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                             </div>
                         )}
 
-                        {analysisResults && (
+                        {analysisResults && analysisResults.success && analysisResults.users && (
                             <div className="results-section">
-                                {analysisResults.type === 'download' ? (
-                                    <div className="download-success">
-                                        <p>{analysisResults.message}</p>
-                                    </div>
-                                ) : analysisResults.success && analysisResults.users ? (
-                                    <div className="sample-data-section">
+                                <div className="sample-data-section">
                                         <div className="table-header-row">
                                             <h4>Results ({analyzeUsersDisplayData.length} users{analyzeUsersDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
                                             <div className="table-action-buttons">
@@ -1260,8 +1152,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                                                 </button>
                                             </div>
                                         )}
-                                    </div>
-                                ) : null}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1719,7 +1610,20 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                         </div>
 
                         <div className="aqb-modal-list">
-                            {filteredSpecialties.length === 0 ? (
+                            {specialtiesLoading ? (
+                                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
+                                    <div style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        border: '2px solid #333',
+                                        borderTopColor: '#0ff',
+                                        borderRadius: '50%',
+                                        animation: 'spin 0.8s linear infinite',
+                                        margin: '0 auto 12px'
+                                    }}></div>
+                                    <p style={{ fontSize: '13px', margin: 0 }}>Loading specialties...</p>
+                                </div>
+                            ) : filteredSpecialties.length === 0 ? (
                                 <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
                                     {specialties.length === 0 ? (
                                         <>

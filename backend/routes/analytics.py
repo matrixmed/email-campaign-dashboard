@@ -5,17 +5,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 from collections import defaultdict
 import os
-import psycopg2
 from psycopg2.extras import RealDictCursor
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from state_mapper import zipcode_to_state_abbrev, state_abbrev_to_full_name, classify_zipcode_urbanization, STATE_NAME_TO_ABBREV
+from db_pool import get_db_connection
 
 analytics_bp = Blueprint('analytics', __name__)
-
-def get_db_connection():
-    conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-    return conn
 
 BLOB_CONNECTION_STRING = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 JSON_CONTAINER = 'json-data'

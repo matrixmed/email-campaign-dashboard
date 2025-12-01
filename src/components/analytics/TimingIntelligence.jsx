@@ -12,6 +12,7 @@ const TimingIntelligence = () => {
   const [hasRun, setHasRun] = useState(false);
   const [heatmapMode, setHeatmapMode] = useState('opens');
   const [specialties, setSpecialties] = useState([]);
+  const [specialtiesLoading, setSpecialtiesLoading] = useState(true);
   const [campaigns, setCampaigns] = useState([]);
   const [showSpecialtySelector, setShowSpecialtySelector] = useState(false);
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
@@ -26,6 +27,7 @@ const TimingIntelligence = () => {
   }, []);
 
   const fetchSpecialties = async () => {
+    setSpecialtiesLoading(true);
     try {
       const url = `${API_BASE}/users/specialties?merge=false`;
       const response = await fetch(url);
@@ -35,6 +37,8 @@ const TimingIntelligence = () => {
       }
     } catch (err) {
       console.error('Error fetching specialties:', err);
+    } finally {
+      setSpecialtiesLoading(false);
     }
   };
 
@@ -575,7 +579,20 @@ const TimingIntelligence = () => {
             </div>
 
             <div className="ti-modal-list">
-              {filteredSpecialties.length === 0 ? (
+              {specialtiesLoading ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    border: '2px solid #333',
+                    borderTopColor: '#0ff',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                    margin: '0 auto 12px'
+                  }}></div>
+                  <p style={{ fontSize: '13px', margin: 0 }}>Loading specialties...</p>
+                </div>
+              ) : filteredSpecialties.length === 0 ? (
                 <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
                   {specialties.length === 0 ? (
                     <>

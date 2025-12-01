@@ -1,11 +1,16 @@
 import os
+import atexit
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from db_pool import init_pool, close_pool
 
 load_dotenv()
 
 app = Flask(__name__)
+
+init_pool(min_conn=2, max_conn=10)
+atexit.register(close_pool)
 CORS(app, resources={
     r"/api/*": {
         "origins": "*",

@@ -1,17 +1,15 @@
 from flask import Blueprint, request, jsonify, make_response
-import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
 from datetime import datetime
 import csv
 import io
 import json
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from db_pool import get_db_connection
 
 users_bp = Blueprint('users', __name__)
-
-def get_db_connection():
-    conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-    return conn
 
 def merge_specialties(specialties, should_merge=False):
     if not should_merge:

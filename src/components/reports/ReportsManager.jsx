@@ -16,7 +16,7 @@ const ReportsManager = () => {
     const [archiveCurrentPage, setArchiveCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(100);
     const [futureRowsPerPage, setFutureRowsPerPage] = useState(10);
-    const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(10);
+    const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(100);
     const [sortBy, setSortBy] = useState('send_date');
     const [sortDirection, setSortDirection] = useState('asc');
 
@@ -806,7 +806,7 @@ const ReportsManager = () => {
     const copyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(JSON.stringify(selectedCMIReport, null, 2));
-            const button = document.querySelector('.copy-button');
+            const button = document.querySelector('.json-modal-copy-btn');
             const originalText = button.textContent;
             button.textContent = 'Copied!';
             button.classList.add('copied');
@@ -1359,43 +1359,39 @@ const ReportsManager = () => {
             </div>
 
             {showModal && selectedCMIReport && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <div className="modal-title">
+                <div className="json-modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="json-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="json-modal-header">
+                            <div className="json-modal-title">
                                 <FileText size={20} />
                                 <h3>Campaign JSON</h3>
                             </div>
                             <button
-                                className="modal-close"
+                                className="json-modal-close"
                                 onClick={() => setShowModal(false)}
                             >
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div className="json-preview">
-                                {selectedCMIReport._confidence && (
-                                    <div className="confidence-display">
-                                        <span className="confidence-label">Match Confidence:</span>
-                                        <span className="confidence-value">{selectedCMIReport._confidence}</span>
-                                    </div>
-                                )}
-                                <div className="json-header">
-                                    <span className="json-label">Generated JSON Structure</span>
-                                    <button
-                                        className="copy-button"
-                                        onClick={copyToClipboard}
-                                    >
-                                        <Copy size={14} />
-                                        Copy
-                                    </button>
+                        <div className="json-modal-body">
+                            {selectedCMIReport._confidence && (
+                                <div className="json-modal-confidence">
+                                    <span className="json-modal-confidence-label">Match Confidence:</span>
+                                    <span className="json-modal-confidence-value">{selectedCMIReport._confidence}</span>
                                 </div>
-                                <div className="json-container">
-                                    <pre className="json-content">
-                                        {JSON.stringify(Object.fromEntries(Object.entries(selectedCMIReport).filter(([key]) => key !== '_confidence')), null, 2)}
-                                    </pre>
-                                </div>
+                            )}
+                            <div className="json-modal-actions">
+                                <span className="json-modal-label">Generated JSON Structure</span>
+                                <button
+                                    className="json-modal-copy-btn"
+                                    onClick={copyToClipboard}
+                                >
+                                    <Copy size={14} />
+                                    Copy
+                                </button>
+                            </div>
+                            <div className="json-modal-code">
+                                <pre>{JSON.stringify(Object.fromEntries(Object.entries(selectedCMIReport).filter(([key]) => key !== '_confidence')), null, 2)}</pre>
                             </div>
                         </div>
                     </div>

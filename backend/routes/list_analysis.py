@@ -1,16 +1,15 @@
 from flask import Blueprint, request, jsonify, send_file
-import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
+import sys
 import pandas as pd
 import json
 from io import BytesIO
 from collections import defaultdict
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from db_pool import get_db_connection
 
 list_analysis_bp = Blueprint('list_analysis', __name__)
-
-def get_db_connection():
-    return psycopg2.connect(os.getenv('DATABASE_URL'))
 
 def find_npi_column(df):
     for col in df.columns:

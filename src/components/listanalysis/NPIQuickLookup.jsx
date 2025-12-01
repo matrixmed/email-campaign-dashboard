@@ -142,7 +142,6 @@ const NPIQuickLookup = forwardRef((props, ref) => {
         <button
           className="btn-primary"
           onClick={handleLookup}
-          disabled={loading || !npiInput.trim()}
         >
           {loading ? 'Looking up...' : 'Lookup NPIs'}
         </button>

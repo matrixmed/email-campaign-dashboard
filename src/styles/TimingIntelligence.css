@@ -818,26 +818,39 @@
 }
 
 .ti-item-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border, #555);
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #555;
+  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  background: transparent;
+}
+
+.ti-modal-list-item:hover .ti-item-checkbox {
+  border-color: #0ff;
 }
 
 .ti-modal-list-item.selected .ti-item-checkbox {
-  background: var(--color-accent, #0ff);
-  border-color: var(--color-accent, #0ff);
+  background: #0ff;
+  border-color: #0ff;
 }
 
 .ti-item-checkbox .checkmark {
-  color: var(--color-bg-card, #2a2a2d);
-  font-weight: bold;
-  font-size: 14px;
+  display: none;
+}
+
+.ti-modal-list-item.selected .ti-item-checkbox::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid #111;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
 }
 
 .ti-item-info {

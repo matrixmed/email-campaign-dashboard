@@ -614,7 +614,9 @@ def campaign_benchmarks():
         similar_campaigns = []
         all_metrics = {
             'unique_open_rate': [],
+            'total_open_rate': [],
             'unique_click_rate': [],
+            'total_click_rate': [],
             'delivery_rate': []
         }
 
@@ -637,23 +639,28 @@ def campaign_benchmarks():
                 core_metrics = camp.get('core_metrics', {})
                 volume_metrics = camp.get('volume_metrics', {})
 
-                open_rate = core_metrics.get('unique_open_rate', 0)
-                click_rate = core_metrics.get('unique_click_rate', 0)
+                unique_open_rate = core_metrics.get('unique_open_rate', 0)
+                total_open_rate = core_metrics.get('total_open_rate', 0)
+                unique_click_rate = core_metrics.get('unique_click_rate', 0)
+                total_click_rate = core_metrics.get('total_click_rate', 0)
                 delivery_rate = core_metrics.get('delivery_rate', 0)
 
                 similar_campaigns.append({
                     'campaign_name': camp.get('campaign_name'),
                     'send_date': camp.get('send_date'),
-                    'unique_open_rate': open_rate,
-                    'unique_click_rate': click_rate,
+                    'unique_open_rate': unique_open_rate,
+                    'total_open_rate': total_open_rate,
+                    'unique_click_rate': unique_click_rate,
+                    'total_click_rate': total_click_rate,
                     'delivery_rate': delivery_rate,
                     'delivered': volume_metrics.get('delivered', 0),
-                    'similarity_score': similarity,
-                    'open_rate_delta': open_rate - selected_campaign.get('core_metrics', {}).get('unique_open_rate', 0)
+                    'similarity_score': similarity
                 })
 
-                all_metrics['unique_open_rate'].append(open_rate)
-                all_metrics['unique_click_rate'].append(click_rate)
+                all_metrics['unique_open_rate'].append(unique_open_rate)
+                all_metrics['total_open_rate'].append(total_open_rate)
+                all_metrics['unique_click_rate'].append(unique_click_rate)
+                all_metrics['total_click_rate'].append(total_click_rate)
                 all_metrics['delivery_rate'].append(delivery_rate)
 
         similar_campaigns.sort(key=lambda x: x['similarity_score'], reverse=True)
@@ -662,30 +669,37 @@ def campaign_benchmarks():
         selected_core = selected_campaign.get('core_metrics', {})
 
         for metric_name, values in all_metrics.items():
+            print(f"[BENCHMARKS] Metric {metric_name}: {len(values)} values")
             if values:
                 values_sorted = sorted(values)
                 n = len(values_sorted)
 
-                p25 = np.percentile(values, 25)
-                p50 = np.percentile(values, 50)
-                p75 = np.percentile(values, 75)
-                p90 = np.percentile(values, 90)
+                min_val = float(min(values))
+                max_val = float(max(values))
+                median_val = float(np.median(values))
+                mean_val = float(np.mean(values))
+                p90 = float(np.percentile(values, 90))
 
                 your_value = selected_core.get(metric_name, 0)
 
                 count_below = sum(1 for v in values if v < your_value)
                 your_percentile = int((count_below / n) * 100) if n > 0 else 0
 
+                print(f"[BENCHMARKS] {metric_name}: min={min_val}, max={max_val}, median={median_val}, mean={mean_val}, your={your_value}")
+
                 benchmarks[metric_name] = {
                     'your_value': your_value,
-                    'median': float(p50),
-                    'p25': float(p25),
-                    'p75': float(p75),
-                    'p90': float(p90),
+                    'min': min_val,
+                    'max': max_val,
+                    'median': median_val,
+                    'mean': mean_val,
+                    'p90': p90,
                     'your_percentile': your_percentile
                 }
 
-        avg_percentile = int(np.mean([b['your_percentile'] for b in benchmarks.values()])) if benchmarks else 0
+        grading_metrics = ['unique_open_rate', 'total_open_rate', 'unique_click_rate', 'total_click_rate']
+        grading_percentiles = [benchmarks[m]['your_percentile'] for m in grading_metrics if m in benchmarks]
+        avg_percentile = int(np.mean(grading_percentiles)) if grading_percentiles else 0
 
         if avg_percentile >= 90:
             grade = 'A+'
@@ -705,8 +719,14 @@ def campaign_benchmarks():
             grade = 'C'
         elif avg_percentile >= 50:
             grade = 'C-'
-        else:
+        elif avg_percentile >= 40:
+            grade = 'D+'
+        elif avg_percentile >= 30:
             grade = 'D'
+        elif avg_percentile >= 20:
+            grade = 'D-'
+        else:
+            grade = 'F'
 
         success_factors = []
 
@@ -1164,7 +1184,7 @@ def timing_intelligence():
 @analytics_bp.route('/geographic-main', methods=['GET'])
 def geographic_main():
     try:
-        print(f"[GEO-MAIN] Fetching main geographic data using zipcode-based approach")
+        print(f"[GEO-MAIN] Fetching main geographic data using SQL aggregation")
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1177,54 +1197,104 @@ def geographic_main():
         cursor.execute(npi_count_query)
         npi_count = cursor.fetchone()['count']
 
-        user_zipcode_query = """
+        state_query = """
             SELECT
-                email,
-                zipcode
+                LEFT(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g'), 3) as zip_prefix,
+                COUNT(*) as count
             FROM user_profiles
             WHERE zipcode IS NOT NULL AND zipcode != ''
+            AND LENGTH(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g')) >= 5
+            GROUP BY LEFT(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g'), 3)
         """
-        cursor.execute(user_zipcode_query)
-        user_results = cursor.fetchall()
+        cursor.execute(state_query)
+        prefix_counts = cursor.fetchall()
 
-        print(f"[GEO-MAIN] Fetched {len(user_results)} users with zipcodes")
-
-        engagement_query = """
-            SELECT DISTINCT
-                up.email,
-                up.zipcode
+        engaged_state_query = """
+            SELECT
+                LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 3) as zip_prefix,
+                COUNT(DISTINCT up.email) as count
             FROM user_profiles up
             INNER JOIN campaign_interactions ci ON up.email = ci.email
             WHERE up.zipcode IS NOT NULL AND up.zipcode != ''
+            AND LENGTH(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g')) >= 5
             AND ci.event_type = 'open'
+            GROUP BY LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 3)
         """
-        cursor.execute(engagement_query)
-        engagement_results = cursor.fetchall()
+        cursor.execute(engaged_state_query)
+        engaged_prefix_counts = cursor.fetchall()
 
-        print(f"[GEO-MAIN] Fetched {len(engagement_results)} engaged users with zipcodes")
+        engaged_by_prefix = {row['zip_prefix']: row['count'] for row in engaged_prefix_counts}
 
         state_counts = {}
         state_engaged = {}
+        zipcode_audience = {}
+        zipcode_engaged = {}
+        urban_counts = {'Urban': 0, 'Suburban': 0, 'Rural': 0}
 
-        for row in user_results:
-            zipcode = row['zipcode']
-            state_abbrev = zipcode_to_state_abbrev(zipcode)
-            if state_abbrev:
-                state_full = state_abbrev_to_full_name(state_abbrev)
-                if state_full:
-                    if state_full not in state_counts:
-                        state_counts[state_full] = 0
-                    state_counts[state_full] += 1
+        METRO_AREAS = {
+            'New York, NY': ['100', '101', '102', '103', '104', '110', '111', '112', '113', '114', '115', '116', '117'],
+            'Los Angeles, CA': ['900', '901', '902', '903', '904', '905', '906', '907', '908', '910', '911', '912', '913', '914', '915', '916', '917', '918'],
+            'Chicago, IL': ['606', '607', '608', '609', '610', '600', '601', '602', '603', '604', '605'],
+            'Houston, TX': ['770', '772', '773', '774', '775', '776', '777'],
+            'Phoenix, AZ': ['850', '851', '852', '853', '855', '856', '857'],
+            'Philadelphia, PA': ['190', '191', '192', '193', '194', '180', '181', '182', '183', '184', '185'],
+            'San Antonio, TX': ['782', '781'],
+            'San Diego, CA': ['919', '920', '921', '922'],
+            'Dallas, TX': ['750', '751', '752', '753', '754', '755', '756', '757'],
+            'San Francisco, CA': ['941', '940', '942', '943', '944', '945', '946', '947'],
+            'Austin, TX': ['787', '786'],
+            'Seattle, WA': ['980', '981', '982', '983', '984', '985'],
+            'Denver, CO': ['802', '803', '804', '805', '800', '801'],
+            'Washington, DC': ['200', '201', '202', '203', '204', '205', '220', '221', '222'],
+            'Boston, MA': ['021', '022', '024', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020'],
+            'Atlanta, GA': ['303', '300', '301', '302', '304', '305', '306', '307', '308', '309', '310', '311'],
+            'Miami, FL': ['331', '330', '332', '333', '334', '335'],
+            'Minneapolis, MN': ['553', '554', '555', '550', '551'],
+            'Detroit, MI': ['481', '482', '483', '484', '480', '485', '486'],
+            'Tampa, FL': ['336', '335', '337', '338'],
+            'Cleveland, OH': ['441', '440', '442', '443', '444'],
+            'Portland, OR': ['972', '973', '974'],
+            'St. Louis, MO': ['631', '630', '633', '634'],
+            'Pittsburgh, PA': ['152', '150', '151', '153', '154'],
+            'Las Vegas, NV': ['891', '890', '889'],
+            'Baltimore, MD': ['212', '210', '211', '214'],
+            'Nashville, TN': ['372', '371', '373'],
+            'Charlotte, NC': ['282', '280', '281', '283'],
+            'Indianapolis, IN': ['462', '460', '461', '463'],
+            'San Jose, CA': ['950', '951', '952']
+        }
 
-        for row in engagement_results:
-            zipcode = row['zipcode']
-            state_abbrev = zipcode_to_state_abbrev(zipcode)
-            if state_abbrev:
-                state_full = state_abbrev_to_full_name(state_abbrev)
-                if state_full:
-                    if state_full not in state_engaged:
-                        state_engaged[state_full] = 0
-                    state_engaged[state_full] += 1
+        metro_audience = {metro: 0 for metro in METRO_AREAS}
+        metro_engaged = {metro: 0 for metro in METRO_AREAS}
+
+        for row in prefix_counts:
+            prefix = row['zip_prefix']
+            count = row['count']
+            engaged = engaged_by_prefix.get(prefix, 0)
+
+            if prefix and len(prefix) == 3:
+                zipcode_audience[prefix] = count
+                zipcode_engaged[prefix] = engaged
+
+                full_zip = prefix + '00'
+                state_abbrev = zipcode_to_state_abbrev(full_zip)
+                if state_abbrev:
+                    state_full = state_abbrev_to_full_name(state_abbrev)
+                    if state_full:
+                        state_counts[state_full] = state_counts.get(state_full, 0) + count
+                        state_engaged[state_full] = state_engaged.get(state_full, 0) + engaged
+
+                classification = classify_zipcode_urbanization(full_zip)
+                if classification in urban_counts:
+                    urban_counts[classification] += count
+
+                for metro, prefixes in METRO_AREAS.items():
+                    if prefix in prefixes:
+                        metro_audience[metro] += count
+                        metro_engaged[metro] += engaged
+                        break
+
+        print(f"[GEO-MAIN] Processed {len(prefix_counts)} zip prefixes")
 
         state_heatmap = {}
         total_states = 0
@@ -1283,70 +1353,62 @@ def geographic_main():
         opportunity = {}
 
         for state, audience_data in state_heatmap.items():
-            audience_count = audience_data['count']
+            aud_count = audience_data['count']
             npi_data = npi_by_state.get(state, {})
-            npi_count = npi_data.get('count', 0)
+            npi_cnt = npi_data.get('count', 0)
 
-            if npi_count > 0:
-                pen_rate = round((audience_count / npi_count * 100), 2)
+            if npi_cnt > 0:
+                pen_rate = round((aud_count / npi_cnt * 100), 2)
             else:
                 pen_rate = 0
 
             penetration[state] = {
-                'audience_count': audience_count,
-                'npi_count': npi_count,
+                'audience_count': aud_count,
+                'npi_count': npi_cnt,
                 'penetration_rate': pen_rate
             }
 
             opportunity_score = round(100 - pen_rate, 2) if pen_rate > 0 else 100
-            addressable = max(0, npi_count - audience_count)
+            addressable = max(0, npi_cnt - aud_count)
 
             opportunity[state] = {
                 'opportunity_score': opportunity_score,
                 'addressable_npis': addressable
             }
 
-        urban_counts = {'Urban': 0, 'Suburban': 0, 'Rural': 0}
-        npi_urban_counts = {'Urban': 0, 'Suburban': 0, 'Rural': 0}
-
-        def normalize_zipcode(zipcode):
-            if not zipcode:
-                return None
-            zip_str = str(zipcode).strip()
-            zip_str = ''.join(c for c in zip_str if c.isdigit())
-            if len(zip_str) < 5:
-                zip_str = zip_str.zfill(5)
-            return zip_str[:5] if len(zip_str) >= 5 else None
-
-        valid_user_zips = 0
-        invalid_user_zips = 0
-        for row in user_results:
-            zipcode = normalize_zipcode(row['zipcode'])
-            if zipcode:
-                valid_user_zips += 1
-                classification = classify_zipcode_urbanization(zipcode)
-                if classification in urban_counts:
-                    urban_counts[classification] += 1
-            else:
-                invalid_user_zips += 1
-
-        print(f"[GEO-MAIN] Urban classification: valid_zips={valid_user_zips}, invalid_zips={invalid_user_zips}")
-
-        npi_urban_query = """
-            SELECT COALESCE(practice_zipcode, mailing_zipcode) as zipcode
+        npi_prefix_query = """
+            SELECT
+                LEFT(REGEXP_REPLACE(COALESCE(practice_zipcode, mailing_zipcode), '[^0-9]', '', 'g'), 3) as zip_prefix,
+                COUNT(*) as count
             FROM universal_profiles
             WHERE is_active = TRUE
             AND COALESCE(practice_zipcode, mailing_zipcode) IS NOT NULL
+            AND LENGTH(REGEXP_REPLACE(COALESCE(practice_zipcode, mailing_zipcode), '[^0-9]', '', 'g')) >= 5
+            GROUP BY LEFT(REGEXP_REPLACE(COALESCE(practice_zipcode, mailing_zipcode), '[^0-9]', '', 'g'), 3)
         """
-        cursor.execute(npi_urban_query)
-        npi_zip_results = cursor.fetchall()
+        cursor.execute(npi_prefix_query)
+        npi_prefix_results = cursor.fetchall()
 
-        for row in npi_zip_results:
-            zipcode = normalize_zipcode(row['zipcode'])
-            if zipcode:
-                classification = classify_zipcode_urbanization(zipcode)
+        npi_urban_counts = {'Urban': 0, 'Suburban': 0, 'Rural': 0}
+        metro_npis = {metro: 0 for metro in METRO_AREAS}
+        zipcode_npis = {}
+
+        for row in npi_prefix_results:
+            prefix = row['zip_prefix']
+            count = row['count']
+
+            if prefix and len(prefix) == 3:
+                zipcode_npis[prefix] = count
+
+                full_zip = prefix + '00'
+                classification = classify_zipcode_urbanization(full_zip)
                 if classification in npi_urban_counts:
-                    npi_urban_counts[classification] += 1
+                    npi_urban_counts[classification] += count
+
+                for metro, prefixes in METRO_AREAS.items():
+                    if prefix in prefixes:
+                        metro_npis[metro] += count
+                        break
 
         urban_rural = {
             'audience': {
@@ -1363,70 +1425,8 @@ def geographic_main():
             }
         }
 
-        print(f"[GEO-MAIN] Urban/Rural - Audience: {urban_counts}, Total: {sum(urban_counts.values())}")
-        print(f"[GEO-MAIN] Urban/Rural - NPIs: {npi_urban_counts}, Total: {sum(npi_urban_counts.values())}")
-        print(f"[GEO-MAIN] urban_rural structure being returned: {urban_rural}")
-
-        METRO_AREAS = {
-            'New York, NY': ['100', '101', '102', '103', '104', '110', '111', '112', '113', '114', '115', '116', '117'],
-            'Los Angeles, CA': ['900', '901', '902', '903', '904', '905', '906', '907', '908', '910', '911', '912', '913', '914', '915', '916', '917', '918'],
-            'Chicago, IL': ['606', '607', '608', '609', '610', '600', '601', '602', '603', '604', '605'],
-            'Houston, TX': ['770', '772', '773', '774', '775', '776', '777'],
-            'Phoenix, AZ': ['850', '851', '852', '853', '855', '856', '857'],
-            'Philadelphia, PA': ['190', '191', '192', '193', '194', '180', '181', '182', '183', '184', '185'],
-            'San Antonio, TX': ['782', '781'],
-            'San Diego, CA': ['919', '920', '921', '922'],
-            'Dallas, TX': ['750', '751', '752', '753', '754', '755', '756', '757'],
-            'San Francisco, CA': ['941', '940', '942', '943', '944', '945', '946', '947'],
-            'Austin, TX': ['787', '786'],
-            'Seattle, WA': ['980', '981', '982', '983', '984', '985'],
-            'Denver, CO': ['802', '803', '804', '805', '800', '801'],
-            'Washington, DC': ['200', '201', '202', '203', '204', '205', '220', '221', '222'],
-            'Boston, MA': ['021', '022', '024', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020'],
-            'Atlanta, GA': ['303', '300', '301', '302', '304', '305', '306', '307', '308', '309', '310', '311'],
-            'Miami, FL': ['331', '330', '332', '333', '334', '335'],
-            'Minneapolis, MN': ['553', '554', '555', '550', '551'],
-            'Detroit, MI': ['481', '482', '483', '484', '480', '485', '486'],
-            'Tampa, FL': ['336', '335', '337', '338'],
-            'Cleveland, OH': ['441', '440', '442', '443', '444'],
-            'Portland, OR': ['972', '973', '974'],
-            'St. Louis, MO': ['631', '630', '633', '634'],
-            'Pittsburgh, PA': ['152', '150', '151', '153', '154'],
-            'Las Vegas, NV': ['891', '890', '889'],
-            'Baltimore, MD': ['212', '210', '211', '214'],
-            'Nashville, TN': ['372', '371', '373'],
-            'Charlotte, NC': ['282', '280', '281', '283'],
-            'Indianapolis, IN': ['462', '460', '461', '463'],
-            'San Jose, CA': ['950', '951', '952']
-        }
-
-        metro_audience = {metro: 0 for metro in METRO_AREAS}
-        metro_npis = {metro: 0 for metro in METRO_AREAS}
-        metro_engaged = {metro: 0 for metro in METRO_AREAS}
-
-        for row in user_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            for metro, prefixes in METRO_AREAS.items():
-                if prefix in prefixes:
-                    metro_audience[metro] += 1
-                    break
-
-        for row in engagement_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            for metro, prefixes in METRO_AREAS.items():
-                if prefix in prefixes:
-                    metro_engaged[metro] += 1
-                    break
-
-        for row in npi_zip_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            for metro, prefixes in METRO_AREAS.items():
-                if prefix in prefixes:
-                    metro_npis[metro] += 1
-                    break
+        print(f"[GEO-MAIN] Urban/Rural - Audience: {urban_counts}")
+        print(f"[GEO-MAIN] Urban/Rural - NPIs: {npi_urban_counts}")
 
         metro_areas = []
         for metro in METRO_AREAS:
@@ -1447,37 +1447,6 @@ def geographic_main():
 
         metro_areas.sort(key=lambda x: x['audience_count'], reverse=True)
         print(f"[GEO-MAIN] Metro areas with data: {len(metro_areas)}")
-        if len(metro_areas) > 0:
-            print(f"[GEO-MAIN] Top metro: {metro_areas[0]}")
-        else:
-            sample_count = 0
-            for row in user_results[:10]:
-                normalized = normalize_zipcode(row['zipcode'])
-                prefix = normalized[:3] if normalized else 'None'
-                print(f"[GEO-MAIN DEBUG] Sample zip: raw='{row['zipcode']}' -> normalized='{normalized}' -> prefix='{prefix}'")
-                sample_count += 1
-
-        zipcode_audience = {}
-        zipcode_npis = {}
-        zipcode_engaged = {}
-
-        for row in user_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            if prefix and len(prefix) == 3:
-                zipcode_audience[prefix] = zipcode_audience.get(prefix, 0) + 1
-
-        for row in engagement_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            if prefix and len(prefix) == 3:
-                zipcode_engaged[prefix] = zipcode_engaged.get(prefix, 0) + 1
-
-        for row in npi_zip_results:
-            normalized_zip = normalize_zipcode(row['zipcode'])
-            prefix = normalized_zip[:3] if normalized_zip else ''
-            if prefix and len(prefix) == 3:
-                zipcode_npis[prefix] = zipcode_npis.get(prefix, 0) + 1
 
         all_prefixes = set(zipcode_audience.keys()) | set(zipcode_npis.keys())
         zipcode_data = {}
@@ -1496,49 +1465,56 @@ def geographic_main():
             }
 
         print(f"[GEO-MAIN] Zipcode prefixes: {len(zipcode_data)}")
-        print(f"[GEO-MAIN] zipcode_audience keys (first 5): {list(zipcode_audience.keys())[:5]}")
 
         city_query = """
-            SELECT city, zipcode, COUNT(*) as count
+            SELECT
+                city,
+                LEFT(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g'), 5) as zipcode,
+                COUNT(*) as count
             FROM user_profiles
             WHERE city IS NOT NULL AND city != ''
-            GROUP BY city, zipcode
+            AND LENGTH(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g')) >= 5
+            GROUP BY city, LEFT(REGEXP_REPLACE(zipcode, '[^0-9]', '', 'g'), 5)
         """
         cursor.execute(city_query)
         city_results = cursor.fetchall()
 
         city_engaged_query = """
-            SELECT up.city, up.zipcode, COUNT(DISTINCT up.email) as count
+            SELECT
+                up.city,
+                LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 5) as zipcode,
+                COUNT(DISTINCT up.email) as count
             FROM user_profiles up
             INNER JOIN campaign_interactions ci ON up.email = ci.email
             WHERE up.city IS NOT NULL AND up.city != ''
+            AND LENGTH(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g')) >= 5
             AND ci.event_type = 'open'
-            GROUP BY up.city, up.zipcode
+            GROUP BY up.city, LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 5)
         """
         cursor.execute(city_engaged_query)
         city_engaged_results = cursor.fetchall()
 
         city_audience = {}
-        city_engaged = {}
+        city_engaged_dict = {}
 
         for row in city_results:
             city = row['city']
-            normalized_zip = normalize_zipcode(row['zipcode'])
+            normalized_zip = row['zipcode']
             state_abbrev = zipcode_to_state_abbrev(normalized_zip) if normalized_zip else None
             city_key = f"{city}, {state_abbrev}" if state_abbrev else city
             city_audience[city_key] = city_audience.get(city_key, 0) + row['count']
 
         for row in city_engaged_results:
             city = row['city']
-            normalized_zip = normalize_zipcode(row['zipcode'])
+            normalized_zip = row['zipcode']
             state_abbrev = zipcode_to_state_abbrev(normalized_zip) if normalized_zip else None
             city_key = f"{city}, {state_abbrev}" if state_abbrev else city
-            city_engaged[city_key] = city_engaged.get(city_key, 0) + row['count']
+            city_engaged_dict[city_key] = city_engaged_dict.get(city_key, 0) + row['count']
 
         city_data = {}
         for city_key in city_audience:
             aud = city_audience[city_key]
-            engaged = city_engaged.get(city_key, 0)
+            engaged = city_engaged_dict.get(city_key, 0)
             city_data[city_key] = {
                 'audience_count': aud,
                 'engaged_count': engaged,
@@ -1548,12 +1524,10 @@ def geographic_main():
         city_data = dict(sorted(city_data.items(), key=lambda x: x[1]['audience_count'], reverse=True)[:100])
         print(f"[GEO-MAIN] City data entries: {len(city_data)}")
 
-        print(f"[GEO-MAIN] Cities: {len(city_data)}")
-
         cursor.close()
         conn.close()
 
-        print(f"[GEO-MAIN] Successfully processed: {total_states} states, {total_users} users, {len(npi_by_state)} NPI states")
+        print(f"[GEO-MAIN] Successfully processed: {total_states} states, {total_users} users")
 
         return jsonify({
             'full_map': {

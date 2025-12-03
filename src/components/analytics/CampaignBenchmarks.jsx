@@ -72,6 +72,10 @@ const CampaignBenchmarks = () => {
 
     const { campaign, classification, benchmarks, grade, overall_score, similar_count } = benchmarkData;
 
+    console.log('Benchmarks data:', benchmarks);
+
+    const displayMetrics = ['unique_open_rate', 'total_open_rate', 'unique_click_rate', 'total_click_rate'];
+
     return (
       <div className="performance-score-container">
         <div className="score-header">
@@ -94,16 +98,18 @@ const CampaignBenchmarks = () => {
         </div>
 
         <div className="benchmark-cards">
-          {Object.entries(benchmarks).map(([metric, data]) => {
+          {displayMetrics.map((metric) => {
+            const data = benchmarks[metric];
+            if (!data) return null;
             const metricName = metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             return (
               <div key={metric} className="benchmark-card">
                 <h4>{metricName}</h4>
                 <div className="metric-value">{data.your_value?.toFixed(1)}%</div>
-                <div className="benchmark-bar">
-                  <div className="benchmark-range">
-                    <span className="range-label">25th</span>
-                    <span className="range-value">{data.p25?.toFixed(1)}%</span>
+                <div className="benchmark-bar-container">
+                  <div className="benchmark-bar-labels">
+                    <span className="range-min">Min: {data.min?.toFixed(1)}%</span>
+                    <span className="range-max">Max: {data.max?.toFixed(1)}%</span>
                   </div>
                   <div className="percentile-track">
                     <div
@@ -112,10 +118,6 @@ const CampaignBenchmarks = () => {
                       title={`${data.your_percentile}th percentile`}
                     />
                   </div>
-                  <div className="benchmark-range">
-                    <span className="range-label">75th</span>
-                    <span className="range-value">{data.p75?.toFixed(1)}%</span>
-                  </div>
                 </div>
                 <div className="benchmark-stats">
                   <div className="stat">
@@ -123,8 +125,8 @@ const CampaignBenchmarks = () => {
                     <span className="stat-value">{data.median?.toFixed(1)}%</span>
                   </div>
                   <div className="stat">
-                    <span className="stat-label">Top 10%:</span>
-                    <span className="stat-value">{data.p90?.toFixed(1)}%</span>
+                    <span className="stat-label">Mean:</span>
+                    <span className="stat-value">{data.mean?.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -133,7 +135,7 @@ const CampaignBenchmarks = () => {
         </div>
 
         <div className="comparison-summary">
-          <p>Based on <strong>{similar_count}</strong> similar campaigns in <strong>{classification?.bucket || 'this category'}</strong></p>
+          <p>Based on <strong>{similar_count}</strong> similar campaigns in <strong>{classification?.bucket || 'this category'}</strong>{filterByTopic && classification?.topic ? ` > ${classification.topic}` : ''}</p>
         </div>
       </div>
     );
@@ -142,7 +144,25 @@ const CampaignBenchmarks = () => {
   const renderSimilarCampaigns = () => {
     if (!benchmarkData?.similar_campaigns) return null;
 
-    const { similar_campaigns } = benchmarkData;
+    const { similar_campaigns, campaign } = benchmarkData;
+    const selectedUniqueOpen = campaign?.core_metrics?.unique_open_rate || 0;
+    const selectedTotalOpen = campaign?.core_metrics?.total_open_rate || 0;
+    const selectedUniqueClick = campaign?.core_metrics?.unique_click_rate || 0;
+    const selectedTotalClick = campaign?.core_metrics?.total_click_rate || 0;
+
+    const formatWithDelta = (value, selectedValue) => {
+      const delta = value - selectedValue;
+      const deltaClass = delta > 0 ? 'delta-positive' : delta < 0 ? 'delta-negative' : '';
+      const rateClass = delta > 0 ? 'rate-positive' : delta < 0 ? 'rate-negative' : '';
+      return (
+        <span className={rateClass}>
+          {value?.toFixed(1)}%
+          <span className={`delta-text ${deltaClass}`}>
+            {' '}({delta > 0 ? '+' : ''}{delta?.toFixed(1)}%)
+          </span>
+        </span>
+      );
+    };
 
     return (
       <div className="similar-campaigns-container">
@@ -156,9 +176,10 @@ const CampaignBenchmarks = () => {
                 <th>Campaign Name</th>
                 <th>Send Date</th>
                 <th>Unique Open Rate</th>
+                <th>Total Open Rate</th>
                 <th>Unique Click Rate</th>
+                <th>Total Click Rate</th>
                 <th>Sends</th>
-                <th>Similarity</th>
               </tr>
             </thead>
             <tbody>
@@ -166,55 +187,15 @@ const CampaignBenchmarks = () => {
                 <tr key={idx}>
                   <td className="campaign-name-cell">{camp.campaign_name}</td>
                   <td>{new Date(camp.send_date).toLocaleDateString()}</td>
-                  <td>
-                    <span className={camp.open_rate_delta > 0 ? 'positive' : camp.open_rate_delta < 0 ? 'negative' : ''}>
-                      {camp.unique_open_rate?.toFixed(1)}%
-                      {camp.open_rate_delta !== undefined && (
-                        <span className="delta"> ({camp.open_rate_delta > 0 ? '+' : ''}{camp.open_rate_delta?.toFixed(1)}%)</span>
-                      )}
-                    </span>
-                  </td>
-                  <td>{camp.unique_click_rate?.toFixed(1)}%</td>
+                  <td>{formatWithDelta(camp.unique_open_rate, selectedUniqueOpen)}</td>
+                  <td>{formatWithDelta(camp.total_open_rate, selectedTotalOpen)}</td>
+                  <td>{formatWithDelta(camp.unique_click_rate, selectedUniqueClick)}</td>
+                  <td>{formatWithDelta(camp.total_click_rate, selectedTotalClick)}</td>
                   <td>{camp.delivered?.toLocaleString()}</td>
-                  <td>
-                    <div className="similarity-badge">{camp.similarity_score}%</div>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSuccessFactors = () => {
-    if (!benchmarkData?.success_factors) return null;
-
-    const { success_factors } = benchmarkData;
-
-    return (
-      <div className="success-factors-container">
-        <h3>Success Factors</h3>
-        <p className="section-subtitle">Performance patterns within this campaign type</p>
-
-        <div className="factors-grid">
-          {success_factors.map((factor, idx) => (
-            <div key={idx} className="factor-card">
-              <div className="factor-header">
-                <h4>{factor.factor}</h4>
-                <div className="factor-performance">{factor.avg_performance?.toFixed(1)}%</div>
-              </div>
-              <div className="factor-details">
-                <span className="factor-sample">Based on {factor.sample_size} campaigns</span>
-                {factor.vs_overall && (
-                  <span className={`factor-delta ${factor.vs_overall > 0 ? 'positive' : 'negative'}`}>
-                    {factor.vs_overall > 0 ? '+' : ''}{factor.vs_overall?.toFixed(1)}% vs avg
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     );
@@ -225,13 +206,17 @@ const CampaignBenchmarks = () => {
 
     const { benchmarks } = benchmarkData;
 
+    const metricOrder = ['unique_open_rate', 'total_open_rate', 'unique_click_rate', 'total_click_rate', 'delivery_rate'];
+
     return (
       <div className="percentile-ranking-container">
         <h3>Percentile Rankings</h3>
         <p className="section-subtitle">Where the campaign ranks across all metrics</p>
 
         <div className="ranking-bars">
-          {Object.entries(benchmarks).map(([metric, data]) => {
+          {metricOrder.map((metric) => {
+            const data = benchmarks[metric];
+            if (!data) return null;
             const metricName = metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const percentile = data.your_percentile || 0;
 
@@ -239,7 +224,7 @@ const CampaignBenchmarks = () => {
               <div key={metric} className="ranking-item">
                 <div className="ranking-label">{metricName}</div>
                 <div className="ranking-bar-wrapper">
-                  <div className="ranking-bar" style={{ width: `${percentile}%` }}>
+                  <div className="ranking-bar" style={{ width: `${Math.max(percentile, 5)}%` }}>
                     <span className="ranking-value">{percentile}th %ile</span>
                   </div>
                 </div>
@@ -368,12 +353,6 @@ const CampaignBenchmarks = () => {
               Similar Campaigns
             </button>
             <button
-              className={`viz-tab ${activeTab === 'factors' ? 'active' : ''}`}
-              onClick={() => setActiveTab('factors')}
-            >
-              Success Factors
-            </button>
-            <button
               className={`viz-tab ${activeTab === 'percentile' ? 'active' : ''}`}
               onClick={() => setActiveTab('percentile')}
             >
@@ -384,7 +363,6 @@ const CampaignBenchmarks = () => {
           <div className="benchmark-content">
             {activeTab === 'performance' && renderPerformanceScore()}
             {activeTab === 'similar' && renderSimilarCampaigns()}
-            {activeTab === 'factors' && renderSuccessFactors()}
             {activeTab === 'percentile' && renderPercentileRanking()}
           </div>
         </>

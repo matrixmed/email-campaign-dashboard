@@ -48,53 +48,77 @@ const MetricCard = ({
     }
   }, [isEditing, id]);
 
-  const handleTitleBlur = useCallback(() => {
+  const handleTitleBlur = useCallback((e) => {
+    const relatedTarget = e.relatedTarget;
+    const isMovingToSiblingInput = relatedTarget &&
+      (relatedTarget === valueInputRef.current || relatedTarget === subtitleInputRef.current);
+
     onEdit?.(id, { title: localTitle });
-    setIsEditing(null);
+
+    if (!isMovingToSiblingInput) {
+      setIsEditing(null);
+    }
   }, [id, localTitle, onEdit, setIsEditing]);
-  
-  const handleValueBlur = useCallback(() => {
+
+  const handleValueBlur = useCallback((e) => {
+    const relatedTarget = e.relatedTarget;
+    const isMovingToSiblingInput = relatedTarget &&
+      (relatedTarget === titleInputRef.current || relatedTarget === subtitleInputRef.current);
+
     onEdit?.(id, { value: localValue });
-    setIsEditing(null);
+
+    if (!isMovingToSiblingInput) {
+      setIsEditing(null);
+    }
   }, [id, localValue, onEdit, setIsEditing]);
-  
-  const handleSubtitleBlur = useCallback(() => {
+
+  const handleSubtitleBlur = useCallback((e) => {
+    const relatedTarget = e.relatedTarget;
+    const isMovingToSiblingInput = relatedTarget &&
+      (relatedTarget === titleInputRef.current || relatedTarget === valueInputRef.current);
+
     onEdit?.(id, { subtitle: localSubtitle });
-    setIsEditing(null);
+
+    if (!isMovingToSiblingInput) {
+      setIsEditing(null);
+    }
   }, [id, localSubtitle, onEdit, setIsEditing]);
   
   const handleTitleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      handleTitleBlur();
+      onEdit?.(id, { title: localTitle });
+      setIsEditing(null);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setLocalTitle(title);
       setIsEditing(null);
     }
-  }, [handleTitleBlur, title, setIsEditing]);
+  }, [id, localTitle, onEdit, title, setIsEditing]);
   
   const handleValueKeyDown = useCallback((e) => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      handleValueBlur();
+      onEdit?.(id, { value: localValue });
+      setIsEditing(null);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setLocalValue(value);
       setIsEditing(null);
     }
-  }, [handleValueBlur, value, setIsEditing]);
+  }, [id, localValue, onEdit, value, setIsEditing]);
   
   const handleSubtitleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      handleSubtitleBlur();
+      onEdit?.(id, { subtitle: localSubtitle });
+      setIsEditing(null);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setLocalSubtitle(subtitle);
       setIsEditing(null);
     }
-  }, [handleSubtitleBlur, subtitle, setIsEditing]);
+  }, [id, localSubtitle, onEdit, subtitle, setIsEditing]);
 
   const [{ isDragMonitor }, drag] = useDrag(() => ({
     type: 'card',

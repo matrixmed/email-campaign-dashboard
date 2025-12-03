@@ -21,7 +21,7 @@ const formatAddress = (address1, address2) => {
 };
 
 const isTaxonomyCode = (value) => {
-  return value && /^\d{9}X$/.test(value);
+  return value && /^\d{3}[A-Z0-9]{6}X$/.test(value);
 };
 
 const getSpecialty = (profile) => {

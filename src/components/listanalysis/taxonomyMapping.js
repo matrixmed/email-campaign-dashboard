@@ -1,6 +1,3 @@
-// NUCC Healthcare Provider Taxonomy Code to Specialty Name Mapping
-// Generated from Taxonomy_List.xlsx
-
 const taxonomyMapping = {
   "171100000X": "Acupuncturist",
   "372600000X": "Adult Companion",

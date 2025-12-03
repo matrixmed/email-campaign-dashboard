@@ -125,9 +125,7 @@ const BrandManagement = () => {
 
     let updates = {};
 
-    if (targetLocation === 'historic') {
-      updates = { is_active: false };
-    } else if (salesMembers.includes(targetLocation)) {
+    if (salesMembers.includes(targetLocation)) {
       updates = { sales_member: targetLocation, is_active: true };
     } else if (targetLocation === 'unassigned') {
       updates = { sales_member: '', is_active: true };
@@ -166,11 +164,7 @@ const BrandManagement = () => {
   };
 
   const getUnassignedBrands = () => {
-    return filterBrands(brands.filter(b => !b.sales_member || b.sales_member.trim() === ''));
-  };
-
-  const getHistoricalBrands = () => {
-    return filterBrands(brands.filter(b => !b.is_active));
+    return filterBrands(brands.filter(b => (!b.sales_member || b.sales_member.trim() === '') && b.is_active !== false));
   };
 
   const renderCell = (brand, field) => {
@@ -206,8 +200,7 @@ const BrandManagement = () => {
     const currentEditor = brand.sales_member;
     const moveOptions = [
       ...salesMembers.filter(m => m !== currentEditor),
-      'unassigned',
-      'historic'
+      'unassigned'
     ];
 
     return (
@@ -224,9 +217,7 @@ const BrandManagement = () => {
         <option value="" disabled>Move to</option>
         {moveOptions.map(option => (
           <option key={option} value={option}>
-            {option === 'historic' ? 'Historic' :
-             option === 'unassigned' ? 'Unassigned' :
-             option}
+            {option === 'unassigned' ? 'Unassigned' : option}
           </option>
         ))}
       </select>
@@ -364,42 +355,6 @@ const BrandManagement = () => {
         </table>
       </div>
 
-      <div className="reports-section">
-        <table className="reports-table">
-          <tbody>
-            <tr className="agency-section-header">
-              <td colSpan="4" className="agency-section-title">
-                Historical / Inactive Brands <span className="agency-count">({getHistoricalBrands().length})</span>
-              </td>
-            </tr>
-            {getHistoricalBrands().map((brand, index) => (
-              <tr key={brand.id} className={index % 2 === 0 ? 'report-row even-row' : 'report-row odd-row'}>
-                {renderCell(brand, 'brand')}
-                {renderCell(brand, 'agency')}
-                {renderCell(brand, 'pharma_company')}
-                <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
-                    {renderMoveDropdown(brand)}
-                    <button
-                      onClick={() => handleDelete(brand.id)}
-                      className="delete-button"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {getHistoricalBrands().length === 0 && (
-              <tr>
-                <td colSpan="4" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
-                  No historical brands
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 };

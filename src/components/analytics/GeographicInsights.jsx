@@ -8,6 +8,7 @@ const GeographicInsights = () => {
   const [loading, setLoading] = useState(true);
   const [mainGeoData, setMainGeoData] = useState(null);
   const [mainDataLoaded, setMainDataLoaded] = useState(false);
+  const [mainDataError, setMainDataError] = useState(null);
   const [customMapData, setCustomMapData] = useState(null);
   const [activeMainTab, setActiveMainTab] = useState('audience-vs-npis');
   const [customMapLoading, setCustomMapLoading] = useState(false);
@@ -24,7 +25,7 @@ const GeographicInsights = () => {
   const [specialtySearchTerm, setSpecialtySearchTerm] = useState('');
   const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
   const [geoViewMode, setGeoViewMode] = useState('state');
-  const [mapColorMode, setMapColorMode] = useState('count'); 
+  const [mapColorMode, setMapColorMode] = useState('count');
   const [customMapGranularity, setCustomMapGranularity] = useState('state');
 
   const API_BASE = `${API_BASE_URL}/api`;
@@ -44,15 +45,37 @@ const GeographicInsights = () => {
 
   const fetchMainGeoData = async () => {
     setLoading(true);
+    setMainDataError(null);
     try {
-      console.log('[GEO] Fetching main geographic data...');
+      console.log('[GEO] Fetching main geographic data from:', `${API_BASE}/analytics/geographic-main`);
       const response = await fetch(`${API_BASE}/analytics/geographic-main`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
       console.log('[GEO] Data received:', data);
+      console.log('[GEO] state_heatmap keys:', data?.state_heatmap ? Object.keys(data.state_heatmap).length : 'null');
+      console.log('[GEO] npi_by_state keys:', data?.npi_by_state ? Object.keys(data.npi_by_state).length : 'null');
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response: expected object');
+      }
+
+      if (!data.state_heatmap || Object.keys(data.state_heatmap).length === 0) {
+        console.warn('[GEO] Warning: state_heatmap is empty or missing');
+      }
+
+      if (!data.npi_by_state || Object.keys(data.npi_by_state).length === 0) {
+        console.warn('[GEO] Warning: npi_by_state is empty or missing');
+      }
+
       setMainGeoData(data);
       setMainDataLoaded(true);
     } catch (error) {
       console.error('[GEO] Error fetching main geographic data:', error);
+      setMainDataError(error.message || 'Failed to load geographic data');
     } finally {
       setLoading(false);
     }
@@ -472,8 +495,52 @@ const GeographicInsights = () => {
   };
 
   const renderAudienceVsNPIs = () => {
-    if (!mainGeoData?.state_heatmap || !mainGeoData?.npi_by_state) {
+    if (mainDataError) {
+      return (
+        <div className="no-data" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ color: '#ff6b6b', marginBottom: '16px' }}>Failed to load map data: {mainDataError}</p>
+          <button
+            onClick={fetchMainGeoData}
+            style={{
+              padding: '10px 20px',
+              background: '#0ff',
+              color: '#000',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (loading) {
       return <div className="no-data">Loading map data...</div>;
+    }
+
+    if (!mainGeoData?.state_heatmap || !mainGeoData?.npi_by_state) {
+      return (
+        <div className="no-data" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ color: '#888', marginBottom: '16px' }}>No geographic data available</p>
+          <button
+            onClick={fetchMainGeoData}
+            style={{
+              padding: '10px 20px',
+              background: '#0ff',
+              color: '#000',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Reload Data
+          </button>
+        </div>
+      );
     }
 
     const audienceMapData = prepareAudienceMapDataByMode();
@@ -1119,16 +1186,49 @@ const GeographicInsights = () => {
   };
 
   const renderMetroUrbanRuralTab = () => {
+    if (mainDataError) {
+      return (
+        <div className="no-data" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ color: '#ff6b6b', marginBottom: '16px' }}>Failed to load data: {mainDataError}</p>
+          <button
+            onClick={fetchMainGeoData}
+            style={{
+              padding: '10px 20px',
+              background: '#0ff',
+              color: '#000',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (loading) {
+      return <div className="no-data">Loading metro data...</div>;
+    }
+
     const urbanRural = mainGeoData?.urban_rural;
     const metroAreas = mainGeoData?.metro_areas || [];
 
-    console.log('[GEO-METRO] urban_rural:', urbanRural);
-    console.log('[GEO-METRO] metro_areas:', metroAreas);
+    console.log('[GEO-METRO] mainGeoData keys:', mainGeoData ? Object.keys(mainGeoData) : 'null');
+    console.log('[GEO-METRO] urban_rural:', JSON.stringify(urbanRural, null, 2));
+    console.log('[GEO-METRO] metro_areas count:', metroAreas.length);
+    if (metroAreas.length > 0) {
+      console.log('[GEO-METRO] first metro:', metroAreas[0]);
+    }
 
     const audience = urbanRural?.audience || {};
     const npis = urbanRural?.npis || {};
     const audienceTotal = audience?.total || 1;
     const npiTotal = npis?.total || 1;
+
+    const hasUrbanRuralData = (audience?.urban > 0 || audience?.suburban > 0 || audience?.rural > 0) ||
+                              (npis?.urban > 0 || npis?.suburban > 0 || npis?.rural > 0);
 
     const audienceUrbanPct = ((audience?.urban || 0) / audienceTotal * 100).toFixed(1);
     const audienceSuburbanPct = ((audience?.suburban || 0) / audienceTotal * 100).toFixed(1);
@@ -1150,6 +1250,30 @@ const GeographicInsights = () => {
     const bestMetro = metroAreas.length > 0
       ? metroAreas.reduce((best, m) => m.engagement_rate > best.engagement_rate ? m : best, metroAreas[0])
       : null;
+
+    if (!hasUrbanRuralData && metroAreas.length === 0) {
+      return (
+        <div className="no-data" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ color: '#888', marginBottom: '16px' }}>No metro or urban/rural data available</p>
+          <p style={{ color: '#666', fontSize: '12px' }}>This data is calculated from user zipcode information.</p>
+          <button
+            onClick={fetchMainGeoData}
+            style={{
+              padding: '10px 20px',
+              background: '#0ff',
+              color: '#000',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              marginTop: '16px'
+            }}
+          >
+            Reload Data
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div className="metro-urban-combined">

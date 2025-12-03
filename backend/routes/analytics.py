@@ -1318,12 +1318,19 @@ def geographic_main():
                 zip_str = zip_str.zfill(5)
             return zip_str[:5] if len(zip_str) >= 5 else None
 
+        valid_user_zips = 0
+        invalid_user_zips = 0
         for row in user_results:
             zipcode = normalize_zipcode(row['zipcode'])
             if zipcode:
+                valid_user_zips += 1
                 classification = classify_zipcode_urbanization(zipcode)
                 if classification in urban_counts:
                     urban_counts[classification] += 1
+            else:
+                invalid_user_zips += 1
+
+        print(f"[GEO-MAIN] Urban classification: valid_zips={valid_user_zips}, invalid_zips={invalid_user_zips}")
 
         npi_urban_query = """
             SELECT COALESCE(practice_zipcode, mailing_zipcode) as zipcode
@@ -1356,7 +1363,9 @@ def geographic_main():
             }
         }
 
-        print(f"[GEO-MAIN] Urban/Rural - Audience: {urban_counts}, NPIs: {npi_urban_counts}")
+        print(f"[GEO-MAIN] Urban/Rural - Audience: {urban_counts}, Total: {sum(urban_counts.values())}")
+        print(f"[GEO-MAIN] Urban/Rural - NPIs: {npi_urban_counts}, Total: {sum(npi_urban_counts.values())}")
+        print(f"[GEO-MAIN] urban_rural structure being returned: {urban_rural}")
 
         METRO_AREAS = {
             'New York, NY': ['100', '101', '102', '103', '104', '110', '111', '112', '113', '114', '115', '116', '117'],
@@ -1437,6 +1446,16 @@ def geographic_main():
                 })
 
         metro_areas.sort(key=lambda x: x['audience_count'], reverse=True)
+        print(f"[GEO-MAIN] Metro areas with data: {len(metro_areas)}")
+        if len(metro_areas) > 0:
+            print(f"[GEO-MAIN] Top metro: {metro_areas[0]}")
+        else:
+            sample_count = 0
+            for row in user_results[:10]:
+                normalized = normalize_zipcode(row['zipcode'])
+                prefix = normalized[:3] if normalized else 'None'
+                print(f"[GEO-MAIN DEBUG] Sample zip: raw='{row['zipcode']}' -> normalized='{normalized}' -> prefix='{prefix}'")
+                sample_count += 1
 
         zipcode_audience = {}
         zipcode_npis = {}
@@ -1477,6 +1496,7 @@ def geographic_main():
             }
 
         print(f"[GEO-MAIN] Zipcode prefixes: {len(zipcode_data)}")
+        print(f"[GEO-MAIN] zipcode_audience keys (first 5): {list(zipcode_audience.keys())[:5]}")
 
         city_query = """
             SELECT city, zipcode, COUNT(*) as count
@@ -1526,6 +1546,7 @@ def geographic_main():
             }
 
         city_data = dict(sorted(city_data.items(), key=lambda x: x[1]['audience_count'], reverse=True)[:100])
+        print(f"[GEO-MAIN] City data entries: {len(city_data)}")
 
         print(f"[GEO-MAIN] Cities: {len(city_data)}")
 

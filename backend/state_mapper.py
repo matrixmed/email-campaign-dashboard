@@ -271,12 +271,13 @@ SUBURBAN_ZIPCODES = {
 
 def classify_zipcode_urbanization(zipcode):
     if not zipcode:
-        return 'Unknown'
+        return 'Rural' 
 
     zip_str = str(zipcode).strip()
+    zip_str = ''.join(c for c in zip_str if c.isdigit())
     if len(zip_str) < 3:
-        return 'Unknown'
-
+        return 'Rural' 
+    
     prefix = zip_str[:3]
 
     if prefix in URBAN_ZIPCODES:

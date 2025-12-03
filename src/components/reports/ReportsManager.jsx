@@ -1121,10 +1121,16 @@ const ReportsManager = () => {
                                         return sortedAgencies.map((agency, agencyIndex) => (
                                             <React.Fragment key={`agency-${agency}`}>
                                                 <tr className="agency-section-header">
-                                                    <td colSpan="7" className="agency-section-title">
+                                                    <td className="report-agency-section-title">
                                                         <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
                                                         <span className="agency-count">({groupedReports[agency].length} reports)</span>
                                                     </td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
                                                 </tr>
                                                 {groupedReports[agency].map((report) => {
                                                     const row = renderCurrentReportRow(report, globalIndex, paginatedCurrentReports);
@@ -1293,10 +1299,16 @@ const ReportsManager = () => {
                                         return sortedAgencies.map((agency, agencyIndex) => (
                                             <React.Fragment key={`archive-agency-${agency}`}>
                                                 <tr className="agency-section-header">
-                                                    <td colSpan="7" className="agency-section-title">
+                                                    <td className="report-agency-section-title">
                                                         <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
                                                         <span className="agency-count">({groupedReports[agency].length} reports)</span>
                                                     </td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
+                                                    <td className="agency-section-empty"></td>
                                                 </tr>
                                                 {groupedReports[agency].map((report) => {
                                                     const isCMI = report.agency === 'CMI';

@@ -3,7 +3,6 @@ import { API_BASE_URL } from '../../config/api';
 import '../../styles/NPIQuickLookup.css';
 import { getSpecialtyFromTaxonomy } from './taxonomyMapping';
 
-// Normalize zipcode to 5 digits
 const formatZipcode = (zip) => {
   if (!zip) return '';
   const cleaned = zip.toString().replace(/\D/g, '');
@@ -11,23 +10,30 @@ const formatZipcode = (zip) => {
   return zip;
 };
 
-// Capitalize first letter of each word, rest lowercase
 const formatName = (name) => {
   if (!name) return '';
   return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 };
 
-// Combine address fields into single address
 const formatAddress = (address1, address2) => {
   const parts = [address1, address2].filter(p => p && p.trim());
   return parts.join(', ');
 };
 
-// Get specialty - use existing specialty or map from taxonomy code
+const isTaxonomyCode = (value) => {
+  return value && /^\d{9}X$/.test(value);
+};
+
 const getSpecialty = (profile) => {
-  if (profile.specialty) return profile.specialty;
-  if (profile.taxonomy_code) return getSpecialtyFromTaxonomy(profile.taxonomy_code);
-  return '';
+  if (profile.specialty && !isTaxonomyCode(profile.specialty)) {
+    return profile.specialty;
+  }
+  const code = profile.taxonomy_code || profile.specialty;
+  if (code) {
+    const mapped = getSpecialtyFromTaxonomy(code);
+    return mapped || "";
+  }
+  return "";
 };
 
 const NPIQuickLookup = forwardRef((props, ref) => {

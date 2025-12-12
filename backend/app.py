@@ -27,24 +27,30 @@ from routes.dashboards import dashboards_bp
 from routes.campaigns import campaigns_bp
 from routes.cmi_contracts import cmi_contracts_bp
 from routes.cmi_reports import cmi_reports_bp
+from routes.expected_reports import expected_reports_bp
+from routes.unified_reports import unified_reports_bp
 from routes.brand_management import brand_management_bp
 from routes.users import users_bp
 from routes.list_analysis import list_analysis_bp
 from routes.analytics import analytics_bp
 from routes.npi import npi_bp
 from routes.basis import basis_bp
+from routes.validation_flags import validation_flags_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
 app.register_blueprint(campaigns_bp, url_prefix='/api/campaigns')
 app.register_blueprint(cmi_contracts_bp, url_prefix='/api/cmi-contracts')
 app.register_blueprint(cmi_reports_bp, url_prefix='/api/cmi')
+app.register_blueprint(expected_reports_bp, url_prefix='/api/cmi')
+app.register_blueprint(unified_reports_bp, url_prefix='/api/unified')
 app.register_blueprint(brand_management_bp, url_prefix='/api/brand-management')
 app.register_blueprint(users_bp, url_prefix='/api/users')
 app.register_blueprint(list_analysis_bp, url_prefix='/api/list-analysis')
 app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
 app.register_blueprint(npi_bp, url_prefix='/api/npi')
 app.register_blueprint(basis_bp, url_prefix='/api/basis')
+app.register_blueprint(validation_flags_bp, url_prefix='/api/validation-flags')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

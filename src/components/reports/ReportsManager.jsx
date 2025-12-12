@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, Clock, CheckCircle, FileText, Eye, Copy } from 'lucide-react';
+import { X, Calendar, Clock, CheckCircle, FileText, Eye, Copy, Link, Unlink, PlusCircle } from 'lucide-react';
 import '../../styles/ReportsManager.css';
 import { API_BASE_URL } from '../../config/api';
 
 const ReportsManager = () => {
     const [reportsData, setReportsData] = useState([]);
+    const [campaignMetadata, setCampaignMetadata] = useState([]);
+    const [cmiContractValues, setCmiContractValues] = useState([]);
+    const [cmiExpectedNoData, setCmiExpectedNoData] = useState({ pldAndAgg: [], aggOnly: [], allExpectedPlacementIds: [] });
     const [loading, setLoading] = useState(true);
     const [checkedReports, setCheckedReports] = useState({});
     const [selectedCMIReport, setSelectedCMIReport] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchCMIJSON, setBatchCMIJSON] = useState(null);
     const [activeTab, setActiveTab] = useState('current');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -19,10 +24,73 @@ const ReportsManager = () => {
     const [archiveRowsPerPage, setArchiveRowsPerPage] = useState(100);
     const [sortBy, setSortBy] = useState('send_date');
     const [sortDirection, setSortDirection] = useState('asc');
+    const [archiveAgencyTab, setArchiveAgencyTab] = useState('CMI');
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [movingReport, setMovingReport] = useState(null);
+    const [moveNote, setMoveNote] = useState('');
+
+    const [attachedAGGs, setAttachedAGGs] = useState({});
+    const [standaloneAGGs, setStandaloneAGGs] = useState([]);
+    const [movedPLDAGGs, setMovedPLDAGGs] = useState(() => {
+        const saved = localStorage.getItem('movedPLDAGGs');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [moveMode, setMoveMode] = useState('attach'); 
+    const [selectedAttachTarget, setSelectedAttachTarget] = useState(null);
+
+    const [showPlacementIdModal, setShowPlacementIdModal] = useState(false);
+    const [placementIdReport, setPlacementIdReport] = useState(null);
+    const [placementIdInput, setPlacementIdInput] = useState('');
+    const [manualMetadata, setManualMetadata] = useState(() => {
+        const saved = localStorage.getItem('manualMetadata');
+        return saved ? JSON.parse(saved) : {};
+    }); 
+
+    const [editedJSON, setEditedJSON] = useState('');
+    const [isEditingJSON, setIsEditingJSON] = useState(false);
+    const [editedBatchJSON, setEditedBatchJSON] = useState('');
+    const [isEditingBatchJSON, setIsEditingBatchJSON] = useState(false);
+
+    const [showEditFormModal, setShowEditFormModal] = useState(false);
+    const [editFormData, setEditFormData] = useState({});
+    const [gcmPlacements, setGcmPlacements] = useState([]);
+    const [gcmUploadBrand, setGcmUploadBrand] = useState('');
+    const [gcmUploadFile, setGcmUploadFile] = useState(null);
+    const [gcmUploadStatus, setGcmUploadStatus] = useState('');
 
     const cleanCampaignName = (name) => {
         if (!name) return name;
-        return name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
+        let cleaned = name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
+        cleaned = cleaned.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+        return cleaned;
+    };
+
+    const findMatchingMetadata = (report) => {
+        if (!campaignMetadata || campaignMetadata.length === 0) return null;
+
+        const reportName = cleanCampaignName(report.campaign_name || '').toLowerCase();
+        const reportSendDate = report.send_date;
+
+        for (const meta of campaignMetadata) {
+            const metaName = cleanCampaignName(meta.campaign_name || '').toLowerCase();
+
+            if (metaName === reportName) {
+                if (meta.send_date && reportSendDate && meta.send_date === reportSendDate) {
+                    return { ...meta, match_confidence: 1.0 };
+                }
+                if (!meta.send_date || !reportSendDate) {
+                    return { ...meta, match_confidence: 0.9 };
+                }
+            }
+
+            if (metaName.includes(reportName) || reportName.includes(metaName)) {
+                if (meta.send_date && reportSendDate && meta.send_date === reportSendDate) {
+                    return { ...meta, match_confidence: 0.8 };
+                }
+            }
+        }
+
+        return null;
     };
 
     const getDeploymentNumber = (name) => {
@@ -49,6 +117,15 @@ const ReportsManager = () => {
             if (sortBy === 'brand') {
                 aVal = (a.brand || '').toLowerCase();
                 bVal = (b.brand || '').toLowerCase();
+
+                const brandCompare = aVal.localeCompare(bVal);
+                if (brandCompare !== 0) {
+                    return sortDirection === 'asc' ? brandCompare : -brandCompare;
+                }
+
+                const aCampaign = (a.campaign_name || '').toLowerCase();
+                const bCampaign = (b.campaign_name || '').toLowerCase();
+                return aCampaign.localeCompare(bCampaign);
             } else if (sortBy === 'send_date') {
                 aVal = a.send_date || '';
                 bVal = b.send_date || '';
@@ -94,11 +171,51 @@ const ReportsManager = () => {
     useEffect(() => {
         const fetchReportsData = async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=90`);
-                const data = await response.json();
+                const reportsResponse = await fetch(`${API_BASE_URL}/api/cmi/reports/all?days_back=90`);
+                const data = await reportsResponse.json();
 
                 const deduplicatedData = deduplicateReports(data);
                 setReportsData(deduplicatedData);
+
+                try {
+                    const metadataResponse = await fetch(`${API_BASE_URL}/api/campaigns/metadata/all`);
+                    if (metadataResponse.ok) {
+                        const metadataResult = await metadataResponse.json();
+                        if (metadataResult.status === 'success') {
+                            setCampaignMetadata(metadataResult.metadata);
+                        }
+                    }
+                } catch (metaError) {
+                    console.error('Error fetching campaign metadata:', metaError);
+                }
+
+                try {
+                    const contractsResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=2025`);
+                    if (contractsResponse.ok) {
+                        const contractsResult = await contractsResponse.json();
+                        if (contractsResult.status === 'success') {
+                            setCmiContractValues(contractsResult.contracts);
+                        }
+                    }
+                } catch (contractsError) {
+                    console.error('Error fetching CMI contract values:', contractsError);
+                }
+
+                try {
+                    const noDataResponse = await fetch(`${API_BASE_URL}/api/unified/no-data`);
+                    if (noDataResponse.ok) {
+                        const noDataResult = await noDataResponse.json();
+                        if (noDataResult.status === 'success') {
+                            setCmiExpectedNoData({
+                                pldAndAgg: noDataResult.pld_and_agg || [],
+                                aggOnly: noDataResult.agg_only || [],
+                                allExpectedPlacementIds: noDataResult.all_expected_placement_ids || []
+                            });
+                        }
+                    }
+                } catch (noDataError) {
+                    console.error('Error fetching CMI expected no-data reports:', noDataError);
+                }
 
                 const newCheckedStates = {};
                 deduplicatedData.forEach(report => {
@@ -112,6 +229,14 @@ const ReportsManager = () => {
                         }
                     }
                 });
+
+                try {
+                    const savedMonthlyStates = JSON.parse(localStorage.getItem('monthlyReportStates') || '{}');
+                    Object.assign(newCheckedStates, savedMonthlyStates);
+                } catch (e) {
+                    console.error('Error loading monthly report states:', e);
+                }
+
                 setCheckedReports(newCheckedStates);
 
             } catch (error) {
@@ -129,6 +254,137 @@ const ReportsManager = () => {
         setFutureCurrentPage(1);
         setArchiveCurrentPage(1);
     }, [searchTerm]);
+
+    const openMoveModal = (report) => {
+        setMovingReport(report);
+        setMoveNote('');
+        setMoveMode('attach');
+        setSelectedAttachTarget(null);
+        setShowMoveModal(true);
+    };
+
+    const closeMoveModal = () => {
+        setShowMoveModal(false);
+        setMovingReport(null);
+        setMoveNote('');
+        setMoveMode('attach');
+        setSelectedAttachTarget(null);
+    };
+
+    const handleMoveToDue = async () => {
+        if (!movingReport) return;
+
+        if (moveMode === 'attach' && selectedAttachTarget) {
+            const newAttachedAGGs = { ...attachedAGGs };
+            const targetId = selectedAttachTarget.id;
+
+            if (!newAttachedAGGs[targetId]) {
+                newAttachedAGGs[targetId] = [];
+            }
+
+            newAttachedAGGs[targetId].push({
+                ...movingReport,
+                agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
+                agg_value: movingReport.agg_value || '',
+                notes: moveNote,
+                attached_at: new Date().toISOString()
+            });
+
+            setAttachedAGGs(newAttachedAGGs);
+            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
+
+        } else if (moveMode === 'standalone') {
+            const newStandaloneAGGs = [...standaloneAGGs, {
+                ...movingReport,
+                agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
+                agg_value: movingReport.agg_value || '',
+                notes: moveNote,
+                added_at: new Date().toISOString()
+            }];
+
+            setStandaloneAGGs(newStandaloneAGGs);
+            localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
+        }
+
+        try {
+            await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/move-to-due`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    notes: moveNote,
+                    assigned_campaign_id: selectedAttachTarget?.id
+                })
+            });
+        } catch (error) {
+            console.error('Error updating backend:', error);
+        }
+
+        closeMoveModal();
+    };
+
+    const handleDetachAGG = (campaignId, aggIndex) => {
+        const newAttachedAGGs = { ...attachedAGGs };
+        if (newAttachedAGGs[campaignId]) {
+            newAttachedAGGs[campaignId].splice(aggIndex, 1);
+            if (newAttachedAGGs[campaignId].length === 0) {
+                delete newAttachedAGGs[campaignId];
+            }
+            setAttachedAGGs(newAttachedAGGs);
+            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
+        }
+    };
+
+    const handleUpdateAttachedAGG = (campaignId, aggIndex, field, value) => {
+        const newAttachedAGGs = { ...attachedAGGs };
+        if (newAttachedAGGs[campaignId] && newAttachedAGGs[campaignId][aggIndex]) {
+            newAttachedAGGs[campaignId][aggIndex][field] = value;
+            setAttachedAGGs(newAttachedAGGs);
+            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
+        }
+    };
+
+    const handleUpdateStandaloneAGG = (index, field, value) => {
+        const newStandaloneAGGs = [...standaloneAGGs];
+        if (newStandaloneAGGs[index]) {
+            newStandaloneAGGs[index][field] = value;
+            setStandaloneAGGs(newStandaloneAGGs);
+            localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
+        }
+    };
+
+    const handleRemoveStandaloneAGG = (index) => {
+        const newStandaloneAGGs = [...standaloneAGGs];
+        newStandaloneAGGs.splice(index, 1);
+        setStandaloneAGGs(newStandaloneAGGs);
+        localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
+    };
+
+    const handleMovePLDAGG = (report) => {
+        const newMovedPLDAGGs = [...movedPLDAGGs, {
+            ...report,
+            moved_at: new Date().toISOString()
+        }];
+        setMovedPLDAGGs(newMovedPLDAGGs);
+        localStorage.setItem('movedPLDAGGs', JSON.stringify(newMovedPLDAGGs));
+    };
+
+    const handleRemovePLDAGG = (index) => {
+        const newMovedPLDAGGs = [...movedPLDAGGs];
+        newMovedPLDAGGs.splice(index, 1);
+        setMovedPLDAGGs(newMovedPLDAGGs);
+        localStorage.setItem('movedPLDAGGs', JSON.stringify(newMovedPLDAGGs));
+    };
+
+    useEffect(() => {
+        try {
+            const savedAttached = localStorage.getItem('attachedAGGs');
+            const savedStandalone = localStorage.getItem('standaloneAGGs');
+            if (savedAttached) setAttachedAGGs(JSON.parse(savedAttached));
+            if (savedStandalone) setStandaloneAGGs(JSON.parse(savedStandalone));
+        } catch (e) {
+            console.error('Error loading AGG state:', e);
+        }
+    }, []);
 
     const getLastMonday = () => {
         const today = new Date();
@@ -270,9 +526,31 @@ const ReportsManager = () => {
     const getCurrentWeekReports = useMemo(() => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const reports = [];
+        const isMonthlyWeek = isFirstWeekOfMonth();
+
+        const monthlyReportIds = new Set();
+        if (isMonthlyWeek) {
+            const reportingMonday = getCurrentWeekMonday();
+            reportingMonday.setDate(reportingMonday.getDate() - 7);
+            const prevMonth = new Date(reportingMonday);
+            prevMonth.setMonth(prevMonth.getMonth() - 1);
+
+            reportsData.forEach(report => {
+                const agency = (report.agency || '').toLowerCase();
+                if (agency === 'castle' && report.send_date) {
+                    const sendDate = parseSendDate(report.send_date);
+                    if (sendDate &&
+                        sendDate.getMonth() === prevMonth.getMonth() &&
+                        sendDate.getFullYear() === prevMonth.getFullYear()) {
+                        monthlyReportIds.add(report.id);
+                    }
+                }
+            });
+        }
 
         reportsData.forEach(report => {
             if (report.is_no_data_report) return;
+            if (monthlyReportIds.has(report.id)) return;
 
             const week = getReportWeek(report.send_date);
 
@@ -285,36 +563,6 @@ const ReportsManager = () => {
                     is_overdue: false
                 });
             }
-
-            if (week === null && report.send_date) {
-                const sendDate = parseSendDate(report.send_date);
-                if (sendDate) {
-                    const reportingMonday = getCurrentWeekMonday();
-                    reportingMonday.setDate(reportingMonday.getDate() - 7);
-
-                    const threeWeeksBeforeReporting = new Date(reportingMonday);
-                    threeWeeksBeforeReporting.setDate(reportingMonday.getDate() - 14); 
-
-                    if (sendDate < threeWeeksBeforeReporting) {
-                        const reportId = report.id;
-
-                        for (let w = 1; w <= 3; w++) {
-                            const checkKey = `${reportId}_week_${w}`;
-                            const isChecked = checkedReports[checkKey];
-
-                            if (!isChecked) {
-                                reports.push({
-                                    ...report,
-                                    week_number: w,
-                                    week_range: currentTimeframe,
-                                    unique_key: `${reportId}_week_${w}_overdue`,
-                                    is_overdue: true
-                                });
-                            }
-                        }
-                    }
-                }
-            }
         });
 
         const monthlyReports = getMonthlyReports();
@@ -323,7 +571,8 @@ const ReportsManager = () => {
                 ...monthlyReport,
                 week_number: 1,
                 week_range: currentTimeframe,
-                is_overdue: false
+                is_overdue: false,
+                is_monthly: true
             });
         });
 
@@ -352,59 +601,101 @@ const ReportsManager = () => {
         return filterReports(reports);
     }, [reportsData, searchTerm]);
 
+    const dueThisWeekPlacementIds = useMemo(() => {
+        const ids = new Set();
+        getCurrentWeekReports.forEach(report => {
+            const placementId = report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id;
+            if (placementId) {
+                ids.add(String(placementId));
+            }
+        });
+        return ids;
+    }, [getCurrentWeekReports]);
+
+    const campaignsWithExpectedStatus = useMemo(() => {
+        return new Set(cmiExpectedNoData.allExpectedPlacementIds || []);
+    }, [cmiExpectedNoData.allExpectedPlacementIds]);
+
+    const getAttachableCampaigns = useMemo(() => {
+        return getCurrentWeekReports.filter(r => r.agency === 'CMI' && !r.is_no_data_report);
+    }, [getCurrentWeekReports]);
+
+    const movedReportIds = useMemo(() => {
+        const ids = new Set();
+
+        Object.values(attachedAGGs).forEach(aggList => {
+            aggList.forEach(agg => {
+                if (agg.id) ids.add(agg.id);
+            });
+        });
+
+        standaloneAGGs.forEach(agg => {
+            if (agg.id) ids.add(agg.id);
+        });
+
+        movedPLDAGGs.forEach(report => {
+            if (report.id) ids.add(report.id);
+        });
+
+        return ids;
+    }, [attachedAGGs, standaloneAGGs, movedPLDAGGs]);
+
+    const contractsByPlacementId = useMemo(() => {
+        const lookup = {};
+        cmiContractValues.forEach(contract => {
+            if (contract.placement_id) {
+                lookup[String(contract.placement_id)] = contract;
+            }
+        });
+        return lookup;
+    }, [cmiContractValues]);
+
     const getNoDataReportsByType = useMemo(() => {
-        const noDataReports = getCurrentWeekNoDataReports;
 
-        const grouped = {};
-        noDataReports.forEach(report => {
-            const key = `${report.brand || 'Unknown'}_${report.campaign_name}`;
-            if (!grouped[key]) {
-                grouped[key] = {
-                    reports: [],
-                    dataTypes: new Set()
-                };
-            }
-            grouped[key].reports.push(report);
-            grouped[key].dataTypes.add((report.data_type || '').toUpperCase());
-        });
+        const filterMoved = (reports) => {
+            return reports.filter(report => !movedReportIds.has(report.id));
+        };
 
-        const pldAndAgg = [];
-        const pldOnly = [];
-        const aggOnly = [];
+        const filterMatched = (reports) => {
+            return reports.filter(report => {
+                const placementId = report.cmi_placement_id;
+                if (!placementId) return true;
+                return !dueThisWeekPlacementIds.has(String(placementId));
+            });
+        };
 
-        Object.values(grouped).forEach(group => {
-            const hasPLD = group.dataTypes.has('PLD') || group.dataTypes.has('DETAIL');
-            const hasAGG = group.dataTypes.has('AGG') || group.dataTypes.has('AGGREGATE');
+        const pldAndAgg = filterMatched(filterMoved(cmiExpectedNoData.pldAndAgg || []));
+        const aggOnly = filterMatched(filterMoved(cmiExpectedNoData.aggOnly || []));
 
-            if (hasPLD && hasAGG) {
-                pldAndAgg.push(...group.reports);
-            } else if (hasPLD) {
-                pldOnly.push(...group.reports);
-            } else if (hasAGG) {
-                aggOnly.push(...group.reports);
-            }
-        });
+        const sortByBrand = (a, b) => {
+            const brandA = (a.brand || '').toLowerCase();
+            const brandB = (b.brand || '').toLowerCase();
+            return brandA.localeCompare(brandB);
+        };
 
-        return { pldAndAgg, pldOnly, aggOnly };
-    }, [getCurrentWeekNoDataReports]);
+        pldAndAgg.sort(sortByBrand);
+        aggOnly.sort(sortByBrand);
+
+        return { pldAndAgg, aggOnly };
+    }, [cmiExpectedNoData, dueThisWeekPlacementIds, movedReportIds]);
 
     const getPastReports = useMemo(() => {
         const expandedReports = [];
-        
+
         reportsData.forEach(report => {
             const week = getReportWeek(report.send_date);
-            
+
             if (week === null && report.send_date && report.monday_date) {
                 const [year, month, day] = report.monday_date.split('-').map(num => parseInt(num));
-                const mondayFromData = new Date(year, month - 1, day); 
-                
+                const mondayFromData = new Date(year, month - 1, day);
+
                 for (let w = 1; w <= 3; w++) {
                     const weekStart = new Date(mondayFromData);
                     weekStart.setDate(mondayFromData.getDate() + (w - 1) * 7);
-                    
+
                     const weekEnd = new Date(weekStart);
                     weekEnd.setDate(weekStart.getDate() + 6);
-                    
+
                     expandedReports.push({
                         ...report,
                         week_number: w,
@@ -415,9 +706,25 @@ const ReportsManager = () => {
                 }
             }
         });
-        
+
         return filterReports(expandedReports);
     }, [reportsData, searchTerm]);
+
+    const archiveAgencies = useMemo(() => {
+        const agencies = new Set();
+        getPastReports.forEach(report => {
+            if (report.agency) agencies.add(report.agency);
+        });
+        return Array.from(agencies).sort((a, b) => {
+            if (a === 'CMI') return -1;
+            if (b === 'CMI') return 1;
+            return a.localeCompare(b);
+        });
+    }, [getPastReports]);
+
+    const getFilteredArchiveReports = useMemo(() => {
+        return getPastReports.filter(r => r.agency === archiveAgencyTab);
+    }, [getPastReports, archiveAgencyTab]);
 
     const getPaginatedData = (data, currentPageParam, rowsPerPageParam) => {
         const startIndex = (currentPageParam - 1) * rowsPerPageParam;
@@ -479,7 +786,7 @@ const ReportsManager = () => {
         }
     };
 
-    const handleCheckboxChange = async (reportId, week) => {
+    const handleCheckboxChange = async (reportId, week, isMonthlyReport = false) => {
         const key = `${reportId}_week_${week}`;
         const newCheckedState = !checkedReports[key];
 
@@ -488,6 +795,17 @@ const ReportsManager = () => {
             [key]: newCheckedState
         };
         setCheckedReports(newStates);
+
+        if (isMonthlyReport || typeof reportId === 'string') {
+            try {
+                const savedMonthlyStates = JSON.parse(localStorage.getItem('monthlyReportStates') || '{}');
+                savedMonthlyStates[key] = newCheckedState;
+                localStorage.setItem('monthlyReportStates', JSON.stringify(savedMonthlyStates));
+            } catch (e) {
+                console.error('Error saving monthly report state:', e);
+            }
+            return;
+        }
 
         try {
             const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${reportId}/submit`, {
@@ -547,12 +865,12 @@ const ReportsManager = () => {
         }
     };
 
-    const generateAgencyJSON = (report, specificWeek = null) => {
+    const generateAgencyJSON = (report, specificWeek = null, overrideMeta = null) => {
         const agency = (report.agency || '').toLowerCase();
 
         switch(agency) {
             case 'cmi':
-                return generateCMIJSON(report, specificWeek);
+                return generateCMIJSON(report, specificWeek, overrideMeta);
             case 'bi':
                 return generateBIJSON(report, specificWeek);
             case 'amg':
@@ -578,9 +896,11 @@ const ReportsManager = () => {
         }
     };
 
-    const generateCMIJSON = (report, specificWeek = null) => {
+    const generateCMIJSON = (report, specificWeek = null, overrideMeta = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const isNoDataReport = report.is_no_data_report || false;
+
+        const matchedMeta = overrideMeta || findMatchingMetadata(report) || manualMetadata[report.id];
 
         const formatDate = (date) => {
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -605,16 +925,17 @@ const ReportsManager = () => {
                 `${year}-${month}-${day}T00:00:00`;
         };
 
-        const cleanedCampaignName = report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '');
-        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+        const rawCampaignName = report.standardized_campaign_name || report.campaign_name || '';
+        const cleanedCampaignName = cleanCampaignName(rawCampaignName);
+        const monthMatch = rawCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         const previousMonday = new Date(currentTimeframe.start);
         previousMonday.setDate(previousMonday.getDate() - 7);
 
-        const brandName = report.cmi_metadata?.Brand_Name || report.brand || "";
-        const vehicleName = report.cmi_metadata?.Vehicle_Name || "";
-        const contractNumber = report.cmi_metadata?.contract_number || "";
+        const brandName = matchedMeta?.brand_name || report.cmi_metadata?.Brand_Name || report.brand || "";
+        const vehicleName = matchedMeta?.vehicle_name || report.cmi_metadata?.Vehicle_Name || "";
+        const contractNumber = matchedMeta?.contract_number || report.cmi_metadata?.contract_number || "";
 
         const internalCampaignName = isNoDataReport ? "No Data" : cleanedCampaignName;
 
@@ -626,22 +947,24 @@ const ReportsManager = () => {
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
             "internal_campaign_name": internalCampaignName,
-            "client_campaign_name": report.cmi_metadata?.client_campaign_name || "",
-            "TargetListID": report.cmi_metadata?.target_list_id || report.cmi_metadata?.TargetListID || "",
-            "CMI_PlacementID": report.cmi_metadata?.placement_id || report.cmi_metadata?.CMI_PlacementID || "",
-            "Client_PlacementID": report.cmi_metadata?.Client_PlacementID || "",
-            "Creative_Code": report.cmi_metadata?.creative_code || report.cmi_metadata?.Creative_Code || "",
-            "GCM_Placement_ID": report.cmi_metadata?.GCM_Placement_ID || "",
-            "GCM_Placement_ID2": report.cmi_metadata?.GCM_Placement_ID2 || "",
-            "Client_ID": report.cmi_metadata?.Client_ID || "",
+            "client_campaign_name": matchedMeta?.campaign_name_from_file || report.cmi_metadata?.client_campaign_name || "",
+            "TargetListID": matchedMeta?.target_list_id || report.cmi_metadata?.target_list_id || report.cmi_metadata?.TargetListID || "",
+            "CMI_PlacementID": matchedMeta?.cmi_placement_id || report.cmi_metadata?.placement_id || report.cmi_metadata?.CMI_PlacementID || "",
+            "Client_PlacementID": matchedMeta?.client_placement_id || report.cmi_metadata?.Client_PlacementID || "",
+            "Creative_Code": matchedMeta?.creative_code || report.cmi_metadata?.creative_code || report.cmi_metadata?.Creative_Code || "",
+            "GCM_Placement_ID": matchedMeta?.gcm_placement_id || report.cmi_metadata?.GCM_Placement_ID || "",
+            "GCM_Placement_ID2": matchedMeta?.gcm_placement_id2 || report.cmi_metadata?.GCM_Placement_ID2 || "",
+            "Client_ID": matchedMeta?.client_id || report.cmi_metadata?.Client_ID || "",
             "finalFileName": `${brandName}_PLD_${vehicleName}_${contractNumber}`,
             "aggFileName": `${brandName}_AGG_${vehicleName}_${contractNumber}`,
             "Brand_Name": brandName,
-            "Supplier": report.cmi_metadata?.Supplier || report.cmi_metadata?.supplier || "",
+            "Supplier": matchedMeta?.supplier || report.cmi_metadata?.Supplier || report.cmi_metadata?.supplier || "",
             "Vehicle_Name": vehicleName,
-            "Placement_Description": report.cmi_metadata?.Placement_Description || report.cmi_metadata?.placement_description || "",
+            "Placement_Description": matchedMeta?.placement_description || report.cmi_metadata?.Placement_Description || report.cmi_metadata?.placement_description || "",
             "Buy_Component_Type": report.cmi_metadata?.Buy_Component_Type || report.cmi_metadata?.buy_component_type || "Email- Re-contact / Trigger",
-            "Campaign_Type": report.cmi_metadata?.Campaign_Type || "email"
+            "Campaign_Type": report.cmi_metadata?.Campaign_Type || "email",
+            "_metadata_source": matchedMeta ? "uploaded" : "pipeline",
+            "_match_confidence": matchedMeta?.match_confidence || null
         };
     };
 
@@ -794,29 +1117,325 @@ const ReportsManager = () => {
     const generateKlikJSON = generateDefaultJSON;
     const generateSLJSON = generateDefaultJSON;
 
+    const generateBatchCMIJSON = () => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cmiReports = getCurrentWeekReports.filter(r => r.agency === 'CMI' && !r.is_no_data_report);
+
+        const sortedCMIReports = sortReports(cmiReports);
+
+        const formatDate = (date) => {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${month}${day}${year}`;
+        };
+
+        const formatISODateTime = (date, isEndOfDay = false) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return isEndOfDay ?
+                `${year}-${month}-${day}T23:59:59` :
+                `${year}-${month}-${day}T00:00:00`;
+        };
+
+        const getContractInfo = (placementId) => {
+            if (!placementId) return null;
+            const contract = cmiContractValues.find(c => String(c.placement_id) === String(placementId));
+            return contract;
+        };
+
+        const campaignsArray = [];
+
+        sortedCMIReports.forEach(report => {
+            const matchedMeta = findMatchingMetadata(report);
+            const cleanedCampaignName = report.standardized_campaign_name || report.campaign_name || '';
+
+            const placementId = matchedMeta?.cmi_placement_id;
+            const contractInfo = getContractInfo(placementId);
+
+            campaignsArray.push({
+                name: cleanedCampaignName,
+                id: report.id,
+                data: {
+                    send_date: report.send_date || '',
+                    client_campaign_name: matchedMeta?.campaign_name_from_file || '',
+                    target_list_id: matchedMeta?.target_list_id || '',
+                    cmi_placement_id: matchedMeta?.cmi_placement_id || '',
+                    client_placement_id: matchedMeta?.client_placement_id || '',
+                    creative_code: matchedMeta?.creative_code || '',
+                    gcm_placement_id: matchedMeta?.gcm_placement_id || '',
+                    gcm_placement_id_2: matchedMeta?.gcm_placement_id2 || '',
+                    client_id: matchedMeta?.client_id || '',
+                    brand_name: matchedMeta?.brand_name || report.brand || '',
+                    supplier: matchedMeta?.supplier || '',
+                    vehicle_name: matchedMeta?.vehicle_name || contractInfo?.vehicle || '',
+                    contract_number: matchedMeta?.contract_number || contractInfo?.contract_number || '',
+                    placement_description: matchedMeta?.placement_description || contractInfo?.placement_description || '',
+                    buy_component_type: matchedMeta?.buy_component_type || contractInfo?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
+                    campaign_type: 'email'
+                }
+            });
+        });
+
+        const campaigns = {};
+        campaignsArray.forEach(item => {
+            campaigns[item.name] = item.data;
+        });
+
+        const aggFileGroups = {};
+
+        const addAggToGroup = (agg, contractInfo) => {
+            const brandName = agg.brand || contractInfo?.brand || '';
+            const vehicleName = agg.vehicle || contractInfo?.vehicle || '';
+            const contractNumber = agg.contract_number || contractInfo?.contract_number || '';
+            const metric = agg.contract_metric || contractInfo?.metric || '';
+
+            const groupKey = `${brandName}|${vehicleName}|${contractNumber}`.toLowerCase();
+
+            if (!aggFileGroups[groupKey]) {
+                aggFileGroups[groupKey] = {
+                    brand_name: brandName,
+                    vehicle_name: vehicleName,
+                    contract_number: contractNumber,
+                    rows: []
+                };
+            }
+
+            aggFileGroups[groupKey].rows.push({
+                cmi_placement_id: agg.cmi_placement_id || '',
+                client_placement_id: agg.client_placement_id || '',
+                placement_description: agg.placement_description || contractInfo?.placement_description || '',
+                buy_component_type: agg.buy_component_type || contractInfo?.buy_component_type || '',
+                metric: metric,
+                value: agg.agg_value || ''
+            });
+        };
+
+        Object.values(attachedAGGs).flat().forEach(agg => {
+            const contractInfo = getContractInfo(agg.cmi_placement_id);
+            addAggToGroup(agg, contractInfo);
+        });
+
+        standaloneAGGs.forEach(agg => {
+            const contractInfo = getContractInfo(agg.cmi_placement_id);
+            addAggToGroup(agg, contractInfo);
+        });
+
+        const result = {
+            monday_date: formatDate(currentTimeframe.start),
+            start_date: formatISODateTime(currentTimeframe.start),
+            end_date: formatISODateTime(currentTimeframe.end, true),
+            campaigns
+        };
+
+        if (Object.keys(aggFileGroups).length > 0) {
+            result.agg_files = Object.values(aggFileGroups);
+        }
+
+        return result;
+    };
+
+    const openBatchCMIModal = () => {
+        const batchData = generateBatchCMIJSON();
+        setBatchCMIJSON(batchData);
+        setShowBatchModal(true);
+    };
+
+    const copyBatchToClipboard = async () => {
+        try {
+            const jsonToCopy = isEditingBatchJSON ? editedBatchJSON : JSON.stringify(batchCMIJSON, null, 4);
+            await navigator.clipboard.writeText(jsonToCopy);
+            const button = document.querySelector('.batch-modal-copy-btn');
+            if (button) {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }
+        } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+        }
+    };
+
     const openCMIModal = (report, specificWeek = null) => {
+        const matchedMeta = findMatchingMetadata(report);
+        const manualMeta = manualMetadata[report.id];
+        const hasMetadata = matchedMeta || manualMeta;
+
+        if (!hasMetadata && report.agency === 'CMI') {
+            setPlacementIdReport(report);
+            setPlacementIdInput('');
+            setShowPlacementIdModal(true);
+            return;
+        }
+
         const jsonData = generateAgencyJSON(report, specificWeek);
-        const confidence = report.cmi_metadata?.match_confidence !== undefined
-            ? (report.cmi_metadata.match_confidence * 100).toFixed(0) + '%'
-            : 'N/A';
-        setSelectedCMIReport({ ...jsonData, _confidence: confidence });
+        const confidence = matchedMeta?.match_confidence !== undefined
+            ? (matchedMeta.match_confidence * 100).toFixed(0) + '%'
+            : manualMeta ? 'Manual' : 'N/A';
+        setSelectedCMIReport({ ...jsonData, _confidence: confidence, _report: report });
         setShowModal(true);
+    };
+
+    const handlePlacementIdSubmit = () => {
+        if (!placementIdInput || !placementIdReport) return;
+
+        const contractData = cmiContractValues.find(c => String(c.placement_id) === String(placementIdInput));
+
+        const newManualMeta = {
+            cmi_placement_id: placementIdInput,
+            brand_name: contractData?.brand || placementIdReport.brand || '',
+            vehicle_name: contractData?.vehicle || '',
+            contract_number: contractData?.contract_number || '',
+            placement_description: contractData?.placement_description || '',
+            buy_component_type: contractData?.buy_component_type || '',
+            client: contractData?.client || '',
+            frequency: contractData?.frequency || '',
+            metric: contractData?.metric || '',
+            notes: contractData?.notes || ''
+        };
+
+        const updatedManualMetadata = {
+            ...manualMetadata,
+            [placementIdReport.id]: newManualMeta
+        };
+        setManualMetadata(updatedManualMetadata);
+        localStorage.setItem('manualMetadata', JSON.stringify(updatedManualMetadata));
+
+        setShowPlacementIdModal(false);
+
+        const jsonData = generateAgencyJSON(placementIdReport, null, newManualMeta);
+        setSelectedCMIReport({ ...jsonData, _confidence: 'Manual', _report: placementIdReport });
+        setShowModal(true);
+
+        setPlacementIdReport(null);
+        setPlacementIdInput('');
     };
 
     const copyToClipboard = async () => {
         try {
-            await navigator.clipboard.writeText(JSON.stringify(selectedCMIReport, null, 2));
-            const button = document.querySelector('.json-modal-copy-btn');
-            const originalText = button.textContent;
-            button.textContent = 'Copied!';
-            button.classList.add('copied');
-            setTimeout(() => {
-                button.textContent = originalText;
-                button.classList.remove('copied');
-            }, 2000);
+            const jsonToCopy = isEditingJSON
+                ? editedJSON
+                : JSON.stringify(Object.fromEntries(
+                    Object.entries(selectedCMIReport).filter(([key]) => !key.startsWith('_'))
+                  ), null, 2);
+            await navigator.clipboard.writeText(jsonToCopy);
+            const button = document.querySelector('.json-modal-copy-btn:not(.batch-modal-copy-btn)');
+            if (button) {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }
         } catch (err) {
             console.error('Failed to copy to clipboard:', err);
         }
+    };
+
+    useEffect(() => {
+        if (showModal && selectedCMIReport) {
+            const jsonStr = JSON.stringify(
+                Object.fromEntries(
+                    Object.entries(selectedCMIReport).filter(([key]) => !key.startsWith('_'))
+                ),
+                null,
+                2
+            );
+            setEditedJSON(jsonStr);
+            setIsEditingJSON(false);
+        }
+    }, [showModal, selectedCMIReport]);
+
+    useEffect(() => {
+        if (showBatchModal && batchCMIJSON) {
+            setEditedBatchJSON(JSON.stringify(batchCMIJSON, null, 4));
+            setIsEditingBatchJSON(false);
+        }
+    }, [showBatchModal, batchCMIJSON]);
+
+    const openEditFormModal = async () => {
+        try {
+            const currentData = JSON.parse(editedJSON);
+            setEditFormData(currentData);
+            setShowEditFormModal(true);
+
+            if (currentData.Brand_Name) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/campaigns/gcm/placements?brand=${encodeURIComponent(currentData.Brand_Name)}`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            setGcmPlacements(result.placements || []);
+                        }
+                    }
+                } catch (gcmError) {
+                    console.error('Error fetching GCM placements:', gcmError);
+                }
+            }
+        } catch (e) {
+            console.error('Error parsing JSON for edit:', e);
+        }
+    };
+
+    const handleGcmUpload = async () => {
+        if (!gcmUploadFile || !gcmUploadBrand) {
+            setGcmUploadStatus('Please select a file and enter a brand name');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('tags_file', gcmUploadFile);
+        formData.append('brand', gcmUploadBrand);
+
+        setGcmUploadStatus('Uploading...');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/campaigns/gcm/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                setGcmUploadStatus(`Uploaded ${result.count} placements for ${result.brand}`);
+                setGcmUploadFile(null);
+                setGcmUploadBrand('');
+
+                if (editFormData.Brand_Name && editFormData.Brand_Name.toLowerCase().includes(gcmUploadBrand.toLowerCase())) {
+                    const placementsResponse = await fetch(`${API_BASE_URL}/api/campaigns/gcm/placements?brand=${encodeURIComponent(editFormData.Brand_Name)}`);
+                    if (placementsResponse.ok) {
+                        const placementsResult = await placementsResponse.json();
+                        if (placementsResult.status === 'success') {
+                            setGcmPlacements(placementsResult.placements || []);
+                        }
+                    }
+                }
+            } else {
+                setGcmUploadStatus(`Error: ${result.message}`);
+            }
+        } catch (error) {
+            setGcmUploadStatus(`Error: ${error.message}`);
+        }
+    };
+
+    const saveEditFormChanges = () => {
+        const jsonStr = JSON.stringify(editFormData, null, 2);
+        setEditedJSON(jsonStr);
+        setShowEditFormModal(false);
+    };
+
+    const updateEditFormField = (field, value) => {
+        setEditFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
     };
 
     const handleRowsPerPageChange = (e, tab) => {
@@ -852,35 +1471,37 @@ const ReportsManager = () => {
         return `${month}/${day}/${year}`;
     };
 
-    const renderNoDataReportRow = (report, rowIndex) => {
-        const isCMI = report.agency === 'CMI';
-        const dataType = report.data_type || 'Unknown';
+    const renderNoDataReportRow = (report, rowIndex, isPLDAGG = false) => {
+        const placementId = report.cmi_placement_id || '';
+        const displayName = `${report.brand || 'Unknown'}${placementId ? ` - ${placementId}` : ''}`;
+        const frequency = report.frequency || '';
+        const metric = report.contract_metric || '';
+        const notes = report.contract_notes || '';
+        const hasContractMatch = report.has_contract_match;
+        const uniqueKey = report.unique_key || `expected_${report.id}_${placementId}`;
 
         return (
-            <tr key={report.unique_key} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'}`}>
+            <tr key={uniqueKey} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${hasContractMatch ? 'has-contract' : 'no-contract'}`}>
                 <td className="campaign-column">
-                    <div
-                        className="campaign-text clickable-campaign"
-                        onClick={() => openCMIModal(report)}
-                        title={report.campaign_name}
-                    >
-                        <span className="campaign-name no-data-campaign" title={report.campaign_name}>
-                            {cleanCampaignName(report.campaign_name)}
+                    <div className="no-data-info">
+                        <span className="no-data-brand" title={displayName}>
+                            {displayName}
                         </span>
-                        {isCMI && (
-                            <div className="cmi-info">
-                                <FileText className="cmi-icon" size={16} />
-                            </div>
-                        )}
                     </div>
                 </td>
-                <td className="brand-column">{report.brand || '-'}</td>
-                <td className="agency-column">
-                    <span className={`agency-badge ${dataType.toLowerCase()}`}>
-                        {dataType}
-                    </span>
+                <td className="no-data-frequency-column">
+                    {frequency && <span className={`frequency-badge frequency-${frequency.toLowerCase()}`}>{frequency}</span>}
                 </td>
-                <td className="date-column-report">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
+                <td className="no-data-metric-column">
+                    {metric && <span className="metric-value">{metric}</span>}
+                </td>
+                <td className="no-data-notes-column">
+                    {notes && (
+                        <span className="no-data-notes-text">
+                            {notes}
+                        </span>
+                    )}
+                </td>
                 <td className="no-data-status-column">
                     <label className="checkbox-container">
                         <input
@@ -891,93 +1512,199 @@ const ReportsManager = () => {
                         <span className="checkmark"></span>
                     </label>
                 </td>
+                <td className="no-data-action-column">
+                    {isPLDAGG ? (
+                        <button
+                            className="move-to-due-btn pld-agg-move-btn"
+                            onClick={() => handleMovePLDAGG(report)}
+                            title="Move to Due This Week"
+                        >
+                            Move
+                        </button>
+                    ) : (
+                        <button
+                            className="move-to-due-btn"
+                            onClick={() => openMoveModal(report)}
+                            title="Assign to campaign"
+                        >
+                            Assign
+                        </button>
+                    )}
+                </td>
             </tr>
         );
     };
 
     const renderCurrentReportRow = (report, rowIndex, allReports) => {
+        const isMonthly = report.is_monthly || report.is_monthly_castle;
         const isCMI = report.agency === 'CMI';
-        const isOverdue = report.is_overdue || false;
 
-        const brandCount = isCMI ? allReports.filter(r => r.agency === 'CMI' && r.brand === report.brand).length : 0;
+        const matchedMeta = findMatchingMetadata(report);
+        const manualMeta = manualMetadata[report.id];
+        const placementId = report.cmi_placement_id ||
+                           report.cmi_metadata?.cmi_placement_id ||
+                           matchedMeta?.cmi_placement_id ||
+                           manualMeta?.cmi_placement_id;
+        const isCMIExpected = isCMI && placementId && campaignsWithExpectedStatus.has(String(placementId));
+
+        const week1Explicitly = checkedReports[`${report.id}_week_1`];
+        const week2Explicitly = checkedReports[`${report.id}_week_2`];
+        const week3Checked = checkedReports[`${report.id}_week_3`] || false;
+
+        const week1Checked = report.week_number > 1 ? (week1Explicitly !== false) : (week1Explicitly || false);
+        const week2Checked = report.week_number > 2 ? (week2Explicitly !== false) : (week2Explicitly || false);
+
+        const week1Overdue = report.week_number > 1 && week1Explicitly === false;
+        const week2Overdue = report.week_number > 2 && week2Explicitly === false;
+        const hasOverdue = week1Overdue || week2Overdue;
+
+        const renderWeekCell = (weekNum, isChecked, isPreviousWeek = false, isOverdue = false) => {
+            if (isPreviousWeek && isChecked) {
+                return (
+                    <span
+                        className="completed-icon-clickable"
+                        onDoubleClick={() => handleCheckboxChange(report.id, weekNum, isMonthly)}
+                        title="Double-click to uncheck"
+                    >
+                        <CheckCircle size={18} className="completed-icon" />
+                    </span>
+                );
+            } else if (isPreviousWeek && !isChecked) {
+                return (
+                    <label className="checkbox-container overdue-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => handleCheckboxChange(report.id, weekNum, isMonthly)}
+                        />
+                        <span className="checkmark overdue"></span>
+                    </label>
+                );
+            } else {
+                return (
+                    <label className="checkbox-container">
+                        <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleCheckboxChange(report.id, weekNum, isMonthly)}
+                        />
+                        <span className="checkmark"></span>
+                    </label>
+                );
+            }
+        };
+
+        const campaignAttachedAGGs = attachedAGGs[report.id] || [];
+        const hasAttachedAGGs = campaignAttachedAGGs.length > 0;
+
+        const isMissingPlacementId = isCMI && !placementId;
 
         return (
-            <tr key={report.unique_key} className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${isOverdue ? 'overdue-row' : ''}`}>
-                <td className="campaign-column">
-                    <div
-                        className="reports-campaign-text clickable-campaign"
-                        onClick={() => openCMIModal(report)}
-                        title={report.campaign_name}
-                    >
-                        <span className="reports-campaign-name" title={report.campaign_name}>
-                            {cleanCampaignName(report.campaign_name)}
+            <React.Fragment key={report.unique_key}>
+                <tr className={`report-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${isCMIExpected ? 'cmi-expected-row' : ''} ${hasAttachedAGGs ? 'has-attached-aggs' : ''} ${isMissingPlacementId ? 'missing-placement-id' : ''}`}>
+                    <td className="campaign-column">
+                        <div
+                            className="reports-campaign-text clickable-campaign"
+                            onClick={() => openCMIModal(report)}
+                            title={report.campaign_name}
+                        >
+                            <span className="reports-campaign-name" title={report.campaign_name}>
+                                {cleanCampaignName(report.campaign_name)}
+                            </span>
+                            {isCMIExpected && (
+                                <span className="cmi-expected-badge" title="CMI expects this report">
+                                    Expected
+                                </span>
+                            )}
+                            {isMissingPlacementId && (
+                                <span className="missing-placement-badge" title="Click to enter CMI Placement ID">
+                                    No ID
+                                </span>
+                            )}
+                            {hasAttachedAGGs && (
+                                <span className="attached-agg-badge" title={`${campaignAttachedAGGs.length} AGG report(s) attached`}>
+                                    +{campaignAttachedAGGs.length} AGG
+                                </span>
+                            )}
+                        </div>
+                    </td>
+                    <td className="brand-column">{report.brand || '-'}</td>
+                    <td className="agency-column">
+                        <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
+                            {report.agency || '-'}
                         </span>
-                        {isCMI && (
-                            <div className="cmi-info">
-                                <FileText className="cmi-icon" size={16} />
-                                {brandCount > 1 && (
-                                    <span className="weeks-count" title={`${brandCount} ${report.brand} campaigns due this week`}>
-                                        {brandCount}
-                                    </span>
-                                )}
-                            </div>
+                    </td>
+                    <td className={`date-column-report ${hasOverdue ? 'overdue-date' : ''}`}>
+                        {formatSendDate(report.send_date)}
+                    </td>
+                <td className="week-column">
+                    {isMonthly ? (
+                        renderWeekCell(1, week1Checked, false)
+                    ) : report.week_number >= 1 ? (
+                        renderWeekCell(1, week1Checked, report.week_number > 1, week1Overdue)
+                    ) : (
+                        <span className="week-inactive">-</span>
+                    )}
+                </td>
+                <td className="week-column">
+                    {isMonthly ? (
+                        <span className="week-inactive"></span>
+                    ) : report.week_number >= 2 ? (
+                        renderWeekCell(2, week2Checked, report.week_number > 2, week2Overdue)
+                    ) : (
+                        <span className="week-inactive">-</span>
+                    )}
+                </td>
+                    <td className="week-column">
+                        {isMonthly ? (
+                            <span className="week-inactive"></span>
+                        ) : report.week_number >= 3 ? (
+                            renderWeekCell(3, week3Checked, false)
+                        ) : (
+                            <span className="week-inactive">-</span>
                         )}
-                    </div>
-                </td>
-                <td className="brand-column">{report.brand || '-'}</td>
-                <td className="agency-column">
-                    <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
-                        {report.agency || '-'}
-                    </span>
-                </td>
-                <td className={`date-column-report ${isOverdue ? 'overdue-date' : ''}`}>
-                    {formatSendDate(report.send_date)}
-                </td>
-                <td className="week-column">
-                    {report.week_number === 1 ? (
-                        <label className="checkbox-container">
-                            <input
-                                type="checkbox"
-                                checked={checkedReports[`${report.id}_week_1`] || false}
-                                onChange={() => handleCheckboxChange(report.id, 1)}
-                            />
-                            <span className="checkmark"></span>
-                        </label>
-                    ) : (
-                        <CheckCircle size={18} className="completed-icon" />
-                    )}
-                </td>
-                <td className="week-column">
-                    {report.week_number === 2 ? (
-                        <label className="checkbox-container">
-                            <input
-                                type="checkbox"
-                                checked={checkedReports[`${report.id}_week_2`] || false}
-                                onChange={() => handleCheckboxChange(report.id, 2)}
-                            />
-                            <span className="checkmark"></span>
-                        </label>
-                    ) : report.week_number === 3 ? (
-                        <CheckCircle size={18} className="completed-icon" />
-                    ) : (
-                        <span className="week-inactive">-</span>
-                    )}
-                </td>
-                <td className="week-column">
-                    {report.week_number === 3 ? (
-                        <label className="checkbox-container">
-                            <input
-                                type="checkbox"
-                                checked={checkedReports[`${report.id}_week_3`] || false}
-                                onChange={() => handleCheckboxChange(report.id, 3)}
-                            />
-                            <span className="checkmark"></span>
-                        </label>
-                    ) : (
-                        <span className="week-inactive">-</span>
-                    )}
-                </td>
-            </tr>
+                    </td>
+                </tr>
+                {campaignAttachedAGGs.map((agg, aggIndex) => {
+                    const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                    return (
+                        <tr key={`${report.unique_key}_agg_${aggIndex}`} className="agg-report-row attached-agg-row">
+                            <td className="campaign-column">
+                                <div className="agg-notes-cell attached">
+                                    <span className="attached-agg-indicator">└─</span>
+                                    {notes || <span className="no-notes">-</span>}
+                                </div>
+                            </td>
+                            <td className="brand-column">
+                                <span className="agg-brand-text">{agg.brand || 'Unknown'}</span>
+                            </td>
+                            <td className="agency-column">
+                                <span className="agency-badge cmi">CMI</span>
+                            </td>
+                            <td className="date-column-report">
+                                <input
+                                    type="text"
+                                    className="agg-value-input-styled"
+                                    placeholder="Value"
+                                    value={agg.agg_value || ''}
+                                    onChange={(e) => handleUpdateAttachedAGG(report.id, aggIndex, 'agg_value', e.target.value)}
+                                />
+                            </td>
+                            <td className="week-column"></td>
+                            <td className="week-column"></td>
+                            <td className="week-column">
+                                <button
+                                    className="agg-remove-btn"
+                                    onClick={() => handleDetachAGG(report.id, aggIndex)}
+                                    title="Remove"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </React.Fragment>
         );
     };
 
@@ -1050,22 +1777,22 @@ const ReportsManager = () => {
 
                 return (
                     <div className="reports-section current-reports">
-                        <div className="section-header">
+                        <div className="reports-section-header">
                             <h3>Campaign Reports Due This Week</h3>
-                            <div className="section-stats">
-                                <span className="stat-item">
-                                    <span className="stat-label">Total:</span>
-                                    <span className="stat-value">{allCurrentReports.length}</span>
+                            <div className="reports-header-stats">
+                                <span className="reports-header-stat-item">
+                                    <span className="reports-header-stat-label">Total:</span>
+                                    <span className="reports-header-stat-value">{allCurrentReports.length}</span>
                                 </span>
-                                <span className="stat-item">
-                                    <span className="stat-label">CMI:</span>
-                                    <span className="stat-value cmi-count">
+                                <span className="reports-header-stat-item">
+                                    <span className="reports-header-stat-label">CMI:</span>
+                                    <span className="reports-header-stat-value reports-header-cmi">
                                         {allCurrentReports.filter(r => r.agency === 'CMI').length}
                                     </span>
                                 </span>
                             </div>
                         </div>
-                        <div className="table-container">
+                        <div className="table-container table-rounded">
                             <table className="reports-table">
                                 <thead>
                                     <tr>
@@ -1122,7 +1849,18 @@ const ReportsManager = () => {
                                             <React.Fragment key={`agency-${agency}`}>
                                                 <tr className="agency-section-header">
                                                     <td className="report-agency-section-title">
-                                                        <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
+                                                        {agency === 'CMI' ? (
+                                                            <span
+                                                                className={`agency-badge ${agency.toLowerCase()} clickable-badge`}
+                                                                onClick={openBatchCMIModal}
+                                                                title="Click to view batch JSON for all CMI campaigns"
+                                                                style={{ cursor: 'pointer' }}
+                                                            >
+                                                                {agency}
+                                                            </span>
+                                                        ) : (
+                                                            <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
+                                                        )}
                                                         <span className="agency-count">({groupedReports[agency].length} reports)</span>
                                                     </td>
                                                     <td className="agency-section-empty"></td>
@@ -1137,6 +1875,76 @@ const ReportsManager = () => {
                                                     globalIndex++;
                                                     return row;
                                                 })}
+                                                {agency === 'CMI' && standaloneAGGs.map((agg, index) => {
+                                                    const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                                                    return (
+                                                        <tr key={`standalone_agg_${index}`} className="agg-report-row standalone-agg-row">
+                                                            <td className="campaign-column">
+                                                                <div className="agg-notes-cell">
+                                                                    <span className="standalone-agg-badge">Standalone</span>
+                                                                    {notes || <span className="no-notes">-</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="brand-column">
+                                                                <span className="agg-brand-text">{agg.brand || 'Unknown'}</span>
+                                                            </td>
+                                                            <td className="agency-column">
+                                                                <span className="agency-badge cmi">CMI</span>
+                                                            </td>
+                                                            <td className="date-column-report">
+                                                                <input
+                                                                    type="text"
+                                                                    className="agg-value-input-styled"
+                                                                    placeholder="Value"
+                                                                    value={agg.agg_value || ''}
+                                                                    onChange={(e) => handleUpdateStandaloneAGG(index, 'agg_value', e.target.value)}
+                                                                />
+                                                            </td>
+                                                            <td className="week-column"></td>
+                                                            <td className="week-column"></td>
+                                                            <td className="week-column">
+                                                                <button
+                                                                    className="agg-remove-btn"
+                                                                    onClick={() => handleRemoveStandaloneAGG(index)}
+                                                                    title="Remove"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {agency === 'CMI' && movedPLDAGGs.map((report, index) => {
+                                                    const notes = report.contract_notes || report.notes || report.placement_description || '';
+                                                    return (
+                                                        <tr key={`pld_agg_${index}`} className="pld-agg-report-row">
+                                                            <td className="campaign-column">
+                                                                <div className="agg-notes-cell">
+                                                                    <span className="pld-agg-badge">PLD & AGG</span>
+                                                                    {notes || <span className="no-notes">-</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="brand-column">
+                                                                <span className="agg-brand-text">{report.brand || 'Unknown'}</span>
+                                                            </td>
+                                                            <td className="agency-column">
+                                                                <span className="agency-badge cmi">CMI</span>
+                                                            </td>
+                                                            <td className="date-column-report"></td>
+                                                            <td className="week-column"></td>
+                                                            <td className="week-column"></td>
+                                                            <td className="week-column">
+                                                                <button
+                                                                    className="agg-remove-btn"
+                                                                    onClick={() => handleRemovePLDAGG(index)}
+                                                                    title="Remove"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                                 {agencyIndex < sortedAgencies.length - 1 && (
                                                     <tr className="agency-divider">
                                                         <td colSpan="7"></td>
@@ -1150,92 +1958,64 @@ const ReportsManager = () => {
                         </div>
                         {renderPaginationButtons(currentPage, totalPages, 'current')}
 
-                        {(getNoDataReportsByType.pldAndAgg.length > 0 || getNoDataReportsByType.pldOnly.length > 0 || getNoDataReportsByType.aggOnly.length > 0) && (
+                        {(getNoDataReportsByType.pldAndAgg.length > 0 || getNoDataReportsByType.aggOnly.length > 0) && (
                             <>
-                                {getNoDataReportsByType.pldAndAgg.length > 0 && (
-                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
-                                        <div className="section-header">
-                                            <h3>No Data Reports - PLD & AGG (Both Required)</h3>
-                                            <div className="section-stats">
-                                                <span className="stat-item">
-                                                    <span className="stat-label">Total:</span>
-                                                    <span className="stat-value">{getNoDataReportsByType.pldAndAgg.length}</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="table-container">
-                                            <table className="reports-table no-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th className="campaign-header">No Data Report</th>
-                                                        <th className="brand-header">Brand</th>
-                                                        <th className="agency-header">Type</th>
-                                                        <th className="timeframe-header">Week Timeframe</th>
-                                                        <th className="status-header">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {getNoDataReportsByType.pldAndAgg.map((report, index) => renderNoDataReportRow(report, index))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {getNoDataReportsByType.pldOnly.length > 0 && (
-                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
-                                        <div className="section-header">
-                                            <h3>No Data Reports - PLD Only</h3>
-                                            <div className="section-stats">
-                                                <span className="stat-item">
-                                                    <span className="stat-label">Total:</span>
-                                                    <span className="stat-value">{getNoDataReportsByType.pldOnly.length}</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="table-container">
-                                            <table className="reports-table no-data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th className="campaign-header">No Data Report</th>
-                                                        <th className="brand-header">Brand</th>
-                                                        <th className="agency-header">Type</th>
-                                                        <th className="timeframe-header">Week Timeframe</th>
-                                                        <th className="status-header">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {getNoDataReportsByType.pldOnly.map((report, index) => renderNoDataReportRow(report, index))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
                                 {getNoDataReportsByType.aggOnly.length > 0 && (
                                     <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
-                                        <div className="section-header">
-                                            <h3>No Data Reports - AGG Only</h3>
-                                            <div className="section-stats">
-                                                <span className="stat-item">
-                                                    <span className="stat-label">Total:</span>
-                                                    <span className="stat-value">{getNoDataReportsByType.aggOnly.length}</span>
+                                        <div className="reports-section-header">
+                                            <h3>No Data to Report - AGG Only (Unassigned)</h3>
+                                            <div className="reports-header-stats">
+                                                <span className="reports-header-stat-item">
+                                                    <span className="reports-header-stat-label">Total:</span>
+                                                    <span className="reports-header-stat-value">{getNoDataReportsByType.aggOnly.length}</span>
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="table-container">
+                                        <div className="table-container table-rounded">
                                             <table className="reports-table no-data-table">
                                                 <thead>
                                                     <tr>
-                                                        <th className="campaign-header">No Data Report</th>
-                                                        <th className="brand-header">Brand</th>
-                                                        <th className="agency-header">Type</th>
-                                                        <th className="timeframe-header">Week Timeframe</th>
-                                                        <th className="status-header">Status</th>
+                                                        <th className="campaign-header">Brand - Placement ID</th>
+                                                        <th className="frequency-header">Frequency</th>
+                                                        <th className="metric-header">Metric</th>
+                                                        <th className="notes-header">Notes</th>
+                                                        <th className="status-header">Confirmed</th>
+                                                        <th className="attach-header">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {getNoDataReportsByType.aggOnly.map((report, index) => renderNoDataReportRow(report, index))}
+                                                    {getNoDataReportsByType.aggOnly.map((report, index) => renderNoDataReportRow(report, index, false))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {getNoDataReportsByType.pldAndAgg.length > 0 && (
+                                    <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
+                                        <div className="reports-section-header">
+                                            <h3>No Data to Report - PLD & AGG</h3>
+                                            <div className="reports-header-stats">
+                                                <span className="reports-header-stat-item">
+                                                    <span className="reports-header-stat-label">Total:</span>
+                                                    <span className="reports-header-stat-value">{getNoDataReportsByType.pldAndAgg.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container table-rounded">
+                                            <table className="reports-table no-data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">Brand - Placement ID</th>
+                                                        <th className="frequency-header">Frequency</th>
+                                                        <th className="metric-header">Metric</th>
+                                                        <th className="notes-header">Notes</th>
+                                                        <th className="status-header">Confirmed</th>
+                                                        <th className="attach-header">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getNoDataReportsByType.pldAndAgg.map((report, index) => renderNoDataReportRow(report, index, true))}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1243,21 +2023,39 @@ const ReportsManager = () => {
                                 )}
                             </>
                         )}
+
                     </div>
                 );
             })()}
 
             {activeTab === 'archive' && (() => {
-                const allArchiveReports = getPastReports;
-                const totalPages = getTotalPages(allArchiveReports.length, archiveRowsPerPage);
-                const paginatedArchiveReports = getPaginatedData(allArchiveReports, archiveCurrentPage, archiveRowsPerPage);
-                
+                const filteredArchiveReports = getFilteredArchiveReports;
+                const totalPages = getTotalPages(filteredArchiveReports.length, archiveRowsPerPage);
+                const paginatedArchiveReports = getPaginatedData(filteredArchiveReports, archiveCurrentPage, archiveRowsPerPage);
+
                 return (
                     <div className="reports-section archive-reports">
-                        <div className="section-header">
+                        <div className="reports-section-header">
                             <h3>Past Reports Archive</h3>
+                            <div className="reports-header-stats">
+                                <span className="reports-header-stat-item">
+                                    <span className="reports-header-stat-label">Total:</span>
+                                    <span className="reports-header-stat-value">{filteredArchiveReports.length}</span>
+                                </span>
+                            </div>
                         </div>
-                        <div className="table-container">
+                        <div className="archive-agency-tabs">
+                            {archiveAgencies.map(agency => (
+                                <button
+                                    key={agency}
+                                    className={`archive-tab-button ${archiveAgencyTab === agency ? 'active' : ''}`}
+                                    onClick={() => { setArchiveAgencyTab(agency); setArchiveCurrentPage(1); }}
+                                >
+                                    {agency} ({getPastReports.filter(r => r.agency === agency).length})
+                                </button>
+                            ))}
+                        </div>
+                        <div className="table-container table-rounded">
                             <table className="reports-table">
                                 <thead>
                                     <tr>
@@ -1270,96 +2068,55 @@ const ReportsManager = () => {
                                         <th className="status-header">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody key={`archive-${archiveCurrentPage}-${archiveRowsPerPage}`}>
-                                    {(() => {
-                                        if (paginatedArchiveReports.length === 0) {
+                                <tbody key={`archive-${archiveCurrentPage}-${archiveRowsPerPage}-${archiveAgencyTab}`}>
+                                    {paginatedArchiveReports.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="empty-state">
+                                                {searchTerm ? 'No matching past reports' : 'No past reports found'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedArchiveReports.map((report, index) => {
+                                            const isCMI = report.agency === 'CMI';
                                             return (
-                                                <tr>
-                                                    <td colSpan="7" className="empty-state">
-                                                        {searchTerm ? 'No matching past reports' : 'No past reports found'}
+                                                <tr key={report.unique_key} className={`report-row archive-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''}`}>
+                                                    <td className="campaign-column">
+                                                        <div
+                                                            className="campaign-text clickable-campaign"
+                                                            onClick={() => openCMIModal(report, report.week_number)}
+                                                            title={report.campaign_name}
+                                                        >
+                                                            <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
+                                                                {cleanCampaignName(report.campaign_name)}
+                                                                {report.is_no_data_report && <span className="no-data-indicator">(No Data)</span>}
+                                                            </span>
+                                                            {isCMI && (
+                                                                <div className="cmi-info">
+                                                                    <FileText className="cmi-icon" size={16} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="brand-column">{report.brand || '-'}</td>
+                                                    <td className="agency-column">
+                                                        <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
+                                                            {report.agency || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="date-column-report">{formatSendDate(report.send_date)}</td>
+                                                    <td className="week-column">Week {report.week_number}</td>
+                                                    <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
+                                                    <td className="status-column">
+                                                        {report.is_submitted || report[`week_${report.week_number}_completed`] ? (
+                                                            <span className="status-completed">Submitted</span>
+                                                        ) : (
+                                                            <span className="status-pending">Pending</span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
-                                        }
-
-                                        const groupedReports = paginatedArchiveReports.reduce((acc, report) => {
-                                            const agency = report.agency;
-                                            if (!acc[agency]) acc[agency] = [];
-                                            acc[agency].push(report);
-                                            return acc;
-                                        }, {});
-
-                                        const sortedAgencies = Object.keys(groupedReports).sort((a, b) => {
-                                            if (a === 'CMI') return -1;
-                                            if (b === 'CMI') return 1;
-                                            return a.localeCompare(b);
-                                        });
-
-                                        let globalIndex = 0;
-                                        return sortedAgencies.map((agency, agencyIndex) => (
-                                            <React.Fragment key={`archive-agency-${agency}`}>
-                                                <tr className="agency-section-header">
-                                                    <td className="report-agency-section-title">
-                                                        <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
-                                                        <span className="agency-count">({groupedReports[agency].length} reports)</span>
-                                                    </td>
-                                                    <td className="agency-section-empty"></td>
-                                                    <td className="agency-section-empty"></td>
-                                                    <td className="agency-section-empty"></td>
-                                                    <td className="agency-section-empty"></td>
-                                                    <td className="agency-section-empty"></td>
-                                                    <td className="agency-section-empty"></td>
-                                                </tr>
-                                                {groupedReports[agency].map((report) => {
-                                                    const isCMI = report.agency === 'CMI';
-                                                    const row = (
-                                                        <tr key={report.unique_key} className={`report-row archive-row ${globalIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''}`}>
-                                                            <td className="campaign-column">
-                                                                <div
-                                                                    className="campaign-text clickable-campaign"
-                                                                    onClick={() => openCMIModal(report, report.week_number)}
-                                                                    title={report.campaign_name}
-                                                                >
-                                                                    <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
-                                                                        {cleanCampaignName(report.campaign_name)}
-                                                                        {report.is_no_data_report && <span className="no-data-indicator">(No Data)</span>}
-                                                                    </span>
-                                                                    {isCMI && (
-                                                                        <div className="cmi-info">
-                                                                            <FileText className="cmi-icon" size={16} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="brand-column">{report.brand || '-'}</td>
-                                                            <td className="agency-column">
-                                                                <span className={`agency-badge ${(report.agency || '').toLowerCase()}`}>
-                                                                    {report.agency || '-'}
-                                                                </span>
-                                                            </td>
-                                                            <td className="date-column-report">{formatSendDate(report.send_date)}</td>
-                                                            <td className="week-column">Week {report.week_number}</td>
-                                                            <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
-                                                            <td className="status-column">
-                                                                {report.is_submitted || report[`week_${report.week_number}_completed`] ? (
-                                                                    <span className="status-completed">Submitted</span>
-                                                                ) : (
-                                                                    <span className="status-pending">Pending</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                    globalIndex++;
-                                                    return row;
-                                                })}
-                                                {agencyIndex < sortedAgencies.length - 1 && (
-                                                    <tr className="agency-divider">
-                                                        <td colSpan="7"></td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
-                                        ));
-                                    })()}
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1394,18 +2151,351 @@ const ReportsManager = () => {
                             )}
                             <div className="json-modal-actions">
                                 <span className="json-modal-label">Generated JSON Structure</span>
-                                <button
-                                    className="json-modal-copy-btn"
-                                    onClick={copyToClipboard}
-                                >
-                                    <Copy size={14} />
-                                    Copy
-                                </button>
+                                <div className="json-modal-buttons">
+                                    <button
+                                        className="json-modal-edit-btn"
+                                        onClick={openEditFormModal}
+                                    >
+                                        Edit Fields
+                                    </button>
+                                    <button
+                                        className="json-modal-copy-btn"
+                                        onClick={copyToClipboard}
+                                    >
+                                        <Copy size={14} />
+                                        Copy
+                                    </button>
+                                </div>
                             </div>
                             <div className="json-modal-code">
-                                <pre>{JSON.stringify(Object.fromEntries(Object.entries(selectedCMIReport).filter(([key]) => key !== '_confidence')), null, 2)}</pre>
+                                <pre>{editedJSON}</pre>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {showEditFormModal && (
+                <div className="edit-form-modal-overlay" onClick={() => setShowEditFormModal(false)}>
+                    <div className="edit-form-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="edit-form-modal-header">
+                            <h3>Edit Campaign Data</h3>
+                            <button className="edit-form-modal-close" onClick={() => setShowEditFormModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="edit-form-modal-body">
+                            <div className="edit-form-grid">
+                                <div className="edit-form-field">
+                                    <label>Internal Campaign Name</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.internal_campaign_name || ''}
+                                        onChange={(e) => updateEditFormField('internal_campaign_name', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>CMI Placement ID</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.CMI_PlacementID || ''}
+                                        onChange={(e) => updateEditFormField('CMI_PlacementID', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>Client Placement ID</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Client_PlacementID || ''}
+                                        onChange={(e) => updateEditFormField('Client_PlacementID', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>Target List ID</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.TargetListID || ''}
+                                        onChange={(e) => updateEditFormField('TargetListID', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>Creative Code</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Creative_Code || ''}
+                                        onChange={(e) => updateEditFormField('Creative_Code', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>GCM Placement ID</label>
+                                    {gcmPlacements.length > 0 ? (
+                                        <select
+                                            value={editFormData.GCM_Placement_ID || ''}
+                                            onChange={(e) => updateEditFormField('GCM_Placement_ID', e.target.value)}
+                                        >
+                                            <option value="">Select GCM Placement</option>
+                                            {gcmPlacements.map((p, idx) => (
+                                                <option key={idx} value={p.gcm_placement_id}>
+                                                    {p.gcm_placement_id} - {p.placement_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={editFormData.GCM_Placement_ID || ''}
+                                            onChange={(e) => updateEditFormField('GCM_Placement_ID', e.target.value)}
+                                            placeholder="Enter GCM Placement ID"
+                                        />
+                                    )}
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>GCM Placement ID 2</label>
+                                    {gcmPlacements.length > 0 ? (
+                                        <select
+                                            value={editFormData.GCM_Placement_ID2 || ''}
+                                            onChange={(e) => updateEditFormField('GCM_Placement_ID2', e.target.value)}
+                                        >
+                                            <option value="">Select GCM Placement</option>
+                                            {gcmPlacements.map((p, idx) => (
+                                                <option key={idx} value={p.gcm_placement_id}>
+                                                    {p.gcm_placement_id} - {p.placement_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={editFormData.GCM_Placement_ID2 || ''}
+                                            onChange={(e) => updateEditFormField('GCM_Placement_ID2', e.target.value)}
+                                            placeholder="Enter GCM Placement ID"
+                                        />
+                                    )}
+                                </div>
+                                <div className="edit-form-field">
+                                    <label>Client ID</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Client_ID || ''}
+                                        onChange={(e) => updateEditFormField('Client_ID', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field full-width">
+                                    <label>Brand Name</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Brand_Name || ''}
+                                        onChange={(e) => updateEditFormField('Brand_Name', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field full-width">
+                                    <label>Vehicle Name</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Vehicle_Name || ''}
+                                        onChange={(e) => updateEditFormField('Vehicle_Name', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field full-width">
+                                    <label>Placement Description</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Placement_Description || ''}
+                                        onChange={(e) => updateEditFormField('Placement_Description', e.target.value)}
+                                    />
+                                </div>
+                                <div className="edit-form-field full-width">
+                                    <label>Buy Component Type</label>
+                                    <input
+                                        type="text"
+                                        value={editFormData.Buy_Component_Type || ''}
+                                        onChange={(e) => updateEditFormField('Buy_Component_Type', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="edit-form-modal-footer">
+                            <button className="edit-form-cancel-btn" onClick={() => setShowEditFormModal(false)}>
+                                Cancel
+                            </button>
+                            <button className="edit-form-save-btn" onClick={saveEditFormChanges}>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showBatchModal && batchCMIJSON && (
+                <div className="json-modal-overlay" onClick={() => setShowBatchModal(false)}>
+                    <div className="json-modal-content batch-modal" onClick={e => e.stopPropagation()}>
+                        <div className="json-modal-header">
+                            <div className="json-modal-title">
+                                <FileText size={20} />
+                                <h3>CMI Batch JSON - All Campaigns This Week</h3>
+                            </div>
+                            <button
+                                className="json-modal-close"
+                                onClick={() => setShowBatchModal(false)}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="json-modal-body">
+                            <div className="batch-modal-info">
+                                <span className="batch-modal-count">
+                                    {Object.keys(batchCMIJSON.campaigns || {}).length} CMI campaigns
+                                </span>
+                                <span className="batch-modal-dates">
+                                    Week: {batchCMIJSON.monday_date}
+                                </span>
+                            </div>
+                            <div className="json-modal-actions">
+                                <span className="json-modal-label">
+                                    {isEditingBatchJSON ? 'Editing JSON' : 'Copy to cmi_batch.json'}
+                                </span>
+                                <div className="json-modal-buttons">
+                                    <button
+                                        className={`json-modal-edit-btn ${isEditingBatchJSON ? 'editing' : ''}`}
+                                        onClick={() => setIsEditingBatchJSON(!isEditingBatchJSON)}
+                                    >
+                                        {isEditingBatchJSON ? 'View' : 'Edit'}
+                                    </button>
+                                    <button
+                                        className="json-modal-copy-btn batch-modal-copy-btn"
+                                        onClick={copyBatchToClipboard}
+                                    >
+                                        <Copy size={14} />
+                                        Copy
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="json-modal-code batch-modal-code">
+                                {isEditingBatchJSON ? (
+                                    <textarea
+                                        className="json-editor"
+                                        value={editedBatchJSON}
+                                        onChange={(e) => setEditedBatchJSON(e.target.value)}
+                                        spellCheck={false}
+                                    />
+                                ) : (
+                                    <pre>{editedBatchJSON}</pre>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showMoveModal && movingReport && (
+                <div className="json-modal-overlay" onClick={closeMoveModal}>
+                    <div className="move-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="json-modal-header">
+                            <div className="json-modal-title">
+                                <Link size={20} />
+                                <h3>Assign Report</h3>
+                            </div>
+                            <button className="json-modal-close" onClick={closeMoveModal}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="move-modal-body">
+                            <div className="move-modal-source-card">
+                                <span className="move-source-brand">{movingReport.brand || 'Unknown'}</span>
+                                <span className="move-source-placement">{movingReport.cmi_placement_id || movingReport.cmi_metadata?.cmi_placement_id || ''}</span>
+                            </div>
+
+                            <div className="move-modal-mode-selection">
+                                <button
+                                    className={`move-mode-btn ${moveMode === 'attach' ? 'active' : ''}`}
+                                    onClick={() => setMoveMode('attach')}
+                                >
+                                    <Link size={16} />
+                                    Attach to Campaign
+                                </button>
+                                <button
+                                    className={`move-mode-btn ${moveMode === 'standalone' ? 'active' : ''}`}
+                                    onClick={() => setMoveMode('standalone')}
+                                >
+                                    <PlusCircle size={16} />
+                                    Standalone
+                                </button>
+                            </div>
+
+                            {moveMode === 'attach' && (
+                                <div className="move-modal-campaign-list">
+                                    {getAttachableCampaigns.length === 0 ? (
+                                        <div className="move-modal-no-campaigns">No CMI campaigns available</div>
+                                    ) : (
+                                        getAttachableCampaigns.map(campaign => (
+                                            <div
+                                                key={campaign.id}
+                                                className={`move-modal-campaign-option ${selectedAttachTarget?.id === campaign.id ? 'selected' : ''}`}
+                                                onClick={() => setSelectedAttachTarget(campaign)}
+                                            >
+                                                <div className="campaign-option-name">
+                                                    {cleanCampaignName(campaign.campaign_name)}
+                                                </div>
+                                                <div className="campaign-option-details">
+                                                    <span className="campaign-option-brand">{campaign.brand}</span>
+                                                    <span className="campaign-option-date">{formatSendDate(campaign.send_date)}</span>
+                                                    {attachedAGGs[campaign.id]?.length > 0 && (
+                                                        <span className="campaign-option-attached-count">
+                                                            +{attachedAGGs[campaign.id].length} AGG
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {moveMode === 'standalone' && (
+                                <div className="move-modal-standalone-info">
+                                    This will be added as a standalone AGG entry.
+                                </div>
+                            )}
+
+                            <div className="move-modal-actions">
+                                <button
+                                    className="move-modal-confirm-btn"
+                                    onClick={handleMoveToDue}
+                                >
+                                    {moveMode === 'attach' ? 'Attach' : 'Add Standalone'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPlacementIdModal && placementIdReport && (
+                <div className="json-modal-overlay" onClick={() => setShowPlacementIdModal(false)}>
+                    <div className="placement-id-modal-simple" onClick={e => e.stopPropagation()}>
+                        <button className="placement-id-modal-close" onClick={() => setShowPlacementIdModal(false)}>
+                            <X size={18} />
+                        </button>
+                        <div className="placement-id-modal-campaign-name">
+                            {cleanCampaignName(placementIdReport.campaign_name)}
+                        </div>
+                        <div className="placement-id-modal-input-row">
+                            <label>CMI Placement ID</label>
+                            <input
+                                type="text"
+                                value={placementIdInput}
+                                onChange={(e) => setPlacementIdInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && placementIdInput.trim() && handlePlacementIdSubmit()}
+                                autoFocus
+                            />
+                        </div>
+                        <button
+                            className="placement-id-modal-enter-btn"
+                            onClick={handlePlacementIdSubmit}
+                            disabled={!placementIdInput.trim()}
+                        >
+                            Enter
+                        </button>
                     </div>
                 </div>
             )}

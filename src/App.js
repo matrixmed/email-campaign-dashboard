@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
+import { SearchProvider } from './context/SearchContext';
 import './App.css';
 import './styles/Dashboard.css';
 import './styles/MatrixSignIn.css';
@@ -53,12 +54,14 @@ function App() {
 
   return (
     <div className="App">
-      <BrowserRouter>
-        <Dashboard
-          isAuthenticated={isAuthenticated}
-          onAuthenticated={handleAuthentication}
-        />
-      </BrowserRouter>
+      <SearchProvider>
+        <BrowserRouter>
+          <Dashboard
+            isAuthenticated={isAuthenticated}
+            onAuthenticated={handleAuthentication}
+          />
+        </BrowserRouter>
+      </SearchProvider>
     </div>
   );
 }

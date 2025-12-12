@@ -485,17 +485,6 @@ const TimingIntelligence = () => {
           >
             {loading ? 'Running...' : 'Run'}
           </button>
-          {(selectedSpecialties.length > 0 || selectedCampaigns.length > 0) && (
-            <button
-              className="clear-all-filters-button"
-              onClick={() => {
-                setSelectedSpecialties([]);
-                setSelectedCampaigns([]);
-              }}
-            >
-              Clear All Filters
-            </button>
-          )}
         </div>
       </div>
 

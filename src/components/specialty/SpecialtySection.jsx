@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../../styles/SpecialtySection.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import { useSearch } from '../../context/SearchContext';
 
 const SpecialtySection = () => {
+  const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
   const [specialtyData, setSpecialtyData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeBucket, setActiveBucket] = useState(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState(null);
   const [combineSubSpecialties, setCombineSubSpecialties] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchTerms.specialtyMetrics || '');
   const layoverRef = useRef(null);
 
   useEffect(() => {
@@ -125,7 +128,7 @@ const SpecialtySection = () => {
     }
   };
 
-  const getTopicTotals = (bucketData, topic) => {
+  const getTopicTotals = (bucketData, topic, searchFilter = '') => {
     if (!bucketData || !bucketData[topic]) {
       return {
         Sent: 0,
@@ -135,13 +138,15 @@ const SpecialtySection = () => {
       };
     }
 
-    if (bucketData[topic].Aggregate) {
-      return {
-        Sent: bucketData[topic].Aggregate.Sent || 0,
-        Delivered: bucketData[topic].Aggregate.Delivered || 0,
-        Unique_Opens: bucketData[topic].Aggregate.Unique_Opens || 0,
-        Unique_Open_Rate: bucketData[topic].Aggregate.Unique_Open_Rate || 0
-      };
+    if (!searchFilter || !searchFilter.trim()) {
+      if (bucketData[topic].Aggregate) {
+        return {
+          Sent: bucketData[topic].Aggregate.Sent || 0,
+          Delivered: bucketData[topic].Aggregate.Delivered || 0,
+          Unique_Opens: bucketData[topic].Aggregate.Unique_Opens || 0,
+          Unique_Open_Rate: bucketData[topic].Aggregate.Unique_Open_Rate || 0
+        };
+      }
     }
 
     if (!bucketData[topic].Specialties) {
@@ -154,14 +159,22 @@ const SpecialtySection = () => {
     }
 
     const specialties = bucketData[topic].Specialties;
-    const totalSent = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Sent || 0), 0);
-    const totalDelivered = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Delivered || 0), 0);
-    const totalOpens = Object.values(specialties).reduce((sum, specialty) => sum + (specialty.Unique_Opens || 0), 0);
-    
+
+    let totalSent = 0;
+    let totalDelivered = 0;
+    let totalOpens = 0;
     let weightedRateSum = 0;
     let totalWeight = 0;
-    
-    Object.values(specialties).forEach(specialty => {
+
+    Object.entries(specialties).forEach(([name, specialty]) => {
+      if (searchFilter && searchFilter.trim() && !matchesSearchTerm(name, searchFilter)) {
+        return;
+      }
+
+      totalSent += specialty.Sent || 0;
+      totalDelivered += specialty.Delivered || 0;
+      totalOpens += specialty.Unique_Opens || 0;
+
       const delivered = specialty.Delivered || 0;
       const rate = specialty.Unique_Open_Rate || 0;
       if (delivered > 0) {
@@ -169,7 +182,7 @@ const SpecialtySection = () => {
         totalWeight += delivered;
       }
     });
-    
+
     const openRate = totalWeight > 0 ? weightedRateSum / totalWeight : 0;
 
     return {
@@ -182,29 +195,75 @@ const SpecialtySection = () => {
 
   const recalculateBucketMetrics = (bucketData) => {
     if (!bucketData) return null;
-    
+
     const topics = Object.keys(bucketData).filter(key => key !== 'Aggregate');
-    
+
     let totalSent = 0;
     let totalDelivered = 0;
     let totalOpens = 0;
     let weightedRateSum = 0;
     let totalWeight = 0;
-    
+
     topics.forEach(topic => {
       const topicMetrics = getTopicTotals(bucketData, topic);
       totalSent += topicMetrics.Sent;
       totalDelivered += topicMetrics.Delivered;
       totalOpens += topicMetrics.Unique_Opens;
-      
+
       if (topicMetrics.Delivered > 0) {
         weightedRateSum += topicMetrics.Unique_Open_Rate * topicMetrics.Delivered;
         totalWeight += topicMetrics.Delivered;
       }
     });
-    
+
     const openRate = totalWeight > 0 ? weightedRateSum / totalWeight : 0;
-    
+
+    return {
+      Sent: totalSent,
+      Delivered: totalDelivered,
+      Unique_Opens: totalOpens,
+      Unique_Open_Rate: openRate
+    };
+  };
+
+  const recalculateFilteredBucketMetrics = (bucketData, searchFilter) => {
+    if (!bucketData) return null;
+
+    if (!searchFilter || !searchFilter.trim()) {
+      return recalculateBucketMetrics(bucketData);
+    }
+
+    const topics = Object.keys(bucketData).filter(key => key !== 'Aggregate');
+
+    let totalSent = 0;
+    let totalDelivered = 0;
+    let totalOpens = 0;
+    let weightedRateSum = 0;
+    let totalWeight = 0;
+
+    topics.forEach(topic => {
+      if (!bucketData[topic] || !bucketData[topic].Specialties) return;
+
+      const specialties = bucketData[topic].Specialties;
+
+      Object.entries(specialties).forEach(([name, data]) => {
+        if (!matchesSearchTerm(name, searchFilter)) return;
+
+        totalSent += data.Sent || 0;
+        totalDelivered += data.Delivered || 0;
+        totalOpens += data.Unique_Opens || 0;
+
+        const delivered = data.Delivered || 0;
+        const rate = data.Unique_Open_Rate || 0;
+        if (delivered > 0) {
+          weightedRateSum += rate * delivered;
+          totalWeight += delivered;
+        }
+      });
+    });
+
+    const openRate = totalWeight > 0 ? weightedRateSum / totalWeight : 0;
+
     return {
       Sent: totalSent,
       Delivered: totalDelivered,
@@ -219,13 +278,12 @@ const SpecialtySection = () => {
     }
 
     const specialties = specialtyData[activeBucket][topic].Specialties;
-    const lowerSearchFilter = searchFilter.toLowerCase().trim();
 
     if (!combineSubSpecialties) {
       return Object.entries(specialties)
         .filter(([name]) => {
-          if (!lowerSearchFilter) return true;
-          return name.toLowerCase().includes(lowerSearchFilter);
+          if (!searchFilter.trim()) return true;
+          return matchesSearchTerm(name, searchFilter);
         })
         .map(([name, data]) => ({
           name,
@@ -240,7 +298,7 @@ const SpecialtySection = () => {
     Object.entries(specialties).forEach(([name, data]) => {
       const groupName = groupSpecialties(name);
 
-      if (lowerSearchFilter && !name.toLowerCase().includes(lowerSearchFilter)) {
+      if (searchFilter.trim() && !matchesSearchTerm(name, searchFilter)) {
         return;
       }
 
@@ -315,8 +373,8 @@ const SpecialtySection = () => {
 
   const buckets = specialtyData ? Object.keys(specialtyData) : [];
   const activeBucketData = activeBucket ? specialtyData[activeBucket] : null;
-  const bucketMetrics = activeBucketData ? 
-    recalculateBucketMetrics(activeBucketData) : 
+  const bucketMetrics = activeBucketData ?
+    recalculateFilteredBucketMetrics(activeBucketData, searchQuery) :
     { Sent: 0, Delivered: 0, Unique_Opens: 0, Unique_Open_Rate: 0 };
 
   return (
@@ -328,7 +386,10 @@ const SpecialtySection = () => {
             type="text"
             placeholder="Search specialties"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setGlobalSearchTerm('specialtyMetrics', e.target.value);
+            }}
             className="search-input"
           />
         </div>
@@ -384,7 +445,7 @@ const SpecialtySection = () => {
             {Object.keys(specialtyData[activeBucket])
               .filter(key => key !== 'Aggregate')
               .map((topic) => {
-                const topicTotals = getTopicTotals(specialtyData[activeBucket], topic);
+                const topicTotals = getTopicTotals(specialtyData[activeBucket], topic, searchQuery);
                 const sortedSpecialties = getSortedSpecialties(topic, searchQuery);
 
                 if (searchQuery && sortedSpecialties.length === 0) {

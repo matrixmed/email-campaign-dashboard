@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import CampaignReportingMetadata, BrandEditorAgency, CMIContractValue
+from models import CampaignReportingMetadata, BrandEditorAgency, CMIContractValue, GCMPlacementLookup
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -110,9 +110,29 @@ def extract_month_from_campaign_name(campaign_name):
     return None
 
 def extract_creative_code_from_placement_name(placement_name):
-    match = re.search(r'([A-Z]{2,3}-[A-Z]{2,3}-[A-Z]{2,3}-\d+)', placement_name, re.IGNORECASE)
-    if match:
-        return match.group(1).upper()
+    """
+    Extract creative code from placement name.
+    Supports patterns like:
+    - ABV-EMR-TT-1234 (standard format)
+    - XX-XXX-XX-12345 (variable lengths)
+    - ABV_EMR_TT_1234 (underscores)
+    """
+    patterns = [
+        # Standard: XX-XXX-XXX-1234 or XX-XXX-XX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # With extra segment: XX-XXX-XX-XX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # Two segment: XX-XXX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # Fallback: Any sequence of letter groups with dashes ending in numbers
+        r'([A-Z]{2,}(?:[-_][A-Z]{2,})+[-_]\d+)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, placement_name, re.IGNORECASE)
+        if match:
+            result = match.group(1).upper().replace('_', '-')
+            return result
     return None
 
 def extract_ad_size_from_placement_name(placement_name):
@@ -192,9 +212,30 @@ def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
         return {'error': str(e)}
 
 def extract_creative_code_from_image(filename):
-    match = re.search(r'([A-Z]{2,3}-[A-Z]{2,3}-[A-Z]{2,3}-\d+)', filename, re.IGNORECASE)
-    if match:
-        return match.group(1).upper()
+    """
+    Extract creative code from image filename.
+    Supports patterns like:
+    - ABV-EMR-TT-1234 (standard format)
+    - XX-XXX-XX-12345 (variable lengths)
+    - ABV_EMR_TT_1234 (underscores)
+    - ABV-EMR-TT-1234-300x250 (with ad size suffix)
+    """
+    patterns = [
+        # Standard: XX-XXX-XXX-1234 or XX-XXX-XX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # With extra segment: XX-XXX-XX-XX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # Two segment: XX-XXX-1234
+        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
+        # Fallback: Any sequence of letter groups with dashes ending in numbers
+        r'([A-Z]{2,}(?:[-_][A-Z]{2,})+[-_]\d+)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
+        if match:
+            result = match.group(1).upper().replace('_', '-')
+            return result
     return None
 
 def normalize_client_id(client_id):
@@ -246,20 +287,20 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
             normalized_client_id = normalize_client_id(contract.client)
 
             extracted_data['CMI_PlacementID'] = contract.placement_id
-            extracted_data['Placement_Description'] = contract.placement_description
+            extracted_data['Placement_Description'] = contract.placement_description or extracted_data.get('Placement_Description')
             extracted_data['contract_number'] = contract.contract_number
-            extracted_data['Brand_Name'] = contract.brand
-            extracted_data['Vehicle_Name'] = contract.vehicle
-            extracted_data['Buy_Component_Type'] = contract.buy_component_type
-            extracted_data['Client_ID'] = normalized_client_id
-            extracted_data['Supplier'] = extracted_data.get('Supplier')
+            extracted_data['Brand_Name'] = contract.brand or extracted_data.get('Brand_Name')
+            extracted_data['Vehicle_Name'] = contract.vehicle or extracted_data.get('Vehicle_Name')
+            extracted_data['Buy_Component_Type'] = contract.buy_component_type or extracted_data.get('Buy_Component_Type')
+            extracted_data['Client_ID'] = normalized_client_id or extracted_data.get('Client_ID')
             extracted_data['cmi_validated'] = True
 
-            print(f"  Overriding with CMI contract values:")
-            print(f"    Client_ID: {normalized_client_id}")
-            print(f"    Brand: {contract.brand}")
-            print(f"    Contract #: {contract.contract_number}")
-            print(f"    Buy Component: {contract.buy_component_type}")
+            print(f"  Using CMI contract values:")
+            print(f"    Client_ID: {extracted_data.get('Client_ID')}")
+            print(f"    Brand: {extracted_data.get('Brand_Name')}")
+            print(f"    Vehicle: {extracted_data.get('Vehicle_Name')}")
+            print(f"    Contract #: {extracted_data.get('contract_number')}")
+            print(f"    Buy Component: {extracted_data.get('Buy_Component_Type')}")
         else:
             print(f"WARNING: No CMI contract found for placement {cmi_placement_id}")
             extracted_data['contract_number'] = None
@@ -279,14 +320,24 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
 @campaigns_bp.route('/<campaign_id>/metadata', methods=['POST'])
 def upload_campaign_metadata(campaign_id):
     try:
-        if 'target_list' not in request.files and 'tags' not in request.files and 'ad_images' not in request.files:
+        has_files = 'target_list' in request.files or 'tags' in request.files or 'ad_images' in request.files
+        manual_placement_id = request.form.get('cmi_placement_id', '').strip()
+
+        if not has_files and not manual_placement_id:
             return jsonify({
                 'status': 'error',
-                'message': 'No files provided'
+                'message': 'No files or placement ID provided'
             }), 400
 
         campaign_name = request.form.get('campaign_name', campaign_id)
         uploaded_by = request.form.get('uploaded_by', 'default_user')
+        send_date_str = request.form.get('send_date')
+        send_date = None
+        if send_date_str:
+            try:
+                send_date = datetime.strptime(send_date_str, '%Y-%m-%d').date()
+            except:
+                pass
 
         target_list_path = None
         tags_path = None
@@ -360,14 +411,31 @@ def upload_campaign_metadata(campaign_id):
         if not final_creative_code and creative_codes_from_images:
             final_creative_code = creative_codes_from_images[0]
 
+        if manual_placement_id:
+            extracted_data['CMI_PlacementID'] = manual_placement_id
+            try:
+                from models import CMIContractValue
+                session_temp = get_session()
+                contract = session_temp.query(CMIContractValue).filter_by(placement_id=manual_placement_id).first()
+                if contract:
+                    extracted_data['Brand_Name'] = extracted_data.get('Brand_Name') or contract.brand
+                    extracted_data['Vehicle_Name'] = extracted_data.get('Vehicle_Name') or contract.vehicle
+                    extracted_data['Placement_Description'] = extracted_data.get('Placement_Description') or contract.placement_description
+                    extracted_data['contract_number'] = extracted_data.get('contract_number') or contract.contract_number
+                    extracted_data['Buy_Component_Type'] = extracted_data.get('Buy_Component_Type') or contract.buy_component_type
+                session_temp.close()
+            except Exception as e:
+                print(f"Error fetching contract for placement ID {manual_placement_id}: {e}")
+
         extracted_data = validate_and_enrich_with_cmi_contracts(extracted_data)
 
         session = get_session()
         existing = session.query(CampaignReportingMetadata).filter_by(campaign_id=campaign_id).first()
 
         if existing:
+            existing.send_date = send_date or existing.send_date
             existing.client_id = extracted_data.get('Client_ID') or existing.client_id
-            existing.cmi_placement_id = extracted_data.get('CMI_PlacementID') or existing.cmi_placement_id
+            existing.cmi_placement_id = manual_placement_id or extracted_data.get('CMI_PlacementID') or existing.cmi_placement_id
             existing.client_placement_id = extracted_data.get('Client_PlacementID') or existing.client_placement_id
             existing.placement_description = extracted_data.get('Placement_Description') or existing.placement_description
             existing.supplier = extracted_data.get('Supplier') or existing.supplier
@@ -378,6 +446,8 @@ def upload_campaign_metadata(campaign_id):
             existing.creative_code = final_creative_code or existing.creative_code
             existing.gcm_placement_id = gcm_ids[0] if len(gcm_ids) > 0 else existing.gcm_placement_id
             existing.gcm_placement_id2 = gcm_ids[1] if len(gcm_ids) > 1 else existing.gcm_placement_id2
+            existing.buy_component_type = extracted_data.get('Buy_Component_Type') or existing.buy_component_type
+            existing.contract_number = extracted_data.get('contract_number') or existing.contract_number
             existing.ad_count = ad_count or existing.ad_count
             existing.target_list_path = target_list_path or existing.target_list_path
             existing.tags_path = tags_path or existing.tags_path
@@ -389,8 +459,9 @@ def upload_campaign_metadata(campaign_id):
             metadata = CampaignReportingMetadata(
                 campaign_id=campaign_id,
                 campaign_name=campaign_name,
+                send_date=send_date,
                 client_id=extracted_data.get('Client_ID'),
-                cmi_placement_id=extracted_data.get('CMI_PlacementID'),
+                cmi_placement_id=manual_placement_id or extracted_data.get('CMI_PlacementID'),
                 client_placement_id=extracted_data.get('Client_PlacementID'),
                 placement_description=extracted_data.get('Placement_Description'),
                 supplier=extracted_data.get('Supplier'),
@@ -401,6 +472,8 @@ def upload_campaign_metadata(campaign_id):
                 creative_code=final_creative_code,
                 gcm_placement_id=gcm_ids[0] if len(gcm_ids) > 0 else None,
                 gcm_placement_id2=gcm_ids[1] if len(gcm_ids) > 1 else None,
+                buy_component_type=extracted_data.get('Buy_Component_Type'),
+                contract_number=extracted_data.get('contract_number'),
                 ad_count=ad_count,
                 target_list_path=target_list_path,
                 tags_path=tags_path,
@@ -490,6 +563,294 @@ def get_campaign_metadata(campaign_id):
         return jsonify({
             'status': 'success',
             'metadata': result
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@campaigns_bp.route('/metadata/all', methods=['GET'])
+def get_all_campaign_metadata():
+    try:
+        session = get_session()
+        all_metadata = session.query(CampaignReportingMetadata).all()
+
+        results = []
+        for metadata in all_metadata:
+            results.append({
+                'campaign_id': metadata.campaign_id,
+                'campaign_name': metadata.campaign_name,
+                'send_date': metadata.send_date.isoformat() if metadata.send_date else None,
+                'client_id': metadata.client_id,
+                'cmi_placement_id': metadata.cmi_placement_id,
+                'client_placement_id': metadata.client_placement_id,
+                'placement_description': metadata.placement_description,
+                'supplier': metadata.supplier,
+                'brand_name': metadata.brand_name,
+                'vehicle_name': metadata.vehicle_name,
+                'target_list_id': metadata.target_list_id,
+                'campaign_name_from_file': metadata.campaign_name_from_file,
+                'creative_code': metadata.creative_code,
+                'gcm_placement_id': metadata.gcm_placement_id,
+                'gcm_placement_id2': metadata.gcm_placement_id2,
+                'buy_component_type': metadata.buy_component_type,
+                'contract_number': metadata.contract_number,
+                'ad_count': metadata.ad_count,
+                'uploaded_at': metadata.uploaded_at.isoformat() if metadata.uploaded_at else None,
+                'uploaded_by': metadata.uploaded_by
+            })
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'metadata': results,
+            'count': len(results)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/gcm/upload', methods=['POST'])
+def upload_gcm_tags():
+    try:
+        if 'tags_file' not in request.files:
+            return jsonify({'status': 'error', 'message': 'No tags file provided'}), 400
+
+        file = request.files['tags_file']
+        brand = request.form.get('brand', '').strip()
+
+        if not file or not file.filename:
+            return jsonify({'status': 'error', 'message': 'No file selected'}), 400
+
+        filename = secure_filename(f"gcm_tags_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+
+        ext = file.filename.rsplit('.', 1)[1].lower()
+
+        placements = []
+
+        if ext == 'xls':
+            import xlrd
+            wb = xlrd.open_workbook(file_path)
+            sheet = wb.sheet_by_index(0)
+
+            header_row_idx = None
+            headers = []
+            for row_idx in range(min(sheet.nrows, 20)):
+                row_values = [sheet.cell_value(row_idx, col) for col in range(sheet.ncols)]
+                if any('Placement ID' in str(cell) or 'Placement Id' in str(cell) for cell in row_values if cell):
+                    headers = row_values
+                    header_row_idx = row_idx
+                    break
+
+            if header_row_idx is None:
+                os.remove(file_path)
+                return jsonify({'status': 'error', 'message': 'Could not find header row with Placement ID'}), 400
+
+            col_map = {}
+            for idx, header in enumerate(headers):
+                header_str = str(header).strip().lower()
+                if 'placement id' in header_str and 'name' not in header_str:
+                    col_map['placement_id'] = idx
+                elif 'placement name' in header_str or 'placement' in header_str and 'name' in header_str:
+                    col_map['placement_name'] = idx
+                elif 'advertiser id' in header_str:
+                    col_map['advertiser_id'] = idx
+                elif 'advertiser name' in header_str or 'advertiser' in header_str and 'name' in header_str:
+                    col_map['advertiser_name'] = idx
+                elif 'campaign id' in header_str and 'name' not in header_str:
+                    col_map['campaign_id'] = idx
+                elif 'campaign name' in header_str or 'campaign' in header_str and 'name' in header_str:
+                    col_map['campaign_name'] = idx
+                elif 'site' in header_str:
+                    col_map['site'] = idx
+                elif 'start' in header_str and 'date' in header_str:
+                    col_map['start_date'] = idx
+                elif 'end' in header_str and 'date' in header_str:
+                    col_map['end_date'] = idx
+
+            for row_idx in range(header_row_idx + 1, sheet.nrows):
+                placement_id = sheet.cell_value(row_idx, col_map.get('placement_id', 0)) if 'placement_id' in col_map else None
+                if placement_id:
+                    placements.append({
+                        'gcm_placement_id': str(int(placement_id) if isinstance(placement_id, float) else placement_id),
+                        'placement_name': str(sheet.cell_value(row_idx, col_map['placement_name'])) if 'placement_name' in col_map else None,
+                        'advertiser_id': str(sheet.cell_value(row_idx, col_map['advertiser_id'])) if 'advertiser_id' in col_map else None,
+                        'advertiser_name': str(sheet.cell_value(row_idx, col_map['advertiser_name'])) if 'advertiser_name' in col_map else None,
+                        'campaign_id': str(sheet.cell_value(row_idx, col_map['campaign_id'])) if 'campaign_id' in col_map else None,
+                        'campaign_name': str(sheet.cell_value(row_idx, col_map['campaign_name'])) if 'campaign_name' in col_map else None,
+                        'site': str(sheet.cell_value(row_idx, col_map['site'])) if 'site' in col_map else None,
+                        'brand': brand,
+                        'source_file': file.filename
+                    })
+
+        elif ext == 'xlsx':
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            sheet = wb.active
+
+            header_row_idx = None
+            headers = []
+            for row_idx in range(1, min(sheet.max_row + 1, 20)):
+                row_values = [sheet.cell(row=row_idx, column=col).value for col in range(1, sheet.max_column + 1)]
+                if any('Placement ID' in str(cell) or 'Placement Id' in str(cell) for cell in row_values if cell):
+                    headers = row_values
+                    header_row_idx = row_idx
+                    break
+
+            if header_row_idx is None:
+                os.remove(file_path)
+                return jsonify({'status': 'error', 'message': 'Could not find header row with Placement ID'}), 400
+
+            col_map = {}
+            for idx, header in enumerate(headers):
+                if header:
+                    header_str = str(header).strip().lower()
+                    if 'placement id' in header_str and 'name' not in header_str:
+                        col_map['placement_id'] = idx + 1
+                    elif 'placement name' in header_str:
+                        col_map['placement_name'] = idx + 1
+                    elif 'advertiser id' in header_str:
+                        col_map['advertiser_id'] = idx + 1
+                    elif 'advertiser name' in header_str:
+                        col_map['advertiser_name'] = idx + 1
+                    elif 'campaign id' in header_str and 'name' not in header_str:
+                        col_map['campaign_id'] = idx + 1
+                    elif 'campaign name' in header_str:
+                        col_map['campaign_name'] = idx + 1
+                    elif 'site' in header_str:
+                        col_map['site'] = idx + 1
+                    elif 'start' in header_str and 'date' in header_str:
+                        col_map['start_date'] = idx + 1
+                    elif 'end' in header_str and 'date' in header_str:
+                        col_map['end_date'] = idx + 1
+
+            for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
+                placement_id = sheet.cell(row=row_idx, column=col_map.get('placement_id', 1)).value if 'placement_id' in col_map else None
+                if placement_id:
+                    placements.append({
+                        'gcm_placement_id': str(int(placement_id) if isinstance(placement_id, float) else placement_id),
+                        'placement_name': str(sheet.cell(row=row_idx, column=col_map['placement_name']).value) if 'placement_name' in col_map else None,
+                        'advertiser_id': str(sheet.cell(row=row_idx, column=col_map['advertiser_id']).value) if 'advertiser_id' in col_map else None,
+                        'advertiser_name': str(sheet.cell(row=row_idx, column=col_map['advertiser_name']).value) if 'advertiser_name' in col_map else None,
+                        'campaign_id': str(sheet.cell(row=row_idx, column=col_map['campaign_id']).value) if 'campaign_id' in col_map else None,
+                        'campaign_name': str(sheet.cell(row=row_idx, column=col_map['campaign_name']).value) if 'campaign_name' in col_map else None,
+                        'site': str(sheet.cell(row=row_idx, column=col_map['site']).value) if 'site' in col_map else None,
+                        'brand': brand,
+                        'source_file': file.filename
+                    })
+
+        else:
+            os.remove(file_path)
+            return jsonify({'status': 'error', 'message': 'Unsupported file format. Use .xls or .xlsx'}), 400
+
+        if not placements:
+            os.remove(file_path)
+            return jsonify({'status': 'error', 'message': 'No placements found in file'}), 400
+
+        session = get_session()
+
+        if brand:
+            session.query(GCMPlacementLookup).filter(GCMPlacementLookup.brand == brand).delete()
+
+        for p in placements:
+            lookup = GCMPlacementLookup(
+                gcm_placement_id=p['gcm_placement_id'],
+                placement_name=p.get('placement_name'),
+                advertiser_id=p.get('advertiser_id'),
+                advertiser_name=p.get('advertiser_name'),
+                campaign_id=p.get('campaign_id'),
+                campaign_name=p.get('campaign_name'),
+                site=p.get('site'),
+                brand=p.get('brand'),
+                source_file=p.get('source_file')
+            )
+            session.add(lookup)
+
+        session.commit()
+        session.close()
+
+        os.remove(file_path)
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Uploaded {len(placements)} GCM placements',
+            'count': len(placements),
+            'brand': brand
+        }), 201
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/gcm/placements', methods=['GET'])
+def get_gcm_placements():
+    try:
+        brand = request.args.get('brand', '').strip()
+
+        session = get_session()
+
+        query = session.query(GCMPlacementLookup)
+        if brand:
+            query = query.filter(GCMPlacementLookup.brand.ilike(f'%{brand}%'))
+
+        placements = query.all()
+
+        results = []
+        for p in placements:
+            results.append({
+                'id': p.id,
+                'gcm_placement_id': p.gcm_placement_id,
+                'placement_name': p.placement_name,
+                'advertiser_id': p.advertiser_id,
+                'advertiser_name': p.advertiser_name,
+                'campaign_id': p.campaign_id,
+                'campaign_name': p.campaign_name,
+                'site': p.site,
+                'brand': p.brand,
+                'source_file': p.source_file
+            })
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'placements': results,
+            'count': len(results)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@campaigns_bp.route('/gcm/brands', methods=['GET'])
+def get_gcm_brands():
+    try:
+        session = get_session()
+
+        brands = session.query(GCMPlacementLookup.brand).distinct().all()
+        brand_list = [b[0] for b in brands if b[0]]
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'brands': sorted(brand_list)
         }), 200
 
     except Exception as e:

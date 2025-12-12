@@ -7,14 +7,22 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
     const [activeTooltipRow, setActiveTooltipRow] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
-    const [selectedCampaigns, setSelectedCampaigns] = useState([]);
-    const [isCompareMode, setIsCompareMode] = useState(false);
+    const [deploymentDropdownOpen, setDeploymentDropdownOpen] = useState(false);
+    const [rowsDropdownOpen, setRowsDropdownOpen] = useState(false);
     const tableContainerRef = useRef(null);
+    const deploymentDropdownRef = useRef(null);
+    const rowsDropdownRef = useRef(null);
     
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (!event.target.closest('th')) {
                 setActiveDropdown(null);
+            }
+            if (deploymentDropdownRef.current && !deploymentDropdownRef.current.contains(event.target)) {
+                setDeploymentDropdownOpen(false);
+            }
+            if (rowsDropdownRef.current && !rowsDropdownRef.current.contains(event.target)) {
+                setRowsDropdownOpen(false);
             }
         };
 
@@ -102,7 +110,6 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
     const handleCampaignClick = (campaign) => {
         setSelectedCampaign(campaign);
         setIsModalOpen(true);
-        setIsCompareMode(false);
     };
 
     const handleModalNavigate = (direction) => {
@@ -113,28 +120,7 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
             setSelectedCampaign(currentRows[currentIndex - 1]);
         }
     };
-    
-    const toggleCampaignSelection = (campaign, isSelected) => {
-        if (isSelected) {
-            setSelectedCampaigns(prev => prev.filter(c => c.Campaign !== campaign.Campaign));
-        } else {
-            if (selectedCampaigns.length < 4) {
-                setSelectedCampaigns(prev => [...prev, campaign]);
-            }
-        }
-    };
-    
-    const isCampaignSelected = (campaign) => {
-        return selectedCampaigns.some(c => c.Campaign === campaign.Campaign);
-    };
-    
-    const openCompareModal = () => {
-        if (selectedCampaigns.length > 0) {
-            setIsCompareMode(true);
-            setIsModalOpen(true);
-        }
-    };
-    
+
     const closeModal = () => {
         setIsModalOpen(false);
     };
@@ -151,53 +137,79 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
         { value: "none", label: "No Deployment" }
     ];
 
+    const rowsOptions = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100];
+
+    const getDeploymentLabel = () => {
+        return deploymentOptions.find(opt => opt.value === selectedDeployment)?.label || 'All Deployments';
+    };
+
     return (
         <div className="table-section">
             <div className="metrics-header">
                 <h2>Completed Campaign Metrics</h2>
-                
+
                 <div className="top-controls">
-                    <div className="filter-control">
-                        <label htmlFor="deploymentFilter">Filter by Deployment:</label>
-                        <select
-                            id="deploymentFilter"
-                            value={selectedDeployment}
-                            onChange={(e) => handleDeploymentChange(e.target.value)}
-                            className="deployment-select"
-                        >
-                            {deploymentOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    
-                    <div className="rows-control">
-                        <label htmlFor="rowsPerPage">Rows per page:</label>
-                        <select
-                            id="rowsPerPage"
-                            value={rowsPerPage}
-                            onChange={handleRowsPerPageChange}
-                        >
-                            {[10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
-                                <option key={num} value={num}>
-                                    {num}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    
-                    {selectedCampaigns.length > 0 && (
-                        <div className="compare-control">
-                            <button 
-                                className="compare-button"
-                                onClick={openCompareModal}
+                    <div className="filter-control" ref={deploymentDropdownRef}>
+                        <label>Filter by Deployment:</label>
+                        <div className="custom-dropdown">
+                            <button
+                                className="custom-dropdown-trigger"
+                                onClick={() => setDeploymentDropdownOpen(!deploymentDropdownOpen)}
                             >
-                                Compare Selected ({selectedCampaigns.length})
+                                <span className="dropdown-value">{getDeploymentLabel()}</span>
+                                <svg className={`dropdown-arrow ${deploymentDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
                             </button>
+                            {deploymentDropdownOpen && (
+                                <div className="custom-dropdown-menu">
+                                    {deploymentOptions.map((option) => (
+                                        <div
+                                            key={option.value}
+                                            className={`custom-dropdown-option ${selectedDeployment === option.value ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                handleDeploymentChange(option.value);
+                                                setDeploymentDropdownOpen(false);
+                                            }}
+                                        >
+                                            <span>{option.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
+
+                    <div className="rows-control" ref={rowsDropdownRef}>
+                        <label>Rows per page:</label>
+                        <div className="custom-dropdown">
+                            <button
+                                className="custom-dropdown-trigger"
+                                onClick={() => setRowsDropdownOpen(!rowsDropdownOpen)}
+                            >
+                                <span className="dropdown-value">{rowsPerPage}</span>
+                                <svg className={`dropdown-arrow ${rowsDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </button>
+                            {rowsDropdownOpen && (
+                                <div className="custom-dropdown-menu">
+                                    {rowsOptions.map((num) => (
+                                        <div
+                                            key={num}
+                                            className={`custom-dropdown-option ${rowsPerPage === num ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                handleRowsPerPageChange({ target: { value: num } });
+                                                setRowsDropdownOpen(false);
+                                            }}
+                                        >
+                                            <span>{num}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -255,20 +267,17 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                                 </th>
                                 
                             ))}
-                            <th className="select-column">Select</th>
                         </tr>
                     </thead>
                     <tbody>
                         {currentRows && currentRows.map((item, index) => {
-                            const tooltipPosition = activeTooltipRow === index 
-                                ? getTooltipPosition(index) 
+                            const tooltipPosition = activeTooltipRow === index
+                                ? getTooltipPosition(index)
                                 : 'bottom';
-                            const isSelected = isCampaignSelected(item);
-                                
+
                             return (
-                                <tr key={index} className={isSelected ? 'selected-row' : ''}>
-                                    
-                                    <td 
+                                <tr key={index}>
+                                    <td
                                         className="campaign-column-with-tooltip clickable"
                                         onMouseEnter={() => setActiveTooltipRow(index)}
                                         onMouseLeave={() => setActiveTooltipRow(null)}
@@ -277,7 +286,7 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                                         <div className="campaign-text">
                                             {item.Campaign}
                                         </div>
-                                        
+
                                         {activeTooltipRow === index && (
                                             <div className={`attached-tooltip tooltip-${tooltipPosition}`}>
                                                 {item.Campaign}
@@ -292,15 +301,6 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                                             {formatValue(item[col], col)}
                                         </td>
                                     ))}
-                                    <td className="select-column">
-                                        <input 
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleCampaignSelection(item, isSelected)}
-                                            title={isSelected ? "Deselect for comparison" : "Select for comparison"}
-                                            disabled={!isSelected && selectedCampaigns.length >= 4}
-                                        />
-                                    </td>
                                 </tr>
                             );
                         })}
@@ -337,8 +337,8 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                 isOpen={isModalOpen}
                 onClose={closeModal}
                 campaign={selectedCampaign}
-                compareCampaigns={selectedCampaigns}
-                isCompareMode={isCompareMode}
+                compareCampaigns={[]}
+                isCompareMode={false}
                 metricDisplayNames={metricDisplayNames}
                 allCampaigns={currentRows}
                 onNavigate={handleModalNavigate}

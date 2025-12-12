@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import '../../styles/journal.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import { useSearch } from '../../context/SearchContext';
 
 const DigitalJournals = () => {
+    const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
     const [journalsData, setJournalsData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(searchTerms.journalMetrics || '');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     
@@ -280,18 +283,19 @@ const DigitalJournals = () => {
     }, [isModalOpen]);
 
     const handleSearchChange = (e) => {
-        const searchValue = e.target.value.toLowerCase();
+        const searchValue = e.target.value;
         setSearch(searchValue);
-        
+        setGlobalSearchTerm('journalMetrics', searchValue);
+
         const newFilteredData = journalsData.filter(item => {
             if (isTitleBanned(item.title)) return false;
-            const displayText = getDisplayTitle(item).toLowerCase();
-            return searchValue.split(' ').every(word => displayText.includes(word));
+            const displayText = getDisplayTitle(item);
+            return matchesSearchTerm(displayText, searchValue);
         });
-        
+
         setFilteredData(newFilteredData);
         setCurrentPage(1);
-        
+
         calculateAggregateMetrics(newFilteredData, timeframeFilter);
     };
 
@@ -445,7 +449,7 @@ const DigitalJournals = () => {
                     <input
                         type="text"
                         className="search-input"
-                        placeholder="Search by Title or URL"
+                        placeholder="Search"
                         value={search}
                         onChange={handleSearchChange}
                     />

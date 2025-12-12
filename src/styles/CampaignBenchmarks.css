@@ -35,6 +35,11 @@
   flex-wrap: wrap;
 }
 
+.filter-row.single-row {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
 .filter-group {
   display: flex;
   flex-direction: column;
@@ -43,10 +48,28 @@
   min-width: 250px;
 }
 
+.filter-group.campaign-select {
+  flex: 1;
+  min-width: 300px;
+}
+
+.filter-group.topic-toggle {
+  flex: 0 0 auto;
+  min-width: auto;
+}
+
 .filter-group label {
   color: #aaa;
   font-size: 14px;
   font-weight: 500;
+}
+
+.filter-label {
+  display: block;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .filter-group select {
@@ -73,7 +96,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 4px;
+}
+
+.toggle-label-text {
+  color: #aaa;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .campaign-benchmark-toggle-switch {
@@ -146,13 +175,14 @@
   background: var(--color-table-header, #1a4d7a);
   color: white;
   border: none;
-  padding: 8px 22px;
+  padding: 10px 24px;
   border-radius: var(--radius-sm, 4px);
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease;
-  min-width: 160px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .run-analysis-button:hover:not(:disabled) {
@@ -242,9 +272,10 @@
 }
 
 .campaign-date {
-  color: #888;
-  font-size: 14px;
+  color: #666;
+  font-size: 13px;
   margin: 0 0 12px 0;
+  font-style: italic;
 }
 
 .classification-badges {

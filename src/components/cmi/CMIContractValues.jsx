@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '../../styles/CMIContractValues.css';
 import { API_BASE_URL } from '../../config/api';
 
@@ -10,6 +10,9 @@ const CMIContractValues = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterText, setFilterText] = useState('');
   const [selectedYear, setSelectedYear] = useState(2025);
+  const [newRowIds, setNewRowIds] = useState(new Set()); 
+  const [aaCounter, setAaCounter] = useState(1);
+  const tableRef = useRef(null);
 
   const columns = [
     { key: 'contract_number', label: 'Contract #' },
@@ -19,6 +22,8 @@ const CMIContractValues = () => {
     { key: 'placement_id', label: 'Placement ID' },
     { key: 'placement_description', label: 'Placement Description' },
     { key: 'buy_component_type', label: 'Buy Component Type' },
+    { key: 'frequency', label: 'Frequency' },
+    { key: 'metric', label: 'Metric' },
     { key: 'data_type', label: 'Data Type' },
     { key: 'notes', label: 'Notes' }
   ];
@@ -42,9 +47,81 @@ const CMIContractValues = () => {
     fetchContracts();
   }, [fetchContracts]);
 
+  useEffect(() => {
+    setNewRowIds(new Set());
+    setAaCounter(1);
+  }, [selectedYear]);
+
   const handleCellClick = (contractId, columnKey, currentValue) => {
     setEditingCell({ contractId, columnKey });
     setEditValue(currentValue || '');
+  };
+
+  const getColumnIndex = (columnKey) => columns.findIndex(c => c.key === columnKey);
+
+  const navigateCell = (currentContractId, currentColumnKey, direction) => {
+    const currentColIndex = getColumnIndex(currentColumnKey);
+    const currentRowIndex = sortedContracts.findIndex(c => c.id === currentContractId);
+
+    let newRowIndex = currentRowIndex;
+    let newColIndex = currentColIndex;
+
+    switch (direction) {
+      case 'ArrowUp':
+        newRowIndex = Math.max(0, currentRowIndex - 1);
+        break;
+      case 'ArrowDown':
+        newRowIndex = Math.min(sortedContracts.length - 1, currentRowIndex + 1);
+        break;
+      case 'ArrowLeft':
+        newColIndex = Math.max(0, currentColIndex - 1);
+        break;
+      case 'ArrowRight':
+        newColIndex = Math.min(columns.length - 1, currentColIndex + 1);
+        break;
+      default:
+        return null;
+    }
+
+    if (newRowIndex !== currentRowIndex || newColIndex !== currentColIndex) {
+      const newContract = sortedContracts[newRowIndex];
+      const newColumn = columns[newColIndex];
+      return { contractId: newContract.id, columnKey: newColumn.key, value: newContract[newColumn.key] || '' };
+    }
+    return null;
+  };
+
+  const handleKeyDown = async (e, contractId, columnKey) => {
+    if (e.key === 'Enter') {
+      await handleCellBlur();
+    } else if (e.key === 'Escape') {
+      setEditingCell(null);
+    } else if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+      await handleCellBlur();
+      const newCell = navigateCell(contractId, columnKey, e.key);
+      if (newCell) {
+        setEditingCell({ contractId: newCell.contractId, columnKey: newCell.columnKey });
+        setEditValue(newCell.value);
+      }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const input = e.target;
+      const cursorPos = input.selectionStart;
+      const textLength = input.value.length;
+
+      const atStart = cursorPos === 0;
+      const atEnd = cursorPos === textLength;
+
+      if ((e.key === 'ArrowLeft' && atStart) || (e.key === 'ArrowRight' && atEnd)) {
+        e.preventDefault();
+        await handleCellBlur();
+        const newCell = navigateCell(contractId, columnKey, e.key);
+        if (newCell) {
+          setEditingCell({ contractId: newCell.contractId, columnKey: newCell.columnKey });
+          setEditValue(newCell.value);
+        }
+      }
+    }
   };
 
   const handleCellBlur = async () => {
@@ -81,7 +158,8 @@ const CMIContractValues = () => {
   };
 
   const handleAddRow = async () => {
-    const newPlacementId = `NEW_${Date.now()}`;
+    const brandName = `aa${aaCounter}`;
+    const placementId = `PL_${Date.now()}`;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/cmi-contracts`, {
@@ -90,11 +168,13 @@ const CMIContractValues = () => {
         body: JSON.stringify({
           contract_number: '',
           client: '',
-          brand: '',
+          brand: brandName,
           vehicle: '',
-          placement_id: newPlacementId,
+          placement_id: placementId,
           placement_description: '',
           buy_component_type: '',
+          frequency: '',
+          metric: '',
           data_type: '',
           notes: '',
           year: selectedYear
@@ -103,7 +183,24 @@ const CMIContractValues = () => {
 
       const data = await response.json();
       if (data.status === 'success') {
-        fetchContracts();
+        setAaCounter(prev => prev + 1);
+        const newContract = {
+          id: data.id,
+          contract_number: '',
+          client: '',
+          brand: brandName,
+          vehicle: '',
+          placement_id: placementId,
+          placement_description: '',
+          buy_component_type: '',
+          frequency: '',
+          metric: '',
+          data_type: '',
+          notes: '',
+          year: selectedYear
+        };
+        setContracts(prev => [newContract, ...prev]);
+        setNewRowIds(prev => new Set([...prev, data.id]));
       } else {
         console.error('Failed to add row:', data.message);
       }
@@ -163,13 +260,28 @@ const CMIContractValues = () => {
   });
 
   const sortedContracts = [...filteredContracts].sort((a, b) => {
-    if (!sortConfig.key) return 0;
+    const aIsNew = newRowIds.has(a.id);
+    const bIsNew = newRowIds.has(b.id);
 
-    const aVal = a[sortConfig.key] || '';
-    const bVal = b[sortConfig.key] || '';
+    if (aIsNew && !bIsNew) return -1;
+    if (!aIsNew && bIsNew) return 1;
 
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    if (aIsNew && bIsNew) {
+      return 0; 
+    }
+
+    if (sortConfig.key) {
+      const aVal = a[sortConfig.key] || '';
+      const bVal = b[sortConfig.key] || '';
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    }
+
+    const aVal = (a.brand || '').toLowerCase();
+    const bVal = (b.brand || '').toLowerCase();
+    if (aVal < bVal) return -1;
+    if (aVal > bVal) return 1;
     return 0;
   });
 
@@ -234,7 +346,7 @@ const CMIContractValues = () => {
 
       <div className="cmi-table-container">
         <div className="cmi-table-wrapper">
-          <table className="cmi-table">
+          <table className="cmi-table" ref={tableRef}>
             <thead>
               <tr>
                 {columns.map(col => (
@@ -268,10 +380,7 @@ const CMIContractValues = () => {
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onBlur={handleCellBlur}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleCellBlur();
-                            if (e.key === 'Escape') setEditingCell(null);
-                          }}
+                          onKeyDown={(e) => handleKeyDown(e, contract.id, col.key)}
                           autoFocus
                           className="cell-input"
                         />

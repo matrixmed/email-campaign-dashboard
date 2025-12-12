@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import '../../styles/AnomalyDetection.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
   const [anomalies, setAnomalies] = useState([]);
@@ -248,18 +249,14 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
   const matchesSearch = (anomaly) => {
     if (!searchTerm) return true;
 
-    const searchWords = searchTerm.toLowerCase().split(' ').filter(w => w.length > 0);
-    const campaignName = anomaly.CleanedName.toLowerCase();
-    const topic = anomaly.Topic.toLowerCase();
-    const bucket = anomaly.Bucket.toLowerCase();
-    const sendDate = formatDate(anomaly.Send_Date).toLowerCase();
+    const searchableText = [
+      anomaly.CleanedName,
+      anomaly.Topic,
+      anomaly.Bucket,
+      formatDate(anomaly.Send_Date)
+    ].join(' ');
 
-    return searchWords.every(word =>
-      campaignName.includes(word) ||
-      topic.includes(word) ||
-      bucket.includes(word) ||
-      sendDate.includes(word)
-    );
+    return matchesSearchTerm(searchableText, searchTerm);
   };
 
   const filteredAnomalies = searchTerm
@@ -348,7 +345,7 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
 
               <div className="anomaly-metrics">
                 <div className="anomaly-metric">
-                  <span className="anomaly-metric-label">Campaign Performance</span>
+                  <span className="anomaly-metric-label">Unique Open Rate</span>
                   <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
                     {anomaly.Unique_Open_Rate.toFixed(2)}%
                   </span>

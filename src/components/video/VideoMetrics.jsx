@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import VideoModal from './VideoModal';
 import '../../styles/video.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import { useSearch } from '../../context/SearchContext';
 
 const metricDisplayNames = {
   views: "Views",
@@ -18,10 +20,11 @@ const metricDisplayNames = {
 };
 
 const VideoMetrics = () => {
+    const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
     const [videosData, setVideosData] = useState({});
     const [videosList, setVideosList] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(searchTerms.videoMetrics || '');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,16 +95,17 @@ const VideoMetrics = () => {
     }, []);
 
     const handleSearchChange = (e) => {
-        const searchValue = e.target.value.toLowerCase();
+        const searchValue = e.target.value;
         setSearch(searchValue);
-        const filtered = videosList.filter(item =>
-            searchValue.split(' ').every(word =>
-                item.title?.toLowerCase().includes(word) ||
-                item.playlist?.toLowerCase().includes(word) ||
-                item.groupTags?.toLowerCase().includes(word) ||
-                false
-            )
-        );
+        setGlobalSearchTerm('videoMetrics', searchValue);
+        const filtered = videosList.filter(item => {
+            const searchableText = [
+                item.title || '',
+                item.playlist || '',
+                item.groupTags || ''
+            ].join(' ');
+            return matchesSearchTerm(searchableText, searchValue);
+        });
         setFilteredData(filtered);
         setCurrentPage(1);
     };
@@ -334,7 +338,7 @@ const VideoMetrics = () => {
                     <input
                         type="text"
                         className="search-input"
-                        placeholder="Search by Title, Playlist, or Group"
+                        placeholder="Search"
                         value={search}
                         onChange={handleSearchChange}
                     />

@@ -154,3 +154,121 @@
 .table-section .campaign-text:hover {
   color: #0ff;
 }
+
+.metrics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md, 16px);
+  gap: var(--spacing-lg, 24px);
+}
+
+.metrics-header h2 {
+  margin: 0;
+  color: var(--color-text-primary, #ffffff);
+  font-family: var(--font-heading, 'Lora', serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg, 24px);
+}
+
+.filter-control,
+.rows-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-control label,
+.rows-control label {
+  color: #aaa;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.table-section .custom-dropdown {
+  position: relative;
+}
+
+.table-section .custom-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 160px;
+  padding: 8px 14px;
+  background: var(--color-bg-elevated, #222224);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-primary, #ffffff);
+  font-size: 14px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.table-section .custom-dropdown-trigger:hover {
+  border-color: #555;
+}
+
+.table-section .custom-dropdown-trigger:focus {
+  outline: none;
+  border-color: var(--color-accent, #0ff);
+}
+
+.table-section .dropdown-value {
+  flex: 1;
+  text-align: left;
+}
+
+.table-section .dropdown-arrow {
+  color: #888;
+  transition: transform 0.2s ease;
+}
+
+.table-section .dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.table-section .custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--color-bg-elevated, #222224);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.table-section .custom-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.table-section .custom-dropdown-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-section .custom-dropdown-option.selected {
+  background: rgba(0, 255, 255, 0.08);
+  color: #fff;
+}
+
+.rows-control .custom-dropdown-trigger {
+  min-width: 80px;
+}

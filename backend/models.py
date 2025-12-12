@@ -64,6 +64,7 @@ class CampaignReportingMetadata(Base):
     id = Column(Integer, primary_key=True)
     campaign_id = Column(String(100), unique=True, nullable=False, index=True)
     campaign_name = Column(String(255), nullable=False)
+    send_date = Column(Date, index=True)
 
     client_id = Column(String(100))
     cmi_placement_id = Column(String(100))
@@ -78,6 +79,8 @@ class CampaignReportingMetadata(Base):
     creative_code = Column(String(100))
     gcm_placement_id = Column(String(100))
     gcm_placement_id2 = Column(String(100))
+    buy_component_type = Column(String(100))
+    contract_number = Column(String(50))
     ad_count = Column(Integer)
 
     target_list_path = Column(String(500))
@@ -99,11 +102,66 @@ class CMIContractValue(Base):
     placement_id = Column(String(100), unique=True, index=True)
     placement_description = Column(Text)
     buy_component_type = Column(String(100))
+    frequency = Column(String(50))
+    metric = Column(String(100))
     data_type = Column(String(50))
     notes = Column(Text)
     year = Column(Integer, default=2025, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CMIExpectedReport(Base):
+    __tablename__ = 'cmi_expected_reports'
+
+    id = Column(Integer, primary_key=True)
+
+    cmi_placement_id = Column(String(100), index=True)
+    client_placement_id = Column(String(100))
+    contract_number = Column(String(100))
+
+    client_name = Column(String(255))
+    brand_name = Column(String(255), index=True)
+    supplier = Column(String(255))
+    vehicle_name = Column(String(255))
+    placement_description = Column(Text)
+    buy_type = Column(String(100))
+    channel = Column(String(100))
+
+    data_type = Column(String(50))
+    expected_data_frequency = Column(String(50)) 
+    reporting_week_start = Column(Date, index=True)
+    reporting_week_end = Column(Date)
+    date_data_expected = Column(Date)
+
+    matched_campaign_id = Column(Integer) 
+    matched_metadata_id = Column(Integer) 
+    is_matched = Column(Boolean, default=False, index=True)
+    match_type = Column(String(50)) 
+
+    is_agg_only = Column(Boolean, default=False)
+    attached_to_campaign_id = Column(Integer)
+    is_standalone = Column(Boolean, default=False)
+
+    assigned_campaign_name = Column(String(500)) 
+    assigned_send_date = Column(Date)
+
+    agg_metric = Column(String(100))
+    agg_value = Column(Integer)
+
+    status = Column(String(50), default='pending')
+    is_submitted = Column(Boolean, default=False)
+    submitted_at = Column(DateTime)
+    notes = Column(Text) 
+
+    source_file = Column(String(255)) 
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_expected_week_placement', 'reporting_week_start', 'cmi_placement_id'),
+        Index('idx_expected_matched', 'is_matched', 'reporting_week_start'),
+    )
 
 class BrandEditorAgency(Base):
     __tablename__ = 'brand_editor_agency'
@@ -121,8 +179,8 @@ class BrandEditorAgency(Base):
         Index('idx_sales_brand', 'sales_member', 'brand'),
     )
 
-class CMIReportResult(Base):
-    __tablename__ = 'cmi_report_results'
+class CampaignReportManager(Base):
+    __tablename__ = 'campaign_report_manager'
 
     id = Column(Integer, primary_key=True)
     campaign_id = Column(String(100), index=True)
@@ -486,6 +544,46 @@ class UniversalProfile(Base):
         Index('idx_last_synced', 'last_synced_at'),
     )
 
+class CampaignValidationFlag(Base):
+    __tablename__ = 'campaign_validation_flags'
+
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(String(100), index=True)
+    campaign_name = Column(String(500), nullable=False, index=True)
+
+    category = Column(String(100), nullable=False, index=True) 
+    severity = Column(String(20), nullable=False, index=True)  
+    description = Column(Text, nullable=False)
+    recommendation = Column(Text)
+
+    issue_type = Column(String(50), index=True) 
+    local_value = Column(Integer) 
+    api_value = Column(Integer)  
+    tolerance_pct = Column(Float)
+    deviation_pct = Column(Float) 
+
+    file_type = Column(String(50))
+    send_date = Column(Date)
+    days_old = Column(Integer)
+
+    is_active = Column(Boolean, default=True, index=True)
+    is_resolved = Column(Boolean, default=False, index=True)
+    resolved_at = Column(DateTime)
+    resolved_reason = Column(String(100))
+
+    detected_at = Column(DateTime, default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_flag_campaign_active', 'campaign_id', 'is_active'),
+        Index('idx_flag_severity_active', 'severity', 'is_active'),
+        Index('idx_flag_expires', 'expires_at', 'is_active'),
+        Index('idx_flag_issue_type', 'issue_type', 'campaign_id'),
+    )
+
+
 class NPISyncProgress(Base):
     __tablename__ = 'npi_sync_progress'
 
@@ -519,6 +617,33 @@ class NPISyncProgress(Base):
     __table_args__ = (
         Index('idx_sync_status', 'sync_id', 'status'),
     )
+
+
+class GCMPlacementLookup(Base):
+    __tablename__ = 'gcm_placement_lookup'
+
+    id = Column(Integer, primary_key=True)
+    gcm_placement_id = Column(String(50), nullable=False, index=True)
+    placement_name = Column(String(500))
+    advertiser_id = Column(String(50))
+    advertiser_name = Column(String(255))
+    campaign_id = Column(String(50))
+    campaign_name = Column(String(500), index=True)
+    site = Column(String(255))
+    start_date = Column(Date)
+    end_date = Column(Date)
+
+    brand = Column(String(100), index=True)
+    source_file = Column(String(500))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_gcm_brand', 'brand', 'gcm_placement_id'),
+        Index('idx_gcm_campaign', 'campaign_name', 'gcm_placement_id'),
+    )
+
 
 def init_db():
     DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'

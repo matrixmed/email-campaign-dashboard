@@ -1,16 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import '../../styles/MonthlyEngagementChart.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate' }) => {
   const [yearData, setYearData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [chartWidth, setChartWidth] = useState(1200);
+  const [allCampaigns, setAllCampaigns] = useState([]);
+  const [filteredCampaignNames, setFilteredCampaignNames] = useState([]);
+  const [excludedCampaigns, setExcludedCampaigns] = useState(new Set());
+  const [campaignDropdownOpen, setCampaignDropdownOpen] = useState(false);
   const chartContainerRef = React.useRef(null);
+  const campaignDropdownRef = React.useRef(null);
 
   useEffect(() => {
-    fetchMonthlyData();
-  }, [searchTerm, selectedMetric]);
+    const handleClickOutside = (event) => {
+      if (campaignDropdownRef.current && !campaignDropdownRef.current.contains(event.target)) {
+        setCampaignDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setExcludedCampaigns(new Set());
+  }, [searchTerm]);
+
+  useEffect(() => {
+    fetchCampaignData();
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (allCampaigns.length > 0) {
+      processMonthlyData();
+    }
+  }, [allCampaigns, selectedMetric, excludedCampaigns]);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -28,7 +54,7 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
   };
 
-  const fetchMonthlyData = async () => {
+  const fetchCampaignData = async () => {
     setIsLoading(true);
     try {
       const response = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
@@ -36,21 +62,17 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
 
       let filteredCampaigns = campaignsData;
       if (searchTerm) {
-        const searchWords = searchTerm.toLowerCase().split(' ').filter(w => w.length > 0);
         filteredCampaigns = campaignsData.filter(campaign =>
-          campaign.Campaign && searchWords.every(word =>
-            campaign.Campaign.toLowerCase().includes(word)
-          )
+          matchesSearchTerm(campaign.Campaign, searchTerm)
         );
       }
 
       const validDeliveries = filteredCampaigns.filter(item => (item.Delivered || 0) >= 100);
-
       const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
 
       const combinedCampaigns = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
         if (deployments.length === 1) {
-          return deployments[0];
+          return { ...deployments[0], Campaign: campaignName };
         }
 
         const deployment1 = deployments.find(d => {
@@ -83,61 +105,83 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
         };
       });
 
-      const monthlyData = {};
-      const currentYear = new Date().getFullYear();
-      const startYear = currentYear - 4;
-
-      combinedCampaigns.forEach(campaign => {
-        if (!campaign.Send_Date) return;
-
-        const date = new Date(campaign.Send_Date);
-        const year = date.getFullYear();
-
-        if (year < startYear) return;
-
-        const month = date.getMonth();
-
-        if (!monthlyData[year]) {
-          monthlyData[year] = Array(12).fill(null).map(() => ({
-            totalUniqueOpens: 0,
-            totalTotalOpens: 0,
-            totalUniqueClicks: 0,
-            totalTotalClicks: 0,
-            totalDelivered: 0
-          }));
-        }
-
-        monthlyData[year][month].totalUniqueOpens += campaign.Unique_Opens || 0;
-        monthlyData[year][month].totalTotalOpens += campaign.Total_Opens || 0;
-        monthlyData[year][month].totalUniqueClicks += campaign.Unique_Clicks || 0;
-        monthlyData[year][month].totalTotalClicks += campaign.Total_Clicks || 0;
-        monthlyData[year][month].totalDelivered += campaign.Delivered || 0;
-      });
-
-      const yearlyAverages = {};
-      Object.keys(monthlyData).forEach(year => {
-        yearlyAverages[year] = monthlyData[year].map(monthData => {
-          if (monthData.totalDelivered === 0) return null;
-
-          if (selectedMetric === 'Unique_Open_Rate') {
-            return (monthData.totalUniqueOpens / monthData.totalDelivered) * 100;
-          } else if (selectedMetric === 'Total_Open_Rate') {
-            return (monthData.totalTotalOpens / monthData.totalDelivered) * 100;
-          } else if (selectedMetric === 'Unique_Click_Rate') {
-            return monthData.totalUniqueOpens > 0 ? (monthData.totalUniqueClicks / monthData.totalUniqueOpens) * 100 : null;
-          } else if (selectedMetric === 'Total_Click_Rate') {
-            return monthData.totalTotalOpens > 0 ? (monthData.totalTotalClicks / monthData.totalTotalOpens) * 100 : null;
-          }
-          return null;
-        });
-      });
-
-      setYearData(yearlyAverages);
+      const campaignNames = combinedCampaigns.map(c => c.Campaign).sort();
+      setFilteredCampaignNames(campaignNames);
+      setAllCampaigns(combinedCampaigns);
     } catch (error) {
-      console.error('Failed to fetch monthly data:', error);
+      console.error('Failed to fetch campaign data:', error);
     }
     setIsLoading(false);
   };
+
+  const processMonthlyData = () => {
+    const campaignsToProcess = allCampaigns.filter(c => !excludedCampaigns.has(c.Campaign));
+
+    const monthlyData = {};
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 4;
+
+    campaignsToProcess.forEach(campaign => {
+      if (!campaign.Send_Date) return;
+
+      const date = new Date(campaign.Send_Date);
+      const year = date.getFullYear();
+
+      if (year < startYear) return;
+
+      const month = date.getMonth();
+
+      if (!monthlyData[year]) {
+        monthlyData[year] = Array(12).fill(null).map(() => ({
+          totalUniqueOpens: 0,
+          totalTotalOpens: 0,
+          totalUniqueClicks: 0,
+          totalTotalClicks: 0,
+          totalDelivered: 0
+        }));
+      }
+
+      monthlyData[year][month].totalUniqueOpens += campaign.Unique_Opens || 0;
+      monthlyData[year][month].totalTotalOpens += campaign.Total_Opens || 0;
+      monthlyData[year][month].totalUniqueClicks += campaign.Unique_Clicks || 0;
+      monthlyData[year][month].totalTotalClicks += campaign.Total_Clicks || 0;
+      monthlyData[year][month].totalDelivered += campaign.Delivered || 0;
+    });
+
+    const yearlyAverages = {};
+    Object.keys(monthlyData).forEach(year => {
+      yearlyAverages[year] = monthlyData[year].map(monthData => {
+        if (monthData.totalDelivered === 0) return null;
+
+        if (selectedMetric === 'Unique_Open_Rate') {
+          return (monthData.totalUniqueOpens / monthData.totalDelivered) * 100;
+        } else if (selectedMetric === 'Total_Open_Rate') {
+          return (monthData.totalTotalOpens / monthData.totalDelivered) * 100;
+        } else if (selectedMetric === 'Unique_Click_Rate') {
+          return monthData.totalUniqueOpens > 0 ? (monthData.totalUniqueClicks / monthData.totalUniqueOpens) * 100 : null;
+        } else if (selectedMetric === 'Total_Click_Rate') {
+          return monthData.totalTotalOpens > 0 ? (monthData.totalTotalClicks / monthData.totalTotalOpens) * 100 : null;
+        }
+        return null;
+      });
+    });
+
+    setYearData(yearlyAverages);
+  };
+
+  const toggleCampaignExclusion = (campaignName) => {
+    setExcludedCampaigns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(campaignName)) {
+        newSet.delete(campaignName);
+      } else {
+        newSet.add(campaignName);
+      }
+      return newSet;
+    });
+  };
+
+  const includedCount = filteredCampaignNames.length - excludedCampaigns.size;
 
   const getMaxValue = () => {
     if (!yearData) return 0;
@@ -157,12 +201,20 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
       if (maxValue <= 5) return { max: 5, step: 1 };
       if (maxValue <= 10) return { max: 10, step: 2 };
       if (maxValue <= 15) return { max: 15, step: 3 };
-      return { max: 20, step: 4 };
+      if (maxValue <= 20) return { max: 20, step: 4 };
+      if (maxValue <= 30) return { max: 30, step: 5 };
+      return { max: Math.ceil(maxValue / 10) * 10, step: Math.ceil(maxValue / 50) * 10 };
     } else {
       if (maxValue <= 20) return { max: 20, step: 4 };
       if (maxValue <= 30) return { max: 30, step: 5 };
       if (maxValue <= 40) return { max: 40, step: 8 };
-      return { max: 50, step: 10 };
+      if (maxValue <= 50) return { max: 50, step: 10 };
+      if (maxValue <= 60) return { max: 60, step: 10 };
+      if (maxValue <= 70) return { max: 70, step: 10 };
+      if (maxValue <= 80) return { max: 80, step: 10 };
+      if (maxValue <= 90) return { max: 90, step: 10 };
+      if (maxValue <= 100) return { max: 100, step: 10 };
+      return { max: Math.ceil(maxValue / 10) * 10, step: 10 };
     }
   };
 
@@ -173,8 +225,99 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
   const chartHeight = 500;
   const padding = { top: 20, right: 40, bottom: 60, left: 80 };
 
+  const metricLabels = {
+    'Unique_Open_Rate': 'Unique Open Rate',
+    'Total_Open_Rate': 'Total Open Rate',
+    'Unique_Click_Rate': 'Unique Click Rate',
+    'Total_Click_Rate': 'Total Click Rate'
+  };
+
+  const getMatrixStats = () => {
+    if (!yearData) return { min: 0, max: 0, avg: 0 };
+    const allValues = [];
+    Object.values(yearData).forEach(yearValues => {
+      yearValues.forEach(val => {
+        if (val !== null) allValues.push(val);
+      });
+    });
+    if (allValues.length === 0) return { min: 0, max: 0, avg: 0 };
+    return {
+      min: Math.min(...allValues),
+      max: Math.max(...allValues),
+      avg: allValues.reduce((a, b) => a + b, 0) / allValues.length
+    };
+  };
+
+  const getValueClass = (value, stats) => {
+    if (value === null) return '';
+    const { min, max } = stats;
+    const range = max - min;
+    if (range === 0) return '';
+
+    const normalized = (value - min) / range;
+
+    if (normalized >= 0.7) {
+      return 'matrix-high';
+    } else if (normalized <= 0.3) {
+      return 'matrix-low';
+    }
+    return '';
+  };
+
   return (
-    <div className="monthly-chart-container" ref={chartContainerRef}>
+    <div className="monthly-trends-wrapper">
+      {searchTerm && !isLoading && (
+        <div className="search-results-bar">
+          <div className="search-indicator">
+            Showing results for "<span className="search-term">{searchTerm}</span>" - {includedCount} campaign{includedCount !== 1 ? 's' : ''}
+            {excludedCampaigns.size > 0 && (
+              <span className="excluded-count"> ({excludedCampaigns.size} excluded)</span>
+            )}
+          </div>
+          <div className="campaign-filter-dropdown" ref={campaignDropdownRef}>
+            <button
+              className="campaign-filter-trigger"
+              onClick={() => setCampaignDropdownOpen(!campaignDropdownOpen)}
+            >
+              <span>View Campaigns</span>
+              <svg className={`dropdown-arrow ${campaignDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {campaignDropdownOpen && (
+              <div className="campaign-filter-menu">
+                <div className="campaign-filter-header">
+                  <span>{filteredCampaignNames.length} campaigns found</span>
+                  {excludedCampaigns.size > 0 && (
+                    <button
+                      className="clear-exclusions"
+                      onClick={() => setExcludedCampaigns(new Set())}
+                    >
+                      Include all
+                    </button>
+                  )}
+                </div>
+                <div className="campaign-filter-list">
+                  {filteredCampaignNames.map(name => (
+                    <label
+                      key={name}
+                      className={`campaign-filter-option ${excludedCampaigns.has(name) ? 'excluded' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!excludedCampaigns.has(name)}
+                        onChange={() => toggleCampaignExclusion(name)}
+                      />
+                      <span className="campaign-name" title={name}>{name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="monthly-chart-container" ref={chartContainerRef}>
       {isLoading ? (
         <div className="loading-container">
           <div className="spinner">
@@ -280,6 +423,52 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
         </div>
       ) : (
         <div className="no-data">No campaign data available</div>
+      )}
+      </div>
+
+      {yearData && Object.keys(yearData).length > 0 && (
+        <div className="monthly-matrix-section">
+          <h4>Monthly {metricLabels[selectedMetric]} Matrix</h4>
+          <div className="matrix-table-wrapper">
+            <table className="monthly-matrix-table">
+              <thead>
+                <tr>
+                  <th className="month-header">Month</th>
+                  {Object.keys(yearData).sort((a, b) => a - b).map((year, idx) => (
+                    <th key={year} style={{ color: colors[idx % colors.length] }}>{year}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const stats = getMatrixStats();
+                  return months.map((month, monthIdx) => (
+                    <tr key={month}>
+                      <td className="month-cell">{month}</td>
+                      {Object.keys(yearData).sort((a, b) => a - b).map((year, idx) => {
+                        const value = yearData[year][monthIdx];
+                        const valueClass = getValueClass(value, stats);
+                        return (
+                          <td key={year} className="matrix-value-cell">
+                            {value !== null ? (
+                              <span className={`matrix-value ${valueClass}`}>{value.toFixed(2)}%</span>
+                            ) : (
+                              <span className="matrix-no-data">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          </div>
+          <div className="matrix-legend">
+            <span className="legend-item"><span className="legend-color matrix-high"></span> Above Average</span>
+            <span className="legend-item"><span className="legend-color matrix-low"></span> Below Average</span>
+          </div>
+        </div>
       )}
     </div>
   );

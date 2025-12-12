@@ -1,16 +1,62 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import '../../styles/AnalyticsHub.css';
 import MonthlyEngagementChart from './MonthlyEngagementChart';
+import YearlyTrends from './YearlyTrends';
 import AnomalyDetection from './AnomalyDetection';
 import TimingIntelligence from './TimingIntelligence';
 import CampaignBenchmarks from './CampaignBenchmarks';
 import GeographicInsights from './GeographicInsights';
+import { useSearch } from '../../context/SearchContext';
 
 const AnalyticsHub = () => {
+  const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
   const [activeView, setActiveView] = useState('monthly');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchTerms.campaignAnalytics || '');
   const [selectedMetric, setSelectedMetric] = useState('Unique_Open_Rate');
   const [detectBySubtopic, setDetectBySubtopic] = useState(false);
+  const [monthlyDropdownOpen, setMonthlyDropdownOpen] = useState(false);
+  const [yearlyDropdownOpen, setYearlyDropdownOpen] = useState(false);
+  const [selectedYearlyMetrics, setSelectedYearlyMetrics] = useState(['Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate']);
+  const monthlyDropdownRef = useRef(null);
+  const yearlyDropdownRef = useRef(null);
+
+  const metricOptions = [
+    { key: 'Unique_Open_Rate', label: 'Unique Open Rate', color: '#0ff' },
+    { key: 'Total_Open_Rate', label: 'Total Open Rate', color: '#00cc99' },
+    { key: 'Unique_Click_Rate', label: 'Unique Click Rate', color: '#38bdf8' },
+    { key: 'Total_Click_Rate', label: 'Total Click Rate', color: '#ffd93d' },
+  ];
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (monthlyDropdownRef.current && !monthlyDropdownRef.current.contains(event.target)) {
+        setMonthlyDropdownOpen(false);
+      }
+      if (yearlyDropdownRef.current && !yearlyDropdownRef.current.contains(event.target)) {
+        setYearlyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleYearlyMetricToggle = (metricKey) => {
+    setSelectedYearlyMetrics(prev => {
+      if (prev.includes(metricKey)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(m => m !== metricKey);
+      }
+      return [...prev, metricKey];
+    });
+  };
+
+  const getYearlySelectedLabel = () => {
+    if (selectedYearlyMetrics.length === 0) return 'Select metrics';
+    if (selectedYearlyMetrics.length === 1) {
+      return metricOptions.find(m => m.key === selectedYearlyMetrics[0])?.label;
+    }
+    return `${selectedYearlyMetrics.length} metrics selected`;
+  };
 
   const [visitedTabs, setVisitedTabs] = useState({ monthly: true });
 
@@ -41,12 +87,6 @@ const AnalyticsHub = () => {
     }
   }, [activeView]);
 
-  const PlaceholderComponent = ({ title }) => (
-    <div className="placeholder-content">
-      <h2>{title}</h2>
-    </div>
-  );
-
   const showClearButton = cacheableTabs.includes(activeView);
 
   return (
@@ -58,7 +98,10 @@ const AnalyticsHub = () => {
             type="text"
             placeholder="Search campaigns"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setGlobalSearchTerm('campaignAnalytics', e.target.value);
+            }}
             className="search-input"
           />
         </div>
@@ -73,16 +116,16 @@ const AnalyticsHub = () => {
             <span>Monthly Trends</span>
           </button>
           <button
+            className={`tab-button ${activeView === 'yearly' ? 'active' : ''}`}
+            onClick={() => handleTabChange('yearly')}
+          >
+            <span>Yearly Trends</span>
+          </button>
+          <button
             className={`tab-button ${activeView === 'anomaly' ? 'active' : ''}`}
             onClick={() => handleTabChange('anomaly')}
           >
             <span>Anomaly Detection</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'timing' ? 'active' : ''}`}
-            onClick={() => handleTabChange('timing')}
-          >
-            <span>Timing Intelligence</span>
           </button>
           <button
             className={`tab-button ${activeView === 'benchmarks' ? 'active' : ''}`}
@@ -91,12 +134,19 @@ const AnalyticsHub = () => {
             <span>Campaign Benchmarks</span>
           </button>
           <button
+            className={`tab-button ${activeView === 'timing' ? 'active' : ''}`}
+            onClick={() => handleTabChange('timing')}
+          >
+            <span>Timing Intelligence</span>
+          </button>
+          {/*
+          <button
             className={`tab-button ${activeView === 'geographic' ? 'active' : ''}`}
             onClick={() => handleTabChange('geographic')}
           >
             <span>Geographic Insights</span>
           </button>
-          {/*
+          
           <button
             className={`tab-button ${activeView === 'deliverability' ? 'active' : ''}`}
             onClick={() => handleTabChange('deliverability')}
@@ -120,19 +170,73 @@ const AnalyticsHub = () => {
 
         <div className="tab-controls">
           {activeView === 'monthly' && (
-            <div className="metric-selector">
-              <label htmlFor="metric-select">Metric:</label>
-              <select
-                id="metric-select"
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-                className="metric-select"
-              >
-                <option value="Unique_Open_Rate">Unique Open Rate</option>
-                <option value="Total_Open_Rate">Total Open Rate</option>
-                <option value="Unique_Click_Rate">Unique Click Rate</option>
-                <option value="Total_Click_Rate">Total Click Rate</option>
-              </select>
+            <div className="metric-selector" ref={monthlyDropdownRef}>
+              <label>Metric:</label>
+              <div className="custom-dropdown">
+                <button
+                  className="custom-dropdown-trigger"
+                  onClick={() => setMonthlyDropdownOpen(!monthlyDropdownOpen)}
+                >
+                  <span className="dropdown-value">
+                    {metricOptions.find(m => m.key === selectedMetric)?.label}
+                  </span>
+                  <svg className={`dropdown-arrow ${monthlyDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {monthlyDropdownOpen && (
+                  <div className="custom-dropdown-menu">
+                    {metricOptions.map(option => (
+                      <div
+                        key={option.key}
+                        className={`custom-dropdown-option ${selectedMetric === option.key ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedMetric(option.key);
+                          setMonthlyDropdownOpen(false);
+                        }}
+                      >
+                        <span className="metric-color-dot" style={{ backgroundColor: option.color }}></span>
+                        <span>{option.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeView === 'yearly' && (
+            <div className="metric-selector" ref={yearlyDropdownRef}>
+              <label>Metrics:</label>
+              <div className="custom-dropdown">
+                <button
+                  className="custom-dropdown-trigger"
+                  onClick={() => setYearlyDropdownOpen(!yearlyDropdownOpen)}
+                >
+                  <span className="dropdown-value">{getYearlySelectedLabel()}</span>
+                  <svg className={`dropdown-arrow ${yearlyDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {yearlyDropdownOpen && (
+                  <div className="custom-dropdown-menu multi-select">
+                    {metricOptions.map(option => (
+                      <label
+                        key={option.key}
+                        className={`custom-dropdown-option ${selectedYearlyMetrics.includes(option.key) ? 'selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedYearlyMetrics.includes(option.key)}
+                          onChange={() => handleYearlyMetricToggle(option.key)}
+                        />
+                        <span className="metric-color-dot" style={{ backgroundColor: option.color }}></span>
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -166,6 +270,9 @@ const AnalyticsHub = () => {
         <div style={{ display: activeView === 'monthly' ? 'block' : 'none' }}>
           <MonthlyEngagementChart searchTerm={searchTerm} selectedMetric={selectedMetric} />
         </div>
+        <div style={{ display: activeView === 'yearly' ? 'block' : 'none' }}>
+          <YearlyTrends searchTerm={searchTerm} selectedMetrics={selectedYearlyMetrics} />
+        </div>
         <div style={{ display: activeView === 'anomaly' ? 'block' : 'none' }}>
           <AnomalyDetection searchTerm={searchTerm} detectBySubtopic={detectBySubtopic} />
         </div>
@@ -180,12 +287,12 @@ const AnalyticsHub = () => {
             <CampaignBenchmarks key={`benchmarks-${clearKeys.benchmarks}`} />
           </div>
         )}
+        {/*
         {visitedTabs.geographic && (
           <div style={{ display: activeView === 'geographic' ? 'block' : 'none' }}>
             <GeographicInsights key={`geographic-${clearKeys.geographic}`} />
           </div>
         )}
-        {/*
         {visitedTabs.deliverability && (
           <div style={{ display: activeView === 'deliverability' ? 'block' : 'none' }}>
             <PlaceholderComponent key={`deliverability-${clearKeys.deliverability}`} title="Deliverability Monitor" />

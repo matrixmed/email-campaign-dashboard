@@ -7,7 +7,6 @@ const CampaignBenchmarks = () => {
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [filterByTopic, setFilterByTopic] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState('all');
   const [activeTab, setActiveTab] = useState('performance');
   const [hasRun, setHasRun] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
@@ -49,8 +48,7 @@ const CampaignBenchmarks = () => {
           campaign_id: selectedCampaign?.campaign_id?.[0] || null,
           campaign_name: selectedCampaign?.campaign_name || null,
           filters: {
-            filter_by_topic: filterByTopic,
-            month: selectedMonth
+            filter_by_topic: filterByTopic
           }
         })
       });
@@ -152,8 +150,8 @@ const CampaignBenchmarks = () => {
 
     const formatWithDelta = (value, selectedValue) => {
       const delta = value - selectedValue;
-      const deltaClass = delta > 0 ? 'delta-positive' : delta < 0 ? 'delta-negative' : '';
-      const rateClass = delta > 0 ? 'rate-positive' : delta < 0 ? 'rate-negative' : '';
+      const deltaClass = delta < 0 ? 'delta-positive' : delta > 0 ? 'delta-negative' : '';
+      const rateClass = delta < 0 ? 'rate-positive' : delta > 0 ? 'rate-negative' : '';
       return (
         <span className={rateClass}>
           {value?.toFixed(1)}%
@@ -254,8 +252,8 @@ const CampaignBenchmarks = () => {
     <div className="campaign-benchmarks">
       <div className="benchmark-filters">
         <div className="filter-row">
-          <div className="filter-group full-width">
-            <label>Select Campaign to Benchmark</label>
+          <div className="filter-group campaign-select">
+            <label className="filter-label">Select Campaign</label>
             <button
               type="button"
               className="selector-button"
@@ -267,52 +265,17 @@ const CampaignBenchmarks = () => {
               }
             </button>
           </div>
-        </div>
 
-        <div className="filter-row">
-          <div className="filter-group">
-            <label>Month/Season</label>
-            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-              <option value="all">All Months</option>
-              <option value="1">January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
-              <option value="Q1">Q1 (Jan-Mar)</option>
-              <option value="Q2">Q2 (Apr-Jun)</option>
-              <option value="Q3">Q3 (Jul-Sep)</option>
-              <option value="Q4">Q4 (Oct-Dec)</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Filter by Topic/Brand</label>
-            <div className="toggle-container">
-              <label className="campaign-benchmark-toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={filterByTopic}
-                  onChange={(e) => setFilterByTopic(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-              <span className="toggle-label">
-                {filterByTopic ? 'Yes - Match topic/brand' : 'No - All in bucket'}
-              </span>
-            </div>
-            <p className="filter-hint">
-              {filterByTopic
-                ? 'Compare only against campaigns with the same topic/brand'
-                : 'Compare against all campaigns in the same campaign type'}
-            </p>
+          <div className="filter-group topic-toggle">
+            <label className="filter-label">Filter by Subtopic</label>
+            <label className="campaign-benchmark-toggle-switch">
+              <input
+                type="checkbox"
+                checked={filterByTopic}
+                onChange={(e) => setFilterByTopic(e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
           </div>
         </div>
 
@@ -323,17 +286,6 @@ const CampaignBenchmarks = () => {
           >
             {loading ? 'Running...' : 'Run'}
           </button>
-          {(selectedMonth !== 'all' || filterByTopic) && (
-            <button
-              className="clear-all-filters-button"
-              onClick={() => {
-                setSelectedMonth('all');
-                setFilterByTopic(false);
-              }}
-            >
-              Clear Filters
-            </button>
-          )}
         </div>
       </div>
 

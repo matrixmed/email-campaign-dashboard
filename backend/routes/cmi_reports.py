@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import CMIReportResult
+from models import CampaignReportManager, CMIContractValue
 from datetime import datetime
 import os
 
@@ -21,11 +21,11 @@ def get_reports_by_week(week_start):
 
         week_date = datetime.strptime(week_start, '%Y-%m-%d').date()
 
-        reports = session.query(CMIReportResult).filter(
-            CMIReportResult.reporting_week_start == week_date
+        reports = session.query(CampaignReportManager).filter(
+            CampaignReportManager.reporting_week_start == week_date
         ).order_by(
-            CMIReportResult.report_category,
-            CMIReportResult.brand_name
+            CampaignReportManager.report_category,
+            CampaignReportManager.brand_name
         ).all()
 
         result = [{
@@ -85,7 +85,7 @@ def update_submission_status(report_id):
         data = request.json
         session = get_session()
 
-        report = session.query(CMIReportResult).filter_by(id=report_id).first()
+        report = session.query(CampaignReportManager).filter_by(id=report_id).first()
 
         if not report:
             session.close()
@@ -133,8 +133,8 @@ def submit_entire_week(week_start):
 
         week_date = datetime.strptime(week_start, '%Y-%m-%d').date()
 
-        reports = session.query(CMIReportResult).filter(
-            CMIReportResult.reporting_week_start == week_date
+        reports = session.query(CampaignReportManager).filter(
+            CampaignReportManager.reporting_week_start == week_date
         ).all()
 
         if not reports:
@@ -181,11 +181,11 @@ def get_reports_by_category(category):
     try:
         session = get_session()
 
-        reports = session.query(CMIReportResult).filter(
-            CMIReportResult.report_category == category
+        reports = session.query(CampaignReportManager).filter(
+            CampaignReportManager.report_category == category
         ).order_by(
-            CMIReportResult.reporting_week_start.desc(),
-            CMIReportResult.brand_name
+            CampaignReportManager.reporting_week_start.desc(),
+            CampaignReportManager.brand_name
         ).all()
 
         result = [{
@@ -221,21 +221,21 @@ def get_reports_stats():
     try:
         session = get_session()
 
-        confirmed = session.query(CMIReportResult).filter(
-            CMIReportResult.report_category == 'confirmed_match'
+        confirmed = session.query(CampaignReportManager).filter(
+            CampaignReportManager.report_category == 'confirmed_match'
         ).count()
 
-        no_data = session.query(CMIReportResult).filter(
-            CMIReportResult.report_category == 'no_data'
+        no_data = session.query(CampaignReportManager).filter(
+            CampaignReportManager.report_category == 'no_data'
         ).count()
 
-        aggregate = session.query(CMIReportResult).filter(
-            CMIReportResult.report_category == 'aggregate_investigation'
+        aggregate = session.query(CampaignReportManager).filter(
+            CampaignReportManager.report_category == 'aggregate_investigation'
         ).count()
 
-        total_reports = session.query(CMIReportResult).count()
-        submitted_reports = session.query(CMIReportResult).filter(
-            CMIReportResult.is_submitted == True
+        total_reports = session.query(CampaignReportManager).count()
+        submitted_reports = session.query(CampaignReportManager).filter(
+            CampaignReportManager.is_submitted == True
         ).count()
 
         pending_reports = total_reports - submitted_reports
@@ -280,36 +280,55 @@ def get_all_reports():
         cutoff_date = (datetime.now() - timedelta(days=days_back)).date()
 
         from sqlalchemy import or_
-        query = session.query(CMIReportResult).filter(
+        query = session.query(CampaignReportManager).filter(
             or_(
-                CMIReportResult.reporting_week_start >= cutoff_date,
-                CMIReportResult.reporting_week_start.is_(None)
+                CampaignReportManager.reporting_week_start >= cutoff_date,
+                CampaignReportManager.reporting_week_start.is_(None)
             )
         )
 
         if brand_filter:
-            query = query.filter(CMIReportResult.brand_name.ilike(f'%{brand_filter}%'))
+            query = query.filter(CampaignReportManager.brand_name.ilike(f'%{brand_filter}%'))
         if agency_filter:
-            query = query.filter(CMIReportResult.agency.ilike(f'%{agency_filter}%'))
+            query = query.filter(CampaignReportManager.agency.ilike(f'%{agency_filter}%'))
         if batch_filter:
-            query = query.filter(CMIReportResult.batch == batch_filter)
+            query = query.filter(CampaignReportManager.batch == batch_filter)
         if is_cmi_filter is not None:
             is_cmi_bool = is_cmi_filter.lower() == 'true'
-            query = query.filter(CMIReportResult.is_cmi_brand == is_cmi_bool)
+            query = query.filter(CampaignReportManager.is_cmi_brand == is_cmi_bool)
 
         reports = query.order_by(
-            CMIReportResult.reporting_week_start.desc().nullslast(),
-            CMIReportResult.send_date.desc().nullslast()
+            CampaignReportManager.reporting_week_start.desc().nullslast(),
+            CampaignReportManager.send_date.desc().nullslast()
         ).all()
+
+        contract_values = session.query(CMIContractValue).all()
+        contracts_by_placement = {}
+        for cv in contract_values:
+            if cv.placement_id:
+                contracts_by_placement[str(cv.placement_id)] = {
+                    'contract_number': cv.contract_number,
+                    'client': cv.client,
+                    'brand': cv.brand,
+                    'vehicle': cv.vehicle,
+                    'placement_description': cv.placement_description,
+                    'buy_component_type': cv.buy_component_type,
+                    'frequency': cv.frequency,
+                    'metric': cv.metric,
+                    'data_type': cv.data_type,
+                    'notes': cv.notes
+                }
 
         result = []
         for r in reports:
+            contract_data = contracts_by_placement.get(str(r.cmi_placement_id), {}) if r.cmi_placement_id else {}
+
             report_data = {
                 'id': r.id,
                 'campaign_id': r.campaign_id or r.campaign_name,
                 'campaign_name': r.campaign_name,
                 'standardized_campaign_name': r.standardized_campaign_name,
-                'brand': r.brand_name,
+                'brand': r.brand_name or contract_data.get('brand'),
                 'agency': r.agency,
                 'send_date': r.send_date.strftime('%Y-%m-%d') if r.send_date else None,
                 'monday_date': r.reporting_week_start.strftime('%Y-%m-%d') if r.reporting_week_start else None,
@@ -319,7 +338,13 @@ def get_all_reports():
                 'match_confidence': r.match_confidence,
                 'is_submitted': r.is_submitted,
                 'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
-                'data_type': r.data_type
+                'data_type': r.data_type or contract_data.get('data_type'),
+                'cmi_placement_id': r.cmi_placement_id,
+                'frequency': r.expected_data_frequency or contract_data.get('frequency'),
+                'buy_component_type': r.buy_component_type or contract_data.get('buy_component_type'),
+                'contract_notes': contract_data.get('notes'),
+                'contract_metric': contract_data.get('metric'),
+                'has_contract_match': bool(contract_data)
             }
 
             if r.is_cmi_brand and r.cmi_placement_id:

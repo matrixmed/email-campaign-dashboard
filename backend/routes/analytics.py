@@ -665,8 +665,14 @@ def campaign_benchmarks():
 
         similar_campaigns.sort(key=lambda x: x['similarity_score'], reverse=True)
 
-        benchmarks = {}
         selected_core = selected_campaign.get('core_metrics', {})
+        all_metrics['unique_open_rate'].append(selected_core.get('unique_open_rate', 0))
+        all_metrics['total_open_rate'].append(selected_core.get('total_open_rate', 0))
+        all_metrics['unique_click_rate'].append(selected_core.get('unique_click_rate', 0))
+        all_metrics['total_click_rate'].append(selected_core.get('total_click_rate', 0))
+        all_metrics['delivery_rate'].append(selected_core.get('delivery_rate', 0))
+
+        benchmarks = {}
 
         for metric_name, values in all_metrics.items():
             print(f"[BENCHMARKS] Metric {metric_name}: {len(values)} values")
@@ -682,8 +688,10 @@ def campaign_benchmarks():
 
                 your_value = selected_core.get(metric_name, 0)
 
-                count_below = sum(1 for v in values if v < your_value)
-                your_percentile = int((count_below / n) * 100) if n > 0 else 0
+                if max_val > min_val:
+                    your_percentile = int(((your_value - min_val) / (max_val - min_val)) * 100)
+                else:
+                    your_percentile = 50
 
                 print(f"[BENCHMARKS] {metric_name}: min={min_val}, max={max_val}, median={median_val}, mean={mean_val}, your={your_value}")
 

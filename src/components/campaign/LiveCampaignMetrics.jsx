@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import CampaignModal from './CampaignModal';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     const [metrics, setMetrics] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
+    const [validationFlags, setValidationFlags] = useState([]);
+    const [flagsByCampaign, setFlagsByCampaign] = useState({});
+    const [flagSummary, setFlagSummary] = useState({ high: 0, medium: 0, low: 0 });
+    const [showFlagDetails, setShowFlagDetails] = useState(null);
     const campaignsPerPage = 2;
 
     useEffect(() => {
@@ -83,12 +90,116 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        const fetchFlags = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/validation-flags/active`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        setValidationFlags(data.flags || []);
+                        setFlagSummary(data.summary || { high: 0, medium: 0, low: 0 });
+
+                        const byName = {};
+                        (data.flags || []).forEach(flag => {
+                            const name = flag.campaign_name;
+                            if (!byName[name]) {
+                                byName[name] = [];
+                            }
+                            byName[name].push(flag);
+                        });
+                        setFlagsByCampaign(byName);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching validation flags:', error);
+            }
+        };
+
+        fetchFlags();
+        const interval = setInterval(fetchFlags, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const getCampaignFlags = (campaignName, currentMetrics) => {
+        let flags = [];
+
+        const namesToCheck = [campaignName];
+        if (currentMetrics?.Deployments) {
+            namesToCheck.push(...currentMetrics.Deployments);
+        }
+
+        for (const nameToCheck of namesToCheck) {
+            if (flagsByCampaign[nameToCheck]) {
+                flags = [...flags, ...flagsByCampaign[nameToCheck]];
+            }
+            for (const flagName of Object.keys(flagsByCampaign)) {
+                if (nameToCheck.includes(flagName) || flagName.includes(nameToCheck)) {
+                    const matchedFlags = flagsByCampaign[flagName];
+                    for (const f of matchedFlags) {
+                        if (!flags.find(existing => existing.id === f.id)) {
+                            flags.push(f);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (flags.length === 0) return [];
+
+        const now = new Date();
+
+        flags = flags.filter(flag => {
+            const flagTime = flag.detected_at ? new Date(flag.detected_at) : null;
+            if (flagTime) {
+                const hoursSinceDetected = (now - flagTime) / (1000 * 60 * 60);
+                if (hoursSinceDetected > 24) {
+                    return false; 
+                }
+            }
+
+            if (flag.issue_type === 'sent_deviation' && flag.campaign_name) {
+                const isDeployment1 = /deployment\s*#?\s*1\b/i.test(flag.campaign_name);
+                const hasDeploymentNumber = /deployment\s*#?\s*\d+/i.test(flag.campaign_name);
+
+                if (hasDeploymentNumber && !isDeployment1) {
+                    return false;
+                }
+            }
+
+            if (flag.api_value && currentMetrics?.Sent) {
+                const deviation = Math.abs(currentMetrics.Sent - flag.api_value) / flag.api_value;
+                if (deviation < 0.01) {
+                    return false; 
+                }
+            }
+
+            return true; 
+        });
+
+        return flags;
+    };
+
+    const getSeverityColor = (severity) => {
+        switch (severity) {
+            case 'HIGH': return '#d32f2f';
+            case 'MEDIUM': return '#ff9800';
+            case 'LOW': return '#2196f3';
+            default: return '#757575';
+        }
+    };
+
+    const getSeverityBg = (severity) => {
+        switch (severity) {
+            case 'HIGH': return '#ffebee';
+            case 'MEDIUM': return '#fff3e0';
+            case 'LOW': return '#e3f2fd';
+            default: return '#f5f5f5';
+        }
+    };
+
     const filteredMetrics = searchTerm
-        ? metrics.filter(item =>
-            searchTerm.split(' ').every(word =>
-                item.Campaign.toLowerCase().includes(word.toLowerCase())
-            )
-          )
+        ? metrics.filter(item => matchesSearchTerm(item.Campaign, searchTerm))
         : metrics;
 
     const indexOfLastCampaign = currentPage * campaignsPerPage;
@@ -181,39 +292,202 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     return (
         <div className="live-campaign-metrics">
             <h2>Live Campaign Metrics</h2>
-            <div className="campaign-grid">
-                {currentCampaigns.map((campaign, index) => (
-                    <div key={index} className="campaign-box">
-                        <h3 
-                            className="campaign-name-clickable" 
-                            onClick={() => handleCampaignClick(campaign)}
-                        >
-                            {campaign.Campaign}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                            Deployment date {campaign.Send_Date} ({campaign.DeploymentCount} deployment{campaign.DeploymentCount !== 1 ? 's' : ''})
-                        </p>
-                        <table>
-                            <tbody>
-                                <tr><td>Sent:</td><td>{campaign.Sent.toLocaleString()}</td></tr>
-                                <tr><td>Hard Bounces:</td><td>{campaign.Hard_Bounces.toLocaleString()}</td></tr>
-                                <tr><td>Soft Bounces:</td><td>{campaign.Soft_Bounces.toLocaleString()}</td></tr>
-                                <tr><td>Total Bounces:</td><td>{campaign.Total_Bounces.toLocaleString()}</td></tr>
-                                <tr><td>Delivered:</td><td>{campaign.Delivered.toLocaleString()}</td></tr>
-                                <tr><td>Delivery Rate:</td><td>{campaign.Delivery_Rate.toFixed(2)}%</td></tr>
-                                <tr><td>Unique Opens:</td><td>{campaign.Unique_Opens.toLocaleString()}</td></tr>
-                                <tr><td>Unique Open Rate:</td><td>{campaign.Unique_Open_Rate.toFixed(2)}%</td></tr>
-                                <tr><td>Total Opens:</td><td>{campaign.Total_Opens.toLocaleString()}</td></tr>
-                                <tr><td>Total Open Rate:</td><td>{campaign.Total_Open_Rate.toFixed(2)}%</td></tr>
-                                <tr><td>Unique Clicks:</td><td>{campaign.Unique_Clicks.toLocaleString()}</td></tr>
-                                <tr><td>Unique Click Rate:</td><td>{campaign.Unique_Click_Rate.toFixed(2)}%</td></tr>
-                                <tr><td>Total Clicks:</td><td>{campaign.Total_Clicks.toLocaleString()}</td></tr>
-                                <tr><td>Total Click Rate:</td><td>{campaign.Total_Click_Rate.toFixed(2)}%</td></tr>
-                                <tr><td>Bot Clicks:</td><td>{campaign.Filtered_Bot_Clicks.toLocaleString()}</td></tr>
-                            </tbody>
-                        </table>
+
+            {(() => {
+                const activeFlagCount = { high: 0, medium: 0, low: 0, total: 0 };
+                const seenCampaigns = new Set();
+
+                metrics.forEach(campaign => {
+                    const activeFlags = getCampaignFlags(campaign.Campaign, campaign);
+                    if (activeFlags.length > 0 && !seenCampaigns.has(campaign.Campaign)) {
+                        seenCampaigns.add(campaign.Campaign);
+                        activeFlagCount.total++;
+                        activeFlags.forEach(f => {
+                            if (f.severity === 'HIGH') activeFlagCount.high++;
+                            else if (f.severity === 'MEDIUM') activeFlagCount.medium++;
+                            else if (f.severity === 'LOW') activeFlagCount.low++;
+                        });
+                    }
+                });
+
+                if (activeFlagCount.total === 0) return null;
+
+                return (
+                    <div style={{
+                        background: '#2a2a3e',
+                        border: '1px solid #444',
+                        borderRadius: '6px',
+                        padding: '12px 16px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '14px', color: '#ccc' }}>
+                                Data Validation Alerts
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {activeFlagCount.high > 0 && (
+                                    <span style={{
+                                        background: '#d32f2f',
+                                        color: '#fff',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        {activeFlagCount.high} HIGH
+                                    </span>
+                                )}
+                                {activeFlagCount.medium > 0 && (
+                                    <span style={{
+                                        background: '#ff9800',
+                                        color: '#fff',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        {activeFlagCount.medium} MEDIUM
+                                    </span>
+                                )}
+                                {activeFlagCount.low > 0 && (
+                                    <span style={{
+                                        background: '#2196f3',
+                                        color: '#fff',
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        {activeFlagCount.low} LOW
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#888' }}>
+                            {activeFlagCount.total} campaign{activeFlagCount.total !== 1 ? 's' : ''} flagged.
+                        </span>
                     </div>
-                ))}
+                );
+            })()}
+
+            <div className="campaign-grid">
+                {currentCampaigns.map((campaign, index) => {
+                    const campaignFlags = getCampaignFlags(campaign.Campaign, campaign);
+                    const hasFlagsForCampaign = campaignFlags.length > 0;
+                    const highestSeverity = campaignFlags.length > 0
+                        ? campaignFlags.reduce((max, f) => {
+                            const order = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+                            return order[f.severity] > order[max] ? f.severity : max;
+                        }, 'LOW')
+                        : null;
+
+                    return (
+                        <div
+                            key={index}
+                            className="campaign-box"
+                            style={{ position: 'relative' }}
+                        >
+                            <h3
+                                className="campaign-name-clickable"
+                                onClick={() => handleCampaignClick(campaign)}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                {campaign.Campaign}
+                                {hasFlagsForCampaign && (
+                                    <div
+                                        className="flag-icon-wrapper"
+                                        onMouseEnter={() => setShowFlagDetails(index)}
+                                        onMouseLeave={() => setShowFlagDetails(null)}
+                                        style={{ position: 'relative', display: 'inline-flex' }}
+                                    >
+                                        <svg
+                                            viewBox="0 0 20 20"
+                                            fill={getSeverityColor(highestSeverity)}
+                                            width="22"
+                                            height="22"
+                                            style={{ cursor: 'pointer', flexShrink: 0 }}
+                                        >
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        {showFlagDetails === index && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '24px',
+                                                left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                background: '#1e1e2e',
+                                                border: '1px solid #444',
+                                                borderRadius: '6px',
+                                                padding: '10px 12px',
+                                                width: '280px',
+                                                zIndex: 1000,
+                                                boxShadow: '0 4px 16px rgba(0,0,0,0.4)'
+                                            }}>
+                                                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '8px' }}>
+                                                    Validation Issue{campaignFlags.length > 1 ? 's' : ''}
+                                                </div>
+                                                {campaignFlags.map((flag, fIdx) => (
+                                                    <div key={fIdx} style={{
+                                                        borderLeft: `3px solid ${getSeverityColor(flag.severity)}`,
+                                                        paddingLeft: '8px',
+                                                        marginBottom: fIdx < campaignFlags.length - 1 ? '8px' : 0,
+                                                        fontSize: '11px'
+                                                    }}>
+                                                        <div style={{ color: '#fff', marginBottom: '2px' }}>
+                                                            <span style={{
+                                                                color: getSeverityColor(flag.severity),
+                                                                fontWeight: 'bold',
+                                                                marginRight: '6px'
+                                                            }}>
+                                                                {flag.severity}
+                                                            </span>
+                                                            {flag.category}
+                                                        </div>
+                                                        {flag.local_value && flag.api_value && (
+                                                            <div style={{ color: '#888' }}>
+                                                                Local: {flag.local_value.toLocaleString()} | API: {flag.api_value.toLocaleString()}
+                                                            </div>
+                                                        )}
+                                                        {flag.deviation_pct && (
+                                                            <div style={{ color: '#888' }}>
+                                                                {flag.deviation_pct.toFixed(1)}% deviation
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                                Deployment date {campaign.Send_Date} ({campaign.DeploymentCount} deployment{campaign.DeploymentCount !== 1 ? 's' : ''})
+                            </p>
+                            <table>
+                                <tbody>
+                                    <tr><td>Sent:</td><td>{campaign.Sent.toLocaleString()}</td></tr>
+                                    <tr><td>Hard Bounces:</td><td>{campaign.Hard_Bounces.toLocaleString()}</td></tr>
+                                    <tr><td>Soft Bounces:</td><td>{campaign.Soft_Bounces.toLocaleString()}</td></tr>
+                                    <tr><td>Total Bounces:</td><td>{campaign.Total_Bounces.toLocaleString()}</td></tr>
+                                    <tr><td>Delivered:</td><td>{campaign.Delivered.toLocaleString()}</td></tr>
+                                    <tr><td>Delivery Rate:</td><td>{campaign.Delivery_Rate.toFixed(2)}%</td></tr>
+                                    <tr><td>Unique Opens:</td><td>{campaign.Unique_Opens.toLocaleString()}</td></tr>
+                                    <tr><td>Unique Open Rate:</td><td>{campaign.Unique_Open_Rate.toFixed(2)}%</td></tr>
+                                    <tr><td>Total Opens:</td><td>{campaign.Total_Opens.toLocaleString()}</td></tr>
+                                    <tr><td>Total Open Rate:</td><td>{campaign.Total_Open_Rate.toFixed(2)}%</td></tr>
+                                    <tr><td>Unique Clicks:</td><td>{campaign.Unique_Clicks.toLocaleString()}</td></tr>
+                                    <tr><td>Unique Click Rate:</td><td>{campaign.Unique_Click_Rate.toFixed(2)}%</td></tr>
+                                    <tr><td>Total Clicks:</td><td>{campaign.Total_Clicks.toLocaleString()}</td></tr>
+                                    <tr><td>Total Click Rate:</td><td>{campaign.Total_Click_Rate.toFixed(2)}%</td></tr>
+                                    <tr><td>Bot Clicks:</td><td>{campaign.Filtered_Bot_Clicks.toLocaleString()}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                })}
             </div>
             <div className="pagination">
                 {currentPage > 1 && (

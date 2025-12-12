@@ -16,11 +16,13 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     const [uploading, setUploading] = useState(false);
     const [hasMetadata, setHasMetadata] = useState(false);
     const [metadataLoading, setMetadataLoading] = useState(false);
+    const [manualPlacementId, setManualPlacementId] = useState('');
     const [dragActive, setDragActive] = useState({
         targetList: false,
         tags: false,
         adImages: false
     });
+    const [audienceLimit, setAudienceLimit] = useState(8);
 
     const currentIndex = campaign && allCampaigns.length > 0
         ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
@@ -32,6 +34,8 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
         if (isOpen && campaign) {
             setShowUploadModal(false);
             setUploadFiles({ targetList: null, tags: null, adImages: [] });
+            setManualPlacementId('');
+            setAudienceLimit(8);
         }
     }, [campaign?.Campaign, isOpen]);
 
@@ -481,15 +485,17 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                             </button>
                         </div>
                         
-                        <div className="campaign-modal-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                                <div className="campaign-date">
-                                    <strong>Send Date:</strong> {campaign.Send_Date ? formatDate(campaign.Send_Date) : 'N/A'}
+                        <div className="campaign-modal-info">
+                            <div className="campaign-modal-info-left">
+                                <div className="info-pill">
+                                    <span className="info-label">Send Date</span>
+                                    <span className="info-value">{campaign.Send_Date ? formatDate(campaign.Send_Date) : 'N/A'}</span>
                                 </div>
 
                                 {campaign.DeploymentCount > 1 && (
-                                    <div className="deployment-info">
-                                        <strong>Number of Deployments:</strong> {campaign.DeploymentCount}
+                                    <div className="info-pill">
+                                        <span className="info-label">Deployments</span>
+                                        <span className="info-value">{campaign.DeploymentCount}</span>
                                     </div>
                                 )}
                             </div>
@@ -527,7 +533,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                     <div className="metric-label">
                                         {metricDisplayNames[metric] || metric}
                                     </div>
-                                    <div className="metric-value">
+                                    <div className="campaign-metric-value">
                                         {campaign[metric] !== undefined && campaign[metric] !== null
                                             ? formatPercentage(campaign[metric])
                                             : 'N/A'}
@@ -653,66 +659,64 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 {campaignMetadata.geographic_breakdown && (
                                     <div className="geographic-section">
                                         <h4>Geographic Metrics</h4>
-                                        <div className="geographic-grid">
-                                            {Object.entries(campaignMetadata.geographic_breakdown).map(([region, data]) => (
-                                                <div key={region} className="geographic-card">
-                                                    <div className="geographic-region">{region.toUpperCase()}</div>
-                                                    <div className="geographic-stats">
-                                                        <div className="geographic-stat">
-                                                            <span className="stat-label">Delivered:</span>
-                                                            <span className="stat-value">{formatNumber(data.delivered)}</span>
-                                                        </div>
-                                                        <div className="geographic-stat">
-                                                            <span className="stat-label">Opens:</span>
-                                                            <span className="stat-value">{formatNumber(data.opens)}</span>
-                                                        </div>
-                                                        <div className="geographic-stat">
-                                                            <span className="stat-label">Open Rate:</span>
-                                                            <span className="stat-value">{formatPercentage(data.open_rate)}</span>
-                                                        </div>
-                                                        <div className="geographic-stat">
-                                                            <span className="stat-label">% of Audience:</span>
-                                                            <span className="stat-value">{formatPercentage(data.percentage_of_audience)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {campaignMetadata.audience_breakdown && (
-                                    <div className="audience-section">
-                                        <h4>Audience Breakdowns</h4>
-                                        <div className="audience-grid">
-                                            {Object.entries(campaignMetadata.audience_breakdown)
+                                        <div className="geo-bars-container">
+                                            {Object.entries(campaignMetadata.geographic_breakdown)
                                                 .sort((a, b) => b[1].percentage_of_audience - a[1].percentage_of_audience)
-                                                .slice(0, 6)
-                                                .map(([audienceType, data]) => (
-                                                    <div key={audienceType} className="audience-card">
-                                                        <div className="audience-type">{audienceType}</div>
-                                                        <div className="audience-metrics">
-                                                            <div className="audience-primary-metric">
-                                                                <span className="primary-label">% of Audience</span>
-                                                                <span className="primary-value">{formatPercentage(data.percentage_of_audience)}</span>
-                                                            </div>
-                                                            <div className="audience-secondary-metrics">
-                                                                <div className="secondary-metric">
-                                                                    <span>Delivered: {formatNumber(data.delivered)}</span>
-                                                                </div>
-                                                                <div className="secondary-metric">
-                                                                    <span>Opens: {formatNumber(data.opens)}</span>
-                                                                </div>
-                                                                <div className="secondary-metric">
-                                                                    <span>Open Rate: {formatPercentage(data.open_rate)}</span>
-                                                                </div>
-                                                            </div>
+                                                .map(([region, data]) => (
+                                                    <div key={region} className="geo-bar-item">
+                                                        <div className="geo-bar-header">
+                                                            <span className="geo-region-name">{region.toUpperCase()}</span>
+                                                            <span className="geo-open-rate">{formatPercentage(data.open_rate)}</span>
+                                                        </div>
+                                                        <div className="geo-bar-track">
+                                                            <div
+                                                                className="geo-bar-fill"
+                                                                style={{ width: `${Math.min(data.percentage_of_audience, 100)}%` }}
+                                                            />
+                                                        </div>
+                                                        <div className="geo-bar-stats">
+                                                            <span>{formatPercentage(data.percentage_of_audience)} of audience</span>
+                                                            <span>{formatNumber(data.delivered)} sent</span>
                                                         </div>
                                                     </div>
                                                 ))}
                                         </div>
                                     </div>
                                 )}
+
+                                {campaignMetadata.audience_breakdown && (() => {
+                                    const sortedAudiences = Object.entries(campaignMetadata.audience_breakdown)
+                                        .sort((a, b) => b[1].percentage_of_audience - a[1].percentage_of_audience);
+                                    const visibleAudiences = sortedAudiences.slice(0, audienceLimit);
+                                    const hasMore = sortedAudiences.length > audienceLimit;
+                                    const remaining = sortedAudiences.length - audienceLimit;
+
+                                    return (
+                                        <div className="audience-section">
+                                            <h4>Audience Breakdown <span className="audience-count">({sortedAudiences.length} specialties)</span></h4>
+                                            <div className="audience-list">
+                                                {visibleAudiences.map(([audienceType, data]) => (
+                                                    <div key={audienceType} className="audience-row">
+                                                        <span className="audience-name">{audienceType}</span>
+                                                        <div className="audience-stats">
+                                                            <span className="audience-pct">{formatPercentage(data.percentage_of_audience)}</span>
+                                                            <span className="audience-open">{formatPercentage(data.open_rate)} open</span>
+                                                            <span className="audience-sent">{formatNumber(data.delivered)}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {hasMore && (
+                                                <button
+                                                    className="load-more-button"
+                                                    onClick={() => setAudienceLimit(prev => prev + 10)}
+                                                >
+                                                    Show More ({remaining} remaining)
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                   {campaignMetadata.device_breakdown && (
                                     <div className="device-section">
@@ -785,17 +789,22 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                     if (e.target.className === 'upload-modal-overlay') {
                         setShowUploadModal(false);
                         setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                        setManualPlacementId('');
                     }
                 }}
             >
                 <div className="upload-modal-content">
                     <div className="upload-modal-header">
-                        <h3>Upload Campaign Metadata</h3>
+                        <div className="upload-header-text">
+                            <h3>Upload Metadata</h3>
+                            <p className="upload-campaign-name">{campaign.Campaign}</p>
+                        </div>
                         <button
                             className="upload-modal-close"
                             onClick={() => {
                                 setShowUploadModal(false);
                                 setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                setManualPlacementId('');
                             }}
                         >
                             ×
@@ -803,27 +812,14 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                     </div>
 
                     <div className="upload-modal-body">
-                        <div className="upload-section">
-                            <label className="upload-label">Target List (Excel)</label>
+                        <div className="upload-grid">
                             <div
-                                className={`dropbox ${dragActive.targetList ? 'drag-active' : ''} ${uploadFiles.targetList ? 'has-file' : ''}`}
-                                onDragEnter={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, targetList: true }));
-                                }}
-                                onDragLeave={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, targetList: false }));
-                                }}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }}
+                                className={`upload-card ${uploadFiles.targetList ? 'has-file' : ''} ${dragActive.targetList ? 'drag-active' : ''}`}
+                                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, targetList: true })); }}
+                                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, targetList: false })); }}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                 onDrop={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                                    e.preventDefault(); e.stopPropagation();
                                     setDragActive(prev => ({ ...prev, targetList: false }));
                                     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                                         setUploadFiles(prev => ({ ...prev, targetList: e.dataTransfer.files[0] }));
@@ -831,60 +827,28 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 }}
                                 onClick={() => document.getElementById('targetListInput').click()}
                             >
-                                {uploadFiles.targetList ? (
-                                    <div className="file-info">
-                                        <span className="file-name">{uploadFiles.targetList.name}</span>
-                                        <button
-                                            className="remove-file"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setUploadFiles(prev => ({ ...prev, targetList: null }));
-                                            }}
-                                        >
-                                            Remove
-                                        </button>
+                                <div className="upload-card-icon">
+                                    {uploadFiles.targetList ? <span className="check-icon">✓</span> : <span>📊</span>}
+                                </div>
+                                <div className="upload-card-content">
+                                    <div className="upload-card-title">Target List</div>
+                                    <div className="upload-card-subtitle">
+                                        {uploadFiles.targetList ? uploadFiles.targetList.name : 'Excel file (.xlsx, .xls)'}
                                     </div>
-                                ) : (
-                                    <div className="dropbox-placeholder">
-                                        <div className="dropbox-icon">📄</div>
-                                        <div className="dropbox-text">Drop Excel file here or click to browse</div>
-                                    </div>
+                                </div>
+                                {uploadFiles.targetList && (
+                                    <button className="upload-card-remove" onClick={(e) => { e.stopPropagation(); setUploadFiles(prev => ({ ...prev, targetList: null })); }}>×</button>
                                 )}
                             </div>
-                            <input
-                                id="targetListInput"
-                                type="file"
-                                accept=".xlsx,.xls"
-                                onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        setUploadFiles(prev => ({ ...prev, targetList: e.target.files[0] }));
-                                    }
-                                }}
-                                style={{ display: 'none' }}
-                            />
-                        </div>
+                            <input id="targetListInput" type="file" accept=".xlsx,.xls" onChange={(e) => { if (e.target.files && e.target.files[0]) setUploadFiles(prev => ({ ...prev, targetList: e.target.files[0] })); }} style={{ display: 'none' }} />
 
-                        <div className="upload-section">
-                            <label className="upload-label">Tags (Excel)</label>
                             <div
-                                className={`dropbox ${dragActive.tags ? 'drag-active' : ''} ${uploadFiles.tags ? 'has-file' : ''}`}
-                                onDragEnter={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, tags: true }));
-                                }}
-                                onDragLeave={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, tags: false }));
-                                }}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }}
+                                className={`upload-card ${uploadFiles.tags ? 'has-file' : ''} ${dragActive.tags ? 'drag-active' : ''}`}
+                                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, tags: true })); }}
+                                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, tags: false })); }}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                 onDrop={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                                    e.preventDefault(); e.stopPropagation();
                                     setDragActive(prev => ({ ...prev, tags: false }));
                                     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                                         setUploadFiles(prev => ({ ...prev, tags: e.dataTransfer.files[0] }));
@@ -892,60 +856,28 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 }}
                                 onClick={() => document.getElementById('tagsInput').click()}
                             >
-                                {uploadFiles.tags ? (
-                                    <div className="file-info">
-                                        <span className="file-name">{uploadFiles.tags.name}</span>
-                                        <button
-                                            className="remove-file"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setUploadFiles(prev => ({ ...prev, tags: null }));
-                                            }}
-                                        >
-                                            Remove
-                                        </button>
+                                <div className="upload-card-icon">
+                                    {uploadFiles.tags ? <span className="check-icon">✓</span> : <span>🏷️</span>}
+                                </div>
+                                <div className="upload-card-content">
+                                    <div className="upload-card-title">Tags</div>
+                                    <div className="upload-card-subtitle">
+                                        {uploadFiles.tags ? uploadFiles.tags.name : 'Excel file (.xlsx, .xls)'}
                                     </div>
-                                ) : (
-                                    <div className="dropbox-placeholder">
-                                        <div className="dropbox-icon">📄</div>
-                                        <div className="dropbox-text">Drop Excel file here or click to browse</div>
-                                    </div>
+                                </div>
+                                {uploadFiles.tags && (
+                                    <button className="upload-card-remove" onClick={(e) => { e.stopPropagation(); setUploadFiles(prev => ({ ...prev, tags: null })); }}>×</button>
                                 )}
                             </div>
-                            <input
-                                id="tagsInput"
-                                type="file"
-                                accept=".xlsx,.xls"
-                                onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        setUploadFiles(prev => ({ ...prev, tags: e.target.files[0] }));
-                                    }
-                                }}
-                                style={{ display: 'none' }}
-                            />
-                        </div>
+                            <input id="tagsInput" type="file" accept=".xlsx,.xls" onChange={(e) => { if (e.target.files && e.target.files[0]) setUploadFiles(prev => ({ ...prev, tags: e.target.files[0] })); }} style={{ display: 'none' }} />
 
-                        <div className="upload-section">
-                            <label className="upload-label">Ad Images (PNG/JPG)</label>
                             <div
-                                className={`dropbox ${dragActive.adImages ? 'drag-active' : ''} ${uploadFiles.adImages.length > 0 ? 'has-file' : ''}`}
-                                onDragEnter={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, adImages: true }));
-                                }}
-                                onDragLeave={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setDragActive(prev => ({ ...prev, adImages: false }));
-                                }}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }}
+                                className={`upload-card ${uploadFiles.adImages.length > 0 ? 'has-file' : ''} ${dragActive.adImages ? 'drag-active' : ''}`}
+                                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, adImages: true })); }}
+                                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(prev => ({ ...prev, adImages: false })); }}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                 onDrop={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                                    e.preventDefault(); e.stopPropagation();
                                     setDragActive(prev => ({ ...prev, adImages: false }));
                                     if (e.dataTransfer.files) {
                                         setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.dataTransfer.files) }));
@@ -953,38 +885,34 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 }}
                                 onClick={() => document.getElementById('adImagesInput').click()}
                             >
-                                {uploadFiles.adImages.length > 0 ? (
-                                    <div className="file-info">
-                                        <span className="file-name">{uploadFiles.adImages.length} image(s) selected</span>
-                                        <button
-                                            className="remove-file"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setUploadFiles(prev => ({ ...prev, adImages: [] }));
-                                            }}
-                                        >
-                                            Remove
-                                        </button>
+                                <div className="upload-card-icon">
+                                    {uploadFiles.adImages.length > 0 ? <span className="check-icon">✓</span> : <span>🖼️</span>}
+                                </div>
+                                <div className="upload-card-content">
+                                    <div className="upload-card-title">Ad Images</div>
+                                    <div className="upload-card-subtitle">
+                                        {uploadFiles.adImages.length > 0 ? `${uploadFiles.adImages.length} file(s) selected` : 'PNG, JPG (multiple)'}
                                     </div>
-                                ) : (
-                                    <div className="dropbox-placeholder">
-                                        <div className="dropbox-icon">🖼️</div>
-                                        <div className="dropbox-text">Drop images here or click to browse</div>
-                                        <div className="dropbox-hint">Multiple files allowed</div>
-                                    </div>
+                                </div>
+                                {uploadFiles.adImages.length > 0 && (
+                                    <button className="upload-card-remove" onClick={(e) => { e.stopPropagation(); setUploadFiles(prev => ({ ...prev, adImages: [] })); }}>×</button>
                                 )}
                             </div>
+                            <input id="adImagesInput" type="file" accept=".png,.jpg,.jpeg" multiple onChange={(e) => { if (e.target.files) setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.target.files) })); }} style={{ display: 'none' }} />
+                        </div>
+
+                        <div className="upload-hint">
+                            Click a card or drag & drop files to upload
+                        </div>
+
+                        <div className="upload-placement-id-section">
+                            <label className="upload-placement-id-label">CMI Placement ID (optional)</label>
                             <input
-                                id="adImagesInput"
-                                type="file"
-                                accept=".png,.jpg,.jpeg"
-                                multiple
-                                onChange={(e) => {
-                                    if (e.target.files) {
-                                        setUploadFiles(prev => ({ ...prev, adImages: Array.from(e.target.files) }));
-                                    }
-                                }}
-                                style={{ display: 'none' }}
+                                type="text"
+                                className="upload-placement-id-input"
+                                value={manualPlacementId}
+                                onChange={(e) => setManualPlacementId(e.target.value)}
+                                placeholder="Enter placement ID if no files to upload"
                             />
                         </div>
                     </div>
@@ -995,6 +923,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                             onClick={() => {
                                 setShowUploadModal(false);
                                 setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                setManualPlacementId('');
                             }}
                         >
                             Cancel
@@ -1002,17 +931,23 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                         <button
                             className="upload-btn-submit"
                             onClick={async () => {
-                                if (!uploadFiles.targetList && !uploadFiles.tags && uploadFiles.adImages.length === 0) {
+                                const hasFiles = uploadFiles.targetList || uploadFiles.tags || uploadFiles.adImages.length > 0;
+                                const hasPlacementId = manualPlacementId.trim() !== '';
+
+                                if (!hasFiles && !hasPlacementId) {
                                     return;
                                 }
 
                                 setUploading(true);
                                 const formData = new FormData();
                                 formData.append('campaign_name', campaign.Campaign);
+                                if (campaign.Send_Date) formData.append('send_date', campaign.Send_Date);
 
                                 if (uploadFiles.targetList) formData.append('target_list', uploadFiles.targetList);
                                 if (uploadFiles.tags) formData.append('tags', uploadFiles.tags);
                                 uploadFiles.adImages.forEach(img => formData.append('ad_images', img));
+
+                                if (hasPlacementId) formData.append('cmi_placement_id', manualPlacementId.trim());
 
                                 try {
                                     const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/metadata`, {
@@ -1024,6 +959,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                     if (data.status === 'success') {
                                         setShowUploadModal(false);
                                         setUploadFiles({ targetList: null, tags: null, adImages: [] });
+                                        setManualPlacementId('');
                                         setHasMetadata(true);
                                     } else {
                                         console.error('Upload failed:', data.message);
@@ -1034,9 +970,9 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                     setUploading(false);
                                 }
                             }}
-                            disabled={uploading}
+                            disabled={uploading || (!uploadFiles.targetList && !uploadFiles.tags && uploadFiles.adImages.length === 0 && !manualPlacementId.trim())}
                         >
-                            {uploading ? 'Uploading...' : 'Upload'}
+                            {uploading ? 'Uploading...' : 'Save'}
                         </button>
                     </div>
                 </div>

@@ -3,16 +3,19 @@ import _ from 'lodash';
 import LiveCampaignMetrics from '../components/campaign/LiveCampaignMetrics';
 import MetricsTable from '../components/campaign/MetricsTable';
 import '../styles/CampaignPerformancePage.css';
+import { matchesSearchTerm } from '../utils/searchUtils';
+import { useSearch } from '../context/SearchContext';
 
 const CampaignPerformancePage = () => {
+  const { searchTerms, setSearchTerm } = useSearch();
   const [metricsData, setMetricsData] = useState([]);
   const [rawFilteredData, setRawFilteredData] = useState([]);
   const [processedData, setProcessedData] = useState([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchTerms.campaignPerformance || '');
   const [selectedDeployment, setSelectedDeployment] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [liveSearchTerm, setLiveSearchTerm] = useState('');
+  const [liveSearchTerm, setLiveSearchTerm] = useState(searchTerms.campaignPerformance || '');
 
   const [selectedColumn, setSelectedColumn] = useState({
     column1: 'Unique_Open_Rate',
@@ -124,7 +127,7 @@ const CampaignPerformancePage = () => {
 
   useEffect(() => {
     const searchFiltered = metricsData.filter(item =>
-      search.split(' ').every(word => item.Campaign.toLowerCase().includes(word.toLowerCase()))
+      matchesSearchTerm(item.Campaign, search)
     );
 
     const deploymentFiltered = filterByDeployment(searchFiltered);
@@ -139,11 +142,12 @@ const CampaignPerformancePage = () => {
   }, [rawFilteredData]);
 
   const handleSearchChange = (e) => {
-    const searchValue = e.target.value.toLowerCase();
+    const searchValue = e.target.value;
     setSearch(searchValue);
     setLiveSearchTerm(searchValue);
+    setSearchTerm('campaignPerformance', searchValue);
     setRawFilteredData(metricsData.filter(item =>
-      searchValue.split(' ').every(word => item.Campaign.toLowerCase().includes(word))
+      matchesSearchTerm(item.Campaign, searchValue)
     ));
     setCurrentPage(1);
   };

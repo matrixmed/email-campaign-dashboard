@@ -36,6 +36,8 @@ def get_all_contracts():
             'placement_id': c.placement_id,
             'placement_description': c.placement_description,
             'buy_component_type': c.buy_component_type,
+            'frequency': c.frequency,
+            'metric': c.metric,
             'data_type': c.data_type,
             'notes': c.notes,
             'year': c.year
@@ -83,6 +85,8 @@ def create_contract():
             placement_id=data.get('placement_id'),
             placement_description=data.get('placement_description'),
             buy_component_type=data.get('buy_component_type'),
+            frequency=data.get('frequency'),
+            metric=data.get('metric'),
             data_type=data.get('data_type'),
             notes=data.get('notes'),
             year=data.get('year', 2025)
@@ -137,6 +141,8 @@ def update_contract(contract_id):
         contract.placement_id = data.get('placement_id', contract.placement_id)
         contract.placement_description = data.get('placement_description', contract.placement_description)
         contract.buy_component_type = data.get('buy_component_type', contract.buy_component_type)
+        contract.frequency = data.get('frequency', contract.frequency)
+        contract.metric = data.get('metric', contract.metric)
         contract.data_type = data.get('data_type', contract.data_type)
         contract.notes = data.get('notes', contract.notes)
         contract.year = data.get('year', contract.year)
@@ -203,7 +209,7 @@ def export_contracts():
         writer.writerow([
             'Contract #', 'Client', 'Brand', 'Vehicle',
             'Placement ID', 'Placement Description',
-            'Buy Component Type', 'Data Type', 'Notes', 'Year'
+            'Buy Component Type', 'Frequency', 'Metric', 'Data Type', 'Notes', 'Year'
         ])
 
         for c in contracts:
@@ -215,6 +221,8 @@ def export_contracts():
                 c.placement_id or '',
                 c.placement_description or '',
                 c.buy_component_type or '',
+                c.frequency or '',
+                c.metric or '',
                 c.data_type or '',
                 c.notes or '',
                 c.year or ''

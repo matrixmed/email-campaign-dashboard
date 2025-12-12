@@ -207,20 +207,24 @@
 .cmi-table td.editing {
   padding: 0;
   white-space: normal;
+  position: relative;
+  overflow: visible;
 }
 
-.cell-input {
+.cmi-table td .cell-input {
   width: 100%;
-  min-width: 200px;
+  min-width: 0;
+  max-width: 100%;
   padding: 12px 16px;
   border: 2px solid var(--color-accent, #0ff);
   background: var(--color-bg-elevated, #222224);
   color: var(--color-text-primary, #ffffff);
   font-size: 14px;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
-.cell-input:focus {
+.cmi-table td .cell-input:focus {
   outline: none;
 }
 

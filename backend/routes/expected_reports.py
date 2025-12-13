@@ -169,6 +169,38 @@ def attach_expected_report(report_id):
         }), 500
 
 
+@expected_reports_bp.route('/expected/<int:report_id>/detach', methods=['POST'])
+@cross_origin()
+def detach_expected_report(report_id):
+    try:
+        session = get_session()
+
+        report = session.query(CMIExpectedReport).filter_by(id=report_id).first()
+        if not report:
+            return jsonify({'status': 'error', 'message': 'Report not found'}), 404
+
+        report.attached_to_campaign_id = None
+        report.is_standalone = False
+        report.is_matched = False
+        report.match_type = None
+        report.status = 'pending'
+        report.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Report detached successfully'
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @expected_reports_bp.route('/expected/<int:report_id>/agg-values', methods=['POST'])
 @cross_origin()
 def set_agg_values(report_id):

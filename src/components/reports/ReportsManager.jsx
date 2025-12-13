@@ -31,10 +31,7 @@ const ReportsManager = () => {
 
     const [attachedAGGs, setAttachedAGGs] = useState({});
     const [standaloneAGGs, setStandaloneAGGs] = useState([]);
-    const [movedPLDAGGs, setMovedPLDAGGs] = useState(() => {
-        const saved = localStorage.getItem('movedPLDAGGs');
-        return saved ? JSON.parse(saved) : [];
-    });
+    const [movedPLDAGGs, setMovedPLDAGGs] = useState([]);
     const [moveMode, setMoveMode] = useState('attach'); 
     const [selectedAttachTarget, setSelectedAttachTarget] = useState(null);
 
@@ -274,39 +271,48 @@ const ReportsManager = () => {
     const handleMoveToDue = async () => {
         if (!movingReport) return;
 
-        if (moveMode === 'attach' && selectedAttachTarget) {
-            const newAttachedAGGs = { ...attachedAGGs };
-            const targetId = selectedAttachTarget.id;
+        try {
+            if (moveMode === 'attach' && selectedAttachTarget) {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/attach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attach_to_campaign_id: selectedAttachTarget.id
+                    })
+                });
 
-            if (!newAttachedAGGs[targetId]) {
-                newAttachedAGGs[targetId] = [];
+                if (movingReport.contract_metric || movingReport.agg_metric) {
+                    await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/agg-values`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
+                            agg_value: movingReport.agg_value || ''
+                        })
+                    });
+                }
+
+            } else if (moveMode === 'standalone') {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/attach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attach_to_campaign_id: null
+                    })
+                });
+
+                if (movingReport.contract_metric || movingReport.agg_metric) {
+                    await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/agg-values`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
+                            agg_value: movingReport.agg_value || ''
+                        })
+                    });
+                }
             }
 
-            newAttachedAGGs[targetId].push({
-                ...movingReport,
-                agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
-                agg_value: movingReport.agg_value || '',
-                notes: moveNote,
-                attached_at: new Date().toISOString()
-            });
-
-            setAttachedAGGs(newAttachedAGGs);
-            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
-
-        } else if (moveMode === 'standalone') {
-            const newStandaloneAGGs = [...standaloneAGGs, {
-                ...movingReport,
-                agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
-                agg_value: movingReport.agg_value || '',
-                notes: moveNote,
-                added_at: new Date().toISOString()
-            }];
-
-            setStandaloneAGGs(newStandaloneAGGs);
-            localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
-        }
-
-        try {
             await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/move-to-due`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -315,6 +321,8 @@ const ReportsManager = () => {
                     assigned_campaign_id: selectedAttachTarget?.id
                 })
             });
+
+            await refreshAGGData();
         } catch (error) {
             console.error('Error updating backend:', error);
         }
@@ -322,68 +330,158 @@ const ReportsManager = () => {
         closeMoveModal();
     };
 
-    const handleDetachAGG = (campaignId, aggIndex) => {
-        const newAttachedAGGs = { ...attachedAGGs };
-        if (newAttachedAGGs[campaignId]) {
-            newAttachedAGGs[campaignId].splice(aggIndex, 1);
-            if (newAttachedAGGs[campaignId].length === 0) {
-                delete newAttachedAGGs[campaignId];
+    const handleDetachAGG = async (campaignId, aggIndex) => {
+        const agg = attachedAGGs[campaignId]?.[aggIndex];
+        if (agg && agg.id) {
+            try {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${agg.id}/detach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                await refreshAGGData();
+            } catch (error) {
+                console.error('Error detaching AGG:', error);
             }
-            setAttachedAGGs(newAttachedAGGs);
-            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
         }
     };
 
-    const handleUpdateAttachedAGG = (campaignId, aggIndex, field, value) => {
-        const newAttachedAGGs = { ...attachedAGGs };
-        if (newAttachedAGGs[campaignId] && newAttachedAGGs[campaignId][aggIndex]) {
+    const handleUpdateAttachedAGG = async (campaignId, aggIndex, field, value) => {
+        const agg = attachedAGGs[campaignId]?.[aggIndex];
+        if (agg && agg.id) {
+            const newAttachedAGGs = { ...attachedAGGs };
             newAttachedAGGs[campaignId][aggIndex][field] = value;
             setAttachedAGGs(newAttachedAGGs);
-            localStorage.setItem('attachedAGGs', JSON.stringify(newAttachedAGGs));
+
+            try {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${agg.id}/agg-values`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agg_metric: field === 'agg_metric' ? value : agg.agg_metric,
+                        agg_value: field === 'agg_value' ? value : agg.agg_value
+                    })
+                });
+            } catch (error) {
+                console.error('Error updating AGG values:', error);
+            }
         }
     };
 
-    const handleUpdateStandaloneAGG = (index, field, value) => {
-        const newStandaloneAGGs = [...standaloneAGGs];
-        if (newStandaloneAGGs[index]) {
+    const handleUpdateStandaloneAGG = async (index, field, value) => {
+        const agg = standaloneAGGs[index];
+        if (agg && agg.id) {
+            const newStandaloneAGGs = [...standaloneAGGs];
             newStandaloneAGGs[index][field] = value;
             setStandaloneAGGs(newStandaloneAGGs);
-            localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
+
+            try {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${agg.id}/agg-values`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agg_metric: field === 'agg_metric' ? value : agg.agg_metric,
+                        agg_value: field === 'agg_value' ? value : agg.agg_value
+                    })
+                });
+            } catch (error) {
+                console.error('Error updating standalone AGG values:', error);
+            }
         }
     };
 
-    const handleRemoveStandaloneAGG = (index) => {
-        const newStandaloneAGGs = [...standaloneAGGs];
-        newStandaloneAGGs.splice(index, 1);
-        setStandaloneAGGs(newStandaloneAGGs);
-        localStorage.setItem('standaloneAGGs', JSON.stringify(newStandaloneAGGs));
+    const handleRemoveStandaloneAGG = async (index) => {
+        const agg = standaloneAGGs[index];
+        if (agg && agg.id) {
+            try {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${agg.id}/detach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                await refreshAGGData();
+            } catch (error) {
+                console.error('Error removing standalone AGG:', error);
+            }
+        }
     };
 
-    const handleMovePLDAGG = (report) => {
-        const newMovedPLDAGGs = [...movedPLDAGGs, {
-            ...report,
-            moved_at: new Date().toISOString()
-        }];
-        setMovedPLDAGGs(newMovedPLDAGGs);
-        localStorage.setItem('movedPLDAGGs', JSON.stringify(newMovedPLDAGGs));
+    const handleMovePLDAGG = async (report) => {
+        try {
+            await fetch(`${API_BASE_URL}/api/cmi/expected/${report.id}/move-to-due`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            await refreshAGGData();
+        } catch (error) {
+            console.error('Error moving PLD AGG:', error);
+        }
     };
 
-    const handleRemovePLDAGG = (index) => {
-        const newMovedPLDAGGs = [...movedPLDAGGs];
-        newMovedPLDAGGs.splice(index, 1);
-        setMovedPLDAGGs(newMovedPLDAGGs);
-        localStorage.setItem('movedPLDAGGs', JSON.stringify(newMovedPLDAGGs));
+    const handleRemovePLDAGG = async (index) => {
+        const report = movedPLDAGGs[index];
+        if (report && report.id) {
+            try {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${report.id}/detach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                await refreshAGGData();
+            } catch (error) {
+                console.error('Error detaching PLD AGG:', error);
+            }
+        }
+    };
+
+    const refreshAGGData = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/expected`);
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const attached = {};
+                    const standalone = [];
+                    const movedPLD = [];
+
+                    result.reports.forEach(report => {
+                        if (report.status === 'moved_to_due' || report.status === 'attached' || report.status === 'standalone') {
+                            if (report.attached_to_campaign_id) {
+                                if (!attached[report.attached_to_campaign_id]) {
+                                    attached[report.attached_to_campaign_id] = [];
+                                }
+                                attached[report.attached_to_campaign_id].push({
+                                    ...report,
+                                    brand: report.brand_name,
+                                    contract_metric: report.agg_metric,
+                                    notes: report.notes
+                                });
+                            } else if (report.is_standalone || report.is_agg_only) {
+                                standalone.push({
+                                    ...report,
+                                    brand: report.brand_name,
+                                    contract_metric: report.agg_metric,
+                                    notes: report.notes
+                                });
+                            } else if (!report.is_agg_only && report.data_type !== 'AGG') {
+                                movedPLD.push({
+                                    ...report,
+                                    brand: report.brand_name
+                                });
+                            }
+                        }
+                    });
+
+                    setAttachedAGGs(attached);
+                    setStandaloneAGGs(standalone);
+                    setMovedPLDAGGs(movedPLD);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading AGG data:', error);
+        }
     };
 
     useEffect(() => {
-        try {
-            const savedAttached = localStorage.getItem('attachedAGGs');
-            const savedStandalone = localStorage.getItem('standaloneAGGs');
-            if (savedAttached) setAttachedAGGs(JSON.parse(savedAttached));
-            if (savedStandalone) setStandaloneAGGs(JSON.parse(savedStandalone));
-        } catch (e) {
-            console.error('Error loading AGG state:', e);
-        }
+        refreshAGGData();
     }, []);
 
     const getLastMonday = () => {
@@ -1281,7 +1379,7 @@ const ReportsManager = () => {
         setShowModal(true);
     };
 
-    const handlePlacementIdSubmit = () => {
+    const handlePlacementIdSubmit = async () => {
         if (!placementIdInput || !placementIdReport) return;
 
         const contractData = cmiContractValues.find(c => String(c.placement_id) === String(placementIdInput));
@@ -1298,6 +1396,30 @@ const ReportsManager = () => {
             metric: contractData?.metric || '',
             notes: contractData?.notes || ''
         };
+
+        try {
+            const formData = new FormData();
+            formData.append('cmi_placement_id', placementIdInput);
+            formData.append('campaign_name', placementIdReport.campaign_name || '');
+            if (placementIdReport.send_date) {
+                formData.append('send_date', placementIdReport.send_date);
+            }
+
+            await fetch(`${API_BASE_URL}/api/campaigns/${placementIdReport.id}/metadata`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const metadataResponse = await fetch(`${API_BASE_URL}/api/campaigns/metadata/all`);
+            if (metadataResponse.ok) {
+                const metadataResult = await metadataResponse.json();
+                if (metadataResult.status === 'success') {
+                    setCampaignMetadata(metadataResult.metadata);
+                }
+            }
+        } catch (error) {
+            console.error('Error saving placement ID:', error);
+        }
 
         const updatedManualMetadata = {
             ...manualMetadata,

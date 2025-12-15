@@ -451,20 +451,25 @@ const ReportsManager = () => {
                                 attached[report.attached_to_campaign_id].push({
                                     ...report,
                                     brand: report.brand_name,
-                                    contract_metric: report.agg_metric,
-                                    notes: report.notes
+                                    contract_metric: report.agg_metric || report.contract_metric,
+                                    contract_notes: report.contract_notes || report.notes || report.placement_description,
+                                    placement_description: report.placement_description,
+                                    frequency: report.expected_data_frequency || report.contract_frequency
                                 });
                             } else if (report.is_standalone || report.is_agg_only) {
                                 standalone.push({
                                     ...report,
                                     brand: report.brand_name,
-                                    contract_metric: report.agg_metric,
-                                    notes: report.notes
+                                    contract_metric: report.agg_metric || report.contract_metric,
+                                    contract_notes: report.contract_notes || report.notes || report.placement_description,
+                                    placement_description: report.placement_description,
+                                    frequency: report.expected_data_frequency || report.contract_frequency
                                 });
                             } else if (!report.is_agg_only && report.data_type !== 'AGG') {
                                 movedPLD.push({
                                     ...report,
-                                    brand: report.brand_name
+                                    brand: report.brand_name,
+                                    frequency: report.expected_data_frequency || report.contract_frequency
                                 });
                             }
                         }
@@ -1398,25 +1403,11 @@ const ReportsManager = () => {
         };
 
         try {
-            const formData = new FormData();
-            formData.append('cmi_placement_id', placementIdInput);
-            formData.append('campaign_name', placementIdReport.campaign_name || '');
-            if (placementIdReport.send_date) {
-                formData.append('send_date', placementIdReport.send_date);
-            }
-
-            await fetch(`${API_BASE_URL}/api/campaigns/${placementIdReport.id}/metadata`, {
-                method: 'POST',
-                body: formData
+            await fetch(`${API_BASE_URL}/api/cmi/reports/${placementIdReport.id}/placement`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cmi_placement_id: placementIdInput })
             });
-
-            const metadataResponse = await fetch(`${API_BASE_URL}/api/campaigns/metadata/all`);
-            if (metadataResponse.ok) {
-                const metadataResult = await metadataResponse.json();
-                if (metadataResult.status === 'success') {
-                    setCampaignMetadata(metadataResult.metadata);
-                }
-            }
         } catch (error) {
             console.error('Error saving placement ID:', error);
         }

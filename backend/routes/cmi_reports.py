@@ -124,6 +124,53 @@ def update_submission_status(report_id):
             'message': str(e)
         }), 500
 
+
+@cmi_reports_bp.route('/reports/<int:report_id>/placement', methods=['PUT', 'OPTIONS'])
+@cross_origin()
+def update_placement_id(report_id):
+    try:
+        data = request.json
+        session = get_session()
+
+        report = session.query(CampaignReportManager).filter_by(id=report_id).first()
+
+        if not report:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'Report not found'
+            }), 404
+
+        cmi_placement_id = data.get('cmi_placement_id')
+        if cmi_placement_id:
+            report.cmi_placement_id = cmi_placement_id
+
+            contract = session.query(CMIContractValue).filter_by(placement_id=cmi_placement_id).first()
+            if contract:
+                report.brand_name = contract.brand or report.brand_name
+                report.vehicle_name = contract.vehicle or report.vehicle_name
+                report.contract_number = contract.contract_number or report.contract_number
+                report.placement_description = contract.placement_description or report.placement_description
+                report.buy_component_type = contract.buy_component_type or report.buy_component_type
+
+        report.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Placement ID updated successfully',
+            'cmi_placement_id': report.cmi_placement_id
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @cmi_reports_bp.route('/reports/week/<week_start>/submit', methods=['PUT', 'OPTIONS'])
 @cross_origin()
 def submit_entire_week(week_start):

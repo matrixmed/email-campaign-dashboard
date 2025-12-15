@@ -42,36 +42,56 @@ def get_expected_reports():
             CMIExpectedReport.brand_name
         ).all()
 
-        result = [{
-            'id': r.id,
-            'cmi_placement_id': r.cmi_placement_id,
-            'client_placement_id': r.client_placement_id,
-            'contract_number': r.contract_number,
-            'client_name': r.client_name,
-            'brand_name': r.brand_name,
-            'supplier': r.supplier,
-            'vehicle_name': r.vehicle_name,
-            'placement_description': r.placement_description,
-            'buy_type': r.buy_type,
-            'channel': r.channel,
-            'data_type': r.data_type,
-            'expected_data_frequency': r.expected_data_frequency,
-            'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
-            'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
-            'date_data_expected': r.date_data_expected.isoformat() if r.date_data_expected else None,
-            'matched_campaign_id': r.matched_campaign_id,
-            'matched_metadata_id': r.matched_metadata_id,
-            'is_matched': r.is_matched,
-            'match_type': r.match_type,
-            'is_agg_only': r.is_agg_only,
-            'attached_to_campaign_id': r.attached_to_campaign_id,
-            'is_standalone': r.is_standalone,
-            'agg_metric': r.agg_metric,
-            'agg_value': r.agg_value,
-            'status': r.status,
-            'is_submitted': r.is_submitted,
-            'source_file': r.source_file
-        } for r in reports]
+        placement_ids = [str(r.cmi_placement_id) for r in reports if r.cmi_placement_id]
+        contracts = {}
+        if placement_ids:
+            contract_records = session.query(CMIContractValue).all()
+            for c in contract_records:
+                if c.placement_id:
+                    contracts[str(c.placement_id)] = {
+                        'notes': c.notes,
+                        'placement_description': c.placement_description,
+                        'metric': c.metric,
+                        'frequency': c.frequency
+                    }
+
+        result = []
+        for r in reports:
+            contract = contracts.get(str(r.cmi_placement_id), {}) if r.cmi_placement_id else {}
+            result.append({
+                'id': r.id,
+                'cmi_placement_id': r.cmi_placement_id,
+                'client_placement_id': r.client_placement_id,
+                'contract_number': r.contract_number,
+                'client_name': r.client_name,
+                'brand_name': r.brand_name,
+                'supplier': r.supplier,
+                'vehicle_name': r.vehicle_name,
+                'placement_description': r.placement_description or contract.get('placement_description'),
+                'buy_type': r.buy_type,
+                'channel': r.channel,
+                'data_type': r.data_type,
+                'expected_data_frequency': r.expected_data_frequency,
+                'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
+                'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
+                'date_data_expected': r.date_data_expected.isoformat() if r.date_data_expected else None,
+                'matched_campaign_id': r.matched_campaign_id,
+                'matched_metadata_id': r.matched_metadata_id,
+                'is_matched': r.is_matched,
+                'match_type': r.match_type,
+                'is_agg_only': r.is_agg_only,
+                'attached_to_campaign_id': r.attached_to_campaign_id,
+                'is_standalone': r.is_standalone,
+                'agg_metric': r.agg_metric,
+                'agg_value': r.agg_value,
+                'status': r.status,
+                'is_submitted': r.is_submitted,
+                'source_file': r.source_file,
+                'notes': r.notes,
+                'contract_notes': contract.get('notes'),
+                'contract_metric': contract.get('metric'),
+                'contract_frequency': contract.get('frequency')
+            })
 
         session.close()
 

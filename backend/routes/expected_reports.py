@@ -390,6 +390,7 @@ def get_no_data_reports():
         pld_only = []
         agg_only = []
 
+        seen_placements = set()
         placement_types = {}
         for r in reports:
             pid = r.cmi_placement_id
@@ -399,7 +400,11 @@ def get_no_data_reports():
                 placement_types[pid].add(r.data_type.upper())
 
         for r in reports:
-            contract_data = contracts_by_placement.get(str(r.cmi_placement_id), {})
+            pid = str(r.cmi_placement_id) if r.cmi_placement_id else None
+            if pid and pid in seen_placements:
+                continue
+
+            contract_data = contracts_by_placement.get(pid, {}) if pid else {}
 
             report_dict = {
                 'id': r.id,
@@ -426,28 +431,33 @@ def get_no_data_reports():
             }
 
             contract_data_type = contract_data.get('data_type', '').upper() if contract_data else ''
-            report_data_type = (r.data_type or '').upper()
 
             if contract_data_type:
+                if pid:
+                    seen_placements.add(pid)
                 if contract_data_type == 'AGG':
-                    if report_data_type == 'AGG':
-                        report_dict['is_agg_only'] = True
-                        agg_only.append(report_dict)
+                    report_dict['is_agg_only'] = True
+                    agg_only.append(report_dict)
                 elif contract_data_type in ('PLD & AGG', 'PLD AND AGG', 'PLD&AGG'):
                     pld_and_agg.append(report_dict)
                 elif contract_data_type == 'PLD':
-                    if report_data_type == 'PLD':
-                        pld_only.append(report_dict)
+                    pld_only.append(report_dict)
                 else:
                     pld_and_agg.append(report_dict)
             else:
                 types_for_placement = placement_types.get(r.cmi_placement_id, set())
 
                 if 'PLD' in types_for_placement and 'AGG' in types_for_placement:
+                    if pid:
+                        seen_placements.add(pid)
                     pld_and_agg.append(report_dict)
                 elif 'PLD' in types_for_placement:
+                    if pid:
+                        seen_placements.add(pid)
                     pld_only.append(report_dict)
                 elif 'AGG' in types_for_placement:
+                    if pid:
+                        seen_placements.add(pid)
                     report_dict['is_agg_only'] = True
                     agg_only.append(report_dict)
                 else:

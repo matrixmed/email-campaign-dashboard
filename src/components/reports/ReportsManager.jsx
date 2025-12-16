@@ -58,7 +58,7 @@ const ReportsManager = () => {
     const cleanCampaignName = (name) => {
         if (!name) return name;
         let cleaned = name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
-        cleaned = cleaned.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+        cleaned = cleaned.replace(/[():#]/g, '').trim();
         return cleaned;
     };
 
@@ -1031,10 +1031,11 @@ const ReportsManager = () => {
         const rawCampaignName = report.standardized_campaign_name || report.campaign_name || '';
         const cleanedCampaignName = cleanCampaignName(rawCampaignName);
         const monthMatch = rawCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
 
-        const previousMonday = new Date(currentTimeframe.start);
-        previousMonday.setDate(previousMonday.getDate() - 7);
+        const today = new Date();
+        const mondayDateValue = formatDateSlash(currentTimeframe.start);
 
         const brandName = matchedMeta?.brand_name || report.cmi_metadata?.Brand_Name || report.brand || "";
         const vehicleName = matchedMeta?.vehicle_name || report.cmi_metadata?.Vehicle_Name || "";
@@ -1043,10 +1044,10 @@ const ReportsManager = () => {
         const internalCampaignName = isNoDataReport ? "No Data" : cleanedCampaignName;
 
         return {
-            "folder": month.toLowerCase(),
-            "dateOfSubmission": formatDate(currentTimeframe.end),
-            "mondayDate": formatDate(previousMonday),
-            "mondaydate": formatDateSlash(currentTimeframe.start),
+            "folder": month,
+            "dateOfSubmission": formatDate(today),
+            "mondayDate": mondayDateValue,
+            "mondaydate": mondayDateValue,
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
             "internal_campaign_name": internalCampaignName,
@@ -1073,7 +1074,7 @@ const ReportsManager = () => {
 
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1085,7 +1086,8 @@ const ReportsManager = () => {
         };
 
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
 
         return {
             "campaigns": [
@@ -1107,7 +1109,7 @@ const ReportsManager = () => {
 
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1126,7 +1128,8 @@ const ReportsManager = () => {
         };
 
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
 
         return {
             "folder": month,
@@ -1152,7 +1155,7 @@ const ReportsManager = () => {
 
     const generateOrthoJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1171,7 +1174,9 @@ const ReportsManager = () => {
         };
 
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
+        const today = new Date();
 
         return {
             "internal_campaign_name": cleanedCampaignName,
@@ -1180,7 +1185,7 @@ const ReportsManager = () => {
             "aggFileName": "Ortho_AGG_",
             "campaginMonth": formatDate(currentTimeframe.start).substring(0, 6),
             "date": `${currentTimeframe.start.getMonth() + 1}/${currentTimeframe.start.getDate()}/${currentTimeframe.start.getFullYear()}`,
-            "dateOfSubmission": formatDate(currentTimeframe.end),
+            "dateOfSubmission": formatDate(today),
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true)
         };
@@ -1188,7 +1193,7 @@ const ReportsManager = () => {
 
     const generateDefaultJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/\([^)]*\)/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1200,7 +1205,8 @@ const ReportsManager = () => {
         };
 
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const month = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
 
         return {
             "folder": month,

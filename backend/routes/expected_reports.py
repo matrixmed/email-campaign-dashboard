@@ -425,21 +425,37 @@ def get_no_data_reports():
                 'has_contract_match': bool(contract_data)
             }
 
-            types_for_placement = placement_types.get(r.cmi_placement_id, set())
+            contract_data_type = contract_data.get('data_type', '').upper() if contract_data else ''
+            report_data_type = (r.data_type or '').upper()
 
-            if 'PLD' in types_for_placement and 'AGG' in types_for_placement:
-                pld_and_agg.append(report_dict)
-            elif 'PLD' in types_for_placement:
-                pld_only.append(report_dict)
-            elif 'AGG' in types_for_placement:
-                report_dict['is_agg_only'] = True
-                agg_only.append(report_dict)
+            if contract_data_type:
+                if contract_data_type == 'AGG':
+                    if report_data_type == 'AGG':
+                        report_dict['is_agg_only'] = True
+                        agg_only.append(report_dict)
+                elif contract_data_type in ('PLD & AGG', 'PLD AND AGG', 'PLD&AGG'):
+                    pld_and_agg.append(report_dict)
+                elif contract_data_type == 'PLD':
+                    if report_data_type == 'PLD':
+                        pld_only.append(report_dict)
+                else:
+                    pld_and_agg.append(report_dict)
             else:
-                if r.data_type and r.data_type.upper() == 'AGG':
+                types_for_placement = placement_types.get(r.cmi_placement_id, set())
+
+                if 'PLD' in types_for_placement and 'AGG' in types_for_placement:
+                    pld_and_agg.append(report_dict)
+                elif 'PLD' in types_for_placement:
+                    pld_only.append(report_dict)
+                elif 'AGG' in types_for_placement:
                     report_dict['is_agg_only'] = True
                     agg_only.append(report_dict)
                 else:
-                    pld_and_agg.append(report_dict)
+                    if r.data_type and r.data_type.upper() == 'AGG':
+                        report_dict['is_agg_only'] = True
+                        agg_only.append(report_dict)
+                    else:
+                        pld_and_agg.append(report_dict)
 
         session.close()
 

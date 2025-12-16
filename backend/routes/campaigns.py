@@ -284,15 +284,12 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
         if contract:
             print(f"CMI Contract found for placement {cmi_placement_id} - using as source of truth")
 
-            normalized_client_id = normalize_client_id(contract.client)
-
             extracted_data['CMI_PlacementID'] = contract.placement_id
             extracted_data['Placement_Description'] = contract.placement_description or extracted_data.get('Placement_Description')
             extracted_data['contract_number'] = contract.contract_number
             extracted_data['Brand_Name'] = contract.brand or extracted_data.get('Brand_Name')
             extracted_data['Vehicle_Name'] = contract.vehicle or extracted_data.get('Vehicle_Name')
             extracted_data['Buy_Component_Type'] = contract.buy_component_type or extracted_data.get('Buy_Component_Type')
-            extracted_data['Client_ID'] = normalized_client_id or extracted_data.get('Client_ID')
             extracted_data['cmi_validated'] = True
 
             print(f"  Using CMI contract values:")

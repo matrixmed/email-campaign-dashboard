@@ -45,44 +45,68 @@ def seed_cmi_contracts():
         Session = sessionmaker(bind=engine)
         session = Session()
 
-        existing = session.query(CMIContractValue).first()
-        if existing:
+        existing_count = session.query(CMIContractValue).count()
+        if existing_count > 0:
             session.close()
             return jsonify({
                 'status': 'success',
-                'message': 'CMI contracts already seeded. Skipping.',
+                'message': f'CMI contracts already seeded ({existing_count} records). Skipping.',
                 'count': 0
             }), 200
 
-        csv_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'CMI Contract Values - 2025.csv')
+        csv_files = [
+            ('CMI Contract Values - 2024.csv', 2024),
+            ('CMI Contract Values - 2025.csv', 2025),
+            ('CMI Contract Values - 2026.csv', 2026),
+        ]
 
-        with open(csv_file_path, 'r', encoding='utf-8') as file:
-            csv_reader = csv.DictReader(file)
-            contracts = []
+        total_inserted = 0
+        seen_ids = set()
 
-            for row in csv_reader:
-                contract = CMIContractValue(
-                    contract_number=row.get('Contract #', '').strip(),
-                    client=row.get('Client', '').strip(),
-                    brand=row.get('Brand', '').strip(),
-                    vehicle=row.get('Vehicle', '').strip(),
-                    placement_id=row.get('Placement ID', '').strip(),
-                    placement_description=row.get('Placement Description', '').strip(),
-                    buy_component_type=row.get('Buy Component Type', '').strip(),
-                    data_type=row.get('Data Type', '').strip(),
-                    notes=row.get('Notes', '').strip()
-                )
-                contracts.append(contract)
+        for csv_filename, year in csv_files:
+            csv_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), csv_filename)
 
-            session.bulk_save_objects(contracts)
-            session.commit()
-            count = len(contracts)
+            if not os.path.exists(csv_file_path):
+                continue
+
+            with open(csv_file_path, 'r', encoding='utf-8') as file:
+                csv_reader = csv.DictReader(file)
+                contracts = []
+
+                for row in csv_reader:
+                    placement_id = row.get('Placement ID', '').strip()
+
+                    if not placement_id or placement_id in seen_ids:
+                        continue
+
+                    seen_ids.add(placement_id)
+
+                    contract = CMIContractValue(
+                        contract_number=row.get('Contract #', '').strip(),
+                        client=row.get('Client', '').strip(),
+                        brand=row.get('Brand', '').strip(),
+                        vehicle=row.get('Vehicle', '').strip(),
+                        placement_id=placement_id,
+                        placement_description=row.get('Placement Description', '').strip(),
+                        buy_component_type=row.get('Buy Component Type', '').strip(),
+                        frequency=row.get('Frequency', '').strip(),
+                        metric=row.get('Metric', '').strip(),
+                        data_type=row.get('PLD Type', row.get('Data Type', '')).strip(),
+                        notes=row.get('Notes', '').strip(),
+                        year=year
+                    )
+                    contracts.append(contract)
+
+                if contracts:
+                    session.bulk_save_objects(contracts)
+                    session.commit()
+                    total_inserted += len(contracts)
 
         session.close()
         return jsonify({
             'status': 'success',
-            'message': f'Successfully seeded {count} CMI contracts from CSV',
-            'count': count
+            'message': f'Successfully seeded {total_inserted} CMI contracts from CSV files (2024, 2025, 2026)',
+            'count': total_inserted
         }), 200
 
     except Exception as e:

@@ -13,7 +13,7 @@ const BrandManagement = () => {
   const tableRefs = useRef({});
 
   const salesMembers = ['Emily', 'Courtney', 'Morgan', 'Dana'];
-  const brandFields = ['brand', 'agency', 'pharma_company'];
+  const brandFields = ['brand', 'agency', 'pharma_company', 'industry'];
 
   const fetchBrands = useCallback(async () => {
     setLoading(true);
@@ -169,6 +169,7 @@ const BrandManagement = () => {
           brand: brandName,
           agency: '',
           pharma_company: '',
+          industry: '',
           is_active: true
         })
       });
@@ -182,6 +183,7 @@ const BrandManagement = () => {
           brand: brandName,
           agency: '',
           pharma_company: '',
+          industry: '',
           is_active: true
         };
         setBrands(prev => [newBrand, ...prev]);
@@ -233,7 +235,8 @@ const BrandManagement = () => {
     return brandsList.filter(b =>
       (b.brand || '').toLowerCase().includes(search) ||
       (b.agency || '').toLowerCase().includes(search) ||
-      (b.pharma_company || '').toLowerCase().includes(search)
+      (b.pharma_company || '').toLowerCase().includes(search) ||
+      (b.industry || '').toLowerCase().includes(search)
     );
   };
 
@@ -281,7 +284,7 @@ const BrandManagement = () => {
       <td
         onClick={() => handleCellClick(brand.id, field, brand[field])}
         className={isEditing ? 'editing' : ''}
-        style={{ width: '25%' }}
+        style={{ width: '20%' }}
       >
         {isEditing ? (
           <input
@@ -338,6 +341,7 @@ const BrandManagement = () => {
             </td>
             <td className="agency-section-empty-cell"></td>
             <td className="agency-section-empty-cell"></td>
+            <td className="agency-section-empty-cell"></td>
             <td className="agency-section-action-cell">
               <button
                 onClick={() => handleAddBrand(editor)}
@@ -352,7 +356,8 @@ const BrandManagement = () => {
               {renderCell(brand, 'brand', brandsData)}
               {renderCell(brand, 'agency', brandsData)}
               {renderCell(brand, 'pharma_company', brandsData)}
-              <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
+              {renderCell(brand, 'industry', brandsData)}
+              <td className="actions-cell" style={{ width: '20%', textAlign: 'right', paddingRight: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
                   {renderMoveDropdown(brand)}
                   <button
@@ -367,13 +372,13 @@ const BrandManagement = () => {
           ))}
           {brandsData.length === 0 && (
             <tr>
-              <td colSpan="4" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
+              <td colSpan="5" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
                 No brands assigned
               </td>
             </tr>
           )}
           <tr className="agency-divider">
-            <td colSpan="4"></td>
+            <td colSpan="5"></td>
           </tr>
         </tbody>
       </table>
@@ -412,10 +417,11 @@ const BrandManagement = () => {
         <table className="reports-table">
           <thead>
             <tr>
-              <th style={{ width: '25%', fontSize: '18px' }}>Brand</th>
-              <th style={{ width: '25%', fontSize: '18px' }}>Agency</th>
-              <th style={{ width: '25%', fontSize: '18px' }}>Pharma Company</th>
-              <th style={{ width: '25%', textAlign: 'right', paddingRight: '16px', fontSize: '18px' }}>Actions</th>
+              <th style={{ width: '20%', fontSize: '18px' }}>Brand</th>
+              <th style={{ width: '20%', fontSize: '18px' }}>Agency</th>
+              <th style={{ width: '20%', fontSize: '18px' }}>Pharma Company</th>
+              <th style={{ width: '20%', fontSize: '18px' }}>Industry</th>
+              <th style={{ width: '20%', textAlign: 'right', paddingRight: '16px', fontSize: '18px' }}>Actions</th>
             </tr>
           </thead>
         </table>
@@ -432,6 +438,7 @@ const BrandManagement = () => {
               </td>
               <td className="agency-section-empty-cell"></td>
               <td className="agency-section-empty-cell"></td>
+              <td className="agency-section-empty-cell"></td>
               <td className="agency-section-action-cell"></td>
             </tr>
             {(() => {
@@ -441,7 +448,8 @@ const BrandManagement = () => {
                   {renderCell(brand, 'brand', unassignedBrands)}
                   {renderCell(brand, 'agency', unassignedBrands)}
                   {renderCell(brand, 'pharma_company', unassignedBrands)}
-                  <td className="actions-cell" style={{ width: '25%', textAlign: 'right', paddingRight: '16px' }}>
+                  {renderCell(brand, 'industry', unassignedBrands)}
+                  <td className="actions-cell" style={{ width: '20%', textAlign: 'right', paddingRight: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
                       {renderMoveDropdown(brand)}
                       <button
@@ -457,13 +465,13 @@ const BrandManagement = () => {
             })()}
             {getUnassignedBrands().length === 0 && (
               <tr>
-                <td colSpan="4" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
+                <td colSpan="5" style={{ textAlign: 'center', color: '#888', padding: '20px', fontStyle: 'italic' }}>
                   No unassigned brands
                 </td>
               </tr>
             )}
             <tr className="agency-divider">
-              <td colSpan="7"></td>
+              <td colSpan="5"></td>
             </tr>
           </tbody>
         </table>

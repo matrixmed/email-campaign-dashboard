@@ -29,6 +29,7 @@ def get_all_brands():
             'brand': b.brand,
             'agency': b.agency,
             'pharma_company': b.pharma_company,
+            'industry': b.industry,
             'is_active': b.is_active
         } for b in brands]
 
@@ -75,6 +76,7 @@ def create_brand_entry():
             brand=data.get('brand'),
             agency=data.get('agency'),
             pharma_company=data.get('pharma_company'),
+            industry=data.get('industry'),
             is_active=data.get('is_active', True)
         )
 
@@ -119,6 +121,8 @@ def update_brand_entry(entry_id):
             entry.agency = data['agency']
         if 'pharma_company' in data:
             entry.pharma_company = data['pharma_company']
+        if 'industry' in data:
+            entry.industry = data['industry']
         if 'is_active' in data:
             entry.is_active = data['is_active']
 

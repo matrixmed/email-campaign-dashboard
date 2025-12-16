@@ -254,14 +254,27 @@ def get_no_data_reports():
             if has_data:
                 matched_reports.append(report_data)
             else:
-                has_pld = 'PLD' in group['data_types'] or 'DETAIL' in group['data_types']
-                has_agg = 'AGG' in group['data_types'] or 'AGGREGATE' in group['data_types']
+                contract_data_type = (contract.data_type or '').upper() if contract else ''
 
-                if has_pld:
-                    pld_and_agg.append(report_data)
-                elif has_agg:
-                    report_data['is_agg_only'] = True
-                    agg_only.append(report_data)
+                if contract_data_type:
+                    if contract_data_type == 'AGG':
+                        report_data['is_agg_only'] = True
+                        agg_only.append(report_data)
+                    elif contract_data_type in ('PLD & AGG', 'PLD AND AGG', 'PLD&AGG'):
+                        pld_and_agg.append(report_data)
+                    elif contract_data_type == 'PLD':
+                        pld_and_agg.append(report_data)
+                    else:
+                        pld_and_agg.append(report_data)
+                else:
+                    has_pld = 'PLD' in group['data_types'] or 'DETAIL' in group['data_types']
+                    has_agg = 'AGG' in group['data_types'] or 'AGGREGATE' in group['data_types']
+
+                    if has_pld:
+                        pld_and_agg.append(report_data)
+                    elif has_agg:
+                        report_data['is_agg_only'] = True
+                        agg_only.append(report_data)
 
         pld_and_agg.sort(key=lambda x: (x.get('brand') or '').lower())
         agg_only.sort(key=lambda x: (x.get('brand') or '').lower())

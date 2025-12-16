@@ -171,6 +171,7 @@ class BrandEditorAgency(Base):
     brand = Column(String(255), nullable=False, index=True)
     agency = Column(String(255))
     pharma_company = Column(String(255))
+    industry = Column(String(255))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

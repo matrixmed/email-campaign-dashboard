@@ -2082,7 +2082,7 @@ const ReportsManager = () => {
                                 {getNoDataReportsByType.aggOnly.length > 0 && (
                                     <div className="no-data-reports-section" style={{ marginTop: '40px' }}>
                                         <div className="reports-section-header">
-                                            <h3>No Data to Report - AGG Only (Unassigned)</h3>
+                                            <h3>No Data to Report - AGG Only</h3>
                                             <div className="reports-header-stats">
                                                 <span className="reports-header-stat-item">
                                                     <span className="reports-header-stat-label">Total:</span>

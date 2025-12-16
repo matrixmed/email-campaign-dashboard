@@ -103,7 +103,7 @@ const CampaignBenchmarks = () => {
             return (
               <div key={metric} className="benchmark-card">
                 <h4>{metricName}</h4>
-                <div className="metric-value">{data.your_value?.toFixed(1)}%</div>
+                <div className="benchmark-metric-value">{data.your_value?.toFixed(1)}%</div>
                 <div className="benchmark-bar-container">
                   <div className="benchmark-bar-labels">
                     <span className="range-min">Min: {data.min?.toFixed(1)}%</span>

@@ -1024,7 +1024,7 @@ tr.overdue-row:hover {
   color: #60a5fa;
 }
 
-.metric-value {
+.reports-metric-value {
   display: inline-block;
   padding: 2px 8px;
   background: rgba(139, 92, 246, 0.15);
@@ -1066,7 +1066,7 @@ body.light .frequency-badge {
   color: #2563eb;
 }
 
-body.light .metric-value {
+body.light .reports-metric-value {
   background: rgba(139, 92, 246, 0.1);
   color: #7c3aed;
 }

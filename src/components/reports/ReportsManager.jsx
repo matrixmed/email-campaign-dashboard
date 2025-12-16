@@ -58,7 +58,7 @@ const ReportsManager = () => {
     const cleanCampaignName = (name) => {
         if (!name) return name;
         let cleaned = name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
-        cleaned = cleaned.replace(/[():#]/g, '').trim();
+        cleaned = cleaned.replace(/[():#']/g, '').trim();
         return cleaned;
     };
 
@@ -1074,7 +1074,7 @@ const ReportsManager = () => {
 
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1109,7 +1109,7 @@ const ReportsManager = () => {
 
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1155,7 +1155,7 @@ const ReportsManager = () => {
 
     const generateOrthoJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1193,7 +1193,7 @@ const ReportsManager = () => {
 
     const generateDefaultJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#]/g, '').trim();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1612,7 +1612,7 @@ const ReportsManager = () => {
                     {frequency && <span className={`frequency-badge frequency-${frequency.toLowerCase()}`}>{frequency}</span>}
                 </td>
                 <td className="no-data-metric-column">
-                    {metric && <span className="metric-value">{metric}</span>}
+                    {metric && <span className="reports-metric-value">{metric}</span>}
                 </td>
                 <td className="no-data-notes-column">
                     {notes && (

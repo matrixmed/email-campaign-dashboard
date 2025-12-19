@@ -11,7 +11,7 @@ import TitleComponent from './TitleComponent';
 import GroupComponent from './template/GroupComponent';
 import SpecialtyKPIStrips from './SpecialtyKPIStrips';
 import { useDragDrop } from './hooks/useDragDrop';
-import { exportDashboard } from './utils/exportUtils';
+import { exportDashboard, exportAsPDF } from './utils/exportUtils';
 import { calculateAlignmentGuides, AlignmentGuides } from './template/AlignmentGuides';
 import { createGroup, ungroupComponents, getComponentsInRect, SelectionBox, MultiSelectToolbar } from './template/ComponentGrouping';
 import TemplateSelectionModal from './TemplateSelectionModal';
@@ -875,22 +875,18 @@ const DashboardCanvasContent = () => {
   const handleExportScreenshot = useCallback(async () => {
     if (!canvasRef.current) return;
 
-    let dashboardName;
-    if (selectedCampaign) {
-      dashboardName = selectedCampaign.campaign_name;
-    } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
-      const campaignNames = selectedMultiCampaigns.map(c => c.campaign_name).slice(0, 2).join(' + ');
-      dashboardName = selectedMultiCampaigns.length > 2 ?
-        `${campaignNames} + ${selectedMultiCampaigns.length - 2} more` : campaignNames;
-    } else {
-      return;
-    }
+    const titleCard = cards.find(card => card.type === 'title');
+    const dashboardName = titleCard?.title || (selectedCampaign
+      ? selectedCampaign.campaign_name
+      : selectedMultiCampaigns && selectedMultiCampaigns.length > 0
+        ? `Multi: ${selectedMultiCampaigns.map(c => c.campaign_name).join(', ')}`
+        : 'Dashboard');
 
-    const result = await exportDashboard(canvasRef, dashboardName);
+    const result = await exportAsPDF(canvasRef, dashboardName);
 
     if (!result.success) {
     }
-  }, [selectedCampaign, selectedMultiCampaigns]);
+  }, [cards, selectedCampaign, selectedMultiCampaigns]);
 
   const { drop, isOver, canDrop, getDropZoneStyles, createDraggableMetric } = useDragDrop(
     cards,

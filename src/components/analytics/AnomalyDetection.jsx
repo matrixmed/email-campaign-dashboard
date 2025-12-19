@@ -2,16 +2,50 @@ import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import '../../styles/AnomalyDetection.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
+import { API_BASE_URL } from '../../config/api';
 
-const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
+const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy = 'content' }) => {
   const [anomalies, setAnomalies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showOverperforming, setShowOverperforming] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [brandIndustryMap, setBrandIndustryMap] = useState({});
+  const [brands, setBrands] = useState([]);
+
+  useEffect(() => {
+    const fetchBrandData = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/brand-management`);
+        const data = await response.json();
+        if (data.status === 'success' && data.brands) {
+          const mapping = {};
+          const brandNames = [];
+          data.brands.forEach(b => {
+            if (b.brand) {
+              brandNames.push(b.brand);
+              if (b.industry) {
+                const brandLower = b.brand.toLowerCase();
+                mapping[brandLower] = b.industry;
+                const firstWord = brandLower.split(/\s+/)[0];
+                if (firstWord && firstWord !== brandLower && !mapping[firstWord]) {
+                  mapping[firstWord] = b.industry;
+                }
+              }
+            }
+          });
+          setBrandIndustryMap(mapping);
+          setBrands(brandNames);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch brand data for industry mapping:', error);
+      }
+    };
+    fetchBrandData();
+  }, []);
 
   useEffect(() => {
     fetchAndAnalyzeAnomalies();
-  }, [detectBySubtopic, showOverperforming]);
+  }, [detectByDisease, showOverperforming, analyzeBy, brandIndustryMap, brands]);
 
   const cleanCampaignName = (name) => {
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
@@ -41,15 +75,6 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
     ]
   };
 
-  const BRANDS = [
-    "Bimzelx", "Adbry", "Breyanzi", "Calquence", "Aquaphor", "Cabometyx",
-    "Carvykti", "Cabtreo", "Claritin", "Castle", "Delgocitinib", "Gvoke VialDx",
-    "Imfinzi", "Eucerin", "Phesgo", "One Lung", "Imlunestrant", "Signia",
-    "Opzelura", "Kisunla", "Uplizna", "Tagrisso", "Leqselvi", "Vabysmo",
-    "Verzenio", "Neutrogena", "Rinvoq", "Skinbetter", "Skinceuticals",
-    "Skyrizi", "Spevigo", "Truqap", "Winlevi", "Zoryve"
-  ];
-
   const extractBucketAndTopic = (campaignName) => {
     const name = campaignName.toLowerCase();
 
@@ -69,7 +94,7 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
     }
 
     if (bucket === 'Custom Email') {
-      for (const brand of BRANDS) {
+      for (const brand of brands) {
         if (name.includes(brand.toLowerCase())) {
           return { bucket, topic: brand };
         }
@@ -127,15 +152,61 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
     return { bucket, topic: 'Other' };
   };
 
+  const extractIndustryAndDisease = (campaignName) => {
+    const name = campaignName.toLowerCase();
+
+    let matchedIndustry = null;
+    let matchedBrand = null;
+
+    for (const [brand, industry] of Object.entries(brandIndustryMap)) {
+      if (name.includes(brand)) {
+        if (!matchedBrand || brand.length > matchedBrand.length) {
+          matchedBrand = brand;
+          matchedIndustry = industry;
+        }
+      }
+    }
+
+    if (!matchedIndustry) {
+      return { industry: null, disease: 'Other' };
+    }
+
+    const { topic } = extractBucketAndTopic(campaignName);
+
+    return { industry: matchedIndustry, disease: topic !== 'Other' ? topic : matchedBrand };
+  };
+
   const fetchAndAnalyzeAnomalies = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
-      const campaignsData = await response.json();
+      const completedResponse = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
+      const completedData = await completedResponse.json();
+
+      let liveData = [];
+      try {
+        const liveResponse = await fetch('https://emaildash.blob.core.windows.net/json-data/live_campaign_metrics.json?sp=r&st=2025-02-05T20:36:54Z&se=2026-07-31T03:36:54Z&spr=https&sv=2022-11-02&sr=b&sig=7Ywfk4UlVByj1PeeOo%2BjdliKQSVAWYDU5ZR%2Fcrc7eBE%3D');
+        liveData = await liveResponse.json();
+        if (!Array.isArray(liveData)) liveData = [];
+      } catch (e) {
+        console.warn('Failed to fetch live campaigns, continuing with completed only:', e);
+      }
+
+      const completedCampaigns = completedData.map(c => ({ ...c, isLive: false }));
+      const liveCampaigns = liveData
+        .filter(c => c.Sent > 0 && c.Delivered > 20 && c.Unique_Opens !== "NA")
+        .map(c => {
+          const delivered = parseFloat(c.Delivered) || 0;
+          const uniqueOpens = parseFloat(c.Unique_Opens) || 0;
+          const uniqueOpenRate = delivered > 0 ? (uniqueOpens / delivered) * 100 : 0;
+          return { ...c, isLive: true, Unique_Open_Rate: uniqueOpenRate };
+        });
+
+      const campaignsData = [...completedCampaigns, ...liveCampaigns];
 
       const cutoffDate = new Date('2025-02-01');
       const validDeliveries = campaignsData.filter(item => {
         if ((item.Delivered || 0) < 100) return false;
+        if (item.isLive) return true;
         if (!item.Send_Date) return false;
         const sendDate = new Date(item.Send_Date);
         return sendDate >= cutoffDate;
@@ -143,8 +214,10 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
       const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
 
       const combinedCampaigns = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
+        const isLive = deployments.some(d => d.isLive);
+
         if (deployments.length === 1) {
-          return { ...deployments[0], CleanedName: campaignName };
+          return { ...deployments[0], CleanedName: campaignName, isLive };
         }
 
         const deployment1 = deployments.find(d => {
@@ -162,30 +235,62 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
           Send_Date: baseDeployment.Send_Date,
           Delivered: totalDelivered,
           Unique_Opens: totalUniqueOpens,
-          Unique_Open_Rate: totalDelivered > 0 ? (totalUniqueOpens / totalDelivered) * 100 : 0
+          Unique_Open_Rate: totalDelivered > 0 ? (totalUniqueOpens / totalDelivered) * 100 : 0,
+          isLive
         };
       });
 
-      const campaignsWithBucket = combinedCampaigns
-        .map(c => {
-          const { bucket, topic } = extractBucketAndTopic(c.CleanedName);
-          return { ...c, Bucket: bucket, Topic: topic };
-        })
-        .filter(c => c.Topic !== 'Other');
+      let processedCampaigns;
 
-      const bucketized = _.groupBy(campaignsWithBucket, 'Bucket');
+      if (analyzeBy === 'industry') {
+        processedCampaigns = combinedCampaigns
+          .map(c => {
+            const { industry, disease } = extractIndustryAndDisease(c.CleanedName);
+            const { topic } = extractBucketAndTopic(c.CleanedName);
+            return {
+              ...c,
+              Industry: industry,
+              Disease: disease !== 'Other' ? disease : topic,
+              Bucket: industry || 'Unknown',
+              Topic: disease !== 'Other' ? disease : topic
+            };
+          })
+          .filter(c => c.Industry !== null);
+      } else {
+        processedCampaigns = combinedCampaigns
+          .map(c => {
+            const { bucket, topic } = extractBucketAndTopic(c.CleanedName);
+            return { ...c, Bucket: bucket, Topic: topic, Disease: topic };
+          })
+          .filter(c => c.Topic !== 'Other');
+      }
+
+      const primaryGroupKey = analyzeBy === 'industry' ? 'Industry' : 'Bucket';
+      const primaryGroups = _.groupBy(processedCampaigns, primaryGroupKey);
       const allAnomalies = [];
+
+      if (analyzeBy === 'industry') {
+        console.log('=== INDUSTRY MODE DEBUG ===');
+        console.log('Brand map size:', Object.keys(brandIndustryMap).length);
+        console.log('Processed campaigns:', processedCampaigns.length);
+        console.log('Industries found:', Object.keys(primaryGroups));
+        Object.entries(primaryGroups).forEach(([ind, camps]) => {
+          const completed = camps.filter(c => !c.isLive).length;
+          console.log(`  ${ind}: ${camps.length} total, ${completed} completed`);
+        });
+      }
 
       const zThreshold = showOverperforming ? 1.5 : -1.5;
 
-      Object.entries(bucketized).forEach(([bucket, bucketCampaigns]) => {
-        const topicGroups = _.groupBy(bucketCampaigns, 'Topic');
+      Object.entries(primaryGroups).forEach(([groupName, groupCampaigns]) => {
+        const diseaseGroups = _.groupBy(groupCampaigns, 'Disease');
 
-        if (detectBySubtopic) {
-          Object.entries(topicGroups).forEach(([topic, campaigns]) => {
-            if (campaigns.length < 5) return;
+        if (detectByDisease) {
+          Object.entries(diseaseGroups).forEach(([disease, campaigns]) => {
+            const completedCampaignsInGroup = campaigns.filter(c => !c.isLive);
+            if (completedCampaignsInGroup.length < 5) return;
 
-            const openRates = campaigns.map(c => c.Unique_Open_Rate).filter(r => r != null);
+            const openRates = completedCampaignsInGroup.map(c => c.Unique_Open_Rate).filter(r => r != null);
             const mean = _.mean(openRates);
             const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
 
@@ -204,12 +309,13 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
             });
           });
         } else {
-          if (bucketCampaigns.length >= 5) {
-            const openRates = bucketCampaigns.map(c => c.Unique_Open_Rate).filter(r => r != null);
+          const completedCampaignsInGroup = groupCampaigns.filter(c => !c.isLive);
+          if (completedCampaignsInGroup.length >= 5) {
+            const openRates = completedCampaignsInGroup.map(c => c.Unique_Open_Rate).filter(r => r != null);
             const mean = _.mean(openRates);
             const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
 
-            bucketCampaigns.forEach(campaign => {
+            groupCampaigns.forEach(campaign => {
               const zScore = (campaign.Unique_Open_Rate - mean) / (stdDev || 1);
               const isAnomaly = showOverperforming ? zScore > zThreshold : zScore < zThreshold;
               if (isAnomaly) {
@@ -226,11 +332,15 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
         }
       });
 
-      if (showOverperforming) {
-        allAnomalies.sort((a, b) => b.zScore - a.zScore);
-      } else {
-        allAnomalies.sort((a, b) => a.zScore - b.zScore);
-      }
+      allAnomalies.sort((a, b) => {
+        if (a.isLive && !b.isLive) return -1;
+        if (!a.isLive && b.isLive) return 1;
+        if (showOverperforming) {
+          return b.zScore - a.zScore;
+        } else {
+          return a.zScore - b.zScore;
+        }
+      });
 
       setAnomalies(allAnomalies);
     } catch (error) {
@@ -285,22 +395,18 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
             </svg>
             {showTooltip && (
               <div className="topics-tooltip">
-                <div className="tooltip-title">Topics & Subtopics</div>
+                <div className="tooltip-title">Anomaly Detection Categories</div>
                 <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Clinical Updates</div>
-                  <div className="tooltip-subtopics">Allergy & Pulmonology, Breast Cancer, Cardiology, Colorectal Surgery, Diabetes, Gastroenterology, GPP, Infectious Disease, Neonatology, Neuroscience, Oncology, Ophthalmology, Acne</div>
+                  <div className="tooltip-topic-header">Content Types</div>
+                  <div className="tooltip-subtopics">Clinical Updates, Expert Perspectives, Hot Topics, Custom Email</div>
                 </div>
                 <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Expert Perspectives</div>
-                  <div className="tooltip-subtopics">RCC, Vitiligo, Skincare Science, Melanoma, GPP, Atopic Dermatitis, Multiple Myeloma</div>
+                  <div className="tooltip-topic-header">Industries</div>
+                  <div className="tooltip-subtopics">Oncology, Dermatology, Neurology, Allergy, Endocrinology, Hematology, Bariatrics, Ophthalmology, Immunology</div>
                 </div>
                 <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Hot Topics</div>
-                  <div className="tooltip-subtopics">Alzheimers, Breast Cancer, MCL, NSCLC, Melanoma, Multiple Myeloma, Ophthalmology, Pigmented Lesions, CLL, Inflammatory Diseases, Metastatic Breast Cancer</div>
-                </div>
-                <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Custom Email</div>
-                  <div className="tooltip-subtopics">Brand-specific campaigns</div>
+                  <div className="tooltip-topic-header">Diseases</div>
+                  <div className="tooltip-subtopics">Acne, Allergy & Pulmonology, Alzheimers, Atopic Dermatitis, Breast Cancer, Cardiology, CLL, Colorectal Surgery, Diabetes, Gastroenterology, GPP, Infectious Disease, Inflammatory Diseases, MCL, Melanoma, Metastatic Breast Cancer, Multiple Myeloma, Neonatology, Neuroscience, NSCLC, Oncology, Ophthalmology, Pigmented Lesions, RCC, Skincare Science, Vitiligo</div>
                 </div>
               </div>
             )}
@@ -332,7 +438,19 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
       ) : filteredAnomalies.length > 0 ? (
         <div className="anomalies-grid">
           {filteredAnomalies.map((anomaly, idx) => (
-            <div key={idx} className={`anomaly-card ${showOverperforming ? 'overperforming' : ''}`}>
+            <div
+              key={idx}
+              className={`anomaly-card ${showOverperforming ? 'overperforming' : ''} ${anomaly.isLive ? 'live-campaign' : ''}`}
+              style={anomaly.isLive ? {
+                borderColor: showOverperforming ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 107, 107, 0.5)',
+                boxShadow: showOverperforming
+                  ? '0 0 0 1px rgba(76, 175, 80, 0.3)'
+                  : '0 0 0 1px rgba(255, 107, 107, 0.3)'
+              } : {}}
+            >
+              {anomaly.isLive && (
+                <div className="live-badge">LIVE</div>
+              )}
               <div className="anomaly-card-header">
                 <span className={`anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
                   {getSeverityLabel(anomaly.zScore)}
@@ -351,7 +469,9 @@ const AnomalyDetection = ({ searchTerm = '', detectBySubtopic = false }) => {
                   </span>
                 </div>
                 <div className="anomaly-metric">
-                  <span className="anomaly-metric-label">{detectBySubtopic ? 'Subtopic' : 'Topic'} Average</span>
+                  <span className="anomaly-metric-label">
+                    {detectByDisease ? 'Disease' : (analyzeBy === 'industry' ? 'Industry' : 'Content')} Average
+                  </span>
                   <span className="anomaly-metric-value">
                     {anomaly.topicMean.toFixed(2)}%
                   </span>

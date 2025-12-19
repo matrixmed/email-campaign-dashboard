@@ -66,7 +66,7 @@ class CampaignReportingMetadata(Base):
     campaign_name = Column(String(255), nullable=False)
     send_date = Column(Date, index=True)
 
-    client_id = Column(String(100))
+    client_id = Column(Boolean, default=False)
     cmi_placement_id = Column(String(100))
     client_placement_id = Column(String(100))
     placement_description = Column(Text)
@@ -77,15 +77,14 @@ class CampaignReportingMetadata(Base):
     campaign_name_from_file = Column(String(255))
 
     creative_code = Column(String(100))
-    gcm_placement_id = Column(String(100))
-    gcm_placement_id2 = Column(String(100))
+    gcm_placement_id = Column(Text)
+    gcm_placement_id_array = Column(Text)
+    gcm_placement_id_description = Column(Text)
     buy_component_type = Column(String(100))
     contract_number = Column(String(50))
+    media_tactic_id = Column(String(100))
     ad_count = Column(Integer)
 
-    target_list_path = Column(String(500))
-    tags_path = Column(String(500))
-    ad_images_path = Column(String(500))
     raw_metadata = Column(JSON)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -221,6 +220,7 @@ class CampaignReportManager(Base):
     is_submitted = Column(Boolean, default=False, index=True)
     submitted_at = Column(DateTime)
     submitted_by = Column(String(100))
+    is_not_needed = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

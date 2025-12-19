@@ -6,7 +6,8 @@ const CampaignBenchmarks = () => {
   const [loading, setLoading] = useState(false);
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [filterByTopic, setFilterByTopic] = useState(false);
+  const [analyzeBy, setAnalyzeBy] = useState('content');
+  const [filterByDisease, setFilterByDisease] = useState(false);
   const [activeTab, setActiveTab] = useState('performance');
   const [hasRun, setHasRun] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
@@ -48,7 +49,8 @@ const CampaignBenchmarks = () => {
           campaign_id: selectedCampaign?.campaign_id?.[0] || null,
           campaign_name: selectedCampaign?.campaign_name || null,
           filters: {
-            filter_by_topic: filterByTopic
+            analyze_by: analyzeBy,
+            filter_by_disease: filterByDisease
           }
         })
       });
@@ -133,7 +135,7 @@ const CampaignBenchmarks = () => {
         </div>
 
         <div className="comparison-summary">
-          <p>Based on <strong>{similar_count}</strong> similar campaigns in <strong>{classification?.bucket || 'this category'}</strong>{filterByTopic && classification?.topic ? ` > ${classification.topic}` : ''}</p>
+          <p>Based on <strong>{similar_count}</strong> similar campaigns in <strong>{classification?.bucket || 'this category'}</strong>{filterByDisease && classification?.topic ? ` > ${classification.topic}` : ''}</p>
         </div>
       </div>
     );
@@ -165,7 +167,7 @@ const CampaignBenchmarks = () => {
     return (
       <div className="similar-campaigns-container">
         <h3>Similar Campaigns</h3>
-        <p className="section-subtitle">Campaigns matching the bucket{filterByTopic ? ' and topic' : ''}</p>
+        <p className="section-subtitle">Campaigns matching the {analyzeBy === 'industry' ? 'industry' : 'content type'}{filterByDisease ? ' and disease' : ''}</p>
 
         <div className="campaigns-table-wrapper">
           <table className="campaigns-table">
@@ -251,31 +253,47 @@ const CampaignBenchmarks = () => {
   return (
     <div className="campaign-benchmarks">
       <div className="benchmark-filters">
-        <div className="filter-row">
-          <div className="filter-group campaign-select">
-            <label className="filter-label">Select Campaign</label>
+        <button
+          type="button"
+          className="selector-button full-width"
+          onClick={() => setShowCampaignSelector(true)}
+        >
+          {selectedCampaign
+            ? selectedCampaign.campaign_name
+            : 'Choose a Campaign'
+          }
+        </button>
+
+        <div className="analyze-toggles-row">
+          <span className="toggle-label">Group by</span>
+          <div className="benchmark-mode-toggle">
             <button
-              type="button"
-              className="selector-button"
-              onClick={() => setShowCampaignSelector(true)}
+              className={`mode-toggle-btn ${analyzeBy === 'content' ? 'active' : ''}`}
+              onClick={() => setAnalyzeBy('content')}
             >
-              {selectedCampaign
-                ? selectedCampaign.campaign_name
-                : 'Choose a Campaign'
-              }
+              Content
+            </button>
+            <button
+              className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
+              onClick={() => setAnalyzeBy('industry')}
+            >
+              Industry
             </button>
           </div>
-
-          <div className="filter-group topic-toggle">
-            <label className="filter-label">Filter by Subtopic</label>
-            <label className="campaign-benchmark-toggle-switch">
-              <input
-                type="checkbox"
-                checked={filterByTopic}
-                onChange={(e) => setFilterByTopic(e.target.checked)}
-              />
-              <span className="toggle-slider"></span>
-            </label>
+          <span className="toggle-arrow">→</span>
+          <div className="benchmark-mode-toggle">
+            <button
+              className={`mode-toggle-btn ${!filterByDisease ? 'active' : ''}`}
+              onClick={() => setFilterByDisease(false)}
+            >
+              All
+            </button>
+            <button
+              className={`mode-toggle-btn ${filterByDisease ? 'active' : ''}`}
+              onClick={() => setFilterByDisease(true)}
+            >
+              By Disease
+            </button>
           </div>
         </div>
 
@@ -283,6 +301,7 @@ const CampaignBenchmarks = () => {
           <button
             className="run-analysis-button"
             onClick={fetchBenchmarkData}
+            disabled={loading}
           >
             {loading ? 'Running...' : 'Run'}
           </button>

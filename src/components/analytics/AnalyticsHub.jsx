@@ -13,7 +13,8 @@ const AnalyticsHub = () => {
   const [activeView, setActiveView] = useState('monthly');
   const [searchTerm, setSearchTerm] = useState(searchTerms.campaignAnalytics || '');
   const [selectedMetric, setSelectedMetric] = useState('Unique_Open_Rate');
-  const [detectBySubtopic, setDetectBySubtopic] = useState(false);
+  const [analyzeBy, setAnalyzeBy] = useState('content');
+  const [detectByDisease, setDetectByDisease] = useState(false);
   const [monthlyDropdownOpen, setMonthlyDropdownOpen] = useState(false);
   const [yearlyDropdownOpen, setYearlyDropdownOpen] = useState(false);
   const [selectedYearlyMetrics, setSelectedYearlyMetrics] = useState(['Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate']);
@@ -241,16 +242,37 @@ const AnalyticsHub = () => {
           )}
 
           {activeView === 'anomaly' && (
-            <div className="metric-selector">
-              <label htmlFor="anomaly-toggle">Analyze by Subtopic:</label>
-              <label className="anomaly-toggle-switch" style={{ marginLeft: '8px' }}>
-                <input
-                  type="checkbox"
-                  checked={detectBySubtopic}
-                  onChange={(e) => setDetectBySubtopic(e.target.checked)}
-                />
-                <span className="anomaly-toggle-slider"></span>
-              </label>
+            <div className="metric-selector anomaly-controls">
+              <span className="control-label">Group by</span>
+              <div className="anomaly-mode-toggle">
+                <button
+                  className={`mode-toggle-btn ${analyzeBy === 'content' ? 'active' : ''}`}
+                  onClick={() => setAnalyzeBy('content')}
+                >
+                  Content
+                </button>
+                <button
+                  className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
+                  onClick={() => setAnalyzeBy('industry')}
+                >
+                  Industry
+                </button>
+              </div>
+              <span className="control-divider">→</span>
+              <div className="anomaly-mode-toggle">
+                <button
+                  className={`mode-toggle-btn ${!detectByDisease ? 'active' : ''}`}
+                  onClick={() => setDetectByDisease(false)}
+                >
+                  All
+                </button>
+                <button
+                  className={`mode-toggle-btn ${detectByDisease ? 'active' : ''}`}
+                  onClick={() => setDetectByDisease(true)}
+                >
+                  By Disease
+                </button>
+              </div>
             </div>
           )}
 
@@ -274,7 +296,7 @@ const AnalyticsHub = () => {
           <YearlyTrends searchTerm={searchTerm} selectedMetrics={selectedYearlyMetrics} />
         </div>
         <div style={{ display: activeView === 'anomaly' ? 'block' : 'none' }}>
-          <AnomalyDetection searchTerm={searchTerm} detectBySubtopic={detectBySubtopic} />
+          <AnomalyDetection searchTerm={searchTerm} detectByDisease={detectByDisease} analyzeBy={analyzeBy} />
         </div>
 
         {visitedTabs.timing && (

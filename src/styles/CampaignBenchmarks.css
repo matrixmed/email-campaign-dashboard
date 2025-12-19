@@ -21,12 +21,29 @@
 .benchmark-filters {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   background: var(--color-bg-card, #2a2a2d);
   border: 1px solid var(--color-border, #333336);
   border-radius: var(--radius-md, 8px);
-  padding: 24px;
+  padding: 20px;
   margin-bottom: 24px;
+}
+
+.benchmark-filters .selector-button.full-width {
+  width: 100%;
+}
+
+.analyze-toggles-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toggle-label {
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .filter-row {
@@ -56,6 +73,49 @@
 .filter-group.topic-toggle {
   flex: 0 0 auto;
   min-width: auto;
+}
+
+.filter-group.analyze-toggles {
+  flex: 0 0 auto;
+  min-width: auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.benchmark-mode-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--color-bg-elevated, #1e1e20);
+  border-radius: 6px;
+  padding: 3px;
+  border: 1px solid var(--color-border, #333336);
+}
+
+.benchmark-mode-toggle .mode-toggle-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.benchmark-mode-toggle .mode-toggle-btn:hover {
+  color: #fff;
+}
+
+.benchmark-mode-toggle .mode-toggle-btn.active {
+  background: var(--color-bg-card, #2a2a2d);
+  color: #fff;
+}
+
+.toggle-arrow {
+  color: #555;
+  font-size: 14px;
 }
 
 .filter-group label {
@@ -175,14 +235,13 @@
   background: var(--color-table-header, #1a4d7a);
   color: white;
   border: none;
-  padding: 10px 24px;
+  padding: 8px 22px;
   border-radius: var(--radius-sm, 4px);
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
+  min-width: 140px;
 }
 
 .run-analysis-button:hover:not(:disabled) {

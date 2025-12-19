@@ -413,7 +413,7 @@ const TableComponent = ({
   };
 
   const isCampaignComparisonTable = id === 'campaign-comparison-table';
-  
+
   const tableStyle = {
     position: 'absolute',
     left: position.x,
@@ -439,7 +439,7 @@ const TableComponent = ({
   };
 
   const titleStyle = {
-    fontSize: Math.max(12, Math.min(18, position.width / 25)),
+    fontSize: Math.min(14, Math.max(10, position.width / 30)),
     fontWeight: '700',
     color: style.color || '#2c3e50',
     marginBottom: isCampaignComparisonTable ? '2px' : '9px',
@@ -457,11 +457,15 @@ const TableComponent = ({
     padding: '0'
   };
 
+  const numCols = tableData[0]?.length || 3;
+  const availableWidthPerCol = (position.width - 20) / numCols;
+  const calculatedFontSize = Math.min(12, Math.max(8, availableWidthPerCol / 7));
+
   const actualTableStyle = {
     width: '100%',
     height: '100%',
     borderCollapse: 'collapse',
-    fontSize: 12,
+    fontSize: calculatedFontSize,
     tableLayout: 'fixed'
   };
 

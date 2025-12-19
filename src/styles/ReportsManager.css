@@ -392,6 +392,35 @@
   border: 1px solid #555;
 }
 
+.agency-badge.clickable-agency {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.agency-badge.clickable-agency:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+
+.agency-badge.not-needed {
+  background-color: rgba(255, 100, 100, 0.3) !important;
+  border-color: #ff6464 !important;
+  color: #ff6464 !important;
+}
+
+.report-row.not-needed-row {
+  background-color: rgba(255, 80, 80, 0.08) !important;
+}
+
+.report-row.not-needed-row td {
+  opacity: 0.7;
+}
+
+.report-row.not-needed-row .reports-campaign-name {
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 100, 100, 0.5);
+}
+
 .date-column-report {
   font-family: 'Courier New', monospace;
 }
@@ -2415,6 +2444,96 @@ body.light .pld-agg-move-btn {
   color: #fff;
 }
 
+.modal-view-toggle-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+
+.modal-view-toggle-bar .toggle-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-view-toggle-bar .toggle-btn:hover {
+  color: #fff;
+  border-color: #555;
+}
+
+.modal-view-toggle-bar .toggle-btn.active {
+  background: linear-gradient(135deg, #0ff 0%, #0cc 100%);
+  border-color: #0ff;
+  color: #000;
+  font-weight: 600;
+}
+
+.json-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.json-view-container .json-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.json-view-container .json-modal-code {
+  background: #0d0d0f;
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+.json-view-container .json-modal-code pre {
+  margin: 0;
+  font-size: 12px;
+  color: #0ff;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+body.light .modal-view-toggle-bar {
+  background: #f5f5f5;
+  border-color: #e5e7eb;
+}
+
+body.light .modal-view-toggle-bar .toggle-btn {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #666;
+}
+
+body.light .modal-view-toggle-bar .toggle-btn:hover {
+  color: #111;
+  border-color: #999;
+}
+
+body.light .modal-view-toggle-bar .toggle-btn.active {
+  background: linear-gradient(135deg, #0cc 0%, #0aa 100%);
+  border-color: #0cc;
+  color: #fff;
+}
+
+body.light .json-view-container .json-modal-code {
+  background: #f5f5f5;
+}
+
+body.light .json-view-container .json-modal-code pre {
+  color: #0099aa;
+}
+
 .edit-form-modal-close {
   background: transparent;
   border: none;
@@ -2682,4 +2801,188 @@ body.light .gcm-file-input {
   background-color: #f9fafb;
   border-color: #d1d5db;
   color: #111;
+}
+
+.gcm-selection-modal {
+  max-width: 700px;
+  max-height: 80vh;
+}
+
+.gcm-selection-hint {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.gcm-selection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.gcm-selection-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background-color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gcm-selection-item:hover {
+  border-color: #4b5563;
+  background-color: #263040;
+}
+
+.gcm-selection-item.selected {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.gcm-selection-checkbox {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #4b5563;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.gcm-selection-item.selected .gcm-selection-checkbox {
+  border-color: #3b82f6;
+  background-color: #3b82f6;
+  color: #fff;
+}
+
+.gcm-selection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.gcm-selection-id {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-bottom: 4px;
+}
+
+.gcm-selection-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+body.light .gcm-selection-hint {
+  color: #666;
+}
+
+body.light .gcm-selection-item {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+body.light .gcm-selection-item:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+body.light .gcm-selection-item.selected {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+body.light .gcm-selection-checkbox {
+  border-color: #d1d5db;
+}
+
+body.light .gcm-selection-id {
+  color: #111;
+}
+
+body.light .gcm-selection-desc {
+  color: #666;
+}
+
+.gcm-selection-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed #0ff;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #0ff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gcm-selection-btn:hover {
+  background-color: rgba(0, 255, 255, 0.1);
+  border-style: solid;
+}
+
+.edit-form-modal-overlay .modal-nav-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  transition: all 0.2s ease;
+}
+
+.edit-form-modal-overlay .modal-nav-arrow:hover {
+  background: rgba(0, 255, 255, 0.2);
+  border-color: #0ff;
+  color: #0ff;
+}
+
+.edit-form-modal-overlay .modal-nav-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.edit-form-modal-overlay .modal-nav-left {
+  left: 20px;
+}
+
+.edit-form-modal-overlay .modal-nav-right {
+  right: 20px;
+}
+
+.edit-form-modal-overlay .modal-nav-arrow svg {
+  width: 24px;
+  height: 24px;
+}
+
+.edit-form-modal-header h3 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 600px;
+  flex: 1;
+}
+
+.modal-nav-counter {
+  font-size: 12px;
+  font-weight: 400;
+  color: #888;
+  margin-left: 8px;
 }

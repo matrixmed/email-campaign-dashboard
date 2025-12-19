@@ -320,6 +320,53 @@
   transform: translateX(22px);
 }
 
+.anomaly-mode-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--color-bg-elevated, #1e1e20);
+  border-radius: 6px;
+  padding: 3px;
+  border: 1px solid var(--color-border, #333336);
+}
+
+.mode-toggle-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-toggle-btn:hover {
+  color: #fff;
+}
+
+.mode-toggle-btn.active {
+  background: var(--color-bg-card, #2a2a2d);
+  color: #fff;
+}
+
+.anomaly-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-label {
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.control-divider {
+  color: #555;
+  font-size: 14px;
+}
+
 .tab-controls {
   display: flex;
   align-items: center;

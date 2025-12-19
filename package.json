@@ -5,6 +5,7 @@
   "homepage": "https://matrix-dashboard-qiq6.onrender.com",
   "dependencies": {
     "@azure/storage-blob": "^12.27.0",
+    "@babel/runtime": "^7.28.4",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -12,6 +13,8 @@
     "d3": "^7.9.0",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.12.1",
+    "jspdf": "^3.0.4",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.540.0",
     "papaparse": "^5.5.3",

@@ -47,8 +47,6 @@ def get_reports_by_week(week_start):
             'vehicle_name': r.vehicle_name,
             'target_list_id': r.target_list_id,
             'creative_code': r.creative_code,
-            'gcm_placement_id': r.gcm_placement_id,
-            'gcm_placement_id2': r.gcm_placement_id2,
             'contract_number': r.contract_number,
             'data_type': r.data_type,
             'expected_data_frequency': r.expected_data_frequency,
@@ -170,6 +168,41 @@ def update_placement_id(report_id):
             'message': str(e)
         }), 500
 
+
+@cmi_reports_bp.route('/reports/<int:report_id>/not-needed', methods=['PUT', 'OPTIONS'])
+@cross_origin()
+def toggle_not_needed(report_id):
+    try:
+        data = request.json
+        session = get_session()
+
+        report = session.query(CampaignReportManager).filter_by(id=report_id).first()
+
+        if not report:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'Report not found'
+            }), 404
+
+        is_not_needed = data.get('is_not_needed', False)
+        report.is_not_needed = is_not_needed
+        report.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Not needed status updated',
+            'is_not_needed': is_not_needed
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 @cmi_reports_bp.route('/reports/week/<week_start>/submit', methods=['PUT', 'OPTIONS'])
 @cross_origin()
@@ -385,6 +418,7 @@ def get_all_reports():
                 'match_confidence': r.match_confidence,
                 'is_submitted': r.is_submitted,
                 'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                'is_not_needed': r.is_not_needed or False,
                 'data_type': r.data_type or contract_data.get('data_type'),
                 'cmi_placement_id': r.cmi_placement_id,
                 'frequency': r.expected_data_frequency or contract_data.get('frequency'),
@@ -396,29 +430,16 @@ def get_all_reports():
 
             if r.is_cmi_brand and r.cmi_placement_id:
                 if r.reporting_week_start and r.reporting_week_end:
-                    week_start = r.reporting_week_start
-                    week_end = r.reporting_week_end
-                    previous_monday = week_start - timedelta(days=7)
-
                     report_data['cmi_metadata'] = {
-                        'Brand_Name': r.brand_name or '',
-                        'Vehicle_Name': r.vehicle_name or '',
-                        'Supplier': r.supplier or '',
-                        'CMI_PlacementID': r.cmi_placement_id or '',
-                        'Client_PlacementID': r.client_placement_id or '',
-                        'Client_ID': r.client_id or '',
-                        'TargetListID': r.target_list_id or '',
-                        'Creative_Code': r.creative_code or '',
-                        'GCM_Placement_ID': r.gcm_placement_id or '',
-                        'GCM_Placement_ID2': r.gcm_placement_id2 or '',
-                        'Placement_Description': r.placement_description or '',
-                        'contract_number': r.contract_number or '',
-                        'Buy_Component_Type': r.buy_component_type or '',
-                        'Campaign_Type': 'email',
-                        'placement_id': r.cmi_placement_id or '',
+                        'cmi_placement_id': r.cmi_placement_id or '',
+                        'client_placement_id': r.client_placement_id or '',
                         'target_list_id': r.target_list_id or '',
                         'creative_code': r.creative_code or '',
-                        'match_confidence': r.match_confidence
+                        'brand_name': r.brand_name or '',
+                        'vehicle_name': r.vehicle_name or '',
+                        'contract_number': r.contract_number or '',
+                        'placement_description': r.placement_description or '',
+                        'buy_component_type': r.buy_component_type or ''
                     }
 
             result.append(report_data)

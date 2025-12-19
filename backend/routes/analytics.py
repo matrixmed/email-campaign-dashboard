@@ -520,6 +520,40 @@ def classify_campaign(campaign_name):
 
     return {'bucket': bucket, 'topic': topic}
 
+def get_brand_industry_map():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT brand, industry FROM brand_editor_agency WHERE brand IS NOT NULL AND industry IS NOT NULL")
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        mapping = {}
+        for row in results:
+            brand_lower = row['brand'].lower()
+            mapping[brand_lower] = row['industry']
+            first_word = brand_lower.split()[0] if ' ' in brand_lower else None
+            if first_word and first_word not in mapping:
+                mapping[first_word] = row['industry']
+        return mapping
+    except Exception as e:
+        print(f"[BENCHMARKS] Error fetching brand map: {e}")
+        return {}
+
+def extract_industry_from_campaign(campaign_name, brand_map):
+    name_lower = campaign_name.lower()
+    matched_industry = None
+    matched_brand = None
+
+    for brand, industry in brand_map.items():
+        if brand in name_lower:
+            if not matched_brand or len(brand) > len(matched_brand):
+                matched_brand = brand
+                matched_industry = industry
+
+    return matched_industry, matched_brand
+
 @analytics_bp.route('/campaign-benchmarks', methods=['POST'])
 def campaign_benchmarks():
     try:
@@ -547,14 +581,30 @@ def campaign_benchmarks():
         if not selected_campaign:
             return jsonify({'error': 'Campaign not found'}), 404
 
-        filter_by_topic = filters.get('filter_by_topic', False)
+        analyze_by = filters.get('analyze_by', 'content')
+        filter_by_disease = filters.get('filter_by_disease', False)
         filter_month = filters.get('month', 'all')
 
+        brand_map = get_brand_industry_map() if analyze_by == 'industry' else {}
+
         selected_classification = classify_campaign(selected_campaign['campaign_name'])
-        selected_bucket = selected_classification['bucket']
         selected_topic = selected_classification['topic']
 
-        print(f"[BENCHMARKS] Selected campaign classified as: {selected_bucket} > {selected_topic}")
+        selected_industry = None
+        selected_bucket = None
+
+        if analyze_by == 'industry':
+            selected_industry, matched_brand = extract_industry_from_campaign(selected_campaign['campaign_name'], brand_map)
+            if selected_industry:
+                selected_bucket = selected_industry
+                print(f"[BENCHMARKS] Matched brand '{matched_brand}' to industry '{selected_industry}'")
+            else:
+                print(f"[BENCHMARKS] WARNING: No industry found for campaign, available brands: {list(brand_map.keys())[:20]}...")
+                selected_bucket = selected_classification['bucket']
+        else:
+            selected_bucket = selected_classification['bucket']
+
+        print(f"[BENCHMARKS] Selected campaign classified as: {selected_bucket} > {selected_topic} (mode: {analyze_by}, industry: {selected_industry})")
 
         selected_date = datetime.strptime(selected_campaign['send_date'], '%Y-%m-%d')
         selected_month = selected_date.month
@@ -566,16 +616,21 @@ def campaign_benchmarks():
             camp_bucket = camp_classification['bucket']
             camp_topic = camp_classification['topic']
 
-            if camp_bucket != selected_bucket:
-                return 0
+            if analyze_by == 'industry':
+                camp_industry, _ = extract_industry_from_campaign(camp.get('campaign_name', ''), brand_map)
+                if not camp_industry or camp_industry != selected_industry:
+                    return 0
+                score = 60
+            else:
+                if camp_bucket != selected_bucket:
+                    return 0
+                score = 60
 
-            score = 60
-
-            if filter_by_topic:
+            if filter_by_disease:
                 if camp_topic == selected_topic:
                     score += 40
                 else:
-                    return 0 
+                    return 0
             else:
                 if camp_topic == selected_topic:
                     score += 20
@@ -595,7 +650,7 @@ def campaign_benchmarks():
                         }
                         if camp_month in quarter_months[quarter]:
                             score += 20
-                    else: 
+                    else:
                         target_month = int(filter_month)
                         if camp_month == target_month:
                             score += 20
@@ -688,12 +743,11 @@ def campaign_benchmarks():
 
                 your_value = selected_core.get(metric_name, 0)
 
-                if max_val > min_val:
-                    your_percentile = int(((your_value - min_val) / (max_val - min_val)) * 100)
-                else:
-                    your_percentile = 50
+                count_below = sum(1 for v in values if v < your_value)
+                count_equal = sum(1 for v in values if v == your_value)
+                your_percentile = int(((count_below + 0.5 * count_equal) / n) * 100)
 
-                print(f"[BENCHMARKS] {metric_name}: min={min_val}, max={max_val}, median={median_val}, mean={mean_val}, your={your_value}")
+                print(f"[BENCHMARKS] {metric_name}: min={min_val}, max={max_val}, median={median_val}, mean={mean_val}, your={your_value}, percentile={your_percentile}")
 
                 benchmarks[metric_name] = {
                     'your_value': your_value,
@@ -705,45 +759,63 @@ def campaign_benchmarks():
                     'your_percentile': your_percentile
                 }
 
-        grading_metrics = ['unique_open_rate', 'total_open_rate', 'unique_click_rate', 'total_click_rate']
-        grading_percentiles = [benchmarks[m]['your_percentile'] for m in grading_metrics if m in benchmarks]
-        avg_percentile = int(np.mean(grading_percentiles)) if grading_percentiles else 0
+        weights = {
+            'unique_open_rate': 0.40,
+            'total_open_rate': 0.30,
+            'total_click_rate': 0.20,
+            'unique_click_rate': 0.10
+        }
 
-        if avg_percentile >= 90:
+        weighted_score = 0
+        total_weight = 0
+        for metric, weight in weights.items():
+            if metric in benchmarks:
+                weighted_score += benchmarks[metric]['your_percentile'] * weight
+                total_weight += weight
+
+        avg_percentile = int(weighted_score / total_weight) if total_weight > 0 else 0
+
+        if avg_percentile >= 85:
             grade = 'A+'
-        elif avg_percentile >= 85:
-            grade = 'A'
-        elif avg_percentile >= 80:
-            grade = 'A-'
         elif avg_percentile >= 75:
-            grade = 'B+'
-        elif avg_percentile >= 70:
-            grade = 'B'
+            grade = 'A'
         elif avg_percentile >= 65:
-            grade = 'B-'
-        elif avg_percentile >= 60:
-            grade = 'C+'
+            grade = 'A-'
         elif avg_percentile >= 55:
-            grade = 'C'
+            grade = 'B+'
         elif avg_percentile >= 50:
-            grade = 'C-'
+            grade = 'B'
+        elif avg_percentile >= 45:
+            grade = 'B-'
         elif avg_percentile >= 40:
-            grade = 'D+'
+            grade = 'C+'
+        elif avg_percentile >= 35:
+            grade = 'C'
         elif avg_percentile >= 30:
-            grade = 'D'
+            grade = 'C-'
+        elif avg_percentile >= 25:
+            grade = 'D+'
         elif avg_percentile >= 20:
+            grade = 'D'
+        elif avg_percentile >= 15:
             grade = 'D-'
         else:
             grade = 'F'
 
         success_factors = []
 
-        bucket_campaigns = [c for c in campaigns_data if classify_campaign(c.get('campaign_name', ''))['bucket'] == selected_bucket]
+        if analyze_by == 'industry':
+            bucket_campaigns = [c for c in campaigns_data if extract_industry_from_campaign(c.get('campaign_name', ''), brand_map)[0] == selected_industry]
+            factor_label = f'Industry: {selected_industry}'
+        else:
+            bucket_campaigns = [c for c in campaigns_data if classify_campaign(c.get('campaign_name', ''))['bucket'] == selected_bucket]
+            factor_label = f'Content Type: {selected_bucket}'
+
         if bucket_campaigns:
             avg_open = np.mean([c.get('core_metrics', {}).get('unique_open_rate', 0) for c in bucket_campaigns])
             overall_avg = np.mean([c.get('core_metrics', {}).get('unique_open_rate', 0) for c in campaigns_data])
             success_factors.append({
-                'factor': f'Campaign Type: {selected_bucket}',
+                'factor': factor_label,
                 'avg_performance': float(avg_open),
                 'sample_size': len(bucket_campaigns),
                 'vs_overall': float(avg_open - overall_avg)
@@ -755,7 +827,7 @@ def campaign_benchmarks():
                 avg_open = np.mean([c.get('core_metrics', {}).get('unique_open_rate', 0) for c in topic_campaigns])
                 bucket_avg = np.mean([c.get('core_metrics', {}).get('unique_open_rate', 0) for c in bucket_campaigns])
                 success_factors.append({
-                    'factor': f'Topic: {selected_topic}',
+                    'factor': f'Disease: {selected_topic}',
                     'avg_performance': float(avg_open),
                     'sample_size': len(topic_campaigns),
                     'vs_overall': float(avg_open - bucket_avg)
@@ -787,9 +859,11 @@ def campaign_benchmarks():
             'campaign': selected_campaign,
             'classification': {
                 'bucket': selected_bucket,
-                'topic': selected_topic
+                'topic': selected_topic,
+                'industry': selected_industry,
+                'mode': analyze_by
             },
-            'similar_campaigns': similar_campaigns[:20],
+            'similar_campaigns': similar_campaigns,
             'similar_count': len(similar_campaigns),
             'benchmarks': benchmarks,
             'success_factors': success_factors,

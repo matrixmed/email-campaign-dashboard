@@ -8,13 +8,46 @@ import json
 import re
 from datetime import datetime
 import openpyxl
+import tempfile
 
 campaigns_bp = Blueprint('campaigns', __name__)
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'png', 'jpg', 'jpeg'}
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+COLUMN_MAPPINGS = {
+    'cmi_placement_id': ['cmi_placementid', 'CMI_PlacementID'],
+    'client_placement_id': ['client_placementid', 'Client_PlacementID'],
+    'client_id': ['client_id', 'Client_ID'],
+    'placement_description': ['placement_description', 'Placement_Description'],
+    'supplier': ['supplier', 'Supplier'],
+    'brand_name': ['brand name', 'Brand_Name', 'brand_name'],
+    'vehicle_name': ['Vehicle_Name', 'vehicle_name', 'tactic_name'],
+    'target_list_id': ['targetlistid', 'TargetListID'],
+    'campaign_name': ['campaign_name', 'Campaign_Name'],
+    'contract_number': ['contractconfirmationnumber', 'contract_number'],
+    'buying_channel': ['buying_channel'],
+    'creative_code': ['creative_code'],
+    'media_tactic_id': ['media_tactic_id', 'mediatacticid', 'Media_Tactic_ID']
+}
+
+PHARMA_COMPANY_MAP = {
+    'eli lilly': 'Lilly',
+    'lilly': 'Lilly',
+    'eli lilly & company': 'Lilly',
+    'eli lilly and company': 'Lilly',
+    'johnson & johnson': 'J&J',
+    'johnson and johnson': 'J&J',
+    'j&j': 'J&J',
+    'jnj': 'J&J',
+    'astrazeneca': 'AstraZeneca',
+    'abbvie': 'Abbvie',
+    'boehringer ingelheim': 'BI',
+    'bi': 'BI',
+    'exelixis': 'Exelixis',
+    'dg': 'DG',
+    'doctors group': 'DG',
+    'dsi': 'DSI'
+}
 
 def get_session():
     engine = create_engine(os.getenv('DATABASE_URL'))
@@ -31,6 +64,14 @@ def allowed_file(filename, file_type):
         return ext in {'png', 'jpg', 'jpeg'}
     return ext in ALLOWED_EXTENSIONS
 
+def find_column_value(row_data, field_name):
+    possible_columns = COLUMN_MAPPINGS.get(field_name, [field_name])
+    for col_name in possible_columns:
+        for key in row_data:
+            if key and str(key).lower().strip() == col_name.lower().strip():
+                return row_data[key]
+    return None
+
 def get_pharma_company_for_brand(brand_name):
     try:
         session = get_session()
@@ -39,48 +80,75 @@ def get_pharma_company_for_brand(brand_name):
             BrandEditorAgency.is_active == True
         ).first()
         session.close()
-
         if brand_mapping:
             return brand_mapping.pharma_company
         return None
     except Exception as e:
-        print(f"Error getting pharma company: {e}")
         return None
 
-def extract_target_list_data(file_path):
+def normalize_pharma_company(client_value):
+    if not client_value:
+        return None
+    client_str = str(client_value).lower().strip()
+    for key, normalized in PHARMA_COMPANY_MAP.items():
+        if key in client_str:
+            return normalized
+    return str(client_value)
+
+def extract_target_list_data(file_content, filename):
     try:
-        wb = openpyxl.load_workbook(file_path, data_only=True)
-        sheet = wb.active
-        headers = [cell.value for cell in sheet[1]]
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
 
-        if sheet.max_row < 2:
-            return {'error': 'No data rows found'}
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}') as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
 
-        row_data = {}
-        for idx, header in enumerate(headers):
-            cell_value = sheet.cell(row=2, column=idx+1).value
-            if header:
-                row_data[header] = cell_value
+        try:
+            if ext == 'xls':
+                import xlrd
+                wb = xlrd.open_workbook(tmp_path)
+                sheet = wb.sheet_by_index(0)
+                headers = [sheet.cell_value(0, col) for col in range(sheet.ncols)]
+                if sheet.nrows < 2:
+                    return {'error': 'No data rows found'}
+                row_data = {}
+                for idx, header in enumerate(headers):
+                    if header:
+                        row_data[header] = sheet.cell_value(1, idx)
+            else:
+                wb = openpyxl.load_workbook(tmp_path, data_only=True)
+                sheet = wb.active
+                headers = [cell.value for cell in sheet[1]]
+                if sheet.max_row < 2:
+                    return {'error': 'No data rows found'}
+                row_data = {}
+                for idx, header in enumerate(headers):
+                    cell_value = sheet.cell(row=2, column=idx+1).value
+                    if header:
+                        row_data[header] = cell_value
+        finally:
+            os.unlink(tmp_path)
 
-        client_id_value = row_data.get('Client_ID')
-        brand_name = row_data.get('Brand_Name', '')
+        raw_client_id = find_column_value(row_data, 'client_id')
+        client_id = raw_client_id is not None and str(raw_client_id).strip() != ''
 
-        if client_id_value and brand_name:
-            pharma_company = get_pharma_company_for_brand(brand_name)
-            client_id = pharma_company if pharma_company else 'Unknown'
-        else:
-            client_id = None
+        brand_name = find_column_value(row_data, 'brand_name') or ''
+        cmi_placement_id = find_column_value(row_data, 'cmi_placement_id')
 
         extracted = {
-            'Client_ID': client_id,
-            'CMI_PlacementID': str(row_data.get('CMI_PlacementID')) if row_data.get('CMI_PlacementID') else None,
-            'Client_PlacementID': row_data.get('Client_PlacementID') or None,
-            'Placement_Description': row_data.get('Placement_Description'),
-            'Supplier': row_data.get('Supplier'),
-            'Brand_Name': row_data.get('Brand_Name'),
-            'Vehicle_Name': row_data.get('Vehicle_Name'),
-            'TargetListID': row_data.get('TargetListID'),
-            'Campaign_Name': row_data.get('Campaign_Name') or None
+            'cmi_placement_id': str(cmi_placement_id) if cmi_placement_id else None,
+            'client_placement_id': find_column_value(row_data, 'client_placement_id') or '',
+            'client_id': client_id,
+            'placement_description': find_column_value(row_data, 'placement_description') or '',
+            'supplier': find_column_value(row_data, 'supplier') or 'Matrix Medical Communications',
+            'brand_name': brand_name,
+            'vehicle_name': find_column_value(row_data, 'vehicle_name') or '',
+            'target_list_id': find_column_value(row_data, 'target_list_id') or '',
+            'campaign_name': find_column_value(row_data, 'campaign_name') or '',
+            'contract_number': find_column_value(row_data, 'contract_number') or '',
+            'buying_channel': find_column_value(row_data, 'buying_channel') or '',
+            'creative_code_from_file': find_column_value(row_data, 'creative_code') or '',
+            'media_tactic_id': find_column_value(row_data, 'media_tactic_id') or ''
         }
 
         return extracted
@@ -102,176 +170,147 @@ def extract_month_from_campaign_name(campaign_name):
         'november': 'November', 'nov': 'November',
         'december': 'December', 'dec': 'December'
     }
-
     campaign_lower = campaign_name.lower()
     for abbr, full in months.items():
         if abbr in campaign_lower:
             return full
     return None
 
-def extract_creative_code_from_placement_name(placement_name):
-    """
-    Extract creative code from placement name.
-    Supports patterns like:
-    - ABV-EMR-TT-1234 (standard format)
-    - XX-XXX-XX-12345 (variable lengths)
-    - ABV_EMR_TT_1234 (underscores)
-    """
+def extract_year_from_campaign_name(campaign_name):
+    match = re.search(r'20\d{2}', campaign_name)
+    if match:
+        return match.group(0)
+    return str(datetime.now().year)
+
+def extract_creative_code_from_text(text):
+    if not text:
+        return None
     patterns = [
-        # Standard: XX-XXX-XXX-1234 or XX-XXX-XX-1234
+        r'(US[-_]?\d{5,6})',
+        r'(CA[-_]?\d{4,5}[-_]\d)',
         r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # With extra segment: XX-XXX-XX-XX-1234
         r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # Two segment: XX-XXX-1234
         r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # Fallback: Any sequence of letter groups with dashes ending in numbers
         r'([A-Z]{2,}(?:[-_][A-Z]{2,})+[-_]\d+)',
     ]
-
     for pattern in patterns:
-        match = re.search(pattern, placement_name, re.IGNORECASE)
+        match = re.search(pattern, str(text), re.IGNORECASE)
         if match:
             result = match.group(1).upper().replace('_', '-')
             return result
     return None
 
-def extract_ad_size_from_placement_name(placement_name):
-    match = re.search(r'(\d+x\d+)', placement_name, re.IGNORECASE)
+def extract_ad_size_from_text(text):
+    if not text:
+        return None
+    match = re.search(r'(\d+x\d+)', str(text), re.IGNORECASE)
     if match:
         return match.group(1)
     return None
 
-def extract_tags_data(file_path, campaign_name='', ad_images_count=0):
+def extract_tags_data(file_content, filename):
     try:
-        wb = openpyxl.load_workbook(file_path, data_only=True)
-        sheet = wb.active
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
 
-        headers = None
-        header_row_idx = None
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}') as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
 
-        for row_idx in range(1, min(sheet.max_row + 1, 20)):
-            row_values = [sheet.cell(row=row_idx, column=col).value for col in range(1, sheet.max_column + 1)]
-            if any('Placement ID' in str(cell) for cell in row_values if cell):
-                headers = row_values
-                header_row_idx = row_idx
-                break
+        try:
+            headers = None
+            header_row_idx = None
+            rows_data = []
+
+            if ext == 'xls':
+                import xlrd
+                wb = xlrd.open_workbook(tmp_path)
+                sheet = wb.sheet_by_index(0)
+
+                for row_idx in range(min(sheet.nrows, 20)):
+                    row_values = [sheet.cell_value(row_idx, col) for col in range(sheet.ncols)]
+                    if any('Placement ID' in str(cell) for cell in row_values if cell):
+                        headers = row_values
+                        header_row_idx = row_idx
+                        break
+
+                if headers and header_row_idx is not None:
+                    for row_idx in range(header_row_idx + 1, sheet.nrows):
+                        row_values = [sheet.cell_value(row_idx, col) for col in range(sheet.ncols)]
+                        rows_data.append(row_values)
+            else:
+                wb = openpyxl.load_workbook(tmp_path, data_only=True)
+                sheet = wb.active
+
+                for row_idx in range(1, min(sheet.max_row + 1, 20)):
+                    row_values = [sheet.cell(row=row_idx, column=col).value for col in range(1, sheet.max_column + 1)]
+                    if any('Placement ID' in str(cell) for cell in row_values if cell):
+                        headers = row_values
+                        header_row_idx = row_idx
+                        break
+
+                if headers and header_row_idx is not None:
+                    for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
+                        row_values = [sheet.cell(row=row_idx, column=col).value for col in range(1, sheet.max_column + 1)]
+                        rows_data.append(row_values)
+        finally:
+            os.unlink(tmp_path)
 
         if not headers or header_row_idx is None:
             return {'error': 'Could not find header row with "Placement ID"'}
 
         placement_id_col = None
         placement_name_col = None
-        ad_name_col = None
 
         for idx, header in enumerate(headers):
-            if header and 'Placement ID' in str(header):
-                placement_id_col = idx + 1
-            elif header and 'Placement Name' in str(header):
-                placement_name_col = idx + 1
-            elif header and 'Ad Name' in str(header):
-                ad_name_col = idx + 1
+            header_str = str(header).strip().lower() if header else ''
+            if 'placement id' in header_str and 'name' not in header_str and 'external' not in header_str:
+                placement_id_col = idx
+            elif 'placement name' in header_str:
+                placement_name_col = idx
 
-        if not placement_id_col:
+        if placement_id_col is None:
             return {'error': 'Could not find "Placement ID" column'}
 
-        all_tags = []
-        for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
-            placement_id = sheet.cell(row=row_idx, column=placement_id_col).value
+        gcm_placement_id_array = []
+        gcm_placement_id_description = []
+
+        for row in rows_data:
+            placement_id = row[placement_id_col] if placement_id_col < len(row) else None
+            placement_name = row[placement_name_col] if placement_name_col and placement_name_col < len(row) else ''
+
             if placement_id:
-                placement_name = sheet.cell(row=row_idx, column=placement_name_col).value if placement_name_col else ''
-                ad_name = sheet.cell(row=row_idx, column=ad_name_col).value if ad_name_col else ''
+                pid_str = str(int(placement_id) if isinstance(placement_id, float) else placement_id)
+                pname_str = str(placement_name) if placement_name else ''
 
-                tag_data = {
-                    'placement_id': str(placement_id),
-                    'placement_name': str(placement_name) if placement_name else '',
-                    'ad_name': str(ad_name) if ad_name else '',
-                    'creative_code': extract_creative_code_from_placement_name(str(placement_name)) if placement_name else None,
-                    'ad_size': extract_ad_size_from_placement_name(str(placement_name)) if placement_name else None
-                }
-                all_tags.append(tag_data)
+                if pid_str not in gcm_placement_id_array:
+                    gcm_placement_id_array.append(pid_str)
+                    gcm_placement_id_description.append(pname_str)
 
-        if not all_tags:
+        if not gcm_placement_id_array:
             return {'error': 'No placement IDs found'}
 
-        target_month = extract_month_from_campaign_name(campaign_name) if campaign_name else None
-
-        filtered_tags = all_tags
-        if target_month:
-            month_filtered = [tag for tag in all_tags if target_month[:3] in tag['placement_name']]
-            if month_filtered:
-                filtered_tags = month_filtered
+        creative_codes = []
+        for desc in gcm_placement_id_description:
+            code = extract_creative_code_from_text(desc)
+            if code and code not in creative_codes:
+                creative_codes.append(code)
 
         return {
-            'all_tags': all_tags,
-            'suggested_tags': filtered_tags[:ad_images_count] if ad_images_count > 0 else filtered_tags[:2],
-            'target_month': target_month,
-            'total_count': len(all_tags),
-            'filtered_count': len(filtered_tags)
+            'gcm_placement_id_array': gcm_placement_id_array,
+            'gcm_placement_id_description': gcm_placement_id_description,
+            'creative_codes_found': creative_codes,
+            'total_count': len(gcm_placement_id_array)
         }
     except Exception as e:
         return {'error': str(e)}
 
 def extract_creative_code_from_image(filename):
-    """
-    Extract creative code from image filename.
-    Supports patterns like:
-    - ABV-EMR-TT-1234 (standard format)
-    - XX-XXX-XX-12345 (variable lengths)
-    - ABV_EMR_TT_1234 (underscores)
-    - ABV-EMR-TT-1234-300x250 (with ad size suffix)
-    """
-    patterns = [
-        # Standard: XX-XXX-XXX-1234 or XX-XXX-XX-1234
-        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # With extra segment: XX-XXX-XX-XX-1234
-        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # Two segment: XX-XXX-1234
-        r'([A-Z]{2,4}[-_][A-Z]{2,4}[-_]\d+)',
-        # Fallback: Any sequence of letter groups with dashes ending in numbers
-        r'([A-Z]{2,}(?:[-_][A-Z]{2,})+[-_]\d+)',
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            result = match.group(1).upper().replace('_', '-')
-            return result
-    return None
-
-def normalize_client_id(client_id):
-    if not client_id:
-        return None
-
-    client_id_str = str(client_id).lower().strip()
-
-    normalizations = {
-        'eli lilly': 'Lilly',
-        'lilly': 'Lilly',
-        'eli lilly & company': 'Lilly',
-        'eli lilly and company': 'Lilly',
-        'johnson & johnson': 'J&J',
-        'johnson and johnson': 'J&J',
-        'j&j': 'J&J',
-        'jnj': 'J&J',
-        'astrazeneca': 'AstraZeneca',
-        'abbvie': 'Abbvie',
-        'boehringer ingelheim': 'BI',
-        'bi': 'BI',
-        'dg': 'DG',
-        'doctors group': 'DG',
-        'dsi': 'DSI'
-    }
-
-    for key, normalized_value in normalizations.items():
-        if key in client_id_str:
-            return normalized_value
-
-    return client_id
+    return extract_creative_code_from_text(filename)
 
 def validate_and_enrich_with_cmi_contracts(extracted_data):
     try:
         session = get_session()
-        cmi_placement_id = extracted_data.get('CMI_PlacementID')
+        cmi_placement_id = extracted_data.get('cmi_placement_id')
 
         if not cmi_placement_id:
             session.close()
@@ -282,35 +321,24 @@ def validate_and_enrich_with_cmi_contracts(extracted_data):
         ).first()
 
         if contract:
-            print(f"CMI Contract found for placement {cmi_placement_id} - using as source of truth")
+            extracted_data['cmi_placement_id'] = contract.placement_id
+            extracted_data['contract_number'] = contract.contract_number or extracted_data.get('contract_number', '')
+            extracted_data['vehicle_name'] = contract.vehicle or extracted_data.get('vehicle_name', '')
+            extracted_data['buy_component_type'] = contract.buy_component_type or extracted_data.get('buy_component_type', '')
 
-            extracted_data['CMI_PlacementID'] = contract.placement_id
-            extracted_data['Placement_Description'] = contract.placement_description or extracted_data.get('Placement_Description')
-            extracted_data['contract_number'] = contract.contract_number
-            extracted_data['Brand_Name'] = contract.brand or extracted_data.get('Brand_Name')
-            extracted_data['Vehicle_Name'] = contract.vehicle or extracted_data.get('Vehicle_Name')
-            extracted_data['Buy_Component_Type'] = contract.buy_component_type or extracted_data.get('Buy_Component_Type')
+            if contract.brand and extracted_data.get('brand_name', '') != contract.brand:
+                extracted_data['brand_name'] = contract.brand
+            if contract.placement_description and extracted_data.get('placement_description', '') != contract.placement_description:
+                extracted_data['placement_description'] = contract.placement_description
+
             extracted_data['cmi_validated'] = True
-
-            print(f"  Using CMI contract values:")
-            print(f"    Client_ID: {extracted_data.get('Client_ID')}")
-            print(f"    Brand: {extracted_data.get('Brand_Name')}")
-            print(f"    Vehicle: {extracted_data.get('Vehicle_Name')}")
-            print(f"    Contract #: {extracted_data.get('contract_number')}")
-            print(f"    Buy Component: {extracted_data.get('Buy_Component_Type')}")
         else:
-            print(f"WARNING: No CMI contract found for placement {cmi_placement_id}")
-            extracted_data['contract_number'] = None
             extracted_data['cmi_validated'] = False
-
-            if extracted_data.get('Client_ID'):
-                extracted_data['Client_ID'] = normalize_client_id(extracted_data['Client_ID'])
 
         session.close()
         return extracted_data
 
     except Exception as e:
-        print(f"Error validating with CMI contracts: {e}")
         extracted_data['cmi_validated'] = False
         return extracted_data
 
@@ -336,22 +364,16 @@ def upload_campaign_metadata(campaign_id):
             except:
                 pass
 
-        target_list_path = None
-        tags_path = None
-        ad_images_paths = []
         extracted_data = {}
+        tags_data = None
+        creative_codes_from_images = []
+        ad_count = 0
 
         if 'target_list' in request.files:
             file = request.files['target_list']
             if file and allowed_file(file.filename, 'excel'):
-                filename = secure_filename(f"{campaign_id}_target_list_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-                target_list_path = os.path.join(UPLOAD_FOLDER, filename)
-                file.save(target_list_path)
-                extracted_data.update(extract_target_list_data(target_list_path))
-
-        ad_count = 0
-        creative_codes_from_images = []
-        ad_sizes_from_images = []
+                file_content = file.read()
+                extracted_data.update(extract_target_list_data(file_content, file.filename))
 
         if 'ad_images' in request.files:
             files = request.files.getlist('ad_images')
@@ -359,96 +381,56 @@ def upload_campaign_metadata(campaign_id):
             for file in files:
                 if file and allowed_file(file.filename, 'image'):
                     creative_code = extract_creative_code_from_image(file.filename)
-                    if creative_code:
+                    if creative_code and creative_code not in creative_codes_from_images:
                         creative_codes_from_images.append(creative_code)
-
-                    ad_size_match = re.search(r'(\d+x\d+)', file.filename, re.IGNORECASE)
-                    if ad_size_match:
-                        ad_sizes_from_images.append(ad_size_match.group(1))
-
-                    filename = secure_filename(f"{campaign_id}_ad_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
-                    file_path = os.path.join(UPLOAD_FOLDER, filename)
-                    file.save(file_path)
-                    ad_images_paths.append(file_path)
-
-        tags_data = None
-        gcm_ids = []
-        final_creative_code = None
 
         if 'tags' in request.files:
             file = request.files['tags']
             if file and allowed_file(file.filename, 'excel'):
-                filename = secure_filename(f"{campaign_id}_tags_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-                tags_path = os.path.join(UPLOAD_FOLDER, filename)
-                file.save(tags_path)
-                tags_data = extract_tags_data(tags_path, campaign_name=campaign_name, ad_images_count=ad_count)
+                file_content = file.read()
+                tags_data = extract_tags_data(file_content, file.filename)
 
-                if not isinstance(tags_data, dict) or 'error' not in tags_data:
-                    extracted_data['tags'] = tags_data
+                if tags_data and 'error' not in tags_data:
+                    extracted_data['gcm_placement_id_array'] = tags_data.get('gcm_placement_id_array', [])
+                    extracted_data['gcm_placement_id_description'] = tags_data.get('gcm_placement_id_description', [])
 
-                    suggested_tags = tags_data.get('suggested_tags', [])
-                    if suggested_tags:
-                        if ad_sizes_from_images:
-                            for ad_size in ad_sizes_from_images:
-                                matching_tag = next((tag for tag in suggested_tags if tag['ad_size'] == ad_size), None)
-                                if matching_tag:
-                                    gcm_ids.append(matching_tag['placement_id'])
-                                    if not final_creative_code and matching_tag['creative_code']:
-                                        final_creative_code = matching_tag['creative_code']
+                    if not creative_codes_from_images and tags_data.get('creative_codes_found'):
+                        creative_codes_from_images = tags_data['creative_codes_found']
 
-                        if len(gcm_ids) < ad_count:
-                            for tag in suggested_tags[:ad_count]:
-                                if tag['placement_id'] not in gcm_ids:
-                                    gcm_ids.append(tag['placement_id'])
-                                    if not final_creative_code and tag['creative_code']:
-                                        final_creative_code = tag['creative_code']
-                else:
-                    extracted_data['tags'] = tags_data
-
+        final_creative_code = extracted_data.get('creative_code_from_file') or ''
         if not final_creative_code and creative_codes_from_images:
             final_creative_code = creative_codes_from_images[0]
 
         if manual_placement_id:
-            extracted_data['CMI_PlacementID'] = manual_placement_id
-            try:
-                from models import CMIContractValue
-                session_temp = get_session()
-                contract = session_temp.query(CMIContractValue).filter_by(placement_id=manual_placement_id).first()
-                if contract:
-                    extracted_data['Brand_Name'] = extracted_data.get('Brand_Name') or contract.brand
-                    extracted_data['Vehicle_Name'] = extracted_data.get('Vehicle_Name') or contract.vehicle
-                    extracted_data['Placement_Description'] = extracted_data.get('Placement_Description') or contract.placement_description
-                    extracted_data['contract_number'] = extracted_data.get('contract_number') or contract.contract_number
-                    extracted_data['Buy_Component_Type'] = extracted_data.get('Buy_Component_Type') or contract.buy_component_type
-                session_temp.close()
-            except Exception as e:
-                print(f"Error fetching contract for placement ID {manual_placement_id}: {e}")
+            extracted_data['cmi_placement_id'] = manual_placement_id
 
         extracted_data = validate_and_enrich_with_cmi_contracts(extracted_data)
+
+        gcm_array = extracted_data.get('gcm_placement_id_array', [])
+        gcm_desc_array = extracted_data.get('gcm_placement_id_description', [])
 
         session = get_session()
         existing = session.query(CampaignReportingMetadata).filter_by(campaign_id=campaign_id).first()
 
         if existing:
             existing.send_date = send_date or existing.send_date
-            existing.client_id = extracted_data.get('Client_ID') or existing.client_id
-            existing.cmi_placement_id = manual_placement_id or extracted_data.get('CMI_PlacementID') or existing.cmi_placement_id
-            existing.client_placement_id = extracted_data.get('Client_PlacementID') or existing.client_placement_id
-            existing.placement_description = extracted_data.get('Placement_Description') or existing.placement_description
-            existing.supplier = extracted_data.get('Supplier') or existing.supplier
-            existing.brand_name = extracted_data.get('Brand_Name') or existing.brand_name
-            existing.vehicle_name = extracted_data.get('Vehicle_Name') or existing.vehicle_name
-            existing.target_list_id = extracted_data.get('TargetListID') or existing.target_list_id
-            existing.campaign_name_from_file = extracted_data.get('Campaign_Name') or existing.campaign_name_from_file
+            existing.client_id = extracted_data.get('client_id', False)
+            existing.cmi_placement_id = extracted_data.get('cmi_placement_id') or existing.cmi_placement_id
+            existing.client_placement_id = extracted_data.get('client_placement_id') or existing.client_placement_id
+            existing.placement_description = extracted_data.get('placement_description') or existing.placement_description
+            existing.supplier = extracted_data.get('supplier') or existing.supplier
+            existing.brand_name = extracted_data.get('brand_name') or existing.brand_name
+            existing.vehicle_name = extracted_data.get('vehicle_name') or existing.vehicle_name
+            existing.target_list_id = extracted_data.get('target_list_id') or existing.target_list_id
+            existing.campaign_name_from_file = extracted_data.get('campaign_name') or existing.campaign_name_from_file
             existing.creative_code = final_creative_code or existing.creative_code
-            existing.gcm_placement_id = gcm_ids[0] if len(gcm_ids) > 0 else existing.gcm_placement_id
-            existing.gcm_placement_id2 = gcm_ids[1] if len(gcm_ids) > 1 else existing.gcm_placement_id2
-            existing.buy_component_type = extracted_data.get('Buy_Component_Type') or existing.buy_component_type
+            existing.gcm_placement_id = json.dumps([]) if not gcm_array else existing.gcm_placement_id
+            existing.gcm_placement_id_array = json.dumps(gcm_array) if gcm_array else existing.gcm_placement_id_array
+            existing.gcm_placement_id_description = json.dumps(gcm_desc_array) if gcm_desc_array else existing.gcm_placement_id_description
+            existing.buy_component_type = extracted_data.get('buy_component_type') or existing.buy_component_type
             existing.contract_number = extracted_data.get('contract_number') or existing.contract_number
+            existing.media_tactic_id = extracted_data.get('media_tactic_id') or existing.media_tactic_id
             existing.ad_count = ad_count or existing.ad_count
-            existing.target_list_path = target_list_path or existing.target_list_path
-            existing.tags_path = tags_path or existing.tags_path
-            existing.ad_images_path = json.dumps(ad_images_paths) if ad_images_paths else existing.ad_images_path
             existing.raw_metadata = json.dumps(extracted_data, default=str)
             existing.uploaded_by = uploaded_by
             existing.updated_at = datetime.utcnow()
@@ -457,24 +439,23 @@ def upload_campaign_metadata(campaign_id):
                 campaign_id=campaign_id,
                 campaign_name=campaign_name,
                 send_date=send_date,
-                client_id=extracted_data.get('Client_ID'),
-                cmi_placement_id=manual_placement_id or extracted_data.get('CMI_PlacementID'),
-                client_placement_id=extracted_data.get('Client_PlacementID'),
-                placement_description=extracted_data.get('Placement_Description'),
-                supplier=extracted_data.get('Supplier'),
-                brand_name=extracted_data.get('Brand_Name'),
-                vehicle_name=extracted_data.get('Vehicle_Name'),
-                target_list_id=extracted_data.get('TargetListID'),
-                campaign_name_from_file=extracted_data.get('Campaign_Name'),
+                client_id=extracted_data.get('client_id', False),
+                cmi_placement_id=extracted_data.get('cmi_placement_id'),
+                client_placement_id=extracted_data.get('client_placement_id'),
+                placement_description=extracted_data.get('placement_description'),
+                supplier=extracted_data.get('supplier'),
+                brand_name=extracted_data.get('brand_name'),
+                vehicle_name=extracted_data.get('vehicle_name'),
+                target_list_id=extracted_data.get('target_list_id'),
+                campaign_name_from_file=extracted_data.get('campaign_name'),
                 creative_code=final_creative_code,
-                gcm_placement_id=gcm_ids[0] if len(gcm_ids) > 0 else None,
-                gcm_placement_id2=gcm_ids[1] if len(gcm_ids) > 1 else None,
-                buy_component_type=extracted_data.get('Buy_Component_Type'),
+                gcm_placement_id=json.dumps([]),
+                gcm_placement_id_array=json.dumps(gcm_array) if gcm_array else None,
+                gcm_placement_id_description=json.dumps(gcm_desc_array) if gcm_desc_array else None,
+                buy_component_type=extracted_data.get('buy_component_type'),
                 contract_number=extracted_data.get('contract_number'),
+                media_tactic_id=extracted_data.get('media_tactic_id'),
                 ad_count=ad_count,
-                target_list_path=target_list_path,
-                tags_path=tags_path,
-                ad_images_path=json.dumps(ad_images_paths) if ad_images_paths else None,
                 raw_metadata=json.dumps(extracted_data, default=str),
                 uploaded_by=uploaded_by
             )
@@ -485,31 +466,29 @@ def upload_campaign_metadata(campaign_id):
 
         response_data = {
             'status': 'success',
-            'message': 'Metadata uploaded and extracted successfully',
+            'message': 'Metadata extracted successfully',
             'campaign_id': campaign_id,
             'cmi_validated': extracted_data.get('cmi_validated', False),
             'extracted': {
-                'client_id': extracted_data.get('Client_ID'),
-                'cmi_placement_id': extracted_data.get('CMI_PlacementID'),
-                'brand_name': extracted_data.get('Brand_Name'),
-                'vehicle_name': extracted_data.get('Vehicle_Name'),
-                'supplier': extracted_data.get('Supplier'),
-                'target_list_id': extracted_data.get('TargetListID'),
+                'client_id': extracted_data.get('client_id', False),
+                'cmi_placement_id': extracted_data.get('cmi_placement_id'),
+                'client_placement_id': extracted_data.get('client_placement_id'),
+                'brand_name': extracted_data.get('brand_name'),
+                'vehicle_name': extracted_data.get('vehicle_name'),
+                'target_list_id': extracted_data.get('target_list_id'),
                 'creative_code': final_creative_code,
                 'contract_number': extracted_data.get('contract_number'),
-                'ad_count': ad_count,
-                'gcm_placement_ids': gcm_ids,
-                'placement_description': extracted_data.get('Placement_Description')
+                'placement_description': extracted_data.get('placement_description'),
+                'buy_component_type': extracted_data.get('buy_component_type'),
+                'media_tactic_id': extracted_data.get('media_tactic_id')
             }
         }
 
-        if tags_data and isinstance(tags_data, dict) and 'all_tags' in tags_data:
-            response_data['tags_review'] = {
-                'total_tags_found': tags_data.get('total_count', 0),
-                'filtered_count': tags_data.get('filtered_count', 0),
-                'target_month': tags_data.get('target_month'),
-                'suggested_tags': tags_data.get('suggested_tags', []),
-                'all_tags': tags_data.get('all_tags', [])
+        if tags_data and 'error' not in tags_data:
+            response_data['gcm_selection'] = {
+                'gcm_placement_id_array': gcm_array,
+                'gcm_placement_id_description': gcm_desc_array,
+                'total_count': len(gcm_array)
             }
 
         return jsonify(response_data), 201
@@ -535,6 +514,19 @@ def get_campaign_metadata(campaign_id):
                 'message': 'Metadata not found'
             }), 404
 
+        gcm_selected = []
+        gcm_array = []
+        gcm_desc_array = []
+        try:
+            if metadata.gcm_placement_id:
+                gcm_selected = json.loads(metadata.gcm_placement_id)
+            if metadata.gcm_placement_id_array:
+                gcm_array = json.loads(metadata.gcm_placement_id_array)
+            if metadata.gcm_placement_id_description:
+                gcm_desc_array = json.loads(metadata.gcm_placement_id_description)
+        except:
+            pass
+
         result = {
             'campaign_id': metadata.campaign_id,
             'campaign_name': metadata.campaign_name,
@@ -548,9 +540,12 @@ def get_campaign_metadata(campaign_id):
             'target_list_id': metadata.target_list_id,
             'campaign_name_from_file': metadata.campaign_name_from_file,
             'creative_code': metadata.creative_code,
-            'gcm_placement_id': metadata.gcm_placement_id,
-            'gcm_placement_id2': metadata.gcm_placement_id2,
-            'ad_count': metadata.ad_count,
+            'gcm_placement_id': gcm_selected,
+            'gcm_placement_id_array': gcm_array,
+            'gcm_placement_id_description': gcm_desc_array,
+            'buy_component_type': metadata.buy_component_type,
+            'contract_number': metadata.contract_number,
+            'media_tactic_id': metadata.media_tactic_id,
             'uploaded_at': metadata.uploaded_at.isoformat(),
             'uploaded_by': metadata.uploaded_by
         }
@@ -568,6 +563,43 @@ def get_campaign_metadata(campaign_id):
             'message': str(e)
         }), 500
 
+@campaigns_bp.route('/<campaign_id>/gcm-selection', methods=['PUT'])
+def update_gcm_selection(campaign_id):
+    try:
+        data = request.get_json()
+        selected_gcm_ids = data.get('gcm_placement_id', [])
+
+        if not isinstance(selected_gcm_ids, list):
+            selected_gcm_ids = [selected_gcm_ids] if selected_gcm_ids else []
+
+        session = get_session()
+        metadata = session.query(CampaignReportingMetadata).filter_by(campaign_id=campaign_id).first()
+
+        if not metadata:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'Metadata not found'
+            }), 404
+
+        metadata.gcm_placement_id = json.dumps(selected_gcm_ids)
+        metadata.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'GCM selection updated',
+            'gcm_placement_id': selected_gcm_ids
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @campaigns_bp.route('/metadata/all', methods=['GET'])
 def get_all_campaign_metadata():
     try:
@@ -576,6 +608,19 @@ def get_all_campaign_metadata():
 
         results = []
         for metadata in all_metadata:
+            gcm_selected = []
+            gcm_array = []
+            gcm_desc_array = []
+            try:
+                if metadata.gcm_placement_id:
+                    gcm_selected = json.loads(metadata.gcm_placement_id)
+                if metadata.gcm_placement_id_array:
+                    gcm_array = json.loads(metadata.gcm_placement_id_array)
+                if metadata.gcm_placement_id_description:
+                    gcm_desc_array = json.loads(metadata.gcm_placement_id_description)
+            except:
+                pass
+
             results.append({
                 'campaign_id': metadata.campaign_id,
                 'campaign_name': metadata.campaign_name,
@@ -584,17 +629,17 @@ def get_all_campaign_metadata():
                 'cmi_placement_id': metadata.cmi_placement_id,
                 'client_placement_id': metadata.client_placement_id,
                 'placement_description': metadata.placement_description,
-                'supplier': metadata.supplier,
                 'brand_name': metadata.brand_name,
                 'vehicle_name': metadata.vehicle_name,
                 'target_list_id': metadata.target_list_id,
                 'campaign_name_from_file': metadata.campaign_name_from_file,
                 'creative_code': metadata.creative_code,
-                'gcm_placement_id': metadata.gcm_placement_id,
-                'gcm_placement_id2': metadata.gcm_placement_id2,
+                'gcm_placement_id': gcm_selected,
+                'gcm_placement_id_array': gcm_array,
+                'gcm_placement_id_description': gcm_desc_array,
                 'buy_component_type': metadata.buy_component_type,
                 'contract_number': metadata.contract_number,
-                'ad_count': metadata.ad_count,
+                'media_tactic_id': metadata.media_tactic_id,
                 'uploaded_at': metadata.uploaded_at.isoformat() if metadata.uploaded_at else None,
                 'uploaded_by': metadata.uploaded_by
             })

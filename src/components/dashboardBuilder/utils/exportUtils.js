@@ -1,3 +1,5 @@
+import html2pdf from 'html2pdf.js';
+
 const EXPORT_CONFIG = {
   width: 1024,
   height: 576,
@@ -141,6 +143,50 @@ export async function exportDashboard(canvasRef, campaignName, options = {}) {
     return { success: true, filename };
   } catch (error) {
     console.error('Export error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function exportAsPDF(canvasRef, campaignName, options = {}) {
+  const element = canvasRef?.current;
+  if (!element) {
+    return { success: false, error: 'Canvas element not found' };
+  }
+
+  try {
+    const filename = generateFilename(campaignName);
+
+    const pdfOptions = {
+      margin: 0,
+      filename: `${filename}.pdf`,
+      image: { type: 'png', quality: 1 },
+      html2canvas: {
+        scale: 3,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 1024,
+        windowHeight: 576,
+        ignoreElements: (el) => {
+          return el.classList?.contains('alignment-guide') ||
+                 el.classList?.contains('selection-box') ||
+                 el.classList?.contains('multi-select-toolbar');
+        }
+      },
+      jsPDF: {
+        unit: 'px',
+        format: [1024, 576],
+        orientation: 'landscape',
+        hotfixes: ['px_scaling']
+      }
+    };
+
+    await html2pdf().set(pdfOptions).from(element).save();
+
+    return { success: true, filename };
+  } catch (error) {
+    console.error('PDF Export error:', error);
     return { success: false, error: error.message };
   }
 }

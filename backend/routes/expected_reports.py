@@ -349,6 +349,100 @@ def auto_match_expected_reports():
         }), 500
 
 
+@expected_reports_bp.route('/expected/create-from-placement', methods=['POST'])
+@cross_origin()
+def create_from_placement():
+    """Create a new CMIExpectedReport entry from a placement ID lookup."""
+    try:
+        session = get_session()
+        data = request.json
+
+        placement_id = data.get('placement_id')
+        if not placement_id:
+            return jsonify({'status': 'error', 'message': 'placement_id is required'}), 400
+
+        # Look up contract data
+        contract = session.query(CMIContractValue).filter_by(placement_id=str(placement_id)).first()
+        if not contract:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': f'No contract found for placement ID: {placement_id}'
+            }), 404
+
+        week_start, week_end = get_current_reporting_week()
+
+        # Check if entry already exists for this placement ID and week
+        existing = session.query(CMIExpectedReport).filter(
+            CMIExpectedReport.cmi_placement_id == str(placement_id),
+            CMIExpectedReport.reporting_week_start == week_start
+        ).first()
+
+        if existing:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': f'An entry for placement ID {placement_id} already exists for this week',
+                'existing_id': existing.id
+            }), 409
+
+        # Create new expected report
+        new_report = CMIExpectedReport(
+            cmi_placement_id=str(placement_id),
+            contract_number=contract.contract_number,
+            client_name=contract.client,
+            brand_name=contract.brand,
+            vehicle_name=contract.vehicle,
+            placement_description=contract.placement_description,
+            buy_type=contract.buy_component_type,
+            data_type=contract.data_type or 'AGG',
+            expected_data_frequency=contract.frequency,
+            agg_metric=contract.metric,
+            notes=contract.notes,
+            reporting_week_start=week_start,
+            reporting_week_end=week_end,
+            is_agg_only=True,
+            status='pending',
+            is_matched=False,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+
+        session.add(new_report)
+        session.commit()
+
+        report_id = new_report.id
+
+        result = {
+            'id': report_id,
+            'cmi_placement_id': str(placement_id),
+            'contract_number': contract.contract_number,
+            'client_name': contract.client,
+            'brand': contract.brand,
+            'vehicle': contract.vehicle,
+            'placement_description': contract.placement_description,
+            'buy_component_type': contract.buy_component_type,
+            'frequency': contract.frequency,
+            'metric': contract.metric,
+            'data_type': contract.data_type,
+            'notes': contract.notes
+        }
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'AGG entry created successfully',
+            'report': result
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @expected_reports_bp.route('/expected/no-data', methods=['GET'])
 @cross_origin()
 def get_no_data_reports():

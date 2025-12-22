@@ -38,6 +38,15 @@ const ReportsManager = () => {
     const [showPlacementIdModal, setShowPlacementIdModal] = useState(false);
     const [placementIdReport, setPlacementIdReport] = useState(null);
     const [placementIdInput, setPlacementIdInput] = useState('');
+
+    const [showAddAggModal, setShowAddAggModal] = useState(false);
+    const [addAggPlacementId, setAddAggPlacementId] = useState('');
+    const [addAggContractData, setAddAggContractData] = useState(null);
+    const [addAggMode, setAddAggMode] = useState('attach');
+    const [addAggSelectedCampaign, setAddAggSelectedCampaign] = useState(null);
+    const [addAggLoading, setAddAggLoading] = useState(false);
+    const [addAggError, setAddAggError] = useState('');
+
     const [manualMetadata, setManualMetadata] = useState(() => {
         const saved = localStorage.getItem('manualMetadata');
         return saved ? JSON.parse(saved) : {};
@@ -360,6 +369,123 @@ const ReportsManager = () => {
         setMoveNote('');
         setMoveMode('attach');
         setSelectedAttachTarget(null);
+    };
+
+    const openAddAggModal = () => {
+        setShowAddAggModal(true);
+        setAddAggPlacementId('');
+        setAddAggContractData(null);
+        setAddAggMode('attach');
+        setAddAggSelectedCampaign(null);
+        setAddAggError('');
+    };
+
+    const closeAddAggModal = () => {
+        setShowAddAggModal(false);
+        setAddAggPlacementId('');
+        setAddAggContractData(null);
+        setAddAggMode('attach');
+        setAddAggSelectedCampaign(null);
+        setAddAggError('');
+        setAddAggLoading(false);
+    };
+
+    const handleAddAggLookup = () => {
+        if (!addAggPlacementId.trim()) return;
+
+        const contract = cmiContractValues.find(c =>
+            String(c.placement_id) === String(addAggPlacementId.trim())
+        );
+
+        if (contract) {
+            setAddAggContractData(contract);
+            setAddAggError('');
+        } else {
+            setAddAggContractData(null);
+            setAddAggError(`No contract found for placement ID: ${addAggPlacementId}`);
+        }
+    };
+
+    const handleAddAggSubmit = async () => {
+        if (!addAggContractData) return;
+
+        setAddAggLoading(true);
+        setAddAggError('');
+
+        try {
+            const createResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/create-from-placement`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    placement_id: addAggPlacementId.trim()
+                })
+            });
+
+            const createResult = await createResponse.json();
+
+            if (!createResponse.ok) {
+                setAddAggError(createResult.message || 'Failed to create AGG entry');
+                setAddAggLoading(false);
+                return;
+            }
+
+            const reportId = createResult.report.id;
+
+            if (addAggMode === 'attach' && addAggSelectedCampaign) {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attach_to_campaign_id: addAggSelectedCampaign.id
+                    })
+                });
+
+                if (addAggContractData.metric) {
+                    await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agg_metric: addAggContractData.metric || '',
+                            agg_value: ''
+                        })
+                    });
+                }
+            } else if (addAggMode === 'standalone') {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        attach_to_campaign_id: null
+                    })
+                });
+
+                if (addAggContractData.metric) {
+                    await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agg_metric: addAggContractData.metric || '',
+                            agg_value: ''
+                        })
+                    });
+                }
+            }
+
+            await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/move-to-due`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    assigned_campaign_id: addAggSelectedCampaign?.id
+                })
+            });
+
+            await refreshAGGData();
+            closeAddAggModal();
+        } catch (error) {
+            setAddAggError('Error creating AGG entry: ' + error.message);
+        } finally {
+            setAddAggLoading(false);
+        }
     };
 
     const handleMoveToDue = async () => {
@@ -2204,20 +2330,30 @@ const ReportsManager = () => {
                     >
                         <span>Archive ({getPastReports.length})</span>
                     </button>
-                    <div className="rows-control">
-                        <label htmlFor="rowsPerPage">Rows per page:</label>
-                        <select
-                            id="rowsPerPage"
-                            value={getCurrentRowsPerPage()}
-                            onChange={handleCurrentTabRowsChange}
+                    {activeTab === 'current' ? (
+                        <button
+                            className="add-aggregate-btn"
+                            onClick={openAddAggModal}
                         >
-                            {[7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
-                                <option key={num} value={num}>
-                                    {num}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            <PlusCircle size={16} />
+                            Add Aggregate
+                        </button>
+                    ) : (
+                        <div className="rows-control">
+                            <label htmlFor="rowsPerPage">Rows per page:</label>
+                            <select
+                                id="rowsPerPage"
+                                value={getCurrentRowsPerPage()}
+                                onChange={handleCurrentTabRowsChange}
+                            >
+                                {[7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100].map((num) => (
+                                    <option key={num} value={num}>
+                                        {num}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -2226,8 +2362,6 @@ const ReportsManager = () => {
             {activeTab === 'current' && (() => {
                 const allCurrentReports = getCurrentWeekReports;
                 const allNoDataReports = getCurrentWeekNoDataReports;
-                const totalPages = getTotalPages(allCurrentReports.length, rowsPerPage);
-                const paginatedCurrentReports = getPaginatedData(allCurrentReports, currentPage, rowsPerPage);
 
                 return (
                     <div className="reports-section current-reports">
@@ -2273,7 +2407,7 @@ const ReportsManager = () => {
                                 </thead>
                                 <tbody>
                                     {(() => {
-                                        if (paginatedCurrentReports.length === 0) {
+                                        if (allCurrentReports.length === 0) {
                                             return (
                                                 <tr>
                                                     <td colSpan="7" className="empty-state">
@@ -2283,7 +2417,7 @@ const ReportsManager = () => {
                                             );
                                         }
 
-                                        const sortedReports = sortReports(paginatedCurrentReports);
+                                        const sortedReports = sortReports(allCurrentReports);
 
                                         const groupedReports = sortedReports.reduce((acc, report) => {
                                                 const agency = report.agency;
@@ -2325,7 +2459,7 @@ const ReportsManager = () => {
                                                     <td className="agency-section-empty"></td>
                                                 </tr>
                                                 {groupedReports[agency].map((report) => {
-                                                    const row = renderCurrentReportRow(report, globalIndex, paginatedCurrentReports);
+                                                    const row = renderCurrentReportRow(report, globalIndex, allCurrentReports);
                                                     globalIndex++;
                                                     return row;
                                                 })}
@@ -2410,7 +2544,6 @@ const ReportsManager = () => {
                                 </tbody>
                             </table>
                         </div>
-                        {renderPaginationButtons(currentPage, totalPages, 'current')}
 
                         {(getNoDataReportsByType.pldAndAgg.length > 0 || getNoDataReportsByType.aggOnly.length > 0) && (
                             <>
@@ -2997,6 +3130,148 @@ const ReportsManager = () => {
                         >
                             Enter
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {showAddAggModal && (
+                <div className="json-modal-overlay" onClick={closeAddAggModal}>
+                    <div className="move-modal-content add-agg-modal" onClick={e => e.stopPropagation()}>
+                        <div className="json-modal-header">
+                            <div className="json-modal-title">
+                                <PlusCircle size={20} />
+                                <h3>Add Aggregate</h3>
+                            </div>
+                            <button className="json-modal-close" onClick={closeAddAggModal}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="move-modal-body">
+                            <div className="add-agg-input-section">
+                                <label>CMI Placement ID</label>
+                                <div className="add-agg-input-row">
+                                    <input
+                                        type="text"
+                                        value={addAggPlacementId}
+                                        onChange={(e) => {
+                                            setAddAggPlacementId(e.target.value);
+                                            setAddAggContractData(null);
+                                            setAddAggError('');
+                                        }}
+                                        onKeyDown={(e) => e.key === 'Enter' && addAggPlacementId.trim() && handleAddAggLookup()}
+                                        placeholder="Enter placement ID"
+                                        autoFocus
+                                    />
+                                    <button
+                                        className="add-agg-lookup-btn"
+                                        onClick={handleAddAggLookup}
+                                        disabled={!addAggPlacementId.trim()}
+                                    >
+                                        Lookup
+                                    </button>
+                                </div>
+                            </div>
+
+                            {addAggError && (
+                                <div className="add-agg-error">{addAggError}</div>
+                            )}
+
+                            {addAggContractData && (
+                                <>
+                                    <div className="move-modal-source-card">
+                                        <span className="move-source-brand">{addAggContractData.brand || 'Unknown'}</span>
+                                        <span className="move-source-placement">{addAggContractData.placement_id}</span>
+                                    </div>
+
+                                    <div className="add-agg-contract-details">
+                                        <div className="add-agg-detail-row">
+                                            <span className="add-agg-detail-label">Vehicle:</span>
+                                            <span className="add-agg-detail-value">{addAggContractData.vehicle || '-'}</span>
+                                        </div>
+                                        <div className="add-agg-detail-row">
+                                            <span className="add-agg-detail-label">Metric:</span>
+                                            <span className="add-agg-detail-value">{addAggContractData.metric || '-'}</span>
+                                        </div>
+                                        <div className="add-agg-detail-row">
+                                            <span className="add-agg-detail-label">Contract #:</span>
+                                            <span className="add-agg-detail-value">{addAggContractData.contract_number || '-'}</span>
+                                        </div>
+                                        <div className="add-agg-detail-row">
+                                            <span className="add-agg-detail-label">Description:</span>
+                                            <span className="add-agg-detail-value">{addAggContractData.placement_description || '-'}</span>
+                                        </div>
+                                        {addAggContractData.notes && (
+                                            <div className="add-agg-detail-row">
+                                                <span className="add-agg-detail-label">Notes:</span>
+                                                <span className="add-agg-detail-value">{addAggContractData.notes}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="move-modal-mode-selection">
+                                        <button
+                                            className={`move-mode-btn ${addAggMode === 'attach' ? 'active' : ''}`}
+                                            onClick={() => setAddAggMode('attach')}
+                                        >
+                                            <Link size={16} />
+                                            Attach to Campaign
+                                        </button>
+                                        <button
+                                            className={`move-mode-btn ${addAggMode === 'standalone' ? 'active' : ''}`}
+                                            onClick={() => setAddAggMode('standalone')}
+                                        >
+                                            <PlusCircle size={16} />
+                                            Standalone
+                                        </button>
+                                    </div>
+
+                                    {addAggMode === 'attach' && (
+                                        <div className="move-modal-campaign-list">
+                                            {getAttachableCampaigns.length === 0 ? (
+                                                <div className="move-modal-no-campaigns">No CMI campaigns available</div>
+                                            ) : (
+                                                getAttachableCampaigns.map(campaign => (
+                                                    <div
+                                                        key={campaign.id}
+                                                        className={`move-modal-campaign-option ${addAggSelectedCampaign?.id === campaign.id ? 'selected' : ''}`}
+                                                        onClick={() => setAddAggSelectedCampaign(campaign)}
+                                                    >
+                                                        <div className="campaign-option-name">
+                                                            {cleanCampaignName(campaign.campaign_name)}
+                                                        </div>
+                                                        <div className="campaign-option-details">
+                                                            <span className="campaign-option-brand">{campaign.brand}</span>
+                                                            <span className="campaign-option-date">{formatSendDate(campaign.send_date)}</span>
+                                                            {attachedAGGs[campaign.id]?.length > 0 && (
+                                                                <span className="campaign-option-attached-count">
+                                                                    +{attachedAGGs[campaign.id].length} AGG
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {addAggMode === 'standalone' && (
+                                        <div className="move-modal-standalone-info">
+                                            This will be added as a standalone AGG entry.
+                                        </div>
+                                    )}
+
+                                    <div className="move-modal-actions">
+                                        <button
+                                            className="move-modal-confirm-btn"
+                                            onClick={handleAddAggSubmit}
+                                            disabled={addAggLoading || (addAggMode === 'attach' && !addAggSelectedCampaign)}
+                                        >
+                                            {addAggLoading ? 'Adding...' : (addAggMode === 'attach' ? 'Attach' : 'Add Standalone')}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

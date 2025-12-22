@@ -2986,3 +2986,179 @@ body.light .gcm-selection-desc {
   color: #888;
   margin-left: 8px;
 }
+
+.add-aggregate-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: rgba(0, 255, 255, 0.1);
+  color: #0ff;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.add-aggregate-btn:hover {
+  background-color: rgba(0, 255, 255, 0.2);
+  border-color: #0ff;
+}
+
+.add-agg-modal {
+  min-width: 450px;
+  max-width: 500px;
+}
+
+.add-agg-input-section {
+  margin-bottom: 16px;
+}
+
+.add-agg-input-section label {
+  display: block;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-agg-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-agg-input-row input {
+  flex: 1;
+  padding: 10px 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #f3f4f6;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.add-agg-input-row input:focus {
+  outline: none;
+  border-color: #0ff;
+  background-color: rgba(0, 255, 255, 0.05);
+}
+
+.add-agg-input-row input::placeholder {
+  color: #6b7280;
+}
+
+.add-agg-lookup-btn {
+  padding: 10px 16px;
+  background-color: rgba(0, 255, 255, 0.15);
+  color: #0ff;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.add-agg-lookup-btn:hover:not(:disabled) {
+  background-color: rgba(0, 255, 255, 0.25);
+}
+
+.add-agg-lookup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.add-agg-error {
+  padding: 10px 12px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.add-agg-contract-details {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.add-agg-detail-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.add-agg-detail-row:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.add-agg-detail-label {
+  color: #9ca3af;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.add-agg-detail-value {
+  color: #f3f4f6;
+  word-break: break-word;
+}
+
+body.light .add-aggregate-btn {
+  background-color: rgba(6, 182, 212, 0.1);
+  color: #0891b2;
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+body.light .add-aggregate-btn:hover {
+  background-color: rgba(6, 182, 212, 0.2);
+  border-color: #0891b2;
+}
+
+body.light .add-agg-input-row input {
+  background-color: #fff;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+body.light .add-agg-input-row input:focus {
+  border-color: #0891b2;
+  background-color: #fff;
+}
+
+body.light .add-agg-lookup-btn {
+  background-color: rgba(6, 182, 212, 0.1);
+  color: #0891b2;
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+body.light .add-agg-lookup-btn:hover:not(:disabled) {
+  background-color: rgba(6, 182, 212, 0.2);
+}
+
+body.light .add-agg-error {
+  background-color: rgba(239, 68, 68, 0.05);
+  color: #dc2626;
+}
+
+body.light .add-agg-contract-details {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+body.light .add-agg-detail-label {
+  color: #6b7280;
+}
+
+body.light .add-agg-detail-value {
+  color: #111827;
+}

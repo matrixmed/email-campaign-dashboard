@@ -216,7 +216,14 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
       const combinedCampaigns = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
         const isLive = deployments.some(d => d.isLive);
 
+        const isDeploymentBased = deployments.some(d =>
+          /deployment\s*#?\d+/i.test(d.Campaign)
+        );
+
         if (deployments.length === 1) {
+          if (isLive && isDeploymentBased) {
+            return null;
+          }
           return { ...deployments[0], CleanedName: campaignName, isLive };
         }
 
@@ -238,7 +245,7 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
           Unique_Open_Rate: totalDelivered > 0 ? (totalUniqueOpens / totalDelivered) * 100 : 0,
           isLive
         };
-      });
+      }).filter(c => c !== null);
 
       let processedCampaigns;
 

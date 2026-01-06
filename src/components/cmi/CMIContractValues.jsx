@@ -9,7 +9,7 @@ const CMIContractValues = () => {
   const [editValue, setEditValue] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterText, setFilterText] = useState('');
-  const [selectedYear, setSelectedYear] = useState(2025);
+  const [selectedYear, setSelectedYear] = useState(2026);
   const [newRowIds, setNewRowIds] = useState(new Set()); 
   const [aaCounter, setAaCounter] = useState(1);
   const tableRef = useRef(null);

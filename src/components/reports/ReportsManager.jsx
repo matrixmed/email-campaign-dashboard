@@ -46,6 +46,7 @@ const ReportsManager = () => {
     const [addAggSelectedCampaign, setAddAggSelectedCampaign] = useState(null);
     const [addAggLoading, setAddAggLoading] = useState(false);
     const [addAggError, setAddAggError] = useState('');
+    const [addAggExistingId, setAddAggExistingId] = useState(null);
 
     const [manualMetadata, setManualMetadata] = useState(() => {
         const saved = localStorage.getItem('manualMetadata');
@@ -388,6 +389,7 @@ const ReportsManager = () => {
         setAddAggSelectedCampaign(null);
         setAddAggError('');
         setAddAggLoading(false);
+        setAddAggExistingId(null);
     };
 
     const handleAddAggLookup = () => {
@@ -406,30 +408,42 @@ const ReportsManager = () => {
         }
     };
 
-    const handleAddAggSubmit = async () => {
+    const handleAddAggSubmit = async (useExistingId = null) => {
         if (!addAggContractData) return;
 
         setAddAggLoading(true);
         setAddAggError('');
 
         try {
-            const createResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/create-from-placement`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    placement_id: addAggPlacementId.trim()
-                })
-            });
+            let reportId;
 
-            const createResult = await createResponse.json();
+            if (useExistingId) {
+                reportId = useExistingId;
+            } else {
+                const createResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/create-from-placement`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        placement_id: addAggPlacementId.trim()
+                    })
+                });
 
-            if (!createResponse.ok) {
-                setAddAggError(createResult.message || 'Failed to create AGG entry');
-                setAddAggLoading(false);
-                return;
+                const createResult = await createResponse.json();
+
+                if (!createResponse.ok) {
+                    if (createResponse.status === 409 && createResult.existing_id) {
+                        setAddAggExistingId(createResult.existing_id);
+                        setAddAggError('');
+                        setAddAggLoading(false);
+                        return;
+                    }
+                    setAddAggError(createResult.message || 'Failed to create AGG entry');
+                    setAddAggLoading(false);
+                    return;
+                }
+
+                reportId = createResult.report.id;
             }
-
-            const reportId = createResult.report.id;
 
             if (addAggMode === 'attach' && addAggSelectedCampaign) {
                 await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
@@ -1274,9 +1288,9 @@ const ReportsManager = () => {
             return [];
         };
 
-        const placementId = matchedMeta?.cmi_placement_id;
+        const placementId = matchedMeta?.cmi_placement_id || report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id || '';
         const contractInfo = getContractInfo(placementId);
-        const brandName = matchedMeta?.brand_name || contractInfo?.brand || report.brand || '';
+        const brandName = contractInfo?.brand || matchedMeta?.brand_name || report.brand || '';
 
         let clientIdValue = '';
         const rawClientId = matchedMeta?.client_id;
@@ -1286,10 +1300,59 @@ const ReportsManager = () => {
             clientIdValue = rawClientId;
         }
 
+        const validationWarnings = [];
+        if (contractInfo && placementId) {
+            if (matchedMeta?.contract_number && contractInfo.contract_number &&
+                String(matchedMeta.contract_number).trim() !== String(contractInfo.contract_number).trim()) {
+                validationWarnings.push({
+                    field: 'contract_number',
+                    label: 'Contract Number',
+                    metadataValue: matchedMeta.contract_number,
+                    contractValue: contractInfo.contract_number
+                });
+            }
+            if (matchedMeta?.placement_description && contractInfo.placement_description &&
+                String(matchedMeta.placement_description).trim().toLowerCase() !== String(contractInfo.placement_description).trim().toLowerCase()) {
+                validationWarnings.push({
+                    field: 'placement_description',
+                    label: 'Placement Description',
+                    metadataValue: matchedMeta.placement_description,
+                    contractValue: contractInfo.placement_description
+                });
+            }
+            if (matchedMeta?.brand_name && contractInfo.brand &&
+                String(matchedMeta.brand_name).trim().toLowerCase() !== String(contractInfo.brand).trim().toLowerCase()) {
+                validationWarnings.push({
+                    field: 'brand_name',
+                    label: 'Brand Name',
+                    metadataValue: matchedMeta.brand_name,
+                    contractValue: contractInfo.brand
+                });
+            }
+            if (matchedMeta?.vehicle_name && contractInfo.vehicle &&
+                String(matchedMeta.vehicle_name).trim().toLowerCase() !== String(contractInfo.vehicle).trim().toLowerCase()) {
+                validationWarnings.push({
+                    field: 'vehicle_name',
+                    label: 'Vehicle Name',
+                    metadataValue: matchedMeta.vehicle_name,
+                    contractValue: contractInfo.vehicle
+                });
+            }
+            if (matchedMeta?.buy_component_type && contractInfo.buy_component_type &&
+                String(matchedMeta.buy_component_type).trim().toLowerCase() !== String(contractInfo.buy_component_type).trim().toLowerCase()) {
+                validationWarnings.push({
+                    field: 'buy_component_type',
+                    label: 'Buy Component Type',
+                    metadataValue: matchedMeta.buy_component_type,
+                    contractValue: contractInfo.buy_component_type
+                });
+            }
+        }
+
         return {
             start_date: formatISODateTime(currentTimeframe.start),
             end_date: formatISODateTime(currentTimeframe.end, true),
-            cmi_placement_id: matchedMeta?.cmi_placement_id || '',
+            cmi_placement_id: placementId,
             client_placement_id: matchedMeta?.client_placement_id || '',
             client_id: clientIdValue,
             client_campaign_name: matchedMeta?.campaign_name_from_file || '',
@@ -1297,12 +1360,20 @@ const ReportsManager = () => {
             creative_code: matchedMeta?.creative_code || '',
             gcm_placement_id: buildGcmArray(),
             brand_name: brandName,
-            vehicle_name: matchedMeta?.vehicle_name || contractInfo?.vehicle || '',
+            vehicle_name: contractInfo?.vehicle || matchedMeta?.vehicle_name || '',
             media_tactic_id: matchedMeta?.media_tactic_id || '',
-            contract_number: matchedMeta?.contract_number || contractInfo?.contract_number || '',
-            placement_description: matchedMeta?.placement_description || contractInfo?.placement_description || '',
-            buy_component_type: matchedMeta?.buy_component_type || contractInfo?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
-            metric: contractInfo?.metric || 'Opens_Unique'
+            contract_number: contractInfo?.contract_number || matchedMeta?.contract_number || '',
+            placement_description: contractInfo?.placement_description || matchedMeta?.placement_description || '',
+            buy_component_type: contractInfo?.buy_component_type || matchedMeta?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
+            metric: contractInfo?.metric || 'Opens_Unique',
+            _validationWarnings: validationWarnings,
+            _contractInfo: contractInfo ? {
+                contract_number: contractInfo.contract_number,
+                placement_description: contractInfo.placement_description,
+                brand: contractInfo.brand,
+                vehicle: contractInfo.vehicle,
+                buy_component_type: contractInfo.buy_component_type
+            } : null
         };
     };
 
@@ -1507,9 +1578,9 @@ const ReportsManager = () => {
             const manualMeta = manualMetadata[report.id] || {};
             const matchedMeta = { ...baseMeta, ...manualMeta };
             const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
-            const placementId = matchedMeta?.cmi_placement_id;
+            const placementId = matchedMeta?.cmi_placement_id || report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id || '';
             const contractInfo = getContractInfo(placementId);
-            const brandName = matchedMeta?.brand_name || report.brand || '';
+            const brandName = contractInfo?.brand || matchedMeta?.brand_name || report.brand || '';
 
             let clientIdValue = '';
             const rawClientId = matchedMeta?.client_id;
@@ -1520,7 +1591,7 @@ const ReportsManager = () => {
             }
 
             campaigns[campaignName] = {
-                cmi_placement_id: matchedMeta?.cmi_placement_id || '',
+                cmi_placement_id: placementId,
                 client_placement_id: matchedMeta?.client_placement_id || '',
                 client_id: clientIdValue,
                 client_campaign_name: matchedMeta?.campaign_name_from_file || '',
@@ -1528,11 +1599,11 @@ const ReportsManager = () => {
                 creative_code: matchedMeta?.creative_code || '',
                 gcm_placement_id: buildGcmArray(matchedMeta),
                 brand_name: brandName,
-                vehicle_name: matchedMeta?.vehicle_name || contractInfo?.vehicle || '',
+                vehicle_name: contractInfo?.vehicle || matchedMeta?.vehicle_name || '',
                 media_tactic_id: matchedMeta?.media_tactic_id || '',
-                contract_number: matchedMeta?.contract_number || contractInfo?.contract_number || '',
-                placement_description: matchedMeta?.placement_description || contractInfo?.placement_description || '',
-                buy_component_type: matchedMeta?.buy_component_type || contractInfo?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
+                contract_number: contractInfo?.contract_number || matchedMeta?.contract_number || '',
+                placement_description: contractInfo?.placement_description || matchedMeta?.placement_description || '',
+                buy_component_type: contractInfo?.buy_component_type || matchedMeta?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
                 metric: contractInfo?.metric || 'Opens_Unique'
             };
         });
@@ -1547,13 +1618,13 @@ const ReportsManager = () => {
                 cmi_placement_id: agg.cmi_placement_id || '',
                 creative_code: '',
                 gcm_placement_id: [],
-                brand_name: agg.brand || contractInfo?.brand || '',
-                vehicle_name: agg.vehicle || contractInfo?.vehicle || '',
+                brand_name: contractInfo?.brand || agg.brand || '',
+                vehicle_name: contractInfo?.vehicle || agg.vehicle || '',
                 media_tactic_id: agg.media_tactic_id || '',
-                contract_number: agg.contract_number || contractInfo?.contract_number || '',
-                placement_description: agg.placement_description || contractInfo?.placement_description || '',
-                buy_component_type: agg.buy_component_type || contractInfo?.buy_component_type || '',
-                metric: agg.agg_metric || agg.contract_metric || contractInfo?.metric || '',
+                contract_number: contractInfo?.contract_number || agg.contract_number || '',
+                placement_description: contractInfo?.placement_description || agg.placement_description || '',
+                buy_component_type: contractInfo?.buy_component_type || agg.buy_component_type || '',
+                metric: contractInfo?.metric || agg.agg_metric || agg.contract_metric || '',
                 value: agg.agg_value || ''
             };
         });
@@ -1997,12 +2068,11 @@ const ReportsManager = () => {
         if (contract) {
             setEditFormData(prev => ({
                 ...prev,
-                brand_name: contract.brand || prev.brand_name,
-                vehicle_name: contract.vehicle || prev.vehicle_name,
-                contract_number: contract.contract_number || prev.contract_number,
-                placement_description: contract.placement_description || prev.placement_description,
-                buy_component_type: contract.buy_component_type || prev.buy_component_type,
-                media_tactic_id: contract.media_tactic_id || prev.media_tactic_id
+                brand_name: prev.brand_name || contract.brand || '',
+                vehicle_name: prev.vehicle_name || contract.vehicle || '',
+                contract_number: prev.contract_number || contract.contract_number || '',
+                placement_description: prev.placement_description || contract.placement_description || '',
+                buy_component_type: prev.buy_component_type || contract.buy_component_type || ''
             }));
         }
     };
@@ -2767,6 +2837,26 @@ const ReportsManager = () => {
                                 JSON
                             </button>
                         </div>
+                        {selectedCMIReport?._validationWarnings?.length > 0 && (
+                            <div className="validation-warnings-banner">
+                                <div className="validation-warnings-header">
+                                    <strong>Data Mismatch Detected</strong>
+                                    <span className="warning-note">(CMI Contracts table is source of truth - values corrected)</span>
+                                </div>
+                                <div className="validation-warnings-list">
+                                    {selectedCMIReport._validationWarnings.map((warning, idx) => (
+                                        <div key={idx} className="validation-warning-item">
+                                            <span className="warning-field">{warning.label}:</span>
+                                            <span className="warning-values">
+                                                <span className="warning-old">File: "{warning.metadataValue}"</span>
+                                                <span className="warning-arrow">→</span>
+                                                <span className="warning-new">Contract: "{warning.contractValue}"</span>
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <div className="edit-form-modal-body">
                             {modalViewMode === 'layout' ? (
                                 <div className="edit-form-grid">
@@ -3157,6 +3247,7 @@ const ReportsManager = () => {
                                             setAddAggPlacementId(e.target.value);
                                             setAddAggContractData(null);
                                             setAddAggError('');
+                                            setAddAggExistingId(null);
                                         }}
                                         onKeyDown={(e) => e.key === 'Enter' && addAggPlacementId.trim() && handleAddAggLookup()}
                                         placeholder="Enter placement ID"
@@ -3174,6 +3265,21 @@ const ReportsManager = () => {
 
                             {addAggError && (
                                 <div className="add-agg-error">{addAggError}</div>
+                            )}
+
+                            {addAggExistingId && addAggContractData && (
+                                <div className="add-agg-existing-notice">
+                                    <div className="existing-notice-text">
+                                        An entry for this placement ID already exists for this week.
+                                    </div>
+                                    <button
+                                        className="use-existing-btn"
+                                        onClick={() => handleAddAggSubmit(addAggExistingId)}
+                                        disabled={addAggLoading || (addAggMode === 'attach' && !addAggSelectedCampaign)}
+                                    >
+                                        {addAggLoading ? 'Processing...' : 'Use Existing Entry'}
+                                    </button>
+                                </div>
                             )}
 
                             {addAggContractData && (

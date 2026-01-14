@@ -308,7 +308,7 @@ def engagement_by_tier():
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
-                LEFT JOIN campaign_interactions ci ON up.email = ci.email
+                LEFT JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.npi IN ({placeholders})
                 GROUP BY up.email, up.first_name, up.last_name, up.specialty, up.npi, cd.campaign_base_name, ci.event_type
@@ -320,7 +320,7 @@ def engagement_by_tier():
             users_data = {}
 
             for row in raw_data:
-                email = row['email']
+                email = row['email'].lower() if row['email'] else '' 
                 campaign_name = row['campaign_base_name']
                 event_type = row['event_type']
 
@@ -472,7 +472,7 @@ def engagement_by_tier():
             cursor.execute(f"""
                 SELECT DISTINCT up.npi
                 FROM user_profiles up
-                JOIN campaign_interactions ci ON up.email = ci.email
+                JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 WHERE up.npi IN ({placeholders})
                 AND ci.event_type = 'open'
             """, all_target_list_npis)

@@ -928,7 +928,7 @@ def timing_intelligence():
             WITH total_delivered AS (
                 SELECT COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as total
                 FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = up.email
+                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE ci.event_type = 'sent'
                 {date_filter}
@@ -941,7 +941,7 @@ def timing_intelligence():
                     EXTRACT(DOW FROM ci.timestamp) as day_of_week,
                     COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as unique_sends
                 FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = up.email
+                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE ci.event_type = 'sent'
                 {date_filter}
@@ -955,7 +955,7 @@ def timing_intelligence():
                     EXTRACT(DOW FROM ci.timestamp) as day_of_week,
                     COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as unique_opens
                 FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = up.email
+                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE ci.event_type = 'open'
                 {date_filter}
@@ -1045,7 +1045,7 @@ def timing_intelligence():
                     MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'sent') as sent_time,
                     MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'open') as first_open_time
                 FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = up.email
+                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE ci.event_type IN ('sent', 'open')
                 {date_filter}
@@ -1120,7 +1120,7 @@ def timing_intelligence():
                     WITH total_opens AS (
                         SELECT COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as total
                         FROM campaign_interactions ci
-                        INNER JOIN user_profiles up ON ci.email = up.email
+                        INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                         LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                         WHERE ci.event_type = 'open'
                         AND up.specialty = %s
@@ -1134,7 +1134,7 @@ def timing_intelligence():
                             EXTRACT(HOUR FROM ci.timestamp) as hour,
                             EXTRACT(DOW FROM ci.timestamp) as day_of_week
                         FROM campaign_interactions ci
-                        INNER JOIN user_profiles up ON ci.email = up.email
+                        INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
                         LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                         WHERE ci.event_type = 'open'
                         AND up.specialty = %s
@@ -1224,7 +1224,7 @@ def timing_intelligence():
         specialty_query = """
             SELECT DISTINCT up.specialty
             FROM user_profiles up
-            INNER JOIN campaign_interactions ci ON up.email = ci.email
+            INNER JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
             WHERE up.specialty IS NOT NULL AND up.specialty != ''
             ORDER BY up.specialty
             LIMIT 50
@@ -1296,7 +1296,7 @@ def geographic_main():
                 LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 3) as zip_prefix,
                 COUNT(DISTINCT up.email) as count
             FROM user_profiles up
-            INNER JOIN campaign_interactions ci ON up.email = ci.email
+            INNER JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
             WHERE up.zipcode IS NOT NULL AND up.zipcode != ''
             AND LENGTH(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g')) >= 5
             AND ci.event_type = 'open'
@@ -1567,7 +1567,7 @@ def geographic_main():
                 LEFT(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g'), 5) as zipcode,
                 COUNT(DISTINCT up.email) as count
             FROM user_profiles up
-            INNER JOIN campaign_interactions ci ON up.email = ci.email
+            INNER JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
             WHERE up.city IS NOT NULL AND up.city != ''
             AND LENGTH(REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g')) >= 5
             AND ci.event_type = 'open'
@@ -1713,7 +1713,7 @@ def geographic_custom():
             query = f"""
                 SELECT DISTINCT up.email, up.zipcode, up.city
                 FROM user_profiles up
-                INNER JOIN campaign_interactions ci ON up.email = ci.email
+                INNER JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 WHERE up.zipcode IS NOT NULL AND up.zipcode != ''
                 AND ci.event_type = 'open'
                 {date_filter}
@@ -1867,11 +1867,11 @@ def geographic_enhanced():
                 up.specialty,
                 CASE WHEN EXISTS (
                     SELECT 1 FROM campaign_interactions ci
-                    WHERE ci.email = up.email AND ci.event_type = 'open'
+                    WHERE ci.email = LOWER(up.email) AND ci.event_type = 'open'
                 ) THEN 1 ELSE 0 END as has_opened,
                 CASE WHEN EXISTS (
                     SELECT 1 FROM campaign_interactions ci
-                    WHERE ci.email = up.email AND ci.event_type = 'click'
+                    WHERE ci.email = LOWER(up.email) AND ci.event_type = 'click'
                 ) THEN 1 ELSE 0 END as has_clicked
             FROM user_profiles up
             WHERE up.zipcode IS NOT NULL AND up.zipcode != ''
@@ -2123,7 +2123,7 @@ def geographic_state_detail():
                 COUNT(*) as count,
                 SUM(CASE WHEN EXISTS (
                     SELECT 1 FROM campaign_interactions ci
-                    WHERE ci.email = up.email AND ci.event_type = 'open'
+                    WHERE ci.email = LOWER(up.email) AND ci.event_type = 'open'
                 ) THEN 1 ELSE 0 END) as engaged_count
             FROM user_profiles up
             WHERE ({zip_conditions})
@@ -2153,7 +2153,7 @@ def geographic_state_detail():
                 COUNT(*) as count,
                 SUM(CASE WHEN EXISTS (
                     SELECT 1 FROM campaign_interactions ci
-                    WHERE ci.email = up.email AND ci.event_type = 'open'
+                    WHERE ci.email = LOWER(up.email) AND ci.event_type = 'open'
                 ) THEN 1 ELSE 0 END) as engaged_count
             FROM user_profiles up
             WHERE ({zip_conditions})

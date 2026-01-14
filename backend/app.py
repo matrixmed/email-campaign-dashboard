@@ -36,6 +36,7 @@ from routes.analytics import analytics_bp
 from routes.npi import npi_bp
 from routes.basis import basis_bp
 from routes.validation_flags import validation_flags_bp
+from routes.tracking import tracking_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
@@ -51,6 +52,7 @@ app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
 app.register_blueprint(npi_bp, url_prefix='/api/npi')
 app.register_blueprint(basis_bp, url_prefix='/api/basis')
 app.register_blueprint(validation_flags_bp, url_prefix='/api/validation-flags')
+app.register_blueprint(tracking_bp, url_prefix='/api/t')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

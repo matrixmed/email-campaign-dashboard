@@ -786,20 +786,17 @@ const ReportsManager = () => {
     };
 
     const isFirstWeekOfMonth = () => {
-        const reportingMonday = getCurrentWeekMonday();
-        reportingMonday.setDate(reportingMonday.getDate() - 7);
-
-        const dayOfMonth = reportingMonday.getDate();
+        const currentMonday = getCurrentWeekMonday();
+        const dayOfMonth = currentMonday.getDate();
         return dayOfMonth <= 7;
     };
 
     const getMonthlyReports = () => {
         if (!isFirstWeekOfMonth()) return [];
 
-        const reportingMonday = getCurrentWeekMonday();
-        reportingMonday.setDate(reportingMonday.getDate() - 7);
+        const currentMonday = getCurrentWeekMonday();
 
-        const prevMonth = new Date(reportingMonday);
+        const prevMonth = new Date(currentMonday);
         prevMonth.setMonth(prevMonth.getMonth() - 1);
 
         const monthName = prevMonth.toLocaleString('default', { month: 'long' });
@@ -833,7 +830,7 @@ const ReportsManager = () => {
             campaign_name: `IQVIA Monthly Report - ${monthName} ${year}`,
             brand: 'IQVIA',
             agency: 'IQVIA',
-            send_date: reportingMonday.toISOString().split('T')[0],
+            send_date: currentMonday.toISOString().split('T')[0],
             is_monthly: true,
             unique_key: `iqvia_monthly_${year}_${prevMonth.getMonth()}`
         });
@@ -867,9 +864,8 @@ const ReportsManager = () => {
 
         const monthlyReportIds = new Set();
         if (isMonthlyWeek) {
-            const reportingMonday = getCurrentWeekMonday();
-            reportingMonday.setDate(reportingMonday.getDate() - 7);
-            const prevMonth = new Date(reportingMonday);
+            const currentMonday = getCurrentWeekMonday();
+            const prevMonth = new Date(currentMonday);
             prevMonth.setMonth(prevMonth.getMonth() - 1);
 
             reportsData.forEach(report => {
@@ -1355,7 +1351,7 @@ const ReportsManager = () => {
             cmi_placement_id: placementId,
             client_placement_id: matchedMeta?.client_placement_id || '',
             client_id: clientIdValue,
-            client_campaign_name: matchedMeta?.campaign_name_from_file || '',
+            client_campaign_name: matchedMeta?.client_campaign_name || matchedMeta?.campaign_name_from_file || '',
             target_list_id: matchedMeta?.target_list_id || '',
             creative_code: matchedMeta?.creative_code || '',
             gcm_placement_id: buildGcmArray(),
@@ -1594,7 +1590,7 @@ const ReportsManager = () => {
                 cmi_placement_id: placementId,
                 client_placement_id: matchedMeta?.client_placement_id || '',
                 client_id: clientIdValue,
-                client_campaign_name: matchedMeta?.campaign_name_from_file || '',
+                client_campaign_name: matchedMeta?.client_campaign_name || matchedMeta?.campaign_name_from_file || '',
                 target_list_id: matchedMeta?.target_list_id || '',
                 creative_code: matchedMeta?.creative_code || '',
                 gcm_placement_id: buildGcmArray(matchedMeta),
@@ -1965,6 +1961,7 @@ const ReportsManager = () => {
                     gcm_placement_id: editFormData.gcm_placement_id,
                     client_id: editFormData.client_id,
                     brand_name: editFormData.brand_name,
+                    client_campaign_name: editFormData.client_campaign_name,
                     vehicle_name: editFormData.vehicle_name,
                     placement_description: editFormData.placement_description,
                     buy_component_type: editFormData.buy_component_type,
@@ -2941,6 +2938,14 @@ const ReportsManager = () => {
                                             type="text"
                                             value={editFormData.brand_name || ''}
                                             onChange={(e) => updateEditFormField('brand_name', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="edit-form-field full-width">
+                                        <label>Campaign Name (Client)</label>
+                                        <input
+                                            type="text"
+                                            value={editFormData.client_campaign_name || ''}
+                                            onChange={(e) => updateEditFormField('client_campaign_name', e.target.value)}
                                         />
                                     </div>
                                     <div className="edit-form-field full-width">

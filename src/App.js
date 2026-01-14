@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import { SearchProvider } from './context/SearchContext';
+import t from './utils/t';
 import './App.css';
 import './styles/Dashboard.css';
 import './styles/MatrixSignIn.css';
 import './styles/ReportsManager.css';
+
+t.init();
 
 const SESSION_DURATION = 10 * 60 * 60 * 1000;
 

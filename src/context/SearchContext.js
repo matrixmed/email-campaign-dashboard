@@ -8,7 +8,8 @@ export const SearchProvider = ({ children }) => {
     campaignAnalytics: '',
     journalMetrics: '',
     videoMetrics: '',
-    specialtyMetrics: ''
+    specialtyMetrics: '',
+    basisOptimization: ''
   });
 
   const setSearchTerm = (key, value) => {

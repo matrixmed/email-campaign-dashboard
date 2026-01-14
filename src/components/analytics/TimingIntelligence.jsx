@@ -672,7 +672,7 @@ const TimingIntelligence = () => {
             </div>
 
             <div className="ti-modal-list">
-              {filteredCampaigns.map(campaign => {
+              {[...filteredCampaigns].sort((a, b) => new Date(b.send_date) - new Date(a.send_date)).map(campaign => {
                 const isSelected = selectedCampaigns.includes(campaign.campaign_name);
                 return (
                   <div

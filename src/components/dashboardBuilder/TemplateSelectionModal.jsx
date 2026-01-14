@@ -418,15 +418,15 @@ const TemplateSelectionModal = ({
                 />
               </div>
 
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                 gap: '16px',
                 maxHeight: '370px',
                 overflow: 'auto',
                 padding: '8px'
               }}>
-                {filteredCampaigns.map(campaign => {
+                {[...filteredCampaigns].sort((a, b) => new Date(b.send_date) - new Date(a.send_date)).map(campaign => {
                   const isSelected = campaignType === 'single' 
                     ? selectedSingleCampaign?.campaign_name === campaign.campaign_name
                     : selectedCampaigns.some(c => c.campaign_name === campaign.campaign_name);

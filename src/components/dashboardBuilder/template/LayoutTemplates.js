@@ -222,27 +222,27 @@ export const TABLE_DEFINITIONS = {
     title: 'Online Journal Metrics',
     headers: ['Metric', 'Value'],
     data: [
-      ['Avg Time in Issue', '3m 19s'],
-      ['Total Page Views', '2,778'],
-      ['Total Issue Visits', '439']
+      ['Avg Time in Issue', ''],
+      ['Total Page Views', ''],
+      ['Total Issue Visits', '']
     ]
   },
   [TABLE_TYPES.VIDEO_METRICS]: {
     title: 'Video Metrics', 
     headers: ['Metric', 'Value'],
     data: [
-      ['Total Time Watched', '24h 27m 6s'],
-      ['Avg Time Watched', '52.7%'],
-      ['Total Impressions', '1,812']
+      ['Total Time Watched', ''],
+      ['Avg Time Watched', ''],
+      ['Total Impressions', '']
     ]
   },
   [TABLE_TYPES.SOCIAL_MEDIA]: {
     title: 'Social Media Metrics',
     headers: ['Metric', 'Value'],
     data: [
-      ['Impressions', '1,000'],
-      ['Engagement Rate', '12%'],
-      ['CTR', '5%']
+      ['Impressions', ''],
+      ['Engagement Rate', ''],
+      ['CTR', '']
     ]
   }
 };

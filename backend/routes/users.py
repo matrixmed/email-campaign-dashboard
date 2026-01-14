@@ -89,7 +89,8 @@ def analyze_list():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        placeholders = ','.join(['%s'] * len(user_list))
+        user_list_normalized = [u.lower() if input_type == 'email' else u for u in user_list]
+        placeholders = ','.join(['%s'] * len(user_list_normalized))
 
         if input_type == 'email':
             query = f"""
@@ -103,9 +104,9 @@ def analyze_list():
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
-                LEFT JOIN campaign_interactions ci ON up.email = ci.email
+                LEFT JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE up.email IN ({placeholders})
+                WHERE LOWER(up.email) IN ({placeholders})
                 GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
@@ -121,20 +122,20 @@ def analyze_list():
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
-                LEFT JOIN campaign_interactions ci ON up.email = ci.email
+                LEFT JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.npi IN ({placeholders})
                 GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
 
-        cursor.execute(query, user_list)
+        cursor.execute(query, user_list_normalized)
         raw_data = cursor.fetchall()
 
         users_data = {}
 
         for row in raw_data:
-            email = row['email']
+            email = row['email'].lower()
             campaign_name = row['campaign_name']
             event_type = row['event_type']
 
@@ -295,7 +296,7 @@ def engagement_patterns():
                         COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
                         COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
                 )
@@ -321,7 +322,7 @@ def engagement_patterns():
                         COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
                         COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
                 )
@@ -346,7 +347,7 @@ def engagement_patterns():
                         COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
                         COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
                 )
@@ -368,7 +369,7 @@ def engagement_patterns():
                         COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
                         COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
                 )
@@ -392,7 +393,7 @@ def engagement_patterns():
                         MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
                         ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
                 ),
@@ -420,7 +421,7 @@ def engagement_patterns():
                         MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
                         ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) DESC) as reverse_sequence
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
                 ),
@@ -449,7 +450,7 @@ def engagement_patterns():
                         EXTRACT(DOW FROM ci.timestamp) as day_of_week,
                         MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) OVER (PARTITION BY up.email, ci.campaign_id) as sent_time
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     WHERE ci.event_type = 'open'
                 ),
@@ -483,7 +484,7 @@ def engagement_patterns():
                         ci.timestamp, cd.campaign_base_name,
                         LAG(ci.timestamp) OVER (PARTITION BY up.email ORDER BY ci.timestamp) as prev_open_time
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     WHERE ci.event_type = 'open'
                 ),
@@ -513,7 +514,7 @@ def engagement_patterns():
                         MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
                         ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
                 ),
@@ -541,7 +542,7 @@ def engagement_patterns():
                         ci.timestamp, EXTRACT(HOUR FROM ci.timestamp) as hour_of_day,
                         MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) OVER (PARTITION BY up.email, ci.campaign_id) as sent_time
                     FROM user_profiles up
-                    JOIN campaign_interactions ci ON up.email = ci.email
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     WHERE ci.event_type = 'open'
                 ),
@@ -648,7 +649,7 @@ def engagement_query():
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM user_profiles up
-                JOIN campaign_interactions ci ON up.email = ci.email
+                JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE 1=1
             """
@@ -690,7 +691,7 @@ def engagement_query():
                     COUNT(*) as event_count
                 FROM campaign_deployments cd
                 JOIN campaign_interactions ci ON cd.campaign_id = ci.campaign_id
-                JOIN user_profiles up ON ci.email = up.email
+                JOIN user_profiles up ON ci.email = LOWER(up.email)
                 WHERE 1=1
             """
 
@@ -723,7 +724,7 @@ def engagement_query():
         users_data = {}
 
         for row in raw_data:
-            email = row['email']
+            email = row['email'].lower()
             campaign_name = row['campaign_base_name']
             event_type = row['event_type'].lower()
             event_count = row['event_count']

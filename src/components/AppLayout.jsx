@@ -16,7 +16,7 @@ const AppLayout = ({ children }) => {
   const navItems = [
     { path: '/campaigns', label: 'Campaign Performance' },
     { path: '/analytics', label: 'Campaign Analytics' },
-    //{ path: '/basis', label: 'Basis Optimization' },
+    { path: '/basis', label: 'Basis Optimization' },
     { path: '/dashboard-builder', label: 'Dashboard Builder' },
     { path: '/reports', label: 'Reports Managment' },
     { path: '/brands', label: 'Brand Management' },
@@ -26,6 +26,7 @@ const AppLayout = ({ children }) => {
     { path: '/specialty', label: 'Specialty Metrics' },
     { path: '/video', label: 'Video Metrics' },
     { path: '/journals', label: 'Journal Metrics' },
+    //{ path: '/tracking', label: 'Visitor Tracking' },
   ];
 
   const isDashboardBuilder = location.pathname === '/dashboard-builder';

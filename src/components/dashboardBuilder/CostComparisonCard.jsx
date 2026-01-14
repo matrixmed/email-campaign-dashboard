@@ -268,7 +268,7 @@ const CostComparisonCard = ({
           UNDER BUDGET
         </div>
         
-        <div style={{ 
+        <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-end',
@@ -276,40 +276,50 @@ const CostComparisonCard = ({
           color: themeColors.textSecondary || '#6b7280',
           gap: '8px'
         }}>
-          <div style={{ 
+          <div style={{
             textAlign: 'left',
-            flex: 1
+            flex: 1,
+            minWidth: 0
           }}>
-            <div style={{ 
+            <div style={{
               fontWeight: '600',
               fontSize: getFontSize(24, 9, 14),
-              color: themeColors.text || '#1f2937'
+              color: themeColors.text || '#1f2937',
+              lineHeight: 1.1
             }}>
               ${actualCost.toFixed(2)}
             </div>
-            <div style={{ 
+            <div style={{
               opacity: 0.7,
-              fontSize: getFontSize(16, 6, 10)
+              fontSize: isMultiCard ? 7 : getFontSize(16, 6, 10),
+              lineHeight: 1.1,
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px'
             }}>
-              Actual
+              {isMultiCard ? 'Actual' : 'Actual'}
             </div>
           </div>
-          <div style={{ 
+          <div style={{
             textAlign: 'right',
-            flex: 1
+            flex: 1,
+            minWidth: 0
           }}>
-            <div style={{ 
+            <div style={{
               fontWeight: '600',
               fontSize: getFontSize(24, 9, 14),
-              color: themeColors.text || '#1f2937'
+              color: themeColors.text || '#1f2937',
+              lineHeight: 1.1
             }}>
               ${contractedCost.toFixed(2)}
             </div>
-            <div style={{ 
+            <div style={{
               opacity: 0.7,
-              fontSize: getFontSize(16, 6, 10)
+              fontSize: isMultiCard ? 7 : getFontSize(16, 6, 10),
+              lineHeight: 1.1,
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px'
             }}>
-              Budget
+              {isMultiCard ? 'Budgeted' : 'Budget'}
             </div>
           </div>
         </div>

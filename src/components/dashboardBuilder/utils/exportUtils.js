@@ -5,11 +5,11 @@ const EXPORT_CONFIG = {
   height: 576,
   scale: 3,
   useCORS: true,
-  allowTaint: false,
-  backgroundColor: '#ffffff',
+  allowTaint: true,
+  backgroundColor: null,
   logging: false,
   imageTimeout: 15000,
-  removeContainer: false,
+  removeContainer: true,
   windowWidth: 1024,
   windowHeight: 576,
   ignoreElements: (element) => {
@@ -148,35 +148,82 @@ export async function exportDashboard(canvasRef, campaignName, options = {}) {
 }
 
 export async function exportAsPDF(canvasRef, campaignName, options = {}) {
-  const element = canvasRef?.current;
-  if (!element) {
+  const innerElement = canvasRef?.current;
+  if (!innerElement) {
     return { success: false, error: 'Canvas element not found' };
   }
+
+  const element = innerElement.parentElement || innerElement;
 
   try {
     const filename = generateFilename(campaignName);
 
+    const images = element.querySelectorAll('img');
+    await Promise.all(
+      Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+          setTimeout(resolve, 5000);
+        });
+      })
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const computedStyle = window.getComputedStyle(element);
+    const originalBackground = computedStyle.background;
+    const originalBoxShadow = computedStyle.boxShadow;
+    const originalBorderRadius = computedStyle.borderRadius;
+
     const pdfOptions = {
-      margin: 0,
+      margin: [20, 20, 20, 20],
       filename: `${filename}.pdf`,
       image: { type: 'png', quality: 1 },
       html2canvas: {
-        scale: 3,
+        scale: 2,
         useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
+        allowTaint: true,
+        backgroundColor: '#f0f2f5',
         logging: false,
-        windowWidth: 1024,
-        windowHeight: 576,
+        windowWidth: 1200,
+        windowHeight: 800,
+        scrollX: 0,
+        scrollY: -window.scrollY,
         ignoreElements: (el) => {
           return el.classList?.contains('alignment-guide') ||
                  el.classList?.contains('selection-box') ||
-                 el.classList?.contains('multi-select-toolbar');
+                 el.classList?.contains('multi-select-toolbar') ||
+                 el.classList?.contains('resize-handle');
+        },
+        onclone: (clonedDoc, clonedElement) => {
+          clonedElement.style.width = '1024px';
+          clonedElement.style.height = '576px';
+          clonedElement.style.maxWidth = '1024px';
+          clonedElement.style.maxHeight = '576px';
+          clonedElement.style.overflow = 'visible';
+          clonedElement.style.position = 'relative';
+
+          clonedElement.style.background = originalBackground || 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)';
+          clonedElement.style.boxShadow = originalBoxShadow || '0 10px 40px rgba(0, 0, 0, 0.15)';
+          clonedElement.style.borderRadius = originalBorderRadius || '16px';
+
+          clonedElement.style.backdropFilter = 'none';
+          clonedElement.style.webkitBackdropFilter = 'none';
+
+          const allElements = clonedElement.querySelectorAll('*');
+          allElements.forEach(el => {
+            if (el.style) {
+              el.style.backdropFilter = 'none';
+              el.style.webkitBackdropFilter = 'none';
+            }
+          });
         }
       },
       jsPDF: {
         unit: 'px',
-        format: [1024, 576],
+        format: [1064, 616],
         orientation: 'landscape',
         hotfixes: ['px_scaling']
       }

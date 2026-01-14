@@ -363,7 +363,7 @@ const CampaignBenchmarks = () => {
             </div>
 
             <div className="cb-modal-list">
-              {filteredCampaigns.map(campaign => {
+              {[...filteredCampaigns].sort((a, b) => new Date(b.send_date) - new Date(a.send_date)).map(campaign => {
                 const isSelected = selectedCampaign?.campaign_name === campaign.campaign_name;
                 return (
                   <div

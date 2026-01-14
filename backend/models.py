@@ -500,6 +500,35 @@ class BasisSyncLog(Base):
         Index('idx_sync_status_date', 'sync_status', 'sync_started_at'),
     )
 
+class BasisExchangeStats(Base):
+    __tablename__ = 'basis_exchange_stats'
+
+    id = Column(Integer, primary_key=True)
+    report_date = Column(Date, nullable=False, index=True)
+    basis_campaign_id = Column(String(100), nullable=False, index=True)
+
+    exchange_id = Column(Integer, index=True)
+    exchange_name = Column(String(255), nullable=False, index=True)
+
+    impressions = Column(Integer, default=0)
+    clicks = Column(Integer, default=0)
+    spend = Column(Float, default=0)
+    bids = Column(Integer, default=0)
+
+    ecpm = Column(Float)
+    ecpc = Column(Float)
+    ctr = Column(Float, index=True)
+    win_rate = Column(Float)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_exchange_date', 'report_date', 'exchange_name'),
+        Index('idx_exchange_campaign', 'basis_campaign_id', 'exchange_name'),
+        Index('idx_exchange_performance', 'exchange_name', 'ctr', 'ecpc'),
+    )
+
 class UniversalProfile(Base):
     __tablename__ = 'universal_profiles'
 
@@ -643,6 +672,72 @@ class GCMPlacementLookup(Base):
     __table_args__ = (
         Index('idx_gcm_brand', 'brand', 'gcm_placement_id'),
         Index('idx_gcm_campaign', 'campaign_name', 'gcm_placement_id'),
+    )
+
+
+class Visitor(Base):
+    __tablename__ = 'visitors'
+
+    id = Column(Integer, primary_key=True)
+    fingerprint = Column(String(64), unique=True, nullable=False, index=True)
+    first_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    visit_count = Column(Integer, default=1)
+    user_agent = Column(String(500))
+    screen_resolution = Column(String(20))
+    timezone = Column(String(100))
+    language = Column(String(20))
+    platform = Column(String(100))
+    environment = Column(String(10), default='prod', index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PageView(Base):
+    __tablename__ = 'page_views'
+
+    id = Column(Integer, primary_key=True)
+    fingerprint = Column(String(64), nullable=False, index=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    page_path = Column(String(500), nullable=False, index=True)
+    referrer = Column(String(500))
+    environment = Column(String(10), default='prod', index=True)
+
+    entered_at = Column(DateTime, default=datetime.utcnow, index=True)
+    duration_seconds = Column(Integer)
+    scroll_depth = Column(Integer)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_pageview_fingerprint_date', 'fingerprint', 'entered_at'),
+        Index('idx_pageview_session', 'session_id', 'entered_at'),
+        Index('idx_pageview_env', 'environment', 'entered_at'),
+    )
+
+
+class UserAction(Base):
+    __tablename__ = 'user_actions'
+
+    id = Column(Integer, primary_key=True)
+    fingerprint = Column(String(64), nullable=False, index=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    page_path = Column(String(500))
+    environment = Column(String(10), default='prod', index=True)
+
+    action_type = Column(String(50), nullable=False, index=True)
+    target_element = Column(String(255))
+    target_text = Column(String(500))
+    action_metadata = Column(JSON)
+
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_action_fingerprint_type', 'fingerprint', 'action_type'),
+        Index('idx_action_session', 'session_id', 'timestamp'),
+        Index('idx_action_env', 'environment', 'timestamp'),
     )
 
 

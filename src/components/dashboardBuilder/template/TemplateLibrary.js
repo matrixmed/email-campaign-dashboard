@@ -222,9 +222,9 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
     title: 'Online Journal Metrics',
     config: {
       customData: [
-        ['Avg Time in Issue', '3m 19s'],
-        ['Total Page Views', '2,778'],
-        ['Total Issue Visits', '439']
+        ['Avg Time in Issue', ''],
+        ['Total Page Views', ''],
+        ['Total Issue Visits', '']
       ],
       headers: ['Platform', 'Value']
     },
@@ -788,9 +788,9 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
     title: 'Online Journal Metrics',
     config: {
       customData: [
-        ['Avg Time in Issue', '3m 19s'],
-        ['Total Page Views', '2,778'],
-        ['Total Issue Visits', '439']
+        ['Avg Time in Issue', ''],
+        ['Total Page Views', ''],
+        ['Total Issue Visits', '']
       ],
       headers: ['Metric', 'Value']
     },
@@ -825,9 +825,9 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
     title: 'Video Metrics',
     config: { 
       customData: [
-        ['Total Time Watched', '24h 27m 6s'],
-        ['Avg Time Watched', '52.7%'],
-        ['Total Impressions', '1,812']
+        ['Total Time Watched', ''],
+        ['Avg Time Watched', ''],
+        ['Total Impressions', '']
       ],
       headers: ['Metric', 'Value']
     },
@@ -857,8 +857,8 @@ export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties
     title: 'Landing Page Impressions',
     config: { 
       customData: [
-        ['300x250', '2,000'],
-        ['728x90', '2,000']
+        ['300x250', ''],
+        ['728x90', '']
       ],
       headers: ['Metric', 'Value']
     },

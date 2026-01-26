@@ -2,6 +2,60 @@
   padding: 0;
 }
 
+.data-source-toggle {
+  display: flex;
+  height: 40px;
+  background: var(--color-bg-card, #2a2a2d);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: var(--spacing-lg, 24px);
+  border: 1px solid var(--color-border, #333336);
+  overflow: hidden;
+}
+
+.data-source-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  color: var(--color-text-tertiary, #8a8a8a);
+}
+
+.data-source-option.active {
+  background: var(--color-bg-elevated, #333336);
+  color: var(--color-text-primary, #fff);
+  border-bottom: 2px solid var(--color-accent, #0ff);
+}
+
+.data-source-option:not(.active):hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-secondary, #b8b8b8);
+}
+
+body.light .data-source-toggle {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+}
+
+body.light .data-source-option {
+  color: #666;
+}
+
+body.light .data-source-option.active {
+  background: #e9ecef;
+  color: #333;
+  border-bottom: 2px solid #0077ff;
+}
+
+body.light .data-source-option:not(.active):hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: #444;
+}
+
 .journal-metrics-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -83,6 +137,31 @@
   margin-bottom: 20px;
 }
 
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.table-title {
+  font-family: var(--font-heading, 'Lora', serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #fff);
+  margin: 0;
+}
+
+.table-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+body.light .table-title {
+  color: #333;
+}
+
 .digital-journals-toggles {
   display: flex;
   gap: 20px;
@@ -113,6 +192,22 @@
 .digital-journals-container .rows-per-page-control select:focus {
   outline: none;
   border-color: var(--color-accent, #0ff);
+}
+
+.digital-journals-container .last-updated-tag {
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #b8b8b8);
+  background: var(--color-bg-elevated, #222224);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border, #333336);
+}
+
+body.light .digital-journals-container .last-updated-tag {
+  background: #f5f5f5;
+  color: #666;
+  border-color: #e0e0e0;
 }
 
 .digital-journals-container .table-footer {

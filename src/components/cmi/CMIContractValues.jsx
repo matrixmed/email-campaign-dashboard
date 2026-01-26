@@ -22,6 +22,7 @@ const CMIContractValues = () => {
     { key: 'placement_id', label: 'Placement ID' },
     { key: 'placement_description', label: 'Placement Description' },
     { key: 'buy_component_type', label: 'Buy Component Type' },
+    { key: 'media_tactic_id', label: 'Media Tactic ID' },
     { key: 'frequency', label: 'Frequency' },
     { key: 'metric', label: 'Metric' },
     { key: 'data_type', label: 'Data Type' },
@@ -37,7 +38,6 @@ const CMIContractValues = () => {
         setContracts(data.contracts);
       }
     } catch (error) {
-      console.error('Error fetching contracts:', error);
     } finally {
       setLoading(false);
     }
@@ -148,10 +148,8 @@ const CMIContractValues = () => {
           c.id === contractId ? { ...c, [columnKey]: editValue } : c
         ));
       } else {
-        console.error('Failed to update:', data.message);
       }
     } catch (error) {
-      console.error('Error updating contract:', error.message);
     }
 
     setEditingCell(null);
@@ -173,6 +171,7 @@ const CMIContractValues = () => {
           placement_id: placementId,
           placement_description: '',
           buy_component_type: '',
+          media_tactic_id: '',
           frequency: '',
           metric: '',
           data_type: '',
@@ -193,6 +192,7 @@ const CMIContractValues = () => {
           placement_id: placementId,
           placement_description: '',
           buy_component_type: '',
+          media_tactic_id: '',
           frequency: '',
           metric: '',
           data_type: '',
@@ -202,10 +202,8 @@ const CMIContractValues = () => {
         setContracts(prev => [newContract, ...prev]);
         setNewRowIds(prev => new Set([...prev, data.id]));
       } else {
-        console.error('Failed to add row:', data.message);
       }
     } catch (error) {
-      console.error('Error adding row:', error.message);
     }
   };
 
@@ -219,10 +217,8 @@ const CMIContractValues = () => {
       if (data.status === 'success') {
         setContracts(prev => prev.filter(c => c.id !== contractId));
       } else {
-        console.error('Failed to delete:', data.message);
       }
     } catch (error) {
-      console.error('Error deleting contract:', error.message);
     }
   };
 
@@ -247,7 +243,6 @@ const CMIContractValues = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting:', error.message);
     }
   };
 

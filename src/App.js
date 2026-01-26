@@ -7,6 +7,7 @@ import './App.css';
 import './styles/Dashboard.css';
 import './styles/MatrixSignIn.css';
 import './styles/ReportsManager.css';
+import './styles/mobile-responsive.css';
 
 t.init();
 

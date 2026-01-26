@@ -36,7 +36,6 @@ const TimingIntelligence = () => {
         setSpecialties(data.specialties || []);
       }
     } catch (err) {
-      console.error('Error fetching specialties:', err);
     } finally {
       setSpecialtiesLoading(false);
     }
@@ -52,7 +51,6 @@ const TimingIntelligence = () => {
         setCampaigns(validCampaigns);
       }
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
     }
   };
 
@@ -112,7 +110,6 @@ const TimingIntelligence = () => {
       const data = await response.json();
       setTimingData(data);
     } catch (error) {
-      console.error('Error fetching timing data:', error);
     } finally {
       setLoading(false);
     }

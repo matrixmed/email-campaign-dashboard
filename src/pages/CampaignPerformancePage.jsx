@@ -119,7 +119,6 @@ const CampaignPerformancePage = () => {
         setMetricsData(jsonData);
         setRawFilteredData(jsonData);
       } catch (error) {
-        console.error('Error fetching metrics data:', error);
       }
     }
     fetchBlobData();

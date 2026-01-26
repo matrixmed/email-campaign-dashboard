@@ -142,7 +142,6 @@ export async function exportDashboard(canvasRef, campaignName, options = {}) {
     
     return { success: true, filename };
   } catch (error) {
-    console.error('Export error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -233,7 +232,6 @@ export async function exportAsPDF(canvasRef, campaignName, options = {}) {
 
     return { success: true, filename };
   } catch (error) {
-    console.error('PDF Export error:', error);
     return { success: false, error: error.message };
   }
 }

@@ -23,7 +23,6 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
         setData(result);
       }
     } catch (err) {
-      console.error('Error fetching domain data:', err);
     }
     setLoading(false);
   }, []);

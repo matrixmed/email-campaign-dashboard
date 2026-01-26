@@ -29,7 +29,6 @@ const BasisOverview = ({ searchTerm }) => {
         });
       }
     } catch (err) {
-      console.error('Error fetching overview data:', err);
     }
     setLoading(false);
   }, []);

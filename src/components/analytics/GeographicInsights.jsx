@@ -47,7 +47,6 @@ const GeographicInsights = () => {
     setLoading(true);
     setMainDataError(null);
     try {
-      console.log('[GEO] Fetching main geographic data from:', `${API_BASE}/analytics/geographic-main`);
       const response = await fetch(`${API_BASE}/analytics/geographic-main`);
 
       if (!response.ok) {
@@ -55,26 +54,14 @@ const GeographicInsights = () => {
       }
 
       const data = await response.json();
-      console.log('[GEO] Data received:', data);
-      console.log('[GEO] state_heatmap keys:', data?.state_heatmap ? Object.keys(data.state_heatmap).length : 'null');
-      console.log('[GEO] npi_by_state keys:', data?.npi_by_state ? Object.keys(data.npi_by_state).length : 'null');
 
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid response: expected object');
       }
 
-      if (!data.state_heatmap || Object.keys(data.state_heatmap).length === 0) {
-        console.warn('[GEO] Warning: state_heatmap is empty or missing');
-      }
-
-      if (!data.npi_by_state || Object.keys(data.npi_by_state).length === 0) {
-        console.warn('[GEO] Warning: npi_by_state is empty or missing');
-      }
-
       setMainGeoData(data);
       setMainDataLoaded(true);
     } catch (error) {
-      console.error('[GEO] Error fetching main geographic data:', error);
       setMainDataError(error.message || 'Failed to load geographic data');
     } finally {
       setLoading(false);
@@ -91,7 +78,6 @@ const GeographicInsights = () => {
         setSpecialties(data.specialties || []);
       }
     } catch (err) {
-      console.error('Error fetching specialties:', err);
     } finally {
       setSpecialtiesLoading(false);
     }
@@ -107,7 +93,6 @@ const GeographicInsights = () => {
         setCampaigns(validCampaigns);
       }
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
     }
   };
 
@@ -168,7 +153,6 @@ const GeographicInsights = () => {
       const data = await response.json();
       setCustomMapData(data);
     } catch (error) {
-      console.error('Error generating custom map:', error);
     } finally {
       setCustomMapLoading(false);
     }
@@ -188,7 +172,6 @@ const GeographicInsights = () => {
       link.href = canvas.toDataURL();
       link.click();
     } catch (error) {
-      console.error('Error exporting map:', error);
     }
   };
 
@@ -1214,13 +1197,6 @@ const GeographicInsights = () => {
 
     const urbanRural = mainGeoData?.urban_rural;
     const metroAreas = mainGeoData?.metro_areas || [];
-
-    console.log('[GEO-METRO] mainGeoData keys:', mainGeoData ? Object.keys(mainGeoData) : 'null');
-    console.log('[GEO-METRO] urban_rural:', JSON.stringify(urbanRural, null, 2));
-    console.log('[GEO-METRO] metro_areas count:', metroAreas.length);
-    if (metroAreas.length > 0) {
-      console.log('[GEO-METRO] first metro:', metroAreas[0]);
-    }
 
     const audience = urbanRural?.audience || {};
     const npis = urbanRural?.npis || {};

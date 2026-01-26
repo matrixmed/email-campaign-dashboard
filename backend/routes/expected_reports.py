@@ -13,7 +13,6 @@ def get_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
-
 def get_current_reporting_week():
     today = datetime.now()
     days_since_monday = today.weekday()
@@ -21,7 +20,6 @@ def get_current_reporting_week():
     reporting_monday = current_monday - timedelta(days=7)
     reporting_sunday = reporting_monday + timedelta(days=6)
     return reporting_monday.date(), reporting_sunday.date()
-
 
 @expected_reports_bp.route('/expected', methods=['GET'])
 @cross_origin()
@@ -109,7 +107,6 @@ def get_expected_reports():
             'message': str(e)
         }), 500
 
-
 @expected_reports_bp.route('/expected/<int:report_id>/match', methods=['POST'])
 @cross_origin()
 def match_expected_report(report_id):
@@ -151,7 +148,6 @@ def match_expected_report(report_id):
             'message': str(e)
         }), 500
 
-
 @expected_reports_bp.route('/expected/<int:report_id>/attach', methods=['POST'])
 @cross_origin()
 def attach_expected_report(report_id):
@@ -188,7 +184,6 @@ def attach_expected_report(report_id):
             'message': str(e)
         }), 500
 
-
 @expected_reports_bp.route('/expected/<int:report_id>/detach', methods=['POST'])
 @cross_origin()
 def detach_expected_report(report_id):
@@ -219,7 +214,6 @@ def detach_expected_report(report_id):
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @expected_reports_bp.route('/expected/<int:report_id>/agg-values', methods=['POST'])
 @cross_origin()
@@ -252,7 +246,6 @@ def set_agg_values(report_id):
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @expected_reports_bp.route('/expected/<int:report_id>/move-to-due', methods=['POST'])
 @cross_origin()
@@ -302,7 +295,6 @@ def move_to_due(report_id):
             'message': str(e)
         }), 500
 
-
 @expected_reports_bp.route('/expected/auto-match', methods=['POST'])
 @cross_origin()
 def auto_match_expected_reports():
@@ -348,11 +340,10 @@ def auto_match_expected_reports():
             'message': str(e)
         }), 500
 
-
 @expected_reports_bp.route('/expected/create-from-placement', methods=['POST'])
 @cross_origin()
 def create_from_placement():
-    """Create a new CMIExpectedReport entry from a placement ID lookup."""
+    session = None
     try:
         session = get_session()
         data = request.json
@@ -361,10 +352,8 @@ def create_from_placement():
         if not placement_id:
             return jsonify({'status': 'error', 'message': 'placement_id is required'}), 400
 
-        # Look up contract data
         contract = session.query(CMIContractValue).filter_by(placement_id=str(placement_id)).first()
         if not contract:
-            session.close()
             return jsonify({
                 'status': 'error',
                 'message': f'No contract found for placement ID: {placement_id}'
@@ -372,21 +361,18 @@ def create_from_placement():
 
         week_start, week_end = get_current_reporting_week()
 
-        # Check if entry already exists for this placement ID and week
         existing = session.query(CMIExpectedReport).filter(
             CMIExpectedReport.cmi_placement_id == str(placement_id),
             CMIExpectedReport.reporting_week_start == week_start
         ).first()
 
         if existing:
-            session.close()
             return jsonify({
                 'status': 'error',
                 'message': f'An entry for placement ID {placement_id} already exists for this week',
                 'existing_id': existing.id
             }), 409
 
-        # Create new expected report
         new_report = CMIExpectedReport(
             cmi_placement_id=str(placement_id),
             contract_number=contract.contract_number,
@@ -428,8 +414,6 @@ def create_from_placement():
             'notes': contract.notes
         }
 
-        session.close()
-
         return jsonify({
             'status': 'success',
             'message': 'AGG entry created successfully',
@@ -437,11 +421,15 @@ def create_from_placement():
         }), 201
 
     except Exception as e:
+        if session:
+            session.rollback()
         return jsonify({
             'status': 'error',
             'message': str(e)
         }), 500
-
+    finally:
+        if session:
+            session.close()
 
 @expected_reports_bp.route('/expected/no-data', methods=['GET'])
 @cross_origin()

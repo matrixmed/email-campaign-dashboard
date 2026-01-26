@@ -93,6 +93,11 @@ ALTER TABLE cmi_contract_values ADD COLUMN IF NOT EXISTS frequency VARCHAR(50);
 ALTER TABLE cmi_contract_values ADD COLUMN IF NOT EXISTS metric VARCHAR(100);
 """
 
+campaign_metadata_column_resize_sql = """
+ALTER TABLE campaign_reporting_metadata ALTER COLUMN campaign_id TYPE VARCHAR(500);
+ALTER TABLE campaign_reporting_metadata ALTER COLUMN campaign_name TYPE VARCHAR(500);
+"""
+
 def run_migration():
     print("=" * 60)
     print("DATABASE MIGRATION")
@@ -136,11 +141,20 @@ def run_migration():
         else:
             print("      No old table found, skipping migration")
 
-        print("\n[4/5] Adding frequency and metric columns to cmi_contract_values...")
+        print("\n[4/6] Adding frequency and metric columns to cmi_contract_values...")
         conn.execute(text(cmi_contracts_columns_sql))
         print("      Done!")
 
-        print("\n[5/5] Verifying...")
+        print("\n[5/6] Resizing campaign_reporting_metadata columns...")
+        for stmt in campaign_metadata_column_resize_sql.strip().split(';'):
+            if stmt.strip():
+                try:
+                    conn.execute(text(stmt))
+                except Exception as e:
+                    print(f"      Note: {e}")
+        print("      Done!")
+
+        print("\n[6/6] Verifying...")
         new_count = conn.execute(text("SELECT COUNT(*) FROM campaign_report_manager")).scalar()
         print(f"      campaign_report_manager has {new_count} rows")
 

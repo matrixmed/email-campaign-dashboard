@@ -2,41 +2,37 @@ import React, { useState, useRef, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import '../../styles/video.css';
 
-const VideoModal = ({ video, onClose }) => {
+const VideoModal = ({ video, onClose, videoSource }) => {
     const [timeframeFilter, setTimeframeFilter] = useState('all');
     const [displayMetrics, setDisplayMetrics] = useState({});
     const modalRef = useRef(null);
-    const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
+    const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+    const [showCustomPicker, setShowCustomPicker] = useState(false);
+
+    const isYoutubeVideo = videoSource === 'youtube';
 
     useEffect(() => {
-        const thumbnails = video.fullData?.snippet?.thumbnails;
-        const isVimeo = thumbnails &&
-                      (typeof thumbnails.default === 'string' ||
-                       thumbnails.default?.url?.includes('vumbnail.com'));
-        setIsYoutubeVideo(!isVimeo);
-    }, [video]);
+        const allTimeMetrics = {
+            views: video.views || 0,
+            impressions: video.impressions || 0,
+            watchTimeHours: (video.totalWatchTimeSeconds || 0) / 3600,
+            averageViewPercentage: video.avgPercentWatched || 0,
+            impressionsCtr: video.ctr || 0
+        };
 
-    useEffect(() => {
         if (timeframeFilter === 'all') {
-            setDisplayMetrics({
-                views: video.totals?.views || video.views || 0,
-                impressions: video.totals?.impressions || video.impressions || 0,
-                watchTimeHours: video.totals?.watchTimeHours || video.watchTimeHours || 0,
-                averageViewDuration: video.totals?.averageViewDuration || video.averageViewDuration || 0,
-                averageViewPercentage: video.totals?.averageViewPercentage || video.averageViewPercentage || 0,
-                impressionsCtr: video.totals?.impressionsCtr || video.impressionsCtr || 0,
-                likes: video.totals?.likes || video.likes || 0
-            });
-        } else if (video.history) {
+            setDisplayMetrics(allTimeMetrics);
+        } else if (video.history && video.history.length > 0) {
             const timeframeData = getTimeframeData();
+
+            if (timeframeData.length === 0) {
+                setDisplayMetrics(allTimeMetrics);
+                return;
+            }
 
             const views = timeframeData.reduce((sum, day) => sum + (day.views || 0), 0);
             const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
             const impressions = timeframeData.reduce((sum, day) => sum + (day.impressions || 0), 0);
-
-            const avgViewDuration = views > 0
-                ? timeframeData.reduce((sum, day) => sum + ((day.averageViewDuration || 0) * (day.views || 0)), 0) / views
-                : 0;
 
             const avgViewPercentage = views > 0
                 ? timeframeData.reduce((sum, day) => sum + ((day.averageViewPercentage || 0) * (day.views || 0)), 0) / views
@@ -48,13 +44,13 @@ const VideoModal = ({ video, onClose }) => {
                 views,
                 impressions,
                 watchTimeHours,
-                averageViewDuration: avgViewDuration,
                 averageViewPercentage: avgViewPercentage,
-                impressionsCtr: impressionsCtr,
-                likes: video.totals?.likes || video.likes || 0 
+                impressionsCtr: impressionsCtr
             });
+        } else {
+            setDisplayMetrics(allTimeMetrics);
         }
-    }, [timeframeFilter, video.history, video]);
+    }, [timeframeFilter, video, customDateRange]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -71,12 +67,21 @@ const VideoModal = ({ video, onClose }) => {
 
 
     const handleTimeframeChange = (e) => {
-        setTimeframeFilter(e.target.value);
+        const value = e.target.value;
+        setTimeframeFilter(value);
+        setShowCustomPicker(value === 'custom');
     };
 
     const formatDate = (isoString) => {
         if (!isoString) return "Unknown";
-        const date = new Date(isoString);
+        let date;
+        if (typeof isoString === 'string' && isoString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [year, month, day] = isoString.split('-').map(Number);
+            date = new Date(year, month - 1, day);
+        } else {
+            date = new Date(isoString);
+        }
+        if (isNaN(date.getTime()) || date.getFullYear() < 2000) return "Unknown";
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -125,41 +130,56 @@ const VideoModal = ({ video, onClose }) => {
         }
     };
 
-    const formatDuration = (ytDuration) => {
-        if (!ytDuration) return "0:00";
-        
-        const hourMatch = ytDuration.match(/(\d+)H/);
-        const minuteMatch = ytDuration.match(/(\d+)M/);
-        const secondMatch = ytDuration.match(/(\d+)S/);
-        
-        const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
-        const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
-        const seconds = secondMatch ? parseInt(secondMatch[1]) : 0;
-        
-        if (hours > 0) {
-            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    };
-
     const getTimeframeData = () => {
         if (!video.history) return [];
-        
-        const historyArray = Object.entries(video.history).map(([date, data]) => ({
-            date,
-            ...data.totals
-        }));
-        
+
+        let historyArray;
+
+        if (Array.isArray(video.history)) {
+            historyArray = video.history.map(item => ({
+                date: item.date,
+                views: item.views || 0,
+                impressions: item.impressions || 0,
+                watchTimeHours: (item.total_seconds_watched || 0) / 3600,
+                averageViewDuration: item.avg_seconds_watched || 0,
+                averageViewPercentage: item.mean_percent_watched || item.avg_percent_watched || 0,
+                subscribersGained: item.subscribersGained || 0,
+                subscribersLost: item.subscribersLost || 0
+            }));
+        } else {
+            historyArray = Object.entries(video.history).map(([date, data]) => ({
+                date,
+                ...(data.totals || data)
+            }));
+        }
+
+        historyArray = historyArray.filter(item => {
+            if (!item.date || typeof item.date !== 'string') return false;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date)) return false;
+            const year = parseInt(item.date.split('-')[0], 10);
+            return year >= 2020;
+        });
+
         historyArray.sort((a, b) => a.date.localeCompare(b.date));
-        
+
+        if (historyArray.length === 0) return [];
+
         if (timeframeFilter === 'all') {
             return getAggregatedData(historyArray);
+        } else if (timeframeFilter === 'custom') {
+            if (!customDateRange.start || !customDateRange.end) return historyArray;
+            const startDate = new Date(customDateRange.start);
+            const endDate = new Date(customDateRange.end);
+            return fillMissingDates(historyArray.filter(item => {
+                const itemDate = new Date(item.date);
+                return itemDate >= startDate && itemDate <= endDate;
+            }), startDate, endDate);
         } else {
             const daysToShow = parseInt(timeframeFilter, 10);
             const endDate = new Date();
             const startDate = new Date();
             startDate.setDate(endDate.getDate() - daysToShow + 1);
-            
+
             return fillMissingDates(historyArray, startDate, endDate);
         }
     };
@@ -398,34 +418,39 @@ const VideoModal = ({ video, onClose }) => {
     const hasData = timeframeData.length > 0;
     
     const getThumbnailUrl = () => {
-        const thumbnails = video.fullData?.snippet?.thumbnails;
-        
-        if (thumbnails?.default && typeof thumbnails.default === 'string') {
-            return thumbnails.default;
+        if (video.thumbnail) {
+            return video.thumbnail;
         }
-        
-        if (thumbnails) {
-            return thumbnails.maxres?.url || 
-                   thumbnails.standard?.url || 
-                   thumbnails.high?.url || 
-                   thumbnails.medium?.url || 
-                   thumbnails.default?.url || 
-                   video.thumbnail;
+
+        if (!isYoutubeVideo && video.id) {
+            return `https://vumbnail.com/${video.id}.jpg`;
         }
-        
-        return video.thumbnail || 'https://placehold.co/320x180?text=No+Thumbnail';
+
+        if (isYoutubeVideo && video.id) {
+            return `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`;
+        }
+
+        return 'https://placehold.co/320x180?text=No+Thumbnail';
     };
-    
+
     const getVideoUrl = () => {
-        if (video.fullData?.snippet?.videoUrl) {
-            return video.fullData.snippet.videoUrl;
+        if (!isYoutubeVideo) {
+            return `https://vimeo.com/${video.id}`;
         }
-        
         return `https://www.youtube.com/watch?v=${video.id}`;
     };
-    
-    const getMetricCardClass = (metricType) => {
-        return 'metric-card';
+
+    const formatDurationFromSeconds = (seconds) => {
+        if (!seconds || isNaN(seconds)) return null;
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        const hours = Math.floor(mins / 60);
+        const remainingMins = mins % 60;
+
+        if (hours > 0) {
+            return `${hours}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -443,13 +468,13 @@ const VideoModal = ({ video, onClose }) => {
                 
                 <div className="video-preview-container">
                     <div className="video-thumbnail-preview">
-                        <img 
+                        <img
                             src={getThumbnailUrl()}
-                            alt={video.title} 
+                            alt={video.title}
                         />
-                        {video.fullData?.contentDetails?.duration && (
+                        {video.duration && (
                             <div className="video-duration">
-                                {formatDuration(video.fullData.contentDetails.duration)}
+                                {formatDurationFromSeconds(video.duration)}
                             </div>
                         )}
                     </div>
@@ -464,13 +489,13 @@ const VideoModal = ({ video, onClose }) => {
                         </div>
                         <div className="video-details-row">
                             <span className="detail-label">URL:</span>
-                            <a 
+                            <a
                                 href={getVideoUrl()}
-                                target="_blank" 
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 className="video-url"
                             >
-                                {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : 'Vimeo Video'}
+                                {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : `vimeo.com/${video.id}`}
                             </a>
                         </div>
                         {video.fullData?.snippet?.tags && (
@@ -486,7 +511,34 @@ const VideoModal = ({ video, onClose }) => {
                     </div>
                 </div>
                 
-                {isYoutubeVideo && hasData && (
+                <div className="video-modal-metrics">
+                    <div className="metrics-top-row">
+                        <div className="metric-card large-card">
+                            <div className="metric-label">Impressions</div>
+                            <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
+                        </div>
+                        <div className="metric-card large-card">
+                            <div className="metric-label">Views</div>
+                            <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
+                        </div>
+                    </div>
+                    <div className="metrics-bottom-row">
+                        <div className="metric-card">
+                            <div className="metric-label">Impressions CTR</div>
+                            <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
+                        </div>
+                        <div className="metric-card">
+                            <div className="metric-label">Avg. % Watched</div>
+                            <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
+                        </div>
+                        <div className="metric-card">
+                            <div className="metric-label">Total Time Watched</div>
+                            <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {hasData && (
                     <div className="video-modal-controls">
                         <div className="timeframe-filter">
                             <label htmlFor="videoTimeframeFilter">Timeframe:</label>
@@ -495,49 +547,44 @@ const VideoModal = ({ video, onClose }) => {
                                 value={timeframeFilter}
                                 onChange={handleTimeframeChange}
                             >
-                                <option value="all">All Time</option>
-                                <option value="60">Last 60 Days</option>
-                                <option value="30">Last 30 Days</option>
-                                <option value="14">Last 14 Days</option>
+                                <option value="1">Last 24 Hours</option>
                                 <option value="7">Last 7 Days</option>
+                                <option value="14">Last 14 Days</option>
+                                <option value="30">Last 30 Days</option>
+                                <option value="90">Last 3 Months</option>
+                                <option value="180">Last 6 Months</option>
+                                <option value="365">Last Year</option>
+                                <option value="730">Last 2 Years</option>
+                                <option value="all">All Time</option>
+                                <option value="custom">Custom Range</option>
                             </select>
+                            {showCustomPicker && (
+                                <div className="custom-date-picker">
+                                    <input
+                                        type="date"
+                                        value={customDateRange.start}
+                                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                        placeholder="Start Date"
+                                    />
+                                    <span>to</span>
+                                    <input
+                                        type="date"
+                                        value={customDateRange.end}
+                                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                        placeholder="End Date"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
-                
-                <div className="video-modal-metrics">
-                    <div className="metric-card large-card">
-                        <div className="metric-label">Impressions</div>
-                        <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
-                    </div>
-                    <div className="metric-card large-card">
-                        <div className="metric-label">Impressions CTR</div>
-                        <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Watch Time</div>
-                        <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Views</div>
-                        <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Avg. View Duration</div>
-                        <div className="metric-value">{formatTime(displayMetrics.averageViewDuration)}</div>
-                    </div>
-                    <div className="metric-card">
-                        <div className="metric-label">Avg. View Percentage</div>
-                        <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
-                    </div>
-                </div>
 
                 {hasData ? (
                     <>
                         <div className="video-modal-charts">
-                            <div className="chart-container">
+                            <div className="views-chart-container views-chart-container">
                                 <h4>Views Over Time</h4>
-                                <ResponsiveContainer width="100%" height={250}>
+                                <ResponsiveContainer>
                                     <LineChart
                                         data={timeframeData}
                                         margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -635,16 +682,9 @@ const VideoModal = ({ video, onClose }) => {
                     </>
                 ) : (
                     <div className="no-data-message">
-                        <p>No historical data available for this video. This is common for videos imported from Vimeo or recently published YouTube videos.</p>
+                        <p>No historical data available for this video.</p>
                     </div>
                 )}
-                
-                <div className="video-modal-description">
-                    <h4>Description</h4>
-                    <div className="video-description-content">
-                        {video.fullData?.snippet?.description || "No description provided."}
-                    </div>
-                </div>
             </div>
         </div>
     );

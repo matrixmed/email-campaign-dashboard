@@ -1,6 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES, TABLE_DEFINITIONS } from './template/LayoutTemplates';
 import { API_BASE_URL } from '../../config/api';
+
+const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 
 const ComponentSidebar = ({
   isOpen,
@@ -27,7 +29,9 @@ const ComponentSidebar = ({
   selectedTableTypes = {},
   onTableTypeChange,
   onRestoreDashboard,
-  selectedRowInfo = null
+  selectedRowInfo = null,
+  onAddJournalMetricRow,
+  hasJournalTable = false
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +42,130 @@ const ComponentSidebar = ({
   const [loadingDashboards, setLoadingDashboards] = useState(false);
   const [archiveSearchTerm, setArchiveSearchTerm] = useState('');
 
+  const [walsworthData, setWalsworthData] = useState([]);
+  const [matchedJournal, setMatchedJournal] = useState(null);
+  const [selectedMetrics, setSelectedMetrics] = useState({
+    avgTimeInIssue: false,
+    totalPageViews: false,
+    uniquePageViews: false,
+    totalIssueVisits: false
+  });
+
+  useEffect(() => {
+    async function fetchWalsworthData() {
+      try {
+        const response = await fetch(WALSWORTH_BLOB_URL);
+        const data = await response.json();
+        if (data.issues) {
+          setWalsworthData(data.issues);
+        }
+      } catch (error) {
+      }
+    }
+    fetchWalsworthData();
+  }, []);
+
+  const matchJournalToCampaign = useCallback((campaignName) => {
+    if (!campaignName || walsworthData.length === 0) return null;
+
+    const name = campaignName.toLowerCase();
+
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    let extractedMonth = null;
+    for (const month of months) {
+      if (name.includes(month)) {
+        extractedMonth = month;
+        break;
+      }
+    }
+
+    const yearMatch = name.match(/20\d{2}/);
+    const extractedYear = yearMatch ? yearMatch[0] : null;
+
+    let publicationType = null;
+    if (name.includes('ht ') || name.includes('ht-') || name.startsWith('ht ') || name.includes('hot topics')) {
+      publicationType = 'hot topics';
+    } else if (name.includes('jcad') && (name.includes('np') || name.includes('pa'))) {
+      publicationType = 'jcad np+pa';
+    } else if (name.includes('jcad')) {
+      publicationType = 'jcad';
+    } else if (name.includes('icns') || name.includes('innovations in clinical neuroscience')) {
+      publicationType = 'icns';
+    }
+
+    const diseaseKeywords = [
+      'inflammatory', 'myeloma', 'breast cancer', 'nsclc', 'lung', 'dermatology', 'melanoma',
+      'alopecia', 'prurigo', 'gpp', 'psoriasis', 'eczema', 'acne', 'rosacea', 'vitiligo',
+      'atopic', 'hidradenitis', 'net', 'rcc', 'sclc', 'oncology', 'bariatric'
+    ];
+    const extractedDiseases = diseaseKeywords.filter(kw => name.includes(kw));
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const journal of walsworthData) {
+      const journalName = (journal.issue_name || '').toLowerCase();
+      let score = 0;
+
+      if (extractedMonth && journalName.includes(extractedMonth)) {
+        score += 30;
+      }
+      if (extractedYear && journalName.includes(extractedYear)) {
+        score += 30;
+      }
+
+      if (publicationType === 'hot topics' && journalName.includes('hot topics')) {
+        score += 25;
+      } else if (publicationType === 'jcad np+pa' && journalName.includes('jcad np+pa')) {
+        score += 25;
+      } else if (publicationType === 'jcad' && (journalName.includes('journal of clinical and aesthetic dermatology') || journalName.startsWith('jcad'))) {
+        score += 20;
+      } else if (publicationType === 'icns' && journalName.includes('innovations in clinical neuroscience')) {
+        score += 25;
+      }
+
+      for (const disease of extractedDiseases) {
+        if (journalName.includes(disease)) {
+          score += 15;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = { ...journal, matchScore: score };
+      }
+    }
+
+    return bestScore >= 45 ? bestMatch : null;
+  }, [walsworthData]);
+
+  useEffect(() => {
+    if (selectedCampaign?.campaign_name) {
+      const match = matchJournalToCampaign(selectedCampaign.campaign_name);
+      setMatchedJournal(match);
+      setSelectedMetrics({ avgTimeInIssue: false, totalPageViews: false, uniquePageViews: false, totalIssueVisits: false });
+    } else {
+      setMatchedJournal(null);
+    }
+  }, [selectedCampaign, matchJournalToCampaign]);
+
+  const formatTimeInIssue = (seconds) => {
+    if (isNaN(seconds) || seconds <= 0) return "0s";
+    seconds = Math.round(seconds);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
+  const handleAddMetricToTable = useCallback((metricKey, value, label) => {
+    if (onAddJournalMetricRow) {
+      onAddJournalMetricRow(label, value);
+    }
+  }, [onAddJournalMetricRow]);
+
   const fetchSavedDashboards = useCallback(async () => {
     setLoadingDashboards(true);
     try {
@@ -47,7 +175,6 @@ const ComponentSidebar = ({
         setSavedDashboards(data.dashboards);
       }
     } catch (error) {
-      console.error('Error fetching dashboards:', error);
     } finally {
       setLoadingDashboards(false);
     }
@@ -556,54 +683,6 @@ const ComponentSidebar = ({
               )}
 
               <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '16px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={specialtyMergeMode}
-                    onChange={onToggleSpecialtyMerge}
-                    style={{ margin: 0 }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
-                      Merge Subspecialties
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '16px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showPatientImpact}
-                    onChange={onPatientImpactToggle}
-                    style={{ margin: 0 }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
-                      Show Patient Impact
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                   Color Theme
                 </label>
@@ -628,12 +707,143 @@ const ComponentSidebar = ({
                 </select>
               </div>
 
+              {matchedJournal && hasJournalTable && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                    Online Journal Metrics
+                  </label>
+                  <div style={{
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}>
+                    <div style={{ color: '#4ade80', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
+                      Matched Journal:
+                    </div>
+                    <div style={{ color: 'white', fontSize: '13px', marginBottom: '12px', lineHeight: '1.4' }}>
+                      {matchedJournal.issue_name}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Avg Time in Issue</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                            {formatTimeInIssue(matchedJournal.current?.seconds_per_visit || 0)}
+                          </span>
+                          <button
+                            onClick={() => handleAddMetricToTable('avgTimeInIssue', formatTimeInIssue(matchedJournal.current?.seconds_per_visit || 0), 'Avg Time in Issue')}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >+</button>
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Page Views</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                            {(matchedJournal.current?.total_page_views || 0).toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => handleAddMetricToTable('totalPageViews', (matchedJournal.current?.total_page_views || 0).toLocaleString(), 'Total Page Views')}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >+</button>
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Unique Page Views</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                            {(matchedJournal.current?.unique_page_views || 0).toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => handleAddMetricToTable('uniquePageViews', (matchedJournal.current?.unique_page_views || 0).toLocaleString(), 'Unique Page Views')}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >+</button>
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Issue Visits</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                            {(matchedJournal.current?.total_issue_visits || 0).toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => handleAddMetricToTable('totalIssueVisits', (matchedJournal.current?.total_issue_visits || 0).toLocaleString(), 'Total Issue Visits')}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >+</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                   Cost Comparison Model
                 </label>
-                <select 
-                  value={costComparisonMode} 
+                <select
+                  value={costComparisonMode}
                   onChange={(e) => onCostModeChange(e.target.value)}
                   style={{
                     width: '100%',
@@ -709,6 +919,54 @@ const ComponentSidebar = ({
                 />
               </div>
 
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={specialtyMergeMode}
+                    onChange={onToggleSpecialtyMerge}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Merge Subspecialties
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showPatientImpact}
+                    onChange={onPatientImpactToggle}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Show Patient Impact
+                    </div>
+                  </div>
+                </label>
+              </div>
+
               {(currentTemplate === 'single-two' || currentTemplate === 'single-three' || currentTemplate === 'multi-two' || currentTemplate === 'multi-three') && (
                 <div style={{ marginBottom: '24px' }}>
                   <h4 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>
@@ -761,63 +1019,6 @@ const ComponentSidebar = ({
                 </div>
               )}
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-                  Current Campaign
-                </label>
-                {selectedCampaign ? (
-                  <div style={{
-                    padding: '12px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}>
-                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
-                      {selectedCampaign.campaign_name}
-                    </div>
-                    <button
-                      onClick={() => onCampaignChange(null)}
-                      style={{
-                        padding: '6px 12px',
-                        background: 'rgba(220, 38, 38, 0.8)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Clear Campaign
-                    </button>
-                  </div>
-                ) : (
-                  <select 
-                    onChange={(e) => {
-                      const campaign = campaigns.find(c => c.campaign_name === e.target.value);
-                      onCampaignChange(campaign);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      fontSize: '14px'
-                    }}
-                    defaultValue=""
-                  >
-                    <option value="" style={{ background: '#1e293b', color: 'white' }}>
-                      Select Campaign
-                    </option>
-                    {campaigns.map(campaign => (
-                      <option key={campaign.campaign_name} value={campaign.campaign_name} style={{ background: '#1e293b', color: 'white' }}>
-                        {campaign.campaign_name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
             </div>
           )}
 
@@ -1232,7 +1433,6 @@ const ComponentSidebar = ({
                                 fetchSavedDashboards();
                               }
                             } catch (error) {
-                              console.error('Error deleting dashboard:', error.message);
                             }
                           }}
                           style={{

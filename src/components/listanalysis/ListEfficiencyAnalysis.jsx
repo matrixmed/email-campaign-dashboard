@@ -18,7 +18,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
                 };
             }
         } catch (e) {
-            console.error('Error loading persisted state:', e);
         }
         return {
             uploadedData: null,

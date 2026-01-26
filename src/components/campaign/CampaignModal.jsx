@@ -99,7 +99,6 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                     setCampaignMetadata(combinedMetadata);
                 }
             } catch (error) {
-                console.error('Error fetching campaign metadata:', error);
             } finally {
                 setIsLoadingMetadata(false);
             }
@@ -962,10 +961,8 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                         setManualPlacementId('');
                                         setHasMetadata(true);
                                     } else {
-                                        console.error('Upload failed:', data.message);
                                     }
                                 } catch (error) {
-                                    console.error('Error uploading files:', error.message);
                                 } finally {
                                     setUploading(false);
                                 }

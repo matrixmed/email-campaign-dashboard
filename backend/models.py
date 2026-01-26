@@ -62,8 +62,8 @@ class CampaignReportingMetadata(Base):
     __tablename__ = 'campaign_reporting_metadata'
 
     id = Column(Integer, primary_key=True)
-    campaign_id = Column(String(100), unique=True, nullable=False, index=True)
-    campaign_name = Column(String(255), nullable=False)
+    campaign_id = Column(String(500), unique=True, nullable=False, index=True)
+    campaign_name = Column(String(500), nullable=False)
     send_date = Column(Date, index=True)
 
     client_id = Column(Boolean, default=False)
@@ -101,6 +101,7 @@ class CMIContractValue(Base):
     placement_id = Column(String(100), unique=True, index=True)
     placement_description = Column(Text)
     buy_component_type = Column(String(100))
+    media_tactic_id = Column(String(100))
     frequency = Column(String(50))
     metric = Column(String(100))
     data_type = Column(String(50))
@@ -108,7 +109,6 @@ class CMIContractValue(Base):
     year = Column(Integer, default=2025, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
 
 class CMIExpectedReport(Base):
     __tablename__ = 'cmi_expected_reports'
@@ -212,12 +212,16 @@ class CampaignReportManager(Base):
     data_type = Column(String(50))
     expected_data_frequency = Column(String(50))
     buy_component_type = Column(String(100))
+    media_tactic_id = Column(String(100))
 
     is_reportable = Column(Boolean, default=True)
     notes = Column(Text)
     requires_manual_review = Column(Boolean, default=False)
 
     is_submitted = Column(Boolean, default=False, index=True)
+    week_1_submitted = Column(Boolean, default=False)
+    week_2_submitted = Column(Boolean, default=False)
+    week_3_submitted = Column(Boolean, default=False)
     submitted_at = Column(DateTime)
     submitted_by = Column(String(100))
     is_not_needed = Column(Boolean, default=False)
@@ -230,7 +234,6 @@ class CampaignReportManager(Base):
         Index('idx_campaign_week', 'campaign_name', 'reporting_week_start'),
         Index('idx_category_brand', 'report_category', 'brand_name'),
     )
-
 
 class BasisCampaign(Base):
     __tablename__ = 'basis_campaigns'
@@ -613,7 +616,6 @@ class CampaignValidationFlag(Base):
         Index('idx_flag_issue_type', 'issue_type', 'campaign_id'),
     )
 
-
 class NPISyncProgress(Base):
     __tablename__ = 'npi_sync_progress'
 
@@ -648,7 +650,6 @@ class NPISyncProgress(Base):
         Index('idx_sync_status', 'sync_id', 'status'),
     )
 
-
 class GCMPlacementLookup(Base):
     __tablename__ = 'gcm_placement_lookup'
 
@@ -674,7 +675,6 @@ class GCMPlacementLookup(Base):
         Index('idx_gcm_campaign', 'campaign_name', 'gcm_placement_id'),
     )
 
-
 class Visitor(Base):
     __tablename__ = 'visitors'
 
@@ -692,7 +692,6 @@ class Visitor(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
 
 class PageView(Base):
     __tablename__ = 'page_views'
@@ -716,7 +715,6 @@ class PageView(Base):
         Index('idx_pageview_env', 'environment', 'entered_at'),
     )
 
-
 class UserAction(Base):
     __tablename__ = 'user_actions'
 
@@ -739,7 +737,6 @@ class UserAction(Base):
         Index('idx_action_session', 'session_id', 'timestamp'),
         Index('idx_action_env', 'environment', 'timestamp'),
     )
-
 
 def init_db():
     DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'

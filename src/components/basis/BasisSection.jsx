@@ -45,7 +45,6 @@ const BasisSection = () => {
           setPendingCount(recData.recommendations?.length || 0);
         }
       } catch (err) {
-        console.error('Error fetching data:', err);
       }
     };
     fetchPendingCount();

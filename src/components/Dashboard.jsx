@@ -36,7 +36,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/video" element={<VideoMetricsPage />} />
           <Route path="/journals" element={<DigitalJournalsPage />} />
           <Route path="/basis" element={<BasisOptimizationPage />} />
-          {/*<Route path="/tracking" element={<TrackingPage />} />*/}
+          <Route path="/tracking" element={<TrackingPage />} />
         </Routes>
       )}
     </AppLayout>

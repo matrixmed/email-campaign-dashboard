@@ -24,7 +24,6 @@ const BrandManagement = () => {
         setBrands(data.brands);
       }
     } catch (error) {
-      console.error('Error fetching brands:', error);
     } finally {
       setLoading(false);
     }
@@ -130,10 +129,8 @@ const BrandManagement = () => {
           b.id === brandId ? { ...b, [field]: editValue } : b
         ));
       } else {
-        console.error('Failed to update:', data.message);
       }
     } catch (error) {
-      console.error('Error updating brand:', error.message);
     }
 
     setEditingCell(null);
@@ -149,10 +146,8 @@ const BrandManagement = () => {
       if (data.status === 'success') {
         setBrands(prev => prev.filter(b => b.id !== brandId));
       } else {
-        console.error('Failed to delete:', data.message);
       }
     } catch (error) {
-      console.error('Error deleting brand:', error.message);
     }
   };
 
@@ -189,10 +184,8 @@ const BrandManagement = () => {
         setBrands(prev => [newBrand, ...prev]);
         setNewRowIds(prev => new Set([...prev, data.id]));
       } else {
-        console.error('Failed to add brand:', data.message);
       }
     } catch (error) {
-      console.error('Error adding brand:', error.message);
     }
   };
 
@@ -222,10 +215,8 @@ const BrandManagement = () => {
         ));
         setNewRowIds(prev => new Set([...prev, brandId]));
       } else {
-        console.error('Failed to move brand:', data.message);
       }
     } catch (error) {
-      console.error('Error moving brand:', error.message);
     }
   };
 

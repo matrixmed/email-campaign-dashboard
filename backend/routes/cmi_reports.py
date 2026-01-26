@@ -93,9 +93,22 @@ def update_submission_status(report_id):
             }), 404
 
         is_submitted = data.get('is_submitted', False)
-        report.is_submitted = is_submitted
+        week = data.get('week')
 
-        if is_submitted:
+        if week == 1:
+            report.week_1_submitted = is_submitted
+        elif week == 2:
+            report.week_2_submitted = is_submitted
+        elif week == 3:
+            report.week_3_submitted = is_submitted
+
+        report.is_submitted = (
+            report.week_1_submitted or
+            report.week_2_submitted or
+            report.week_3_submitted
+        )
+
+        if report.is_submitted:
             report.submitted_at = datetime.utcnow()
             report.submitted_by = data.get('submitted_by', 'user')
         else:
@@ -108,6 +121,9 @@ def update_submission_status(report_id):
             'status': 'success',
             'message': 'Submission status updated successfully',
             'is_submitted': report.is_submitted,
+            'week_1_submitted': report.week_1_submitted,
+            'week_2_submitted': report.week_2_submitted,
+            'week_3_submitted': report.week_3_submitted,
             'submitted_at': report.submitted_at.isoformat() if report.submitted_at else None
         }
 
@@ -121,7 +137,6 @@ def update_submission_status(report_id):
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @cmi_reports_bp.route('/reports/<int:report_id>/placement', methods=['PUT', 'OPTIONS'])
 @cross_origin()
@@ -150,6 +165,7 @@ def update_placement_id(report_id):
                 report.contract_number = contract.contract_number or report.contract_number
                 report.placement_description = contract.placement_description or report.placement_description
                 report.buy_component_type = contract.buy_component_type or report.buy_component_type
+                report.media_tactic_id = contract.media_tactic_id or report.media_tactic_id
 
         report.updated_at = datetime.utcnow()
 
@@ -167,7 +183,6 @@ def update_placement_id(report_id):
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @cmi_reports_bp.route('/reports/<int:report_id>/not-needed', methods=['PUT', 'OPTIONS'])
 @cross_origin()
@@ -393,6 +408,7 @@ def get_all_reports():
                     'vehicle': cv.vehicle,
                     'placement_description': cv.placement_description,
                     'buy_component_type': cv.buy_component_type,
+                    'media_tactic_id': cv.media_tactic_id,
                     'frequency': cv.frequency,
                     'metric': cv.metric,
                     'data_type': cv.data_type,
@@ -417,12 +433,16 @@ def get_all_reports():
                 'is_cmi_brand': r.is_cmi_brand,
                 'match_confidence': r.match_confidence,
                 'is_submitted': r.is_submitted,
+                'week_1_submitted': r.week_1_submitted or False,
+                'week_2_submitted': r.week_2_submitted or False,
+                'week_3_submitted': r.week_3_submitted or False,
                 'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
                 'is_not_needed': r.is_not_needed or False,
                 'data_type': r.data_type or contract_data.get('data_type'),
                 'cmi_placement_id': r.cmi_placement_id,
                 'frequency': r.expected_data_frequency or contract_data.get('frequency'),
                 'buy_component_type': r.buy_component_type or contract_data.get('buy_component_type'),
+                'media_tactic_id': contract_data.get('media_tactic_id'),
                 'contract_notes': contract_data.get('notes'),
                 'contract_metric': contract_data.get('metric'),
                 'has_contract_match': bool(contract_data)
@@ -439,7 +459,8 @@ def get_all_reports():
                         'vehicle_name': r.vehicle_name or '',
                         'contract_number': r.contract_number or '',
                         'placement_description': r.placement_description or '',
-                        'buy_component_type': r.buy_component_type or ''
+                        'buy_component_type': r.buy_component_type or '',
+                        'media_tactic_id': contract_data.get('media_tactic_id') or ''
                     }
 
             result.append(report_data)

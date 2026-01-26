@@ -4,24 +4,11 @@ import '../../styles/video.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
 
-const metricDisplayNames = {
-  views: "Views",
-  impressions: "Impressions",
-  averageViewDuration: "Avg. Watch Time",
-  averageViewPercentage: "Avg. Completion %",
-  watchTimeHours: "Total Watch Time",
-  likes: "Likes",
-  comments: "Comments",
-  shares: "Shares",
-  subscribersGained: "Subscribers Gained",
-  subscribersLost: "Subscribers Lost",
-  estimatedMinutesWatched: "Minutes Watched",
-  impressionsCtr: "Click-Through Rate"
-};
-
 const VideoMetrics = () => {
     const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
-    const [videosData, setVideosData] = useState({});
+    const [videoSource, setVideoSource] = useState('youtube');
+    const [youtubeData, setYoutubeData] = useState({ videos: [] });
+    const [vimeoData, setVimeoData] = useState({ videos: [] });
     const [videosList, setVideosList] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [search, setSearch] = useState(searchTerms.videoMetrics || '');
@@ -31,80 +18,102 @@ const VideoMetrics = () => {
     const [selectedVideo, setSelectedVideo] = useState(null);
     const [sortColumn, setSortColumn] = useState('views');
     const [sortDirection, setSortDirection] = useState('desc');
+    const [isLoading, setIsLoading] = useState(true);
 
-    const displayMetrics = [
-        'source',
-        'impressions',
-        'watchTimeHours',
-        'averageViewPercentage',
-        'impressionsCtr'
-    ];
+    const YOUTUBE_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2026-01-23T22:10:53Z&se=2028-02-03T06:25:53Z&spr=https&sv=2024-11-04&sr=b&sig=5a4p0mFtPn4d9In830LMCQOJlaqkcuPCt7okIDLSHBA%3D";
+    const VIMEO_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/vimeo_metrics.json?sp=r&st=2026-01-16T21:10:17Z&se=2028-06-21T04:25:17Z&spr=https&sv=2024-11-04&sr=b&sig=KxSCICZ7CgOWv07ct%2Bv2ZViTuZoNtdd5osIS5PgfKa8%3D";
 
     useEffect(() => {
-        async function fetchVideoMetricsData() {
-            const blobUrl = "https://emaildash.blob.core.windows.net/json-data/video_metrics.json?sp=r&st=2024-12-13T20:41:55Z&se=2026-02-02T04:41:55Z&spr=https&sv=2022-11-02&sr=b&sig=9V%2B8%2FcA1G1pIdaNAyicVWNiKfjbXbwjv4zZgLvuLoEE%3D";
+        async function fetchVideoData() {
+            setIsLoading(true);
+
             try {
-                const response = await fetch(blobUrl);
-                const jsonData = await response.json();
-                setVideosData(jsonData);
-                
-                const videoIds = Object.keys(jsonData.videos || {});
-                const videos = videoIds.map(id => {
-                    const video = jsonData.videos[id];
-
-                    let thumbnail;
-                    if (video.snippet?.thumbnails?.default && typeof video.snippet.thumbnails.default === 'string') {
-                        thumbnail = video.snippet.thumbnails.default;
-                    } else {
-                        thumbnail = video.snippet?.thumbnails?.medium?.url ||
-                                   video.snippet?.thumbnails?.default?.url;
-                    }
-
-                    const playlists = video.playlists || [];
-                    const playlistNames = playlists.map(p => p.title).join(' ');
-
-                    const internalGroups = video.internalGroups || [];
-                    const groupNames = internalGroups.join(' ');
-
-                    const impressions = video.totals?.impressions || 0;
-                    const views = video.totals?.views || 0;
-                    const calculatedCtr = impressions > 0 ? (views / impressions * 100) : 0;
-
-                    return {
-                        id,
-                        title: video.snippet?.title || 'Untitled',
-                        thumbnail: thumbnail,
-                        publishedAt: video.snippet?.publishedAt,
-                        ...video.totals,
-                        impressionsCtr: calculatedCtr,
-                        history: video.history,
-                        playlists: playlists,
-                        playlist: playlistNames,
-                        internalGroups: internalGroups,
-                        groupTags: groupNames
-                    };
-                });
-                
-                const sortedVideos = videos.sort((a, b) => (b.views || 0) - (a.views || 0));
-                setVideosList(sortedVideos);
-                setFilteredData(sortedVideos);
+                const ytResponse = await fetch(YOUTUBE_BLOB_URL);
+                if (ytResponse.ok) {
+                    const ytData = await ytResponse.json();
+                    setYoutubeData(ytData);
+                }
             } catch (error) {
             }
+
+            try {
+                const vimeoResponse = await fetch(VIMEO_BLOB_URL);
+                if (vimeoResponse.ok) {
+                    const vimeoJsonData = await vimeoResponse.json();
+                    setVimeoData(vimeoJsonData);
+                }
+            } catch (error) {
+            }
+
+            setIsLoading(false);
         }
-        fetchVideoMetricsData();
+        fetchVideoData();
     }, []);
+
+    useEffect(() => {
+        const sourceData = videoSource === 'youtube' ? youtubeData : vimeoData;
+        const videos = (sourceData.videos || []).map(video => {
+            const current = video.current || {};
+
+            if (videoSource === 'youtube') {
+                const views = current.views || 0;
+                const impressions = current.impressions || 0;
+                const ctr = impressions > 0 ? (views / impressions * 100) : 0;
+                const avgWatchTimeMs = current.avg_watch_time_ms || 0;
+                const totalWatchTimeSeconds = (avgWatchTimeMs / 1000) * views;
+                const avgPercentWatched = current.avg_percent_watched || 0;
+
+                return {
+                    id: video.video_id,
+                    title: video.title || 'Untitled',
+                    views,
+                    impressions,
+                    ctr,
+                    avgPercentWatched,
+                    totalWatchTimeSeconds,
+                    history: video.history || [],
+                    publishedAt: video.published_at,
+                    thumbnail: video.thumbnail,
+                    duration: video.duration
+                };
+            } else {
+                const views = current.views || 0;
+                const impressions = current.impressions || 0;
+                const ctr = impressions > 0 ? (views / impressions * 100) : 0;
+
+                return {
+                    id: video.video_id,
+                    title: video.title || 'Untitled',
+                    views,
+                    impressions,
+                    ctr,
+                    avgPercentWatched: current.mean_percent_watched || 0,
+                    totalWatchTimeSeconds: current.total_seconds_watched || 0,
+                    history: video.history || [],
+                    publishedAt: video.created_time || video.release_time,
+                    thumbnail: video.thumbnail,
+                    duration: video.duration
+                };
+            }
+        });
+
+        const sortedVideos = videos.sort((a, b) => (b.views || 0) - (a.views || 0));
+        setVideosList(sortedVideos);
+
+        const filtered = sortedVideos.filter(item => {
+            if (!search) return true;
+            return matchesSearchTerm(item.title || '', search);
+        });
+        setFilteredData(filtered);
+        setCurrentPage(1);
+    }, [videoSource, youtubeData, vimeoData, search]);
 
     const handleSearchChange = (e) => {
         const searchValue = e.target.value;
         setSearch(searchValue);
         setGlobalSearchTerm('videoMetrics', searchValue);
         const filtered = videosList.filter(item => {
-            const searchableText = [
-                item.title || '',
-                item.playlist || '',
-                item.groupTags || ''
-            ].join(' ');
-            return matchesSearchTerm(searchableText, searchValue);
+            return matchesSearchTerm(item.title || '', searchValue);
         });
         setFilteredData(filtered);
         setCurrentPage(1);
@@ -120,24 +129,13 @@ const VideoMetrics = () => {
         setSortDirection(newDirection);
 
         const sorted = [...filteredData].sort((a, b) => {
-            if (column === 'source') {
-                const aIsYoutube = isYouTubeVideo(a);
-                const bIsYoutube = isYouTubeVideo(b);
+            const aVal = a[column] || 0;
+            const bVal = b[column] || 0;
 
-                if (newDirection === 'asc') {
-                    return aIsYoutube === bIsYoutube ? 0 : aIsYoutube ? -1 : 1;
-                } else {
-                    return aIsYoutube === bIsYoutube ? 0 : aIsYoutube ? 1 : -1;
-                }
+            if (newDirection === 'asc') {
+                return aVal - bVal;
             } else {
-                const aVal = a[column] || 0;
-                const bVal = b[column] || 0;
-
-                if (newDirection === 'asc') {
-                    return aVal - bVal;
-                } else {
-                    return bVal - aVal;
-                }
+                return bVal - aVal;
             }
         });
 
@@ -147,38 +145,23 @@ const VideoMetrics = () => {
     const calculateAggregateMetrics = () => {
         if (!filteredData || filteredData.length === 0) {
             return {
+                totalViews: 0,
                 totalImpressions: 0,
-                totalWatchTime: 0,
-                avgPercentViewed: 0,
-                impressionsCtr: 0
+                avgPercentWatched: 0,
+                totalWatchTimeSeconds: 0
             };
         }
 
-        const totalImpressions = filteredData.reduce((sum, video) => {
-            return sum + (video.impressions || 0);
-        }, 0);
-
-        const totalWatchTime = filteredData.reduce((sum, video) => {
-            return sum + (video.watchTimeHours || 0);
-        }, 0);
-
-        const avgPercentViewed = filteredData.reduce((sum, video) => {
-            return sum + (video.averageViewPercentage || 0);
-        }, 0) / filteredData.length;
-
-        const totalViews = filteredData.reduce((sum, video) => {
-            return sum + (video.views || 0);
-        }, 0);
-
-        const impressionsCtr = totalImpressions > 0
-            ? (totalViews / totalImpressions * 100)
-            : 0;
+        const totalViews = filteredData.reduce((sum, v) => sum + (v.views || 0), 0);
+        const totalImpressions = filteredData.reduce((sum, v) => sum + (v.impressions || 0), 0);
+        const avgPercentWatched = filteredData.reduce((sum, v) => sum + (v.avgPercentWatched || 0), 0) / filteredData.length;
+        const totalWatchTimeSeconds = filteredData.reduce((sum, v) => sum + (v.totalWatchTimeSeconds || 0), 0);
 
         return {
+            totalViews,
             totalImpressions,
-            totalWatchTime,
-            avgPercentViewed,
-            impressionsCtr
+            avgPercentWatched,
+            totalWatchTimeSeconds
         };
     };
 
@@ -192,29 +175,12 @@ const VideoMetrics = () => {
     };
 
     const openVideoModal = (video) => {
-        const fullVideoData = videosData.videos[video.id];
-        setSelectedVideo({
-            ...video,
-            fullData: fullVideoData
-        });
+        setSelectedVideo(video);
         setIsModalOpen(true);
     };
 
     const closeVideoModal = () => {
         setIsModalOpen(false);
-    };
-
-    const isYouTubeVideo = (video) => {
-        if (!video || !videosData.videos[video.id]) return false;
-        
-        const videoData = videosData.videos[video.id];
-        const thumbnails = videoData?.snippet?.thumbnails;
-        
-        const isVimeo = thumbnails && 
-                       (typeof thumbnails.default === 'string' || 
-                        thumbnails.default?.url?.includes('vumbnail.com'));
-        
-        return !isVimeo;
     };
 
     const formatNumber = (num) => {
@@ -227,82 +193,46 @@ const VideoMetrics = () => {
         return value.toFixed(1) + '%';
     };
 
-    const formatTime = (seconds) => {
-        if (seconds === undefined || isNaN(seconds)) return "0:00";
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = Math.floor(seconds % 60);
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
+    const formatWatchTime = (seconds) => {
+        if (seconds === undefined || isNaN(seconds) || seconds === 0) return "0s";
 
-    const formatWatchTime = (hours) => {
-        if (hours === undefined || isNaN(hours)) return "0h";
-
-        const totalSeconds = Math.round(hours * 3600);
-        const d = Math.floor(totalSeconds / 86400);
-        const h = Math.floor((totalSeconds % 86400) / 3600);
-        const m = Math.floor((totalSeconds % 3600) / 60);
-        const s = totalSeconds % 60;
+        const d = Math.floor(seconds / 86400);
+        const h = Math.floor((seconds % 86400) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
 
         if (d > 0) {
             const parts = [`${d}d`];
             if (h > 0) parts.push(`${h}h`);
             if (m > 0) parts.push(`${m}m`);
-            if (s > 0) parts.push(`${s}s`);
             return parts.join(' ');
         } else if (h > 0) {
             return m > 0 ? `${h}h ${m}m` : `${h}h`;
         } else if (m > 0) {
-            return `${m}m`;
+            return `${m}m ${s}s`;
         } else {
             return `${s}s`;
         }
     };
 
-    const formatMetric = (metric, value, video) => {
-        if (metric === 'source') {
-            return getSourceBadge(video);
-        }
-
-        if (metric === 'averageViewPercentage' || metric === 'impressionsCtr') {
-            return formatPercent(value);
-        } else if (metric === 'averageViewDuration') {
-            return formatTime(value);
-        } else if (metric === 'watchTimeHours') {
-            return formatWatchTime(value);
-        } else {
-            return formatNumber(value);
-        }
-    };
-
-    const getSourceBadge = (video) => {
-        if (!video || !videosData.videos[video.id]) return null;
-        
-        return isYouTubeVideo(video) ? (
-            <span className="source-badge youtube">YOUTUBE</span>
-        ) : (
-            <span className="source-badge vimeo">VIMEO</span>
-        );
+    const formatWatchTimeMs = (ms) => {
+        if (ms === undefined || isNaN(ms) || ms === 0) return "0s";
+        return formatWatchTime(ms / 1000);
     };
 
     const exportToCSV = () => {
-        const header = ['Title', ...displayMetrics.map(metric => metric === 'source' ? 'Source' : metricDisplayNames[metric])];
-        const rows = filteredData.map(item => {
-            const source = isYouTubeVideo(item) ? 'YouTube' : 'Vimeo';
-            return [
-                item.title,
-                ...displayMetrics.map(metric => {
-                    if (metric === 'source') {
-                        return source;
-                    }
-                    if (metric === 'impressionsCtr') {
-                        return item[metric]?.toFixed(2) || '0';
-                    }
-                    return item[metric];
-                })
-            ];
-        });
+        const headers = ['Title', 'Views', 'Impressions', 'CTR (%)', 'Avg % Watched', 'Total Watch Time'];
 
-        const csvContent = [header, ...rows]
+        const rows = filteredData.map(item => [
+            item.title,
+            item.views,
+            item.impressions,
+            item.ctr?.toFixed(2) || '0',
+            item.avgPercentWatched?.toFixed(2) || '0',
+            formatWatchTime(item.totalWatchTimeSeconds)
+        ]);
+
+        const csvContent = [headers, ...rows]
             .map(row => row.map(field =>
                 `"${String(field || '').replace(/"/g, '""')}"`
             ).join(","))
@@ -312,7 +242,7 @@ const VideoMetrics = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", "video_metrics_data.csv");
+        link.setAttribute("download", `${videoSource}_metrics_data.csv`);
         link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
@@ -345,106 +275,139 @@ const VideoMetrics = () => {
                 </div>
             </div>
 
+            <div className="data-source-toggle">
+                <div
+                    className={`data-source-option ${videoSource === 'youtube' ? 'active' : ''}`}
+                    onClick={() => { setVideoSource('youtube'); setCurrentPage(1); }}
+                >
+                    YouTube
+                </div>
+                <div
+                    className={`data-source-option ${videoSource === 'vimeo' ? 'active' : ''}`}
+                    onClick={() => { setVideoSource('vimeo'); setCurrentPage(1); }}
+                >
+                    Vimeo
+                </div>
+            </div>
+
             <div className="video-metrics-summary">
+                <div className="metric-summary-card">
+                    <div className="metric-summary-label">Total Views</div>
+                    <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalViews)}</div>
+                </div>
                 <div className="metric-summary-card">
                     <div className="metric-summary-label">Total Impressions</div>
                     <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalImpressions)}</div>
                 </div>
                 <div className="metric-summary-card">
+                    <div className="metric-summary-label">Avg % Watched</div>
+                    <div className="metric-summary-value">{formatPercent(aggregateMetrics.avgPercentWatched)}</div>
+                </div>
+                <div className="metric-summary-card">
                     <div className="metric-summary-label">Total Watch Time</div>
-                    <div className="metric-summary-value">{formatWatchTime(aggregateMetrics.totalWatchTime)}</div>
-                </div>
-                <div className="metric-summary-card">
-                    <div className="metric-summary-label">Avg % Viewed</div>
-                    <div className="metric-summary-value">{formatPercent(aggregateMetrics.avgPercentViewed)}</div>
-                </div>
-                <div className="metric-summary-card">
-                    <div className="metric-summary-label">Impressions CTR</div>
-                    <div className="metric-summary-value">{formatPercent(aggregateMetrics.impressionsCtr)}</div>
+                    <div className="metric-summary-value">{formatWatchTime(aggregateMetrics.totalWatchTimeSeconds)}</div>
                 </div>
             </div>
 
-            <div className="table-section">
-                <div className="table-controls">
-                    <label htmlFor="rowsPerPage">Rows per page:</label>
-                    <select
-                        id="rowsPerPage"
-                        value={rowsPerPage}
-                        onChange={handleRowsPerPageChange}
-                    >
-                        {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
-                            <option key={num} value={num}>{num}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <table className="video-metrics-table">
-                    <thead>
-                        <tr>
-                            <th className="title-column">Title</th>
-                            {displayMetrics.map((metric) => (
-                                <th
-                                    key={metric}
-                                    className={`${metric === 'source' ? 'source-column' : 'metric-column'} sortable`}
-                                    onClick={() => handleSort(metric)}
+            {isLoading ? (
+                <div className="loading-indicator">Loading video data...</div>
+            ) : (
+                <div className="table-section">
+                    <div className="table-header-row">
+                        <h2 className="table-title">{videoSource === 'youtube' ? 'YouTube Metrics' : 'Vimeo Metrics'}</h2>
+                        <div className="table-header-controls">
+                            <div className="rows-per-page-control">
+                                <label htmlFor="rowsPerPage">Rows per page:</label>
+                                <select
+                                    id="rowsPerPage"
+                                    value={rowsPerPage}
+                                    onChange={handleRowsPerPageChange}
                                 >
-                                    {metric === 'source' ? 'Source' : metricDisplayNames[metric]}
-                                    {sortColumn === metric && (
-                                        <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>
-                                    )}
+                                    {[10, 15, 20, 25, 30, 35, 40, 45, 50].map((num) => (
+                                        <option key={num} value={num}>{num}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {(videoSource === 'youtube' ? youtubeData.last_updated : vimeoData.last_updated) && (
+                                <div className="last-updated-tag">
+                                    Last Updated: {new Date(videoSource === 'youtube' ? youtubeData.last_updated : vimeoData.last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <table className="video-metrics-table">
+                        <thead>
+                            <tr>
+                                <th className="title-column">Title</th>
+                                <th className="metric-column sortable" onClick={() => handleSort('views')}>
+                                    Views {sortColumn === 'views' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
                                 </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {currentRows.map((item, index) => (
-                            <tr key={index}>
-                                <td
-                                    className="title-column journal-title"
-                                    onClick={() => openVideoModal(item)}
-                                >
-                                    {item.title}
-                                </td>
-                                {displayMetrics.map((metric) => (
-                                    <td key={metric} className={metric === 'source' ? 'source-column' : 'metric-column'}>
-                                        {formatMetric(metric, item[metric], item)}
-                                    </td>
-                                ))}
+                                <th className="metric-column sortable" onClick={() => handleSort('impressions')}>
+                                    Impressions {sortColumn === 'impressions' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
+                                </th>
+                                <th className="metric-column sortable" onClick={() => handleSort('ctr')}>
+                                    CTR {sortColumn === 'ctr' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
+                                </th>
+                                <th className="metric-column sortable" onClick={() => handleSort('avgPercentWatched')}>
+                                    Avg % Watched {sortColumn === 'avgPercentWatched' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
+                                </th>
+                                <th className="metric-column sortable" onClick={() => handleSort('totalWatchTimeSeconds')}>
+                                    Total Watch Time {sortColumn === 'totalWatchTimeSeconds' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
+                                </th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {currentRows.map((item, index) => (
+                                <tr key={index}>
+                                    <td
+                                        className="title-column journal-title"
+                                        onClick={() => openVideoModal(item)}
+                                    >
+                                        {item.title}
+                                    </td>
+                                    <td className="metric-column">{formatNumber(item.views)}</td>
+                                    <td className="metric-column">{formatNumber(item.impressions)}</td>
+                                    <td className="metric-column">{formatPercent(item.ctr)}</td>
+                                    <td className="metric-column">{formatPercent(item.avgPercentWatched)}</td>
+                                    <td className="metric-column">{formatWatchTime(item.totalWatchTimeSeconds)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
 
-                <div className="table-footer">
-                    <div className="pagination">
-                        {currentPage > 1 && (
-                            <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
-                        )}
-                        {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
-                            <button
-                                key={num}
-                                onClick={() => handlePagination(num)}
-                                className={currentPage === num ? 'active' : ''}
-                            >
-                                {num}
-                            </button>
-                        ))}
-                        {currentPage < totalPages && (
-                            <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
-                        )}
+                    <div className="table-footer">
+                        <div className="pagination">
+                            {currentPage > 1 && (
+                                <button onClick={() => handlePagination(currentPage - 1)}>Previous</button>
+                            )}
+                            {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(num => (
+                                <button
+                                    key={num}
+                                    onClick={() => handlePagination(num)}
+                                    className={currentPage === num ? 'active' : ''}
+                                >
+                                    {num}
+                                </button>
+                            ))}
+                            {currentPage < totalPages && (
+                                <button onClick={() => handlePagination(currentPage + 1)}>Next</button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="export-button-container">
+                        <button className="export-button" onClick={exportToCSV}>
+                            Export CSV
+                        </button>
                     </div>
                 </div>
-                <div className="export-button-container">
-                    <button className="export-button" onClick={exportToCSV}>
-                        Export CSV
-                    </button>
-                </div>
-            </div>
+            )}
 
             {isModalOpen && selectedVideo && (
-                <VideoModal 
-                    video={selectedVideo} 
-                    onClose={closeVideoModal} 
+                <VideoModal
+                    video={selectedVideo}
+                    onClose={closeVideoModal}
+                    videoSource={videoSource}
                 />
             )}
         </div>

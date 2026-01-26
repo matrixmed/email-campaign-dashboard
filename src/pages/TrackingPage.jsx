@@ -33,7 +33,6 @@ const TrackingPage = () => {
       const result = await response.json();
       setVisitorDetail(result);
     } catch (err) {
-      console.error(err);
     }
   };
 

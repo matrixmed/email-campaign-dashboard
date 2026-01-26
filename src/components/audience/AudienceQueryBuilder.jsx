@@ -17,7 +17,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 };
             }
         } catch (e) {
-            console.error('Error loading persisted state:', e);
             localStorage.removeItem('audienceQueryState');
         }
         return {
@@ -100,7 +99,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             };
             localStorage.setItem('audienceQueryState', JSON.stringify(stateToPersist));
         } catch (error) {
-            console.warn('Failed to save state to localStorage:', error);
             if (error.name === 'QuotaExceededError') {
                 localStorage.removeItem('audienceQueryState');
             }
@@ -116,20 +114,14 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
         setSpecialtiesLoading(true);
         try {
             const url = `${API_BASE}/users/specialties?merge=${specialtyMergeMode}`;
-            console.log('Fetching specialties from:', url);
             const response = await fetch(url);
-            console.log('Specialties response status:', response.status);
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Specialties data:', data);
                 setSpecialties(data.specialties || []);
-            } else {
-                const errorText = await response.text();
-                console.error('Failed to fetch specialties:', response.status, errorText);
             }
         } catch (err) {
-            console.error('Error fetching specialties:', err);
+            // Silently handle specialty fetch errors
         } finally {
             setSpecialtiesLoading(false);
         }
@@ -145,8 +137,7 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 setCampaigns(validCampaigns);
             }
         } catch (err) {
-            console.error('Error fetching campaigns:', err);
-        }
+                    }
     };
 
     const clearFindUsers = () => {
@@ -282,8 +273,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 export_csv: false
             };
 
-            console.log('Request data:', requestData);
-
             if (searchMode === 'specialty') {
                 if (selectedSpecialties.length === 0) {
                     throw new Error('Please select at least one specialty');
@@ -302,11 +291,8 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 body: JSON.stringify(requestData)
             });
 
-            console.log('Response status:', response.status);
-
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Error response:', errorText);
                 try {
                     const errorData = JSON.parse(errorText);
                     throw new Error(errorData.error || `HTTP ${response.status}`);
@@ -316,12 +302,9 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             }
 
             const data = await response.json();
-            console.log('Response data:', data);
-            console.log('First user sample:', data.users?.[0]);
             setResults(data);
 
         } catch (err) {
-            console.error('Error finding users:', err);
             setError(err.message || 'Failed to process request');
         } finally {
             setLoading(false);
@@ -418,7 +401,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             const data = await response.json();
             setAnalysisResults(data);
         } catch (err) {
-            console.error('Error analyzing users:', err);
             setAnalysisError(err.message || 'Failed to process request');
         } finally {
             setAnalysisLoading(false);
@@ -512,7 +494,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             setPatternResults(data);
 
         } catch (err) {
-            console.error('Error analyzing engagement patterns:', err);
             setPatternError(err.message || 'Failed to process request');
         } finally {
             setPatternLoading(false);

@@ -83,7 +83,6 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
                 setMetrics(sortedMetrics);
 
             } catch (error) {
-                console.error('Error fetching data:', error);
             }
         };
 
@@ -112,7 +111,6 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
                     }
                 }
             } catch (error) {
-                console.error('Error fetching validation flags:', error);
             }
         };
 

@@ -26,7 +26,6 @@ const DashboardCanvasContent = () => {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        console.error('Failed to parse saved dashboard state:', e);
         return null;
       }
     }
@@ -69,6 +68,7 @@ const DashboardCanvasContent = () => {
     table2: TABLE_TYPES.VIDEO_METRICS,
     table3: TABLE_TYPES.SOCIAL_MEDIA
   });
+  const [isRestoring, setIsRestoring] = useState(false);
   const canvasRef = useRef(null);
 
   const {
@@ -154,8 +154,10 @@ const DashboardCanvasContent = () => {
   const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
 
   useEffect(() => {
+    if (isRestoring) return;
+
     const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showPatientImpact}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
-    
+
     if (triggerKey !== lastRegenerationTrigger && cards.length > 0 && currentTemplate) {
       let templateConfig;
       
@@ -247,11 +249,10 @@ const DashboardCanvasContent = () => {
           setCards(finalCards);
           setLastRegenerationTrigger(triggerKey);
         } catch (error) {
-          console.error('Template regeneration failed:', error);
         }
       }
     }
-  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes]);
+  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes, isRestoring]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
     const normalizedData = { ...newData };
@@ -397,7 +398,6 @@ const DashboardCanvasContent = () => {
         setSelectedMultiCampaigns(templateConfig.campaigns);
       }
     } catch (error) {
-      console.error('Template selection failed:', error);
     }
   }, [specialtyMergeMode, costComparisonMode, showPatientImpact, selectedTableTypes]);
 
@@ -433,6 +433,43 @@ const DashboardCanvasContent = () => {
       [tablePosition]: newType
     }));
   }, []);
+
+  const handleAddJournalMetricRow = useCallback((label, value) => {
+    setCards(prev => {
+      const journalTableIndex = prev.findIndex(card =>
+        card.type === 'table' &&
+        (card.title === 'Online Journal Metrics' || card.id?.includes('journal'))
+      );
+
+      if (journalTableIndex === -1) return prev;
+
+      const updatedCards = [...prev];
+      const journalTable = { ...updatedCards[journalTableIndex] };
+      const currentData = journalTable.config?.customData || [];
+
+      const existingRowIndex = currentData.findIndex(row => row[0] === label);
+
+      let newData;
+      if (existingRowIndex !== -1) {
+        newData = currentData.map((row, idx) =>
+          idx === existingRowIndex ? [label, value] : row
+        );
+      } else {
+        newData = [...currentData, [label, value]];
+      }
+
+      journalTable.config = {
+        ...journalTable.config,
+        customData: newData
+      };
+
+      updatedCards[journalTableIndex] = journalTable;
+
+      preserveEdit(journalTable.id, { config: { customData: newData } });
+
+      return updatedCards;
+    });
+  }, [preserveEdit]);
 
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.target === e.currentTarget || e.target.classList.contains('dashboard-canvas-background')) {
@@ -790,20 +827,23 @@ const DashboardCanvasContent = () => {
 
       const data = await response.json();
       if (data.status !== 'success') {
-        console.error('Failed to save dashboard:', data.message);
       }
     } catch (error) {
-      console.error('Error saving dashboard:', error.message);
     }
   }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
 
   const handleRestoreDashboard = useCallback(async (dashboardId) => {
+    setIsRestoring(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/dashboards/${dashboardId}`);
       const data = await response.json();
 
       if (data.status === 'success') {
         const state = data.dashboard.state_json;
+
+        if (state.userEdits) {
+          setUserEdits(state.userEdits);
+        }
 
         if (state.cards) {
           setCards(state.cards);
@@ -841,34 +881,35 @@ const DashboardCanvasContent = () => {
           setSelectedTableTypes(state.selectedTableTypes);
         }
 
-        if (state.userEdits) {
-          setUserEdits(state.userEdits);
-        }
-
+        let restoredCampaign = null;
         if (state.selectedCampaign) {
-          const campaign = campaigns.find(c => c.campaign_name === state.selectedCampaign);
-          if (campaign) {
-            setSelectedCampaign(campaign);
+          restoredCampaign = campaigns.find(c => c.campaign_name === state.selectedCampaign);
+          if (restoredCampaign) {
+            setSelectedCampaign(restoredCampaign);
           }
         }
 
+        let restoredMultiCampaigns = [];
         if (state.selectedMultiCampaigns && state.selectedMultiCampaigns.length > 0) {
-          const multiCampaigns = state.selectedMultiCampaigns
+          restoredMultiCampaigns = state.selectedMultiCampaigns
             .map(name => campaigns.find(c => c.campaign_name === name))
             .filter(c => c);
-          if (multiCampaigns.length > 0) {
-            setSelectedMultiCampaigns(multiCampaigns);
+          if (restoredMultiCampaigns.length > 0) {
+            setSelectedMultiCampaigns(restoredMultiCampaigns);
           }
         }
 
         if (state.currentTemplate) {
           setCurrentTemplate({ id: state.currentTemplate });
         }
+
+        const triggerKey = `${state.specialtyMergeMode || false}-${state.costComparisonMode || 'none'}-${state.showPatientImpact || false}-${state.theme || 'matrix'}-${state.selectedCampaign || ''}-${restoredMultiCampaigns?.length || 0}-${state.currentTemplate || ''}-${JSON.stringify(state.selectedTableTypes || {})}`;
+        setLastRegenerationTrigger(triggerKey);
       } else {
-        console.error('Failed to load dashboard:', data.message);
       }
     } catch (error) {
-      console.error('Error loading dashboard:', error.message);
+    } finally {
+      setTimeout(() => setIsRestoring(false), 100);
     }
   }, [campaigns]);
 
@@ -1151,6 +1192,8 @@ const DashboardCanvasContent = () => {
             onTableTypeChange={handleTableTypeChange}
             onRestoreDashboard={handleRestoreDashboard}
             selectedRowInfo={selectedRowInfo}
+            onAddJournalMetricRow={handleAddJournalMetricRow}
+            hasJournalTable={cards.some(card => card.type === 'table' && (card.title === 'Online Journal Metrics' || card.id?.includes('journal')))}
           />
         </div>
 

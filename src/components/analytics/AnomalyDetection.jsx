@@ -37,7 +37,6 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
           setBrands(brandNames);
         }
       } catch (error) {
-        console.warn('Failed to fetch brand data for industry mapping:', error);
       }
     };
     fetchBrandData();
@@ -188,7 +187,6 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
         liveData = await liveResponse.json();
         if (!Array.isArray(liveData)) liveData = [];
       } catch (e) {
-        console.warn('Failed to fetch live campaigns, continuing with completed only:', e);
       }
 
       const completedCampaigns = completedData.map(c => ({ ...c, isLive: false }));
@@ -276,16 +274,6 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
       const primaryGroups = _.groupBy(processedCampaigns, primaryGroupKey);
       const allAnomalies = [];
 
-      if (analyzeBy === 'industry') {
-        console.log('=== INDUSTRY MODE DEBUG ===');
-        console.log('Brand map size:', Object.keys(brandIndustryMap).length);
-        console.log('Processed campaigns:', processedCampaigns.length);
-        console.log('Industries found:', Object.keys(primaryGroups));
-        Object.entries(primaryGroups).forEach(([ind, camps]) => {
-          const completed = camps.filter(c => !c.isLive).length;
-          console.log(`  ${ind}: ${camps.length} total, ${completed} completed`);
-        });
-      }
 
       const zThreshold = showOverperforming ? 1.5 : -1.5;
 
@@ -351,7 +339,6 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
 
       setAnomalies(allAnomalies);
     } catch (error) {
-      console.error('Failed to fetch anomaly data:', error);
     }
     setIsLoading(false);
   };

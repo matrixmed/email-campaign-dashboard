@@ -24,7 +24,6 @@ const ExchangeScorecard = ({ searchTerm, startDate = null, endDate = null }) => 
         setSummary(result.summary || {});
       }
     } catch (err) {
-      console.error('Error fetching exchange data:', err);
     }
     setLoading(false);
   }, [startDate, endDate]);

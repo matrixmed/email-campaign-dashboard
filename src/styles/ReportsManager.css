@@ -1916,6 +1916,21 @@ body.light .json-content {
   cursor: not-allowed;
 }
 
+.placement-id-error {
+  padding: 8px 12px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+body.light .placement-id-error {
+  background-color: rgba(239, 68, 68, 0.05);
+  color: #dc2626;
+}
+
 body.light .placement-id-modal-simple {
   background-color: #fff;
   border-color: #e5e7eb;

@@ -15,7 +15,6 @@ const BasisRecommendations = ({ searchTerm }) => {
         setRecommendations(data.recommendations || []);
       }
     } catch (err) {
-      console.error('Error fetching recommendations:', err);
     }
     setLoading(false);
   }, []);

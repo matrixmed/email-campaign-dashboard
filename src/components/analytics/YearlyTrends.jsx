@@ -57,7 +57,6 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
         setCampaigns(Array.isArray(data) ? data : []);
       }
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
     } finally {
       setLoading(false);
     }

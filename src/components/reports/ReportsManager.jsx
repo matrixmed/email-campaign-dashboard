@@ -14,6 +14,8 @@ const ReportsManager = () => {
     const [showModal, setShowModal] = useState(false);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [batchCMIJSON, setBatchCMIJSON] = useState(null);
+    const [batchAgencyJSON, setBatchAgencyJSON] = useState(null);
+    const [batchAgencyName, setBatchAgencyName] = useState('');
     const [activeTab, setActiveTab] = useState('current');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -38,6 +40,7 @@ const ReportsManager = () => {
     const [showPlacementIdModal, setShowPlacementIdModal] = useState(false);
     const [placementIdReport, setPlacementIdReport] = useState(null);
     const [placementIdInput, setPlacementIdInput] = useState('');
+    const [placementIdError, setPlacementIdError] = useState('');
 
     const [showAddAggModal, setShowAddAggModal] = useState(false);
     const [addAggPlacementId, setAddAggPlacementId] = useState('');
@@ -138,7 +141,7 @@ const ReportsManager = () => {
     const cleanCampaignName = (name) => {
         if (!name) return name;
         let cleaned = name.split(/\s*[-–—]?\s*deployment\s+#?\d+/i)[0].trim();
-        cleaned = cleaned.replace(/[():#']/g, '').trim();
+        cleaned = cleaned.replace(/[():#'\[\]]/g, '').trim();
         return cleaned;
     };
 
@@ -270,7 +273,6 @@ const ReportsManager = () => {
                         }
                     }
                 } catch (metaError) {
-                    console.error('Error fetching campaign metadata:', metaError);
                 }
 
                 try {
@@ -282,7 +284,6 @@ const ReportsManager = () => {
                         }
                     }
                 } catch (contractsError) {
-                    console.error('Error fetching CMI contract values:', contractsError);
                 }
 
                 try {
@@ -298,7 +299,6 @@ const ReportsManager = () => {
                         }
                     }
                 } catch (noDataError) {
-                    console.error('Error fetching CMI expected no-data reports:', noDataError);
                 }
 
                 try {
@@ -310,18 +310,23 @@ const ReportsManager = () => {
                         }
                     }
                 } catch (brandsError) {
-                    console.error('Error fetching brands data:', brandsError);
                 }
 
                 const newCheckedStates = {};
                 const notNeededStates = {};
                 deduplicatedData.forEach(report => {
-                    if (report.is_submitted && report.id) {
+                    if (report.id) {
                         const reportId = report.id;
-                        newCheckedStates[`${reportId}_week_1`] = true;
-                        newCheckedStates[`${reportId}_week_2`] = true;
-                        newCheckedStates[`${reportId}_week_3`] = true;
-                        if (report.is_no_data_report) {
+                        if (report.week_1_submitted) {
+                            newCheckedStates[`${reportId}_week_1`] = true;
+                        }
+                        if (report.week_2_submitted) {
+                            newCheckedStates[`${reportId}_week_2`] = true;
+                        }
+                        if (report.week_3_submitted) {
+                            newCheckedStates[`${reportId}_week_3`] = true;
+                        }
+                        if (report.is_no_data_report && report.is_submitted) {
                             newCheckedStates[`${reportId}_no_data`] = true;
                         }
                     }
@@ -335,13 +340,11 @@ const ReportsManager = () => {
                     const savedMonthlyStates = JSON.parse(localStorage.getItem('monthlyReportStates') || '{}');
                     Object.assign(newCheckedStates, savedMonthlyStates);
                 } catch (e) {
-                    console.error('Error loading monthly report states:', e);
                 }
 
                 setCheckedReports(newCheckedStates);
 
             } catch (error) {
-                console.error('Error fetching reports data:', error);
             } finally {
                 setLoading(false);
             }
@@ -446,16 +449,20 @@ const ReportsManager = () => {
             }
 
             if (addAggMode === 'attach' && addAggSelectedCampaign) {
-                await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
+                const attachResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         attach_to_campaign_id: addAggSelectedCampaign.id
                     })
                 });
+                if (!attachResponse.ok) {
+                    const attachError = await attachResponse.json();
+                    throw new Error(attachError.message || 'Failed to attach report');
+                }
 
                 if (addAggContractData.metric) {
-                    await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
+                    const aggResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -463,18 +470,26 @@ const ReportsManager = () => {
                             agg_value: ''
                         })
                     });
+                    if (!aggResponse.ok) {
+                        const aggError = await aggResponse.json();
+                        throw new Error(aggError.message || 'Failed to set AGG values');
+                    }
                 }
             } else if (addAggMode === 'standalone') {
-                await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
+                const attachResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/attach`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         attach_to_campaign_id: null
                     })
                 });
+                if (!attachResponse.ok) {
+                    const attachError = await attachResponse.json();
+                    throw new Error(attachError.message || 'Failed to set as standalone');
+                }
 
                 if (addAggContractData.metric) {
-                    await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
+                    const aggResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/agg-values`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -482,16 +497,24 @@ const ReportsManager = () => {
                             agg_value: ''
                         })
                     });
+                    if (!aggResponse.ok) {
+                        const aggError = await aggResponse.json();
+                        throw new Error(aggError.message || 'Failed to set AGG values');
+                    }
                 }
             }
 
-            await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/move-to-due`, {
+            const moveResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/move-to-due`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     assigned_campaign_id: addAggSelectedCampaign?.id
                 })
             });
+            if (!moveResponse.ok) {
+                const moveError = await moveResponse.json();
+                throw new Error(moveError.message || 'Failed to move to due');
+            }
 
             await refreshAGGData();
             closeAddAggModal();
@@ -558,7 +581,6 @@ const ReportsManager = () => {
 
             await refreshAGGData();
         } catch (error) {
-            console.error('Error updating backend:', error);
         }
 
         closeMoveModal();
@@ -574,7 +596,6 @@ const ReportsManager = () => {
                 });
                 await refreshAGGData();
             } catch (error) {
-                console.error('Error detaching AGG:', error);
             }
         }
     };
@@ -596,7 +617,6 @@ const ReportsManager = () => {
                     })
                 });
             } catch (error) {
-                console.error('Error updating AGG values:', error);
             }
         }
     };
@@ -618,7 +638,6 @@ const ReportsManager = () => {
                     })
                 });
             } catch (error) {
-                console.error('Error updating standalone AGG values:', error);
             }
         }
     };
@@ -633,7 +652,6 @@ const ReportsManager = () => {
                 });
                 await refreshAGGData();
             } catch (error) {
-                console.error('Error removing standalone AGG:', error);
             }
         }
     };
@@ -647,7 +665,6 @@ const ReportsManager = () => {
             });
             await refreshAGGData();
         } catch (error) {
-            console.error('Error moving PLD AGG:', error);
         }
     };
 
@@ -661,7 +678,6 @@ const ReportsManager = () => {
                 });
                 await refreshAGGData();
             } catch (error) {
-                console.error('Error detaching PLD AGG:', error);
             }
         }
     };
@@ -715,7 +731,6 @@ const ReportsManager = () => {
                 }
             }
         } catch (error) {
-            console.error('Error loading AGG data:', error);
         }
     };
 
@@ -1135,7 +1150,6 @@ const ReportsManager = () => {
                 savedMonthlyStates[key] = newCheckedState;
                 localStorage.setItem('monthlyReportStates', JSON.stringify(savedMonthlyStates));
             } catch (e) {
-                console.error('Error saving monthly report state:', e);
             }
             return;
         }
@@ -1148,6 +1162,7 @@ const ReportsManager = () => {
                 },
                 body: JSON.stringify({
                     is_submitted: newCheckedState,
+                    week: week,
                     submitted_by: 'user'
                 })
             });
@@ -1155,12 +1170,9 @@ const ReportsManager = () => {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
                 setCheckedReports(checkedReports);
-                console.error('Failed to update submission status:', response.status, errorData);
-                alert(`Failed to update: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             setCheckedReports(checkedReports);
-            console.error('Error updating submission status:', error);
         }
     };
 
@@ -1181,7 +1193,6 @@ const ReportsManager = () => {
                 body: JSON.stringify({ is_not_needed: newValue })
             });
         } catch (error) {
-            console.error('Error updating not-needed status:', error);
             setNotNeededReports(notNeededReports);
         }
     };
@@ -1211,12 +1222,10 @@ const ReportsManager = () => {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
                 setCheckedReports(checkedReports);
-                console.error('Failed to update no-data submission status:', response.status, errorData);
                 alert(`Failed to update: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             setCheckedReports(checkedReports);
-            console.error('Error updating no-data submission status:', error);
         }
     };
 
@@ -1227,25 +1236,40 @@ const ReportsManager = () => {
             case 'cmi':
                 return generateCMIJSON(report, specificWeek, overrideMeta);
             case 'bi':
+            case 'boehringer':
                 return generateBIJSON(report, specificWeek);
             case 'amg':
+            case 'amgen':
                 return generateAMGJSON(report, specificWeek);
             case 'ortho':
+            case 'orthomd':
                 return generateOrthoJSON(report, specificWeek);
             case 'sun':
                 return generateSunJSON(report, specificWeek);
             case 'cas':
+            case 'castle':
                 return generateCasJSON(report, specificWeek);
             case 'deer':
+            case 'deerfield':
                 return generateDeerJSON(report, specificWeek);
             case 'good':
+            case 'goodapple':
                 return generateGoodJSON(report, specificWeek);
             case 'iq':
+            case 'iqvia':
                 return generateIQJSON(report, specificWeek);
             case 'klik':
+            case 'klick':
                 return generateKlikJSON(report, specificWeek);
             case 'sl':
+            case 'silverlight':
                 return generateSLJSON(report, specificWeek);
+            case 'lucid':
+                return generateLucidJSON(report, specificWeek);
+            case 'phm':
+                return generatePHMJSON(report, specificWeek);
+            case 'omd':
+                return generateOMDJSON(report, specificWeek);
             default:
                 return generateDefaultJSON(report, specificWeek);
         }
@@ -1357,7 +1381,7 @@ const ReportsManager = () => {
             gcm_placement_id: buildGcmArray(),
             brand_name: brandName,
             vehicle_name: contractInfo?.vehicle || matchedMeta?.vehicle_name || '',
-            media_tactic_id: matchedMeta?.media_tactic_id || '',
+            media_tactic_id: contractInfo?.media_tactic_id || matchedMeta?.media_tactic_id || '',
             contract_number: contractInfo?.contract_number || matchedMeta?.contract_number || '',
             placement_description: contractInfo?.placement_description || matchedMeta?.placement_description || '',
             buy_component_type: contractInfo?.buy_component_type || matchedMeta?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
@@ -1368,164 +1392,229 @@ const ReportsManager = () => {
                 placement_description: contractInfo.placement_description,
                 brand: contractInfo.brand,
                 vehicle: contractInfo.vehicle,
-                buy_component_type: contractInfo.buy_component_type
+                buy_component_type: contractInfo.buy_component_type,
+                media_tactic_id: contractInfo.media_tactic_id
             } : null
         };
     };
 
+    const formatISODateTime = (date, isEndOfDay = false) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return isEndOfDay ? `${year}-${month}-${day}T23:59:59` : `${year}-${month}-${day}T00:00:00`;
+    };
+
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
-
-        const formatISODateTime = (date, isEndOfDay = false) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return isEndOfDay ?
-                `${year}-${month}-${day}T23:59:59` :
-                `${year}-${month}-${day}T00:00:00`;
-        };
-
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
-        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
+        const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
         return {
-            "campaigns": [
-                {
-                    "campaign_name": cleanedCampaignName,
-                    "topic_brand": (report.brand || '').toUpperCase(),
-                    "topic_therapeutic_area": "IMMUNOLOGY",
-                    "topic_asset_ids": ["1339853"]
-                }
-            ],
-            "folder": month,
-            "channel": "Email",
-            "sub_channel": "Third Party Initiated Email",
-            "interaction_functional_area": "Human Pharma Commercial",
             "start_date": formatISODateTime(currentTimeframe.start),
-            "end_date": formatISODateTime(currentTimeframe.end, true)
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "topic_brand": meta.topic_brand || (report.brand || '').toUpperCase(),
+            "topic_therapeutic_area": meta.topic_therapeutic_area || 'IMMUNOLOGY',
+            "topic_asset_ids": meta.topic_asset_ids || ['']
         };
     };
 
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
-
-        const formatISODateTime = (date, isEndOfDay = false) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return isEndOfDay ?
-                `${year}-${month}-${day}T23:59:59` :
-                `${year}-${month}-${day}T00:00:00`;
-        };
-
-        const formatDate = (date) => {
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${year}${month}${day}`;
-        };
-
-        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
-        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+        const brandUpper = (meta.brand_name || report.brand || '').toUpperCase();
+        const formatDateCompact = (date) => `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
 
         return {
-            "folder": month,
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true),
-            "internal_campaign_name": cleanedCampaignName,
-            "channel_partner": "Matrix_Medical",
-            "channel": "EM",
-            "brand_name": (report.brand || '').toUpperCase(),
-            "promotion_type": "Branded",
-            "campaign_target_date": formatDate(currentTimeframe.start),
-            "campaign_code": `${(report.brand || '').toUpperCase()}11778`,
-            "offer_name": `${(report.brand || '').toUpperCase()} MATRIX_EM`,
-            "offer_code": "CampOffer-08492",
-            "vendor_code": "VC-00103",
-            "tactic_name": `${(report.brand || '').toUpperCase()} EMAIL`,
-            "tactic_id": "Tactic-019998",
-            "contact_filename_base": "CONTACT_DATA",
-            "response_filename_base": "RESPONSE",
-            "aggregate_filename_base": "AggReport"
+            "channel_partner": meta.channel_partner || 'Matrix_Medical',
+            "channel": meta.channel || 'EM',
+            "brand_name": brandUpper,
+            "promotion_type": meta.promotion_type || 'Branded',
+            "campaign_target_date": meta.campaign_target_date || formatDateCompact(currentTimeframe.start),
+            "campaign_code": meta.campaign_code || '',
+            "offer_name": meta.offer_name || `${brandUpper} MATRIX_EM`,
+            "offer_code": meta.offer_code || '',
+            "vendor_code": meta.vendor_code || '',
+            "tactic_name": meta.tactic_name || `${brandUpper} EMAIL`,
+            "tactic_id": meta.tactic_id || ''
         };
     };
 
     const generateOrthoJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
-
-        const formatISODateTime = (date, isEndOfDay = false) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return isEndOfDay ?
-                `${year}-${month}-${day}T23:59:59` :
-                `${year}-${month}-${day}T00:00:00`;
-        };
-
-        const formatDate = (date) => {
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${month}${day}${year}`;
-        };
-
-        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
-        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
-        const today = new Date();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
 
         return {
-            "internal_campaign_name": cleanedCampaignName,
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "campaigns": [cleanedCampaignName]
+        };
+    };
+
+    const generateSunJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "brand": meta.brand || report.brand || ''
+        };
+    };
+
+    const generateCasJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "file_name": meta.file_name || ''
+        };
+    };
+
+    const generateDeerJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "tactic": meta.tactic || '',
+            "campaign": meta.campaign || '',
+            "brand": meta.brand || report.brand || ''
+        };
+    };
+
+    const generateGoodJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "campaign": meta.campaign || '',
+            "placement": meta.placement || '',
+            "creative": meta.creative || ''
+        };
+    };
+
+    const generateIQJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const monthMatch = (report.campaign_name || '').match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : currentTimeframe.start.toLocaleString('default', { month: 'long' });
+
+        return {
+            "campaign_patterns": [],
             "folder": month,
-            "finalFileName": "Ortho_PLD_",
-            "aggFileName": "Ortho_AGG_",
-            "campaginMonth": formatDate(currentTimeframe.start).substring(0, 6),
-            "date": `${currentTimeframe.start.getMonth() + 1}/${currentTimeframe.start.getDate()}/${currentTimeframe.start.getFullYear()}`,
-            "dateOfSubmission": formatDate(today),
+            "campaign_month": `${month} ${currentTimeframe.start.getFullYear()} List Report`,
             "start_date": formatISODateTime(currentTimeframe.start),
             "end_date": formatISODateTime(currentTimeframe.end, true)
+        };
+    };
+
+    const generateKlikJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "client_name": meta.client_name || '',
+            "advertiser_name": meta.advertiser_name || report.brand || '',
+            "placement_ids": meta.placement_ids || ['']
+        };
+    };
+
+    const generateSLJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "campaigns": [cleanedCampaignName]
+        };
+    };
+
+    const generateLucidJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "brand": meta.brand || report.brand || '',
+            "publisher": meta.publisher || 'Matrix Medical Communications',
+            "program": meta.program || '',
+            "campaign": meta.campaign || ''
+        };
+    };
+
+    const generatePHMJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "file_prefix": meta.file_prefix || '',
+            "brand_name": meta.brand_name || report.brand || '',
+            "campaign_code": meta.campaign_code || '',
+            "campaign_name_full": meta.campaign_name_full || '',
+            "placement_id": meta.placement_id || '',
+            "placement_name": meta.placement_name || '',
+            "publisher_product_name": meta.publisher_product_name || '',
+            "content_location": meta.content_location || '',
+            "content_id": meta.content_id || '',
+            "content_name": meta.content_name || '',
+            "channel_code": meta.channel_code || 'Email',
+            "source_id_qual": meta.source_id_qual || 'NPI',
+            "source_list_name": meta.source_list_name || '',
+            "client_type": meta.client_type || 'standard',
+            "generate_aggregate": meta.generate_aggregate !== false
+        };
+    };
+
+    const generateOMDJSON = (report, specificWeek = null) => {
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
+        const meta = manualMetadata[report.id] || {};
+        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+        const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : new Date().toLocaleString('default', { month: 'long' });
+
+        return {
+            "type": meta.type || '',
+            "campaign": meta.campaign || '',
+            "placement": meta.placement || '',
+            "creative": meta.creative || '',
+            "cost": meta.cost || 0,
+            "ads": meta.ads || 1
         };
     };
 
     const generateDefaultJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
-        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#']/g, '').trim();
-
-        const formatISODateTime = (date, isEndOfDay = false) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return isEndOfDay ?
-                `${year}-${month}-${day}T23:59:59` :
-                `${year}-${month}-${day}T00:00:00`;
-        };
-
-        const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
-        const monthRaw = monthMatch ? monthMatch[0] : currentTimeframe.start.toLocaleString('default', { month: 'long' });
-        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1).toLowerCase();
+        const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
 
         return {
-            "folder": month,
-            "internal_campaign_name": cleanedCampaignName,
-            "brand_name": report.brand,
-            "agency": report.agency,
             "start_date": formatISODateTime(currentTimeframe.start),
-            "end_date": formatISODateTime(currentTimeframe.end, true)
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "campaigns": [cleanedCampaignName],
+            "brand": report.brand || ''
         };
     };
-
-    const generateSunJSON = generateDefaultJSON;
-    const generateCasJSON = generateDefaultJSON;
-    const generateDeerJSON = generateDefaultJSON;
-    const generateGoodJSON = generateDefaultJSON;
-    const generateIQJSON = generateDefaultJSON;
-    const generateKlikJSON = generateDefaultJSON;
-    const generateSLJSON = generateDefaultJSON;
 
     const generateBatchCMIJSON = () => {
         const currentTimeframe = getCurrentWeekTimeframe();
@@ -1534,7 +1623,7 @@ const ReportsManager = () => {
 
         const cleanName = (name) => {
             if (!name) return '';
-            return name.replace(/[():#']/g, '').replace(/\s+/g, ' ').trim();
+            return name.replace(/[():#'\[\]]/g, '').replace(/\s+/g, ' ').trim();
         };
 
         const formatISODateTime = (date, isEndOfDay = false) => {
@@ -1596,7 +1685,7 @@ const ReportsManager = () => {
                 gcm_placement_id: buildGcmArray(matchedMeta),
                 brand_name: brandName,
                 vehicle_name: contractInfo?.vehicle || matchedMeta?.vehicle_name || '',
-                media_tactic_id: matchedMeta?.media_tactic_id || '',
+                media_tactic_id: contractInfo?.media_tactic_id || matchedMeta?.media_tactic_id || '',
                 contract_number: contractInfo?.contract_number || matchedMeta?.contract_number || '',
                 placement_description: contractInfo?.placement_description || matchedMeta?.placement_description || '',
                 buy_component_type: contractInfo?.buy_component_type || matchedMeta?.buy_component_type || 'e-Newsletters- Targeted/Programmatic',
@@ -1616,7 +1705,7 @@ const ReportsManager = () => {
                 gcm_placement_id: [],
                 brand_name: contractInfo?.brand || agg.brand || '',
                 vehicle_name: contractInfo?.vehicle || agg.vehicle || '',
-                media_tactic_id: agg.media_tactic_id || '',
+                media_tactic_id: contractInfo?.media_tactic_id || agg.media_tactic_id || '',
                 contract_number: contractInfo?.contract_number || agg.contract_number || '',
                 placement_description: contractInfo?.placement_description || agg.placement_description || '',
                 buy_component_type: contractInfo?.buy_component_type || agg.buy_component_type || '',
@@ -1639,7 +1728,7 @@ const ReportsManager = () => {
                 client_placement_id: report.client_placement_id || '',
                 brand_name: report.brand || contractInfo?.brand || '',
                 vehicle_name: report.vehicle || contractInfo?.vehicle || '',
-                media_tactic_id: report.media_tactic_id || '',
+                media_tactic_id: contractInfo?.media_tactic_id || report.media_tactic_id || '',
                 contract_number: report.contract_number || contractInfo?.contract_number || '',
                 placement_description: report.placement_description || contractInfo?.placement_description || '',
                 buy_component_type: report.buy_component_type || contractInfo?.buy_component_type || '',
@@ -1667,7 +1756,7 @@ const ReportsManager = () => {
                 client_placement_id: report.client_placement_id || '',
                 brand_name: report.brand || contractInfo?.brand || '',
                 vehicle_name: report.vehicle || contractInfo?.vehicle || '',
-                media_tactic_id: report.media_tactic_id || '',
+                media_tactic_id: contractInfo?.media_tactic_id || report.media_tactic_id || '',
                 contract_number: report.contract_number || contractInfo?.contract_number || '',
                 placement_description: report.placement_description || contractInfo?.placement_description || '',
                 buy_component_type: report.buy_component_type || contractInfo?.buy_component_type || '',
@@ -1702,12 +1791,165 @@ const ReportsManager = () => {
     const openBatchCMIModal = () => {
         const batchData = generateBatchCMIJSON();
         setBatchCMIJSON(batchData);
+        setBatchAgencyJSON(null);
+        setBatchAgencyName('');
+        setShowBatchModal(true);
+    };
+
+    const generateBatchAgencyJSON = (agency) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const agencyReports = getCurrentWeekReports.filter(r =>
+            r.agency === agency && !r.is_no_data_report && !notNeededReports[r.id]
+        );
+        const sortedReports = sortReports(agencyReports);
+
+        const cleanName = (name) => {
+            if (!name) return '';
+            return name.replace(/[():#'\[\]]/g, '').replace(/\s+/g, ' ').trim();
+        };
+
+        const agencyLower = agency.toLowerCase();
+
+        if (agencyLower === 'castle' || agencyLower === 'cas') {
+            const campaigns = [];
+            const fileNames = [];
+            sortedReports.forEach(report => {
+                const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
+                const meta = manualMetadata[report.id] || {};
+                campaigns.push(campaignName);
+                fileNames.push(meta.file_name || '');
+            });
+            return {
+                start_date: formatISODateTime(currentTimeframe.start),
+                end_date: formatISODateTime(currentTimeframe.end, true),
+                campaigns,
+                file_name: fileNames
+            };
+        }
+
+        if (agencyLower === 'sun') {
+            const campaigns = [];
+            const brands = [];
+            sortedReports.forEach(report => {
+                const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
+                const meta = manualMetadata[report.id] || {};
+                campaigns.push(campaignName);
+                brands.push(meta.brand || report.brand || '');
+            });
+            return {
+                start_date: formatISODateTime(currentTimeframe.start),
+                end_date: formatISODateTime(currentTimeframe.end, true),
+                campaigns,
+                brands
+            };
+        }
+
+        const campaigns = {};
+        sortedReports.forEach(report => {
+            const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
+            const meta = manualMetadata[report.id] || {};
+
+            if (agencyLower === 'klick' || agencyLower === 'klik') {
+                campaigns[campaignName] = {
+                    client_name: meta.client_name || '',
+                    advertiser_name: meta.advertiser_name || report.brand || '',
+                    placement_ids: meta.placement_ids || ['']
+                };
+            } else if (agencyLower === 'amgen' || agencyLower === 'amg') {
+                const brandUpper = (meta.brand_name || report.brand || '').toUpperCase();
+                campaigns[campaignName] = {
+                    channel_partner: meta.channel_partner || 'Matrix_Medical',
+                    channel: meta.channel || 'EM',
+                    brand_name: brandUpper,
+                    promotion_type: meta.promotion_type || 'Branded',
+                    campaign_target_date: meta.campaign_target_date || '',
+                    campaign_code: meta.campaign_code || '',
+                    offer_name: meta.offer_name || `${brandUpper} MATRIX_EM`,
+                    offer_code: meta.offer_code || '',
+                    vendor_code: meta.vendor_code || '',
+                    tactic_name: meta.tactic_name || `${brandUpper} EMAIL`,
+                    tactic_id: meta.tactic_id || ''
+                };
+            } else if (agencyLower === 'deerfield' || agencyLower === 'deer') {
+                campaigns[campaignName] = {
+                    tactic: meta.tactic || '',
+                    campaign: meta.campaign || '',
+                    brand: meta.brand || report.brand || ''
+                };
+            } else if (agencyLower === 'goodapple' || agencyLower === 'good') {
+                campaigns[campaignName] = {
+                    campaign: meta.campaign || '',
+                    placement: meta.placement || '',
+                    creative: meta.creative || ''
+                };
+            } else if (agencyLower === 'lucid') {
+                campaigns[campaignName] = {
+                    brand: meta.brand || report.brand || '',
+                    publisher: meta.publisher || 'Matrix Medical Communications',
+                    program: meta.program || '',
+                    campaign: meta.campaign || ''
+                };
+            } else if (agencyLower === 'phm') {
+                campaigns[campaignName] = {
+                    file_prefix: meta.file_prefix || '',
+                    brand_name: meta.brand_name || report.brand || '',
+                    campaign_code: meta.campaign_code || '',
+                    campaign_name_full: meta.campaign_name_full || '',
+                    placement_id: meta.placement_id || '',
+                    placement_name: meta.placement_name || '',
+                    publisher_product_name: meta.publisher_product_name || '',
+                    content_location: meta.content_location || '',
+                    content_id: meta.content_id || '',
+                    content_name: meta.content_name || '',
+                    channel_code: meta.channel_code || 'Email',
+                    source_id_qual: meta.source_id_qual || 'NPI',
+                    source_list_name: meta.source_list_name || '',
+                    client_type: meta.client_type || 'standard',
+                    generate_aggregate: meta.generate_aggregate !== false
+                };
+            } else if (agencyLower === 'bi' || agencyLower === 'boehringer') {
+                const monthMatch = campaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
+                const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : '';
+                return {
+                    start_date: formatISODateTime(currentTimeframe.start),
+                    end_date: formatISODateTime(currentTimeframe.end, true),
+                    campaigns: sortedReports.map(r => ({
+                        campaign_name: cleanName(r.standardized_campaign_name || r.campaign_name || ''),
+                        topic_brand: (r.brand || '').toUpperCase(),
+                        topic_therapeutic_area: manualMetadata[r.id]?.topic_therapeutic_area || 'IMMUNOLOGY',
+                        topic_asset_ids: manualMetadata[r.id]?.topic_asset_ids || ['']
+                    })),
+                    folder: month || currentTimeframe.start.toLocaleString('default', { month: 'long' }),
+                    channel: 'Email',
+                    sub_channel: 'Third Party Initiated Email',
+                    interaction_functional_area: 'Human Pharma Commercial'
+                };
+            }
+        });
+
+        return {
+            start_date: formatISODateTime(currentTimeframe.start),
+            end_date: formatISODateTime(currentTimeframe.end, true),
+            campaigns
+        };
+    };
+
+    const openBatchAgencyModal = (agency) => {
+        if (agency === 'CMI') {
+            openBatchCMIModal();
+            return;
+        }
+        const batchData = generateBatchAgencyJSON(agency);
+        setBatchAgencyJSON(batchData);
+        setBatchAgencyName(agency);
+        setBatchCMIJSON(null);
         setShowBatchModal(true);
     };
 
     const copyBatchToClipboard = async () => {
         try {
-            const jsonToCopy = isEditingBatchJSON ? editedBatchJSON : JSON.stringify(batchCMIJSON, null, 4);
+            const activeJSON = batchCMIJSON || batchAgencyJSON;
+            const jsonToCopy = isEditingBatchJSON ? editedBatchJSON : JSON.stringify(activeJSON, null, 4);
             await navigator.clipboard.writeText(jsonToCopy);
             const button = document.querySelector('.batch-modal-copy-btn');
             if (button) {
@@ -1720,18 +1962,19 @@ const ReportsManager = () => {
                 }, 2000);
             }
         } catch (err) {
-            console.error('Failed to copy to clipboard:', err);
         }
     };
 
     const openCMIModal = async (report, specificWeek = null, campaignsList = null) => {
         const matchedMeta = findMatchingMetadata(report);
         const manualMeta = manualMetadata[report.id];
-        const hasMetadata = matchedMeta || manualMeta;
+        const dbPlacementId = report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id;
+        const hasMetadata = matchedMeta || manualMeta || dbPlacementId;
 
         if (!hasMetadata && report.agency === 'CMI') {
             setPlacementIdReport(report);
             setPlacementIdInput('');
+            setPlacementIdError('');
             setShowPlacementIdModal(true);
             return;
         }
@@ -1743,7 +1986,9 @@ const ReportsManager = () => {
         setSelectedCMIReport({ ...jsonData, _confidence: confidence, _report: report });
         setEditFormData(jsonData);
         setEditedJSON(JSON.stringify(jsonData, null, 2));
-        setModalViewMode('layout');
+        const jsonOnlyAgencies = ['iqvia', 'iq', 'ortho', 'orthomd', 'silverlight', 'sl'];
+        const agencyLower = (report.agency || '').toLowerCase();
+        setModalViewMode(jsonOnlyAgencies.includes(agencyLower) ? 'json' : 'layout');
         setShowModal(true);
 
         if (campaignsList) {
@@ -1795,6 +2040,8 @@ const ReportsManager = () => {
     const handlePlacementIdSubmit = async () => {
         if (!placementIdInput || !placementIdReport) return;
 
+        setPlacementIdError('');
+
         const contractData = cmiContractValues.find(c => String(c.placement_id) === String(placementIdInput));
 
         const newManualMeta = {
@@ -1804,6 +2051,7 @@ const ReportsManager = () => {
             contract_number: contractData?.contract_number || '',
             placement_description: contractData?.placement_description || '',
             buy_component_type: contractData?.buy_component_type || '',
+            media_tactic_id: contractData?.media_tactic_id || '',
             client: contractData?.client || '',
             frequency: contractData?.frequency || '',
             metric: contractData?.metric || '',
@@ -1811,13 +2059,19 @@ const ReportsManager = () => {
         };
 
         try {
-            await fetch(`${API_BASE_URL}/api/cmi/reports/${placementIdReport.id}/placement`, {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${placementIdReport.id}/placement`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cmi_placement_id: placementIdInput })
             });
+
+            if (!response.ok) {
+                setPlacementIdError('Failed to save placement ID');
+                return;
+            }
         } catch (error) {
-            console.error('Error saving placement ID:', error);
+            setPlacementIdError('Failed to save placement ID');
+            return;
         }
 
         const updatedManualMetadata = {
@@ -1831,6 +2085,9 @@ const ReportsManager = () => {
 
         const jsonData = generateAgencyJSON(placementIdReport, null, newManualMeta);
         setSelectedCMIReport({ ...jsonData, _confidence: 'Manual', _report: placementIdReport });
+        setEditFormData(jsonData);
+        setEditedJSON(JSON.stringify(jsonData, null, 2));
+        setModalViewMode('layout');
         setShowModal(true);
 
         setPlacementIdReport(null);
@@ -1856,7 +2113,6 @@ const ReportsManager = () => {
                 }, 2000);
             }
         } catch (err) {
-            console.error('Failed to copy to clipboard:', err);
         }
     };
 
@@ -1875,11 +2131,14 @@ const ReportsManager = () => {
     }, [showModal, selectedCMIReport]);
 
     useEffect(() => {
-        if (showBatchModal && batchCMIJSON) {
-            setEditedBatchJSON(JSON.stringify(batchCMIJSON, null, 4));
-            setIsEditingBatchJSON(false);
+        if (showBatchModal) {
+            const activeJSON = batchCMIJSON || batchAgencyJSON;
+            if (activeJSON) {
+                setEditedBatchJSON(JSON.stringify(activeJSON, null, 4));
+                setIsEditingBatchJSON(false);
+            }
         }
-    }, [showBatchModal, batchCMIJSON]);
+    }, [showBatchModal, batchCMIJSON, batchAgencyJSON]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -1948,12 +2207,13 @@ const ReportsManager = () => {
 
     const saveEditFormChanges = async () => {
         const reportId = selectedCMIReport?._report?.id;
+        const agencyLower = (selectedCMIReport?._report?.agency || '').toLowerCase();
 
         if (reportId) {
-            const updatedManualMetadata = {
-                ...manualMetadata,
-                [reportId]: {
-                    ...manualMetadata[reportId],
+            let agencyMeta = {};
+
+            if (agencyLower === 'cmi') {
+                agencyMeta = {
                     cmi_placement_id: editFormData.cmi_placement_id,
                     client_placement_id: editFormData.client_placement_id,
                     target_list_id: editFormData.target_list_id,
@@ -1967,6 +2227,90 @@ const ReportsManager = () => {
                     buy_component_type: editFormData.buy_component_type,
                     media_tactic_id: editFormData.media_tactic_id,
                     contract_number: editFormData.contract_number
+                };
+            } else if (agencyLower === 'klick' || agencyLower === 'klik') {
+                agencyMeta = {
+                    client_name: editFormData.client_name,
+                    advertiser_name: editFormData.advertiser_name,
+                    placement_ids: editFormData.placement_ids
+                };
+            } else if (agencyLower === 'amgen' || agencyLower === 'amg') {
+                agencyMeta = {
+                    channel_partner: editFormData.channel_partner,
+                    channel: editFormData.channel,
+                    brand_name: editFormData.brand_name,
+                    promotion_type: editFormData.promotion_type,
+                    campaign_target_date: editFormData.campaign_target_date,
+                    campaign_code: editFormData.campaign_code,
+                    offer_name: editFormData.offer_name,
+                    offer_code: editFormData.offer_code,
+                    vendor_code: editFormData.vendor_code,
+                    tactic_name: editFormData.tactic_name,
+                    tactic_id: editFormData.tactic_id
+                };
+            } else if (agencyLower === 'deerfield' || agencyLower === 'deer') {
+                agencyMeta = {
+                    tactic: editFormData.tactic,
+                    campaign: editFormData.campaign,
+                    brand: editFormData.brand
+                };
+            } else if (agencyLower === 'goodapple' || agencyLower === 'good') {
+                agencyMeta = {
+                    campaign: editFormData.campaign,
+                    placement: editFormData.placement,
+                    creative: editFormData.creative
+                };
+            } else if (agencyLower === 'castle' || agencyLower === 'cas') {
+                agencyMeta = {
+                    file_name: editFormData.file_name
+                };
+            } else if (agencyLower === 'sun') {
+                agencyMeta = {
+                    brand: editFormData.brand
+                };
+            } else if (agencyLower === 'lucid') {
+                agencyMeta = {
+                    brand: editFormData.brand,
+                    publisher: editFormData.publisher,
+                    program: editFormData.program,
+                    campaign: editFormData.campaign
+                };
+            } else if (agencyLower === 'bi' || agencyLower === 'boehringer') {
+                agencyMeta = {
+                    topic_brand: editFormData.topic_brand,
+                    topic_therapeutic_area: editFormData.topic_therapeutic_area,
+                    topic_asset_ids: editFormData.topic_asset_ids
+                };
+            } else if (agencyLower === 'phm') {
+                agencyMeta = {
+                    file_prefix: editFormData.file_prefix,
+                    brand_name: editFormData.brand_name,
+                    campaign_code: editFormData.campaign_code,
+                    campaign_name_full: editFormData.campaign_name_full,
+                    placement_id: editFormData.placement_id,
+                    placement_name: editFormData.placement_name,
+                    publisher_product_name: editFormData.publisher_product_name,
+                    content_location: editFormData.content_location,
+                    content_id: editFormData.content_id,
+                    content_name: editFormData.content_name,
+                    source_list_name: editFormData.source_list_name
+                };
+            } else if (agencyLower === 'omd') {
+                agencyMeta = {
+                    type: editFormData.type,
+                    campaign: editFormData.campaign,
+                    placement: editFormData.placement,
+                    creative: editFormData.creative,
+                    cost: editFormData.cost,
+                    ads: editFormData.ads
+                };
+            }
+
+            const updatedManualMetadata = {
+                ...manualMetadata,
+                [reportId]: {
+                    ...manualMetadata[reportId],
+                    ...agencyMeta
                 }
             };
             setManualMetadata(updatedManualMetadata);
@@ -2045,7 +2389,6 @@ const ReportsManager = () => {
                     }
                 }
             } catch (error) {
-                console.error('Error saving GCM selection:', error);
             }
         }
 
@@ -2069,7 +2412,8 @@ const ReportsManager = () => {
                 vehicle_name: prev.vehicle_name || contract.vehicle || '',
                 contract_number: prev.contract_number || contract.contract_number || '',
                 placement_description: prev.placement_description || contract.placement_description || '',
-                buy_component_type: prev.buy_component_type || contract.buy_component_type || ''
+                buy_component_type: prev.buy_component_type || contract.buy_component_type || '',
+                media_tactic_id: prev.media_tactic_id || contract.media_tactic_id || ''
             }));
         }
     };
@@ -2183,15 +2527,12 @@ const ReportsManager = () => {
                            manualMeta?.cmi_placement_id;
         const isCMIExpected = isCMI && placementId && campaignsWithExpectedStatus.has(String(placementId));
 
-        const week1Explicitly = checkedReports[`${report.id}_week_1`];
-        const week2Explicitly = checkedReports[`${report.id}_week_2`];
+        const week1Checked = checkedReports[`${report.id}_week_1`] || false;
+        const week2Checked = checkedReports[`${report.id}_week_2`] || false;
         const week3Checked = checkedReports[`${report.id}_week_3`] || false;
 
-        const week1Checked = report.week_number > 1 ? (week1Explicitly !== false) : (week1Explicitly || false);
-        const week2Checked = report.week_number > 2 ? (week2Explicitly !== false) : (week2Explicitly || false);
-
-        const week1Overdue = report.week_number > 1 && week1Explicitly === false;
-        const week2Overdue = report.week_number > 2 && week2Explicitly === false;
+        const week1Overdue = report.week_number > 1 && !week1Checked;
+        const week2Overdue = report.week_number > 2 && !week2Checked;
         const hasOverdue = week1Overdue || week2Overdue;
 
         const renderWeekCell = (weekNum, isChecked, isPreviousWeek = false, isOverdue = false) => {
@@ -2242,7 +2583,7 @@ const ReportsManager = () => {
                     <td className="campaign-column">
                         <div
                             className="reports-campaign-text clickable-campaign"
-                            onClick={() => openCMIModal(report, null, allReports.filter(r => r.agency === 'CMI'))}
+                            onClick={() => openCMIModal(report, null, allReports.filter(r => r.agency === report.agency))}
                             title={report.campaign_name}
                         >
                             <span className="reports-campaign-name" title={report.campaign_name}>
@@ -2504,18 +2845,14 @@ const ReportsManager = () => {
                                             <React.Fragment key={`agency-${agency}`}>
                                                 <tr className="agency-section-header">
                                                     <td className="report-agency-section-title">
-                                                        {agency === 'CMI' ? (
-                                                            <span
-                                                                className={`agency-badge ${agency.toLowerCase()} clickable-badge`}
-                                                                onClick={openBatchCMIModal}
-                                                                title="Click to view batch JSON for all CMI campaigns"
-                                                                style={{ cursor: 'pointer' }}
-                                                            >
-                                                                {agency}
-                                                            </span>
-                                                        ) : (
-                                                            <span className={`agency-badge ${agency.toLowerCase()}`}>{agency}</span>
-                                                        )}
+                                                        <span
+                                                            className={`agency-badge ${agency.toLowerCase()} clickable-badge`}
+                                                            onClick={() => openBatchAgencyModal(agency)}
+                                                            title={`Click to view batch JSON for all ${agency} campaigns`}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            {agency}
+                                                        </span>
                                                         <span className="agency-count">({groupedReports[agency].length} reports)</span>
                                                     </td>
                                                     <td className="agency-section-empty"></td>
@@ -2737,7 +3074,7 @@ const ReportsManager = () => {
                                                     <td className="campaign-column">
                                                         <div
                                                             className="campaign-text clickable-campaign"
-                                                            onClick={() => openCMIModal(report, report.week_number, filteredArchiveReports.filter(r => r.agency === 'CMI'))}
+                                                            onClick={() => openCMIModal(report, report.week_number, filteredArchiveReports.filter(r => r.agency === report.agency))}
                                                             title={report.campaign_name}
                                                         >
                                                             <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
@@ -2817,24 +3154,33 @@ const ReportsManager = () => {
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="modal-view-toggle-bar">
-                            <button
-                                className={`toggle-btn ${modalViewMode === 'layout' ? 'active' : ''}`}
-                                onClick={() => setModalViewMode('layout')}
-                            >
-                                Layout
-                            </button>
-                            <button
-                                className={`toggle-btn ${modalViewMode === 'json' ? 'active' : ''}`}
-                                onClick={() => {
-                                    setEditedJSON(JSON.stringify(editFormData, null, 2));
-                                    setModalViewMode('json');
-                                }}
-                            >
-                                JSON
-                            </button>
-                        </div>
-                        {selectedCMIReport?._validationWarnings?.length > 0 && (
+                        {(() => {
+                            const agencyLower = (selectedCMIReport._report?.agency || '').toLowerCase();
+                            const jsonOnlyAgencies = ['iqvia', 'iq', 'ortho', 'orthomd', 'silverlight', 'sl'];
+                            if (!jsonOnlyAgencies.includes(agencyLower)) {
+                                return (
+                                    <div className="modal-view-toggle-bar">
+                                        <button
+                                            className={`toggle-btn ${modalViewMode === 'layout' ? 'active' : ''}`}
+                                            onClick={() => setModalViewMode('layout')}
+                                        >
+                                            Layout
+                                        </button>
+                                        <button
+                                            className={`toggle-btn ${modalViewMode === 'json' ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setEditedJSON(JSON.stringify(editFormData, null, 2));
+                                                setModalViewMode('json');
+                                            }}
+                                        >
+                                            JSON
+                                        </button>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+                        {selectedCMIReport._report?.agency === 'CMI' && selectedCMIReport?._validationWarnings?.length > 0 && (
                             <div className="validation-warnings-banner">
                                 <div className="validation-warnings-header">
                                     <strong>Data Mismatch Detected</strong>
@@ -2855,165 +3201,373 @@ const ReportsManager = () => {
                             </div>
                         )}
                         <div className="edit-form-modal-body">
-                            {modalViewMode === 'layout' ? (
-                                <div className="edit-form-grid">
-                                    <div className="edit-form-field">
-                                        <label>CMI Placement ID</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.cmi_placement_id || ''}
-                                            onChange={(e) => updateEditFormField('cmi_placement_id', e.target.value)}
-                                            onBlur={(e) => lookupAndFillFromContract(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Client Placement ID</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.client_placement_id || ''}
-                                            onChange={(e) => updateEditFormField('client_placement_id', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Target List ID</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.target_list_id || ''}
-                                            onChange={(e) => updateEditFormField('target_list_id', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Creative Code</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.creative_code || ''}
-                                            onChange={(e) => updateEditFormField('creative_code', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>GCM Placement IDs</label>
-                                        <input
-                                            type="text"
-                                            value={Array.isArray(editFormData.gcm_placement_id)
-                                                ? editFormData.gcm_placement_id.join(', ')
-                                                : (editFormData.gcm_placement_id || '')}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                const arr = value.split(',').map(s => s.trim()).filter(s => s);
-                                                updateEditFormField('gcm_placement_id', arr);
-                                            }}
-                                            placeholder="Comma separated"
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        {selectedCMIReport?._report && findMatchingMetadata(selectedCMIReport._report)?.gcm_placement_id_array?.length > 0 ? (
-                                            <>
-                                                <label>&nbsp;</label>
-                                                <button
-                                                    type="button"
-                                                    className="gcm-selection-btn"
-                                                    onClick={() => {
-                                                        const meta = findMatchingMetadata(selectedCMIReport._report);
-                                                        openGcmSelectionModal(meta?.campaign_id, meta);
-                                                    }}
-                                                >
-                                                    Select from Tags
+                            {(() => {
+                                const agencyLower = (selectedCMIReport._report?.agency || '').toLowerCase();
+                                const jsonOnlyAgencies = ['iqvia', 'iq', 'ortho', 'orthomd', 'silverlight', 'sl'];
+
+                                if (modalViewMode === 'json' || jsonOnlyAgencies.includes(agencyLower)) {
+                                    return (
+                                        <div className="json-view-container">
+                                            <div className="json-modal-actions">
+                                                <button className="json-modal-copy-btn" onClick={copyToClipboard}>
+                                                    <Copy size={14} />
+                                                    Copy JSON
                                                 </button>
-                                            </>
-                                        ) : (
-                                            <>&nbsp;</>
-                                        )}
+                                            </div>
+                                            <div className="json-modal-code">
+                                                <pre>{editedJSON}</pre>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'cmi') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>CMI Placement ID</label>
+                                                <input type="text" value={editFormData.cmi_placement_id || ''} onChange={(e) => updateEditFormField('cmi_placement_id', e.target.value)} onBlur={(e) => lookupAndFillFromContract(e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Client Placement ID</label>
+                                                <input type="text" value={editFormData.client_placement_id || ''} onChange={(e) => updateEditFormField('client_placement_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Target List ID</label>
+                                                <input type="text" value={editFormData.target_list_id || ''} onChange={(e) => updateEditFormField('target_list_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Creative Code</label>
+                                                <input type="text" value={editFormData.creative_code || ''} onChange={(e) => updateEditFormField('creative_code', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>GCM Placement IDs</label>
+                                                <input type="text" value={Array.isArray(editFormData.gcm_placement_id) ? editFormData.gcm_placement_id.join(', ') : (editFormData.gcm_placement_id || '')} onChange={(e) => { const arr = e.target.value.split(',').map(s => s.trim()).filter(s => s); updateEditFormField('gcm_placement_id', arr); }} placeholder="Comma separated" />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                {selectedCMIReport?._report && findMatchingMetadata(selectedCMIReport._report)?.gcm_placement_id_array?.length > 0 ? (
+                                                    <><label>&nbsp;</label><button type="button" className="gcm-selection-btn" onClick={() => { const meta = findMatchingMetadata(selectedCMIReport._report); openGcmSelectionModal(meta?.campaign_id, meta); }}>Select from Tags</button></>
+                                                ) : <>&nbsp;</>}
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Client ID</label>
+                                                <input type="text" value={editFormData.client_id || ''} onChange={(e) => updateEditFormField('client_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Brand Name</label>
+                                                <input type="text" value={editFormData.brand_name || ''} onChange={(e) => updateEditFormField('brand_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Campaign Name (Client)</label>
+                                                <input type="text" value={editFormData.client_campaign_name || ''} onChange={(e) => updateEditFormField('client_campaign_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Vehicle Name</label>
+                                                <input type="text" value={editFormData.vehicle_name || ''} onChange={(e) => updateEditFormField('vehicle_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Placement Description</label>
+                                                <input type="text" value={editFormData.placement_description || ''} onChange={(e) => updateEditFormField('placement_description', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Buy Component Type</label>
+                                                <input type="text" value={editFormData.buy_component_type || ''} onChange={(e) => updateEditFormField('buy_component_type', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Media Tactic ID</label>
+                                                <input type="text" value={editFormData.media_tactic_id || ''} onChange={(e) => updateEditFormField('media_tactic_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Contract Number</label>
+                                                <input type="text" value={editFormData.contract_number || ''} onChange={(e) => updateEditFormField('contract_number', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'klick' || agencyLower === 'klik') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Client Name</label>
+                                                <input type="text" value={editFormData.client_name || ''} onChange={(e) => updateEditFormField('client_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Advertiser Name</label>
+                                                <input type="text" value={editFormData.advertiser_name || ''} onChange={(e) => updateEditFormField('advertiser_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Placement IDs</label>
+                                                <input type="text" value={Array.isArray(editFormData.placement_ids) ? editFormData.placement_ids.join(', ') : (editFormData.placement_ids || '')} onChange={(e) => { const arr = e.target.value.split(',').map(s => s.trim()).filter(s => s); updateEditFormField('placement_ids', arr.length > 0 ? arr : ['']); }} placeholder="Comma separated" />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'amgen' || agencyLower === 'amg') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Channel Partner</label>
+                                                <input type="text" value={editFormData.channel_partner || ''} onChange={(e) => updateEditFormField('channel_partner', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Channel</label>
+                                                <input type="text" value={editFormData.channel || ''} onChange={(e) => updateEditFormField('channel', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Brand Name</label>
+                                                <input type="text" value={editFormData.brand_name || ''} onChange={(e) => updateEditFormField('brand_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Promotion Type</label>
+                                                <input type="text" value={editFormData.promotion_type || ''} onChange={(e) => updateEditFormField('promotion_type', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign Target Date</label>
+                                                <input type="text" value={editFormData.campaign_target_date || ''} onChange={(e) => updateEditFormField('campaign_target_date', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign Code</label>
+                                                <input type="text" value={editFormData.campaign_code || ''} onChange={(e) => updateEditFormField('campaign_code', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Offer Name</label>
+                                                <input type="text" value={editFormData.offer_name || ''} onChange={(e) => updateEditFormField('offer_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Offer Code</label>
+                                                <input type="text" value={editFormData.offer_code || ''} onChange={(e) => updateEditFormField('offer_code', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Vendor Code</label>
+                                                <input type="text" value={editFormData.vendor_code || ''} onChange={(e) => updateEditFormField('vendor_code', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Tactic Name</label>
+                                                <input type="text" value={editFormData.tactic_name || ''} onChange={(e) => updateEditFormField('tactic_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Tactic ID</label>
+                                                <input type="text" value={editFormData.tactic_id || ''} onChange={(e) => updateEditFormField('tactic_id', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'deerfield' || agencyLower === 'deer') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Tactic</label>
+                                                <input type="text" value={editFormData.tactic || ''} onChange={(e) => updateEditFormField('tactic', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign</label>
+                                                <input type="text" value={editFormData.campaign || ''} onChange={(e) => updateEditFormField('campaign', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Brand</label>
+                                                <input type="text" value={editFormData.brand || ''} onChange={(e) => updateEditFormField('brand', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'goodapple' || agencyLower === 'good') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Campaign</label>
+                                                <input type="text" value={editFormData.campaign || ''} onChange={(e) => updateEditFormField('campaign', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Placement</label>
+                                                <input type="text" value={editFormData.placement || ''} onChange={(e) => updateEditFormField('placement', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Creative</label>
+                                                <input type="text" value={editFormData.creative || ''} onChange={(e) => updateEditFormField('creative', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'castle' || agencyLower === 'cas') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field full-width">
+                                                <label>File Name</label>
+                                                <input type="text" value={editFormData.file_name || ''} onChange={(e) => updateEditFormField('file_name', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'sun') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field full-width">
+                                                <label>Brand</label>
+                                                <input type="text" value={editFormData.brand || ''} onChange={(e) => updateEditFormField('brand', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'lucid') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Brand</label>
+                                                <input type="text" value={editFormData.brand || ''} onChange={(e) => updateEditFormField('brand', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Publisher</label>
+                                                <input type="text" value={editFormData.publisher || ''} onChange={(e) => updateEditFormField('publisher', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Program</label>
+                                                <input type="text" value={editFormData.program || ''} onChange={(e) => updateEditFormField('program', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign</label>
+                                                <input type="text" value={editFormData.campaign || ''} onChange={(e) => updateEditFormField('campaign', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'bi' || agencyLower === 'boehringer') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Topic Brand</label>
+                                                <input type="text" value={editFormData.topic_brand || ''} onChange={(e) => updateEditFormField('topic_brand', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Topic Therapeutic Area</label>
+                                                <input type="text" value={editFormData.topic_therapeutic_area || ''} onChange={(e) => updateEditFormField('topic_therapeutic_area', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Topic Asset IDs</label>
+                                                <input type="text" value={Array.isArray(editFormData.topic_asset_ids) ? editFormData.topic_asset_ids.join(', ') : (editFormData.topic_asset_ids || '')} onChange={(e) => { const arr = e.target.value.split(',').map(s => s.trim()).filter(s => s); updateEditFormField('topic_asset_ids', arr.length > 0 ? arr : ['']); }} placeholder="Comma separated" />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'phm') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>File Prefix</label>
+                                                <input type="text" value={editFormData.file_prefix || ''} onChange={(e) => updateEditFormField('file_prefix', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Brand Name</label>
+                                                <input type="text" value={editFormData.brand_name || ''} onChange={(e) => updateEditFormField('brand_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign Code</label>
+                                                <input type="text" value={editFormData.campaign_code || ''} onChange={(e) => updateEditFormField('campaign_code', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Campaign Name Full</label>
+                                                <input type="text" value={editFormData.campaign_name_full || ''} onChange={(e) => updateEditFormField('campaign_name_full', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Placement ID</label>
+                                                <input type="text" value={editFormData.placement_id || ''} onChange={(e) => updateEditFormField('placement_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Placement Name</label>
+                                                <input type="text" value={editFormData.placement_name || ''} onChange={(e) => updateEditFormField('placement_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Publisher Product Name</label>
+                                                <input type="text" value={editFormData.publisher_product_name || ''} onChange={(e) => updateEditFormField('publisher_product_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Content Location</label>
+                                                <input type="text" value={editFormData.content_location || ''} onChange={(e) => updateEditFormField('content_location', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Content ID</label>
+                                                <input type="text" value={editFormData.content_id || ''} onChange={(e) => updateEditFormField('content_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Content Name</label>
+                                                <input type="text" value={editFormData.content_name || ''} onChange={(e) => updateEditFormField('content_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Source List Name</label>
+                                                <input type="text" value={editFormData.source_list_name || ''} onChange={(e) => updateEditFormField('source_list_name', e.target.value)} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'omd') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Type</label>
+                                                <input type="text" value={editFormData.type || ''} onChange={(e) => updateEditFormField('type', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Campaign</label>
+                                                <input type="text" value={editFormData.campaign || ''} onChange={(e) => updateEditFormField('campaign', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Placement</label>
+                                                <input type="text" value={editFormData.placement || ''} onChange={(e) => updateEditFormField('placement', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Creative</label>
+                                                <input type="text" value={editFormData.creative || ''} onChange={(e) => updateEditFormField('creative', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Cost</label>
+                                                <input type="number" value={editFormData.cost || 0} onChange={(e) => updateEditFormField('cost', Number(e.target.value))} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Ads</label>
+                                                <input type="number" value={editFormData.ads || 1} onChange={(e) => updateEditFormField('ads', Number(e.target.value))} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="json-view-container">
+                                        <div className="json-modal-actions">
+                                            <button className="json-modal-copy-btn" onClick={copyToClipboard}>
+                                                <Copy size={14} />
+                                                Copy JSON
+                                            </button>
+                                        </div>
+                                        <div className="json-modal-code">
+                                            <pre>{editedJSON}</pre>
+                                        </div>
                                     </div>
-                                    <div className="edit-form-field">
-                                        <label>Client ID</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.client_id || ''}
-                                            onChange={(e) => updateEditFormField('client_id', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Brand Name</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.brand_name || ''}
-                                            onChange={(e) => updateEditFormField('brand_name', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field full-width">
-                                        <label>Campaign Name (Client)</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.client_campaign_name || ''}
-                                            onChange={(e) => updateEditFormField('client_campaign_name', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field full-width">
-                                        <label>Vehicle Name</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.vehicle_name || ''}
-                                            onChange={(e) => updateEditFormField('vehicle_name', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field full-width">
-                                        <label>Placement Description</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.placement_description || ''}
-                                            onChange={(e) => updateEditFormField('placement_description', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field full-width">
-                                        <label>Buy Component Type</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.buy_component_type || ''}
-                                            onChange={(e) => updateEditFormField('buy_component_type', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Media Tactic ID</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.media_tactic_id || ''}
-                                            onChange={(e) => updateEditFormField('media_tactic_id', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="edit-form-field">
-                                        <label>Contract Number</label>
-                                        <input
-                                            type="text"
-                                            value={editFormData.contract_number || ''}
-                                            onChange={(e) => updateEditFormField('contract_number', e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="json-view-container">
-                                    <div className="json-modal-actions">
-                                        <button
-                                            className="json-modal-copy-btn"
-                                            onClick={copyToClipboard}
-                                        >
-                                            <Copy size={14} />
-                                            Copy JSON
+                                );
+                            })()}
+                        </div>
+                        {(() => {
+                            const agencyLower = (selectedCMIReport._report?.agency || '').toLowerCase();
+                            const jsonOnlyAgencies = ['iqvia', 'iq', 'ortho', 'orthomd', 'silverlight', 'sl'];
+                            if (!jsonOnlyAgencies.includes(agencyLower) && modalViewMode === 'layout') {
+                                return (
+                                    <div className="edit-form-modal-footer">
+                                        <button className="edit-form-save-btn" onClick={saveEditFormChanges}>
+                                            Save Changes
                                         </button>
                                     </div>
-                                    <div className="json-modal-code">
-                                        <pre>{editedJSON}</pre>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="edit-form-modal-footer">
-                            <button className="edit-form-cancel-btn" onClick={() => setShowModal(false)}>
-                                Cancel
-                            </button>
-                            <button className="edit-form-save-btn" onClick={saveEditFormChanges}>
-                                Save Changes
-                            </button>
-                        </div>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                 </div>
             )}
@@ -3055,13 +3609,13 @@ const ReportsManager = () => {
                 </div>
             )}
 
-            {showBatchModal && batchCMIJSON && (
+            {showBatchModal && (batchCMIJSON || batchAgencyJSON) && (
                 <div className="json-modal-overlay" onClick={() => setShowBatchModal(false)}>
                     <div className="json-modal-content batch-modal" onClick={e => e.stopPropagation()}>
                         <div className="json-modal-header">
                             <div className="json-modal-title">
                                 <FileText size={20} />
-                                <h3>CMI Batch JSON - All Campaigns This Week</h3>
+                                <h3>{batchAgencyName || 'CMI'} Batch JSON - All Campaigns This Week</h3>
                             </div>
                             <button
                                 className="json-modal-close"
@@ -3073,15 +3627,21 @@ const ReportsManager = () => {
                         <div className="json-modal-body">
                             <div className="batch-modal-info">
                                 <span className="batch-modal-count">
-                                    {Object.keys(batchCMIJSON.campaigns || {}).length} CMI campaigns
-                                </span>
-                                <span className="batch-modal-dates">
-                                    Week: {batchCMIJSON.monday_date}
+                                    {(() => {
+                                        const activeJSON = batchCMIJSON || batchAgencyJSON;
+                                        const campaigns = activeJSON?.campaigns;
+                                        if (Array.isArray(campaigns)) {
+                                            return campaigns.length;
+                                        } else if (campaigns && typeof campaigns === 'object') {
+                                            return Object.keys(campaigns).length;
+                                        }
+                                        return 0;
+                                    })()} {batchAgencyName || 'CMI'} campaigns
                                 </span>
                             </div>
                             <div className="json-modal-actions">
                                 <span className="json-modal-label">
-                                    {isEditingBatchJSON ? 'Editing JSON' : 'Copy to cmi_batch.json'}
+                                    {isEditingBatchJSON ? 'Editing JSON' : `Copy to ${(batchAgencyName || 'cmi').toLowerCase()}.json`}
                                 </span>
                                 <div className="json-modal-buttons">
                                     <button
@@ -3218,6 +3778,9 @@ const ReportsManager = () => {
                                 autoFocus
                             />
                         </div>
+                        {placementIdError && (
+                            <div className="placement-id-error">{placementIdError}</div>
+                        )}
                         <button
                             className="placement-id-modal-enter-btn"
                             onClick={handlePlacementIdSubmit}
@@ -3374,7 +3937,7 @@ const ReportsManager = () => {
                                     <div className="move-modal-actions">
                                         <button
                                             className="move-modal-confirm-btn"
-                                            onClick={handleAddAggSubmit}
+                                            onClick={() => handleAddAggSubmit()}
                                             disabled={addAggLoading || (addAggMode === 'attach' && !addAggSelectedCampaign)}
                                         >
                                             {addAggLoading ? 'Adding...' : (addAggMode === 'attach' ? 'Attach' : 'Add Standalone')}

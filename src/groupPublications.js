@@ -133,7 +133,6 @@ const groupPublications = (data) => {
             const group = findGroup(item.Publication) || 'Others'; 
         
             if (!groups[group]) {
-                console.error(`Group "${group}" does not exist in the groups object.`);
             } else {
                 groups[group].push(item);
             }

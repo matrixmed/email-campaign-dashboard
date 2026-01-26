@@ -109,7 +109,6 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
       setFilteredCampaignNames(campaignNames);
       setAllCampaigns(combinedCampaigns);
     } catch (error) {
-      console.error('Failed to fetch campaign data:', error);
     }
     setIsLoading(false);
   };

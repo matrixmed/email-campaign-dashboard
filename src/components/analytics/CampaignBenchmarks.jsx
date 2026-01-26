@@ -30,7 +30,6 @@ const CampaignBenchmarks = () => {
         setCampaigns(validCampaigns);
       }
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
     }
   };
 
@@ -57,7 +56,6 @@ const CampaignBenchmarks = () => {
       const data = await response.json();
       setBenchmarkData(data);
     } catch (error) {
-      console.error('Error fetching benchmark data:', error);
     } finally {
       setLoading(false);
     }
@@ -71,8 +69,6 @@ const CampaignBenchmarks = () => {
     if (!benchmarkData?.campaign || !benchmarkData?.benchmarks) return null;
 
     const { campaign, classification, benchmarks, grade, overall_score, similar_count } = benchmarkData;
-
-    console.log('Benchmarks data:', benchmarks);
 
     const displayMetrics = ['unique_open_rate', 'total_open_rate', 'unique_click_rate', 'total_click_rate'];
 

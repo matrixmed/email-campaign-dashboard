@@ -22,7 +22,6 @@ const BidAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
         setSummary(result.summary || {});
       }
     } catch (err) {
-      console.error('Error fetching bid data:', err);
     }
     setLoading(false);
   }, [startDate, endDate]);

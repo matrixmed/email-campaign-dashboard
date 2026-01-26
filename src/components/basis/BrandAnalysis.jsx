@@ -26,7 +26,6 @@ const BrandAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
         setSummary(campaignData.summary || {});
       }
     } catch (err) {
-      console.error('Error fetching brand data:', err);
     }
     setLoading(false);
   }, [startDate, endDate]);

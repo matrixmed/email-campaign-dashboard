@@ -121,7 +121,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                 setSpecialties(data.specialties || []);
             }
         } catch (err) {
-            // Silently handle specialty fetch errors
         } finally {
             setSpecialtiesLoading(false);
         }

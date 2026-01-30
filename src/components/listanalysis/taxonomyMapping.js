@@ -874,7 +874,6 @@ const taxonomyMapping = {
   "251V00000X": "Voluntary or Charitable",
 };
 
-// Function to get specialty name from taxonomy code
 export const getSpecialtyFromTaxonomy = (taxonomyCode) => {
   if (!taxonomyCode) return "";
   return taxonomyMapping[taxonomyCode] || "";

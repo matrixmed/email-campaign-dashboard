@@ -1,11 +1,10 @@
 export const MATRIX_COLORS = {
-  primary: '#575757',      // Matrix 
-  primaryDark: '#a50001',  // Darker 
-  secondary: '#003a6d',    // Matrix Blue Dark
-  secondaryLight: '#0066cc', // Matrix Blue Light
-  accent: '#00a0e6',       // Light Blue Accent
-  
-  // Neutrals
+  primary: '#575757',
+  primaryDark: '#a50001',
+  secondary: '#003a6d',
+  secondaryLight: '#0066cc',
+  accent: '#00a0e6',
+
   white: '#ffffff',
   lightGray: '#f8f9fa',
   gray: '#6c757d',
@@ -14,12 +13,10 @@ export const MATRIX_COLORS = {
   textSecondary: '#6b7280',
   border: '#e2e8f0',
   
-  // Status colors
   success: '#28a745',
   warning: '#ffc107',
   info: '#17a2b8',
   
-  // Gradients
   primaryGradient: 'linear-gradient(135deg, #414141 0%, #585858 100%)',
   secondaryGradient: 'linear-gradient(135deg, #003a6d 0%, #0066cc 100%)',
   heroGradient: 'linear-gradient(135deg, #0066cc 0%, #003a6d 100%)',
@@ -27,31 +24,27 @@ export const MATRIX_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%)'
 };
 
-// JCAD Color Scheme
 export const JCAD_COLORS = {
-  primary: '#00857a',      // Main Teal
-  primaryDark: '#005954',  // Darker Teal
-  secondary: '#007837',    // Green
-  secondaryLight: '#5aa8a2', // Light Teal
-  accent: '#00a0a0',       // Bright Teal Accent
-  
-  // Neutrals
+  primary: '#00857a',
+  primaryDark: '#005954',
+  secondary: '#007837',
+  secondaryLight: '#5aa8a2',
+  accent: '#00a0a0',
+
   white: '#ffffff',
   lightGray: '#f8f9fa',
   gray: '#6c757d',
   darkGray: '#2c3e50',
-  text: '#003735',         // Dark teal for text
+  text: '#003735',
   textSecondary: '#6c757d',
-  border: '#b2dfdb',       // Light teal border
-  surface: '#e1f4f3',      // Very light teal
-  onSurface: '#003735',    // Dark teal for text
+  border: '#b2dfdb',
+  surface: '#e1f4f3',
+  onSurface: '#003735',
   
-  // Status colors
   success: '#28a745',
   warning: '#ffc107',
   info: '#17a2b8',
   
-  // Gradients
   primaryGradient: 'linear-gradient(135deg, #00857a 0%, #005954 100%)',
   secondaryGradient: 'linear-gradient(135deg, #007837 0%, #5aa8a2 100%)',
   heroGradient: 'linear-gradient(135deg, #5aa8a2 0%, #00857a 100%)',
@@ -59,31 +52,27 @@ export const JCAD_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #e1f4f3 0%, #f0fffe 100%)'
 };
 
-// NPPA Color Scheme
 export const NPPA_COLORS = {
-  primary: '#543378',      // Purple
-  primaryDark: '#3d2558',  // Darker Purple
-  secondary: '#008378',    // Teal
-  secondaryLight: '#69727d', // Gray
-  accent: '#00a5a5',       // Bright Teal
-  
-  // Neutrals
+  primary: '#543378',
+  primaryDark: '#3d2558',
+  secondary: '#008378',
+  secondaryLight: '#69727d',
+  accent: '#00a5a5',
+
   white: '#ffffff',
   lightGray: '#f8f9fa',
   gray: '#6c757d',
   darkGray: '#2c3e50',
-  text: '#2a1b3d',         // Dark purple for text
+  text: '#2a1b3d',
   textSecondary: '#6c757d',
-  border: '#e6e0f0',       // Light purple border
-  surface: '#f3f1f7',      // Very light purple
-  onSurface: '#2a1b3d',    // Dark purple for text
+  border: '#e6e0f0',
+  surface: '#f3f1f7',
+  onSurface: '#2a1b3d',
   
-  // Status colors
   success: '#28a745',
   warning: '#ffc107',
   info: '#17a2b8',
   
-  // Gradients
   primaryGradient: 'linear-gradient(135deg, #543378 0%, #3d2558 100%)',
   secondaryGradient: 'linear-gradient(135deg, #008378 0%, #69727d 100%)',
   heroGradient: 'linear-gradient(135deg, #69727d 0%, #543378 100%)',
@@ -92,13 +81,12 @@ export const NPPA_COLORS = {
 };
 
 export const ICNS_COLORS = {
-  primary: '#1a365d',      // Deep navy blue
-  primaryDark: '#102a44',  // Darker navy
-  secondary: '#2b77ad',    // Medium blue
-  secondaryLight: '#4299e1', // Light blue
-  accent: '#6366f1',       // Indigo accent
+  primary: '#1a365d',
+  primaryDark: '#102a44',
+  secondary: '#2b77ad',
+  secondaryLight: '#4299e1',
+  accent: '#6366f1',
 
-  // Neutrals
   white: '#ffffff',
   lightGray: '#f7fafc',
   gray: '#718096',
@@ -109,12 +97,10 @@ export const ICNS_COLORS = {
   surface: '#edf2f7',
   onSurface: '#1a202c',
 
-  // Status colors
   success: '#059669',
   warning: '#ed8936',
   info: '#4299e1',
 
-  // Gradients
   primaryGradient: 'linear-gradient(135deg, #1a365d 0%, #102a44 100%)',
   secondaryGradient: 'linear-gradient(135deg, #2b77ad 0%, #4299e1 100%)',
   heroGradient: 'linear-gradient(135deg, #4299e1 0%, #1a365d 100%)',
@@ -122,31 +108,27 @@ export const ICNS_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
 };
 
-// Oncology Color Scheme
 export const ONCOLOGY_COLORS = {
-  primary: '#2a5fa3',      // Main blue
-  primaryDark: '#1d4a85',  // Darker blue
-  secondary: '#37bbb4',    // Teal
-  secondaryLight: '#5cc9c2', // Light teal
-  accent: '#37bbb4',       // Teal accent
+  primary: '#2a5fa3',
+  primaryDark: '#1d4a85',
+  secondary: '#37bbb4',
+  secondaryLight: '#5cc9c2',
+  accent: '#37bbb4',
 
-  // Neutrals
   white: '#ffffff',
   lightGray: '#efefef',
   gray: '#6c757d',
   darkGray: '#2c3e50',
-  text: '#1a365d',         // Dark blue for text
+  text: '#1a365d',
   textSecondary: '#6c757d',
-  border: '#d1e7dd',       // Light blue border
-  surface: '#f8fbfc',      // Very light blue
-  onSurface: '#1a365d',    // Dark blue for text
+  border: '#d1e7dd',
+  surface: '#f8fbfc',
+  onSurface: '#1a365d',
 
-  // Status colors
   success: '#28a745',
   warning: '#ffc107',
   info: '#17a2b8',
 
-  // Gradients
   primaryGradient: 'linear-gradient(135deg, #2a5fa3 0%, #1d4a85 100%)',
   secondaryGradient: 'linear-gradient(135deg, #37bbb4 0%, #5cc9c2 100%)',
   heroGradient: 'linear-gradient(135deg, #37bbb4 0%, #2a5fa3 100%)',

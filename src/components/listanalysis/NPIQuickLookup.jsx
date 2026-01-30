@@ -86,11 +86,9 @@ const NPIQuickLookup = forwardRef((props, ref) => {
       return;
     }
 
-    // Helper to escape CSV values - wrap in quotes and escape internal quotes
     const escapeCSV = (value) => {
       if (value === null || value === undefined) return '""';
       const str = String(value);
-      // Always wrap in quotes and escape any quotes inside
       return `"${str.replace(/"/g, '""')}"`;
     };
 

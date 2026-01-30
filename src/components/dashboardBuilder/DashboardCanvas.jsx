@@ -471,6 +471,61 @@ const DashboardCanvasContent = () => {
     });
   }, [preserveEdit]);
 
+  const handleAddVideoMetricRow = useCallback((label, value) => {
+    setCards(prev => {
+      const videoTableIndex = prev.findIndex(card =>
+        card.type === 'table' &&
+        (card.title === 'Video Metrics' || card.id?.includes('video'))
+      );
+
+      if (videoTableIndex === -1) return prev;
+
+      const updatedCards = [...prev];
+      const videoTable = { ...updatedCards[videoTableIndex] };
+      const currentData = videoTable.config?.customData || [];
+
+      let newData;
+
+      if (label === 'Total Views') {
+        const impressionsIndex = currentData.findIndex(row => row[0] === 'Total Impressions');
+        if (impressionsIndex !== -1) {
+          newData = currentData.map((row, idx) =>
+            idx === impressionsIndex ? ['Total Views', value] : row
+          );
+        } else {
+          const existingIndex = currentData.findIndex(row => row[0] === 'Total Views');
+          if (existingIndex !== -1) {
+            newData = currentData.map((row, idx) =>
+              idx === existingIndex ? [label, value] : row
+            );
+          } else {
+            newData = [...currentData, [label, value]];
+          }
+        }
+      } else {
+        const existingRowIndex = currentData.findIndex(row => row[0] === label);
+        if (existingRowIndex !== -1) {
+          newData = currentData.map((row, idx) =>
+            idx === existingRowIndex ? [label, value] : row
+          );
+        } else {
+          newData = [...currentData, [label, value]];
+        }
+      }
+
+      videoTable.config = {
+        ...videoTable.config,
+        customData: newData
+      };
+
+      updatedCards[videoTableIndex] = videoTable;
+
+      preserveEdit(videoTable.id, { config: { customData: newData } });
+
+      return updatedCards;
+    });
+  }, [preserveEdit]);
+
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.target === e.currentTarget || e.target.classList.contains('dashboard-canvas-background')) {
       if (!e.ctrlKey && !e.metaKey) {
@@ -1194,6 +1249,8 @@ const DashboardCanvasContent = () => {
             selectedRowInfo={selectedRowInfo}
             onAddJournalMetricRow={handleAddJournalMetricRow}
             hasJournalTable={cards.some(card => card.type === 'table' && (card.title === 'Online Journal Metrics' || card.id?.includes('journal')))}
+            onAddVideoMetricRow={handleAddVideoMetricRow}
+            hasVideoTable={cards.some(card => card.type === 'table' && (card.title === 'Video Metrics' || card.id?.includes('video')))}
           />
         </div>
 

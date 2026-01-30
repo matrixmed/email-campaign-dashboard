@@ -80,14 +80,12 @@ const ReportsManager = () => {
         const normalizedBrand = brandName.toLowerCase().trim();
 
         const brandToPharma = {
-            // Lilly
             'taltz': 'Lilly', 'verzenio': 'Lilly', 'trulicity': 'Lilly', 'mounjaro': 'Lilly',
             'zepbound': 'Lilly', 'retevmo': 'Lilly', 'jaypirca': 'Lilly', 'kisunla': 'Lilly',
             'ebglyss': 'Lilly', 'omvoh': 'Lilly', 'cyramza': 'Lilly', 'erbitux': 'Lilly',
             'olumiant': 'Lilly', 'emgality': 'Lilly', 'reyvow': 'Lilly', 'lyumjev': 'Lilly',
             'humalog': 'Lilly', 'humulin': 'Lilly', 'basaglar': 'Lilly',
             'pirtobrutinib': 'Lilly', 'imlunestrant': 'Lilly', 'lebrikizumab': 'Lilly',
-            // AstraZeneca
             'tagrisso': 'AstraZeneca', 'farxiga': 'AstraZeneca', 'lynparza': 'AstraZeneca',
             'imfinzi': 'AstraZeneca', 'calquence': 'AstraZeneca', 'enhertu': 'AstraZeneca',
             'breztri': 'AstraZeneca', 'symbicort': 'AstraZeneca', 'fasenra': 'AstraZeneca',
@@ -95,22 +93,17 @@ const ReportsManager = () => {
             'beyfortus': 'AstraZeneca', 'ultomiris': 'AstraZeneca', 'soliris': 'AstraZeneca',
             'airsupra': 'AstraZeneca', 'truqap': 'AstraZeneca', 'capivasertib': 'AstraZeneca',
             'dato-dxd': 'AstraZeneca', 'volrustomig': 'AstraZeneca',
-            // Abbvie
             'skyrizi': 'Abbvie', 'rinvoq': 'Abbvie', 'humira': 'Abbvie', 'botox': 'Abbvie',
             'vraylar': 'Abbvie', 'ubrelvy': 'Abbvie', 'qulipta': 'Abbvie', 'venclexta': 'Abbvie',
             'imbruvica': 'Abbvie', 'epkinly': 'Abbvie', 'elahere': 'Abbvie', 'linzess': 'Abbvie',
-            // J&J / Janssen
             'stelara': 'J&J', 'darzalex': 'J&J', 'tremfya': 'J&J', 'erleada': 'J&J',
             'carvykti': 'J&J', 'tecvayli': 'J&J', 'talvey': 'J&J', 'rybrevant': 'J&J',
             'spravato': 'J&J', 'invega': 'J&J', 'xarelto': 'J&J', 'simponi': 'J&J',
             'remicade': 'J&J', 'balversa': 'J&J', 'akeega': 'J&J', 'nipocalimab': 'J&J',
-            // BI (Boehringer Ingelheim)
             'ofev': 'BI', 'trajenta': 'BI', 'jardiance': 'BI', 'synjardy': 'BI',
             'stiolto': 'BI', 'spiriva': 'BI', 'gilotrif': 'BI', 'praxbind': 'BI',
             'pradaxa': 'BI', 'spevigo': 'BI', 'ayvakyt': 'BI',
-            // Exelixis
             'cabometyx': 'Exelixis', 'cometriq': 'Exelixis',
-            // Other
             'dg': 'DG', 'dsi': 'DSI'
         };
 

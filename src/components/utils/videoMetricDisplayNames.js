@@ -9,10 +9,7 @@ export const videoMetricDisplayNames = {
     estimatedMinutesWatched: 'Minutes Watched',
     averageViewDuration: 'Avg View Duration',
     averageViewPercentage: 'Completion Rate %',
-    
-    impressions: 'Impressions',
-    impressionsCtr: 'CTR %',
-    
+
     subscribersGained: 'Subscribers Gained',
     subscribersLost: 'Subscribers Lost'
   };

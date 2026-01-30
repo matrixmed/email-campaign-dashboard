@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES, TABLE_DEFINITIONS } from './template/LayoutTemplates';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
+const YOUTUBE_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2026-01-23T22:10:53Z&se=2028-02-03T06:25:53Z&spr=https&sv=2024-11-04&sr=b&sig=5a4p0mFtPn4d9In830LMCQOJlaqkcuPCt7okIDLSHBA%3D";
 
 const ComponentSidebar = ({
   isOpen,
@@ -31,7 +33,9 @@ const ComponentSidebar = ({
   onRestoreDashboard,
   selectedRowInfo = null,
   onAddJournalMetricRow,
-  hasJournalTable = false
+  hasJournalTable = false,
+  onAddVideoMetricRow,
+  hasVideoTable = false
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,12 +48,122 @@ const ComponentSidebar = ({
 
   const [walsworthData, setWalsworthData] = useState([]);
   const [matchedJournal, setMatchedJournal] = useState(null);
+  const [showJournalSelector, setShowJournalSelector] = useState(false);
+  const [journalSearchTerm, setJournalSearchTerm] = useState('');
   const [selectedMetrics, setSelectedMetrics] = useState({
     avgTimeInIssue: false,
     totalPageViews: false,
     uniquePageViews: false,
     totalIssueVisits: false
   });
+
+  const [youtubeData, setYoutubeData] = useState({ videos: {}, playlists: {} });
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
+  const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
+  const [excludedVideoIds, setExcludedVideoIds] = useState(new Set());
+  const [showVideoDropdown, setShowVideoDropdown] = useState(false);
+
+  useEffect(() => {
+    async function fetchYoutubeData() {
+      try {
+        const response = await fetch(YOUTUBE_BLOB_URL);
+        const data = await response.json();
+        setYoutubeData(data);
+      } catch (error) {
+      }
+    }
+    fetchYoutubeData();
+  }, []);
+
+  const youtubePlaylistsList = useMemo(() => {
+    const playlists = youtubeData.playlists || {};
+    return Object.entries(playlists).map(([id, pl]) => ({
+      id,
+      title: pl.title,
+      itemCount: pl.itemCount,
+      videoIds: pl.videoIds || []
+    })).sort((a, b) => b.itemCount - a.itemCount);
+  }, [youtubeData]);
+
+  const selectedPlaylist = useMemo(() => {
+    if (!selectedPlaylistId) return null;
+    return youtubePlaylistsList.find(pl => pl.id === selectedPlaylistId) || null;
+  }, [selectedPlaylistId, youtubePlaylistsList]);
+
+  const playlistVideos = useMemo(() => {
+    if (!selectedPlaylist) return [];
+    const videosObj = youtubeData.videos || {};
+    return selectedPlaylist.videoIds
+      .map(vid => {
+        const video = videosObj[vid];
+        if (!video) return null;
+        const current = video.current || {};
+        return {
+          id: vid,
+          title: video.title || 'Untitled',
+          views: current.views || 0,
+          totalWatchTimeSeconds: (current.watchTimeHours || (current.estimatedMinutesWatched || 0) / 60) * 3600,
+          avgPercentWatched: current.averageViewPercentage || 0
+        };
+      })
+      .filter(Boolean);
+  }, [selectedPlaylist, youtubeData]);
+
+  const videoAggregateMetrics = useMemo(() => {
+    if (!playlistVideos.length) return { totalWatchTime: 0, avgPercentWatched: 0, totalViews: 0, mostWatchedVideo: '' };
+    const activeVideos = playlistVideos.filter(v => !excludedVideoIds.has(v.id));
+    if (!activeVideos.length) return { totalWatchTime: 0, avgPercentWatched: 0, totalViews: 0, mostWatchedVideo: '' };
+
+    const totalViews = activeVideos.reduce((sum, v) => sum + v.views, 0);
+    const avgPercentWatched = activeVideos.reduce((sum, v) => sum + v.avgPercentWatched, 0) / activeVideos.length;
+    const totalWatchTime = activeVideos.reduce((sum, v) => sum + v.totalWatchTimeSeconds, 0);
+    const mostWatched = activeVideos.reduce((best, v) => v.views > best.views ? v : best, activeVideos[0]);
+
+    return { totalWatchTime, avgPercentWatched, totalViews, mostWatchedVideo: mostWatched.title };
+  }, [playlistVideos, excludedVideoIds]);
+
+  const formatVideoWatchTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "0s";
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (d > 0) {
+      const parts = [`${d}d`];
+      if (h > 0) parts.push(`${h}h`);
+      if (m > 0) parts.push(`${m}m`);
+      return parts.join(' ');
+    } else if (h > 0) {
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    } else if (m > 0) {
+      return `${m}m ${s}s`;
+    }
+    return `${s}s`;
+  };
+
+  const handleAddVideoMetric = useCallback((metricKey, value, label) => {
+    if (onAddVideoMetricRow) {
+      onAddVideoMetricRow(label, value);
+    }
+  }, [onAddVideoMetricRow]);
+
+  const handleSelectPlaylist = useCallback((playlist) => {
+    setSelectedPlaylistId(playlist.id);
+    setShowPlaylistSelector(false);
+    setExcludedVideoIds(new Set());
+  }, []);
+
+  const toggleVideoExclusion = useCallback((videoId) => {
+    setExcludedVideoIds(prev => {
+      const next = new Set(prev);
+      if (next.has(videoId)) {
+        next.delete(videoId);
+      } else {
+        next.add(videoId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchWalsworthData() {
@@ -139,6 +253,122 @@ const ComponentSidebar = ({
     return bestScore >= 45 ? bestMatch : null;
   }, [walsworthData]);
 
+  const getRankedJournals = useCallback((campaignName) => {
+    if (!campaignName || walsworthData.length === 0) return { topMatches: [], remainingJournals: [] };
+
+    const name = campaignName.toLowerCase();
+
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    let extractedMonth = null;
+    for (const month of months) {
+      if (name.includes(month)) {
+        extractedMonth = month;
+        break;
+      }
+    }
+
+    const yearMatch = name.match(/20\d{2}/);
+    const extractedYear = yearMatch ? yearMatch[0] : null;
+
+    let publicationType = null;
+    if (name.includes('ht ') || name.includes('ht-') || name.startsWith('ht ') || name.includes('hot topics')) {
+      publicationType = 'hot topics';
+    } else if (name.includes('jcad') && (name.includes('np') || name.includes('pa'))) {
+      publicationType = 'jcad np+pa';
+    } else if (name.includes('jcad')) {
+      publicationType = 'jcad';
+    } else if (name.includes('icns') || name.includes('innovations in clinical neuroscience')) {
+      publicationType = 'icns';
+    }
+
+    const diseaseKeywords = [
+      'inflammatory', 'myeloma', 'breast cancer', 'nsclc', 'lung', 'dermatology', 'melanoma',
+      'alopecia', 'prurigo', 'gpp', 'psoriasis', 'eczema', 'acne', 'rosacea', 'vitiligo',
+      'atopic', 'hidradenitis', 'net', 'rcc', 'sclc', 'oncology', 'bariatric'
+    ];
+    const extractedDiseases = diseaseKeywords.filter(kw => name.includes(kw));
+
+    const scoredJournals = walsworthData.map(journal => {
+      const journalName = (journal.issue_name || '').toLowerCase();
+      let score = 0;
+
+      if (extractedMonth && journalName.includes(extractedMonth)) {
+        score += 30;
+      }
+      if (extractedYear && journalName.includes(extractedYear)) {
+        score += 30;
+      }
+
+      if (publicationType === 'hot topics' && journalName.includes('hot topics')) {
+        score += 25;
+      } else if (publicationType === 'jcad np+pa' && journalName.includes('jcad np+pa')) {
+        score += 25;
+      } else if (publicationType === 'jcad' && (journalName.includes('journal of clinical and aesthetic dermatology') || journalName.startsWith('jcad'))) {
+        score += 20;
+      } else if (publicationType === 'icns' && journalName.includes('innovations in clinical neuroscience')) {
+        score += 25;
+      }
+
+      for (const disease of extractedDiseases) {
+        if (journalName.includes(disease)) {
+          score += 15;
+        }
+      }
+
+      return { ...journal, matchScore: score };
+    });
+
+    const sortedByScore = [...scoredJournals].sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      return (a.issue_name || '').localeCompare(b.issue_name || '');
+    });
+
+    const topMatches = sortedByScore.filter(j => j.matchScore > 0).slice(0, 5);
+    const topMatchIds = new Set(topMatches.map(j => j.issue_name));
+
+    const remainingJournals = scoredJournals
+      .filter(j => !topMatchIds.has(j.issue_name))
+      .sort((a, b) => {
+        const getDateScore = (journal) => {
+          const name = (journal.issue_name || '').toLowerCase();
+          const yearMatch = name.match(/20\d{2}/);
+          const year = yearMatch ? parseInt(yearMatch[0]) : 0;
+
+          const monthOrder = {
+            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+          };
+          let month = 0;
+          for (const [monthName, monthNum] of Object.entries(monthOrder)) {
+            if (name.includes(monthName)) {
+              month = Math.max(month, monthNum);
+            }
+          }
+          return year * 100 + month;
+        };
+        return getDateScore(b) - getDateScore(a);
+      });
+
+    return { topMatches, remainingJournals };
+  }, [walsworthData]);
+
+  const rankedJournals = useMemo(() => {
+    if (!selectedCampaign?.campaign_name) return { topMatches: [], remainingJournals: [] };
+    return getRankedJournals(selectedCampaign.campaign_name);
+  }, [selectedCampaign?.campaign_name, getRankedJournals]);
+
+  const filteredRankedJournals = useMemo(() => {
+    if (!journalSearchTerm.trim()) return rankedJournals;
+
+    const filterJournals = (journals) =>
+      journals.filter(j => matchesSearchTerm(j.issue_name, journalSearchTerm));
+
+    return {
+      topMatches: filterJournals(rankedJournals.topMatches),
+      remainingJournals: filterJournals(rankedJournals.remainingJournals)
+    };
+  }, [rankedJournals, journalSearchTerm]);
+
   useEffect(() => {
     if (selectedCampaign?.campaign_name) {
       const match = matchJournalToCampaign(selectedCampaign.campaign_name);
@@ -165,6 +395,12 @@ const ComponentSidebar = ({
       onAddJournalMetricRow(label, value);
     }
   }, [onAddJournalMetricRow]);
+
+  const handleSelectJournal = useCallback((journal) => {
+    setMatchedJournal(journal);
+    setShowJournalSelector(false);
+    setJournalSearchTerm('');
+  }, []);
 
   const fetchSavedDashboards = useCallback(async () => {
     setLoadingDashboards(true);
@@ -721,8 +957,241 @@ const ComponentSidebar = ({
                     <div style={{ color: '#4ade80', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
                       Matched Journal:
                     </div>
-                    <div style={{ color: 'white', fontSize: '13px', marginBottom: '12px', lineHeight: '1.4' }}>
-                      {matchedJournal.issue_name}
+                    <div style={{ position: 'relative' }}>
+                      <div
+                        onClick={() => setShowJournalSelector(!showJournalSelector)}
+                        style={{
+                          color: 'white',
+                          fontSize: '13px',
+                          marginBottom: '12px',
+                          lineHeight: '1.4',
+                          cursor: 'pointer',
+                          padding: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      >
+                        <span style={{ flex: 1 }}>{matchedJournal.issue_name}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.7 }}>
+                          {showJournalSelector ? '▲' : '▼'}
+                        </span>
+                      </div>
+
+                      {showJournalSelector && (
+                        <>
+                          <div
+                            onClick={() => {
+                              setShowJournalSelector(false);
+                              setJournalSearchTerm('');
+                            }}
+                            style={{
+                              position: 'fixed',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              zIndex: 999
+                            }}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            background: '#1e293b',
+                            border: '1px solid rgba(74, 222, 128, 0.3)',
+                            borderRadius: '8px',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                            maxHeight: '400px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden'
+                          }}>
+                          <div style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <input
+                              type="text"
+                              placeholder="Search journals"
+                              value={journalSearchTerm}
+                              onChange={(e) => setJournalSearchTerm(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                fontSize: '13px',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+                                e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                              }}
+                              onBlur={(e) => {
+                                e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                              }}
+                            />
+                          </div>
+
+                          <div style={{ flex: 1, overflow: 'auto', maxHeight: '320px' }}>
+                            {filteredRankedJournals.topMatches.length > 0 && (
+                              <div>
+                                <div style={{
+                                  padding: '8px 12px',
+                                  background: 'rgba(74, 222, 128, 0.1)',
+                                  color: '#4ade80',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  position: 'sticky',
+                                  top: 0,
+                                  zIndex: 1
+                                }}>
+                                  Best Matches
+                                </div>
+                                {filteredRankedJournals.topMatches.map((journal, index) => (
+                                  <div
+                                    key={`top-${journal.issue_name}-${index}`}
+                                    onClick={() => handleSelectJournal(journal)}
+                                    style={{
+                                      padding: '10px 12px',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                      background: matchedJournal?.issue_name === journal.issue_name
+                                        ? 'rgba(74, 222, 128, 0.2)'
+                                        : 'transparent',
+                                      transition: 'background 0.15s ease'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      if (matchedJournal?.issue_name !== journal.issue_name) {
+                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                      }
+                                    }}
+                                    onMouseOut={(e) => {
+                                      if (matchedJournal?.issue_name !== journal.issue_name) {
+                                        e.currentTarget.style.background = 'transparent';
+                                      }
+                                    }}
+                                  >
+                                    <div style={{
+                                      color: 'white',
+                                      fontSize: '12px',
+                                      lineHeight: '1.4',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}>
+                                      <span style={{ flex: 1 }}>{journal.issue_name}</span>
+                                      {matchedJournal?.issue_name === journal.issue_name && (
+                                        <span style={{ color: '#4ade80', fontSize: '10px' }}>✓</span>
+                                      )}
+                                      <span style={{
+                                        fontSize: '10px',
+                                        color: 'rgba(74, 222, 128, 0.8)',
+                                        background: 'rgba(74, 222, 128, 0.15)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px'
+                                      }}>
+                                        {journal.matchScore}pts
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {filteredRankedJournals.remainingJournals.length > 0 && (
+                              <div>
+                                <div style={{
+                                  padding: '8px 12px',
+                                  background: 'rgba(99, 102, 241, 0.1)',
+                                  color: 'rgba(165, 180, 252, 0.9)',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  position: 'sticky',
+                                  top: 0,
+                                  zIndex: 1
+                                }}>
+                                  All Journals (Most Recent First)
+                                </div>
+                                {filteredRankedJournals.remainingJournals.map((journal, index) => (
+                                  <div
+                                    key={`all-${journal.issue_name}-${index}`}
+                                    onClick={() => handleSelectJournal(journal)}
+                                    style={{
+                                      padding: '10px 12px',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                      background: matchedJournal?.issue_name === journal.issue_name
+                                        ? 'rgba(74, 222, 128, 0.2)'
+                                        : 'transparent',
+                                      transition: 'background 0.15s ease'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      if (matchedJournal?.issue_name !== journal.issue_name) {
+                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                      }
+                                    }}
+                                    onMouseOut={(e) => {
+                                      if (matchedJournal?.issue_name !== journal.issue_name) {
+                                        e.currentTarget.style.background = 'transparent';
+                                      }
+                                    }}
+                                  >
+                                    <div style={{
+                                      color: 'rgba(255, 255, 255, 0.9)',
+                                      fontSize: '12px',
+                                      lineHeight: '1.4',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}>
+                                      <span style={{ flex: 1 }}>{journal.issue_name}</span>
+                                      {matchedJournal?.issue_name === journal.issue_name && (
+                                        <span style={{ color: '#4ade80', fontSize: '10px' }}>✓</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {filteredRankedJournals.topMatches.length === 0 &&
+                             filteredRankedJournals.remainingJournals.length === 0 && (
+                              <div style={{
+                                padding: '20px',
+                                textAlign: 'center',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                fontSize: '13px'
+                              }}>
+                                No journals found matching "{journalSearchTerm}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        </>
+                      )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{
@@ -834,6 +1303,378 @@ const ComponentSidebar = ({
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {hasVideoTable && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                    Video Metrics
+                  </label>
+                  <div style={{
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}>
+                    {!selectedPlaylist ? (
+                      <div>
+                        <div style={{ color: '#60a5fa', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
+                          Select a YouTube Playlist:
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflow: 'auto' }}>
+                          {youtubePlaylistsList.map(pl => (
+                            <div
+                              key={pl.id}
+                              onClick={() => handleSelectPlaylist(pl)}
+                              style={{
+                                padding: '8px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+                              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                            >
+                              <span style={{ color: 'white', fontSize: '12px', flex: 1 }}>{pl.title}</span>
+                              <span style={{
+                                fontSize: '10px',
+                                color: 'rgba(96, 165, 250, 0.8)',
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                padding: '2px 6px',
+                                borderRadius: '4px'
+                              }}>{pl.itemCount} videos</span>
+                            </div>
+                          ))}
+                          {youtubePlaylistsList.length === 0 && (
+                            <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', padding: '8px', textAlign: 'center' }}>
+                              No playlists available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ color: '#60a5fa', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
+                          Selected Playlist:
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            onClick={() => setShowPlaylistSelector(!showPlaylistSelector)}
+                            style={{
+                              color: 'white',
+                              fontSize: '13px',
+                              marginBottom: '12px',
+                              lineHeight: '1.4',
+                              cursor: 'pointer',
+                              padding: '8px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '8px',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                            }}
+                          >
+                            <span style={{ flex: 1 }}>{selectedPlaylist.title}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.7 }}>
+                              {showPlaylistSelector ? '\u25B2' : '\u25BC'}
+                            </span>
+                          </div>
+
+                          {showPlaylistSelector && (
+                            <>
+                              <div
+                                onClick={() => setShowPlaylistSelector(false)}
+                                style={{
+                                  position: 'fixed',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  zIndex: 999
+                                }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                zIndex: 1000,
+                                background: '#1e293b',
+                                border: '1px solid rgba(96, 165, 250, 0.3)',
+                                borderRadius: '8px',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                                maxHeight: '250px',
+                                overflow: 'auto'
+                              }}>
+                                {youtubePlaylistsList.map(pl => (
+                                  <div
+                                    key={pl.id}
+                                    onClick={() => handleSelectPlaylist(pl)}
+                                    style={{
+                                      padding: '10px 12px',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                      background: selectedPlaylistId === pl.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                      transition: 'background 0.15s ease'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                      if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'transparent';
+                                    }}
+                                  >
+                                    <div style={{
+                                      color: 'white',
+                                      fontSize: '12px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}>
+                                      <span style={{ flex: 1 }}>{pl.title}</span>
+                                      {selectedPlaylistId === pl.id && (
+                                        <span style={{ color: '#60a5fa', fontSize: '10px' }}>{'\u2713'}</span>
+                                      )}
+                                      <span style={{
+                                        fontSize: '10px',
+                                        color: 'rgba(96, 165, 250, 0.8)',
+                                        background: 'rgba(59, 130, 246, 0.15)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px'
+                                      }}>{pl.itemCount}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '4px'
+                          }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Watch Time</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                                {formatVideoWatchTime(videoAggregateMetrics.totalWatchTime)}
+                              </span>
+                              <button
+                                onClick={() => handleAddVideoMetric('totalWatchTime', formatVideoWatchTime(videoAggregateMetrics.totalWatchTime), 'Total Time Watched')}
+                                style={{
+                                  padding: '4px 8px',
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer'
+                                }}
+                              >+</button>
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '4px'
+                          }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Avg Time Watched</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                                {videoAggregateMetrics.avgPercentWatched.toFixed(1)}%
+                              </span>
+                              <button
+                                onClick={() => handleAddVideoMetric('avgTimeWatched', `${videoAggregateMetrics.avgPercentWatched.toFixed(1)}%`, 'Avg Time Watched')}
+                                style={{
+                                  padding: '4px 8px',
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer'
+                                }}
+                              >+</button>
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '4px'
+                          }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Views</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                                {videoAggregateMetrics.totalViews.toLocaleString()}
+                              </span>
+                              <button
+                                onClick={() => handleAddVideoMetric('totalViews', videoAggregateMetrics.totalViews.toLocaleString(), 'Total Views')}
+                                style={{
+                                  padding: '4px 8px',
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer'
+                                }}
+                              >+</button>
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '4px'
+                          }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Most Watched Video</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: 'white', fontWeight: '600', fontSize: '11px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {videoAggregateMetrics.mostWatchedVideo || 'N/A'}
+                              </span>
+                              <button
+                                onClick={() => handleAddVideoMetric('mostWatchedVideo', videoAggregateMetrics.mostWatchedVideo || 'N/A', 'Most Watched Video')}
+                                style={{
+                                  padding: '4px 8px',
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer'
+                                }}
+                              >+</button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            onClick={() => setShowVideoDropdown(!showVideoDropdown)}
+                            style={{
+                              padding: '8px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                            }}
+                          >
+                            <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                              Videos ({playlistVideos.length - excludedVideoIds.size}/{playlistVideos.length} selected)
+                            </span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '10px' }}>
+                              {showVideoDropdown ? '\u25B2' : '\u25BC'}
+                            </span>
+                          </div>
+
+                          {showVideoDropdown && (
+                            <div style={{
+                              marginTop: '4px',
+                              background: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(96, 165, 250, 0.2)',
+                              borderRadius: '6px',
+                              maxHeight: '180px',
+                              overflow: 'auto'
+                            }}>
+                              {playlistVideos.map(video => {
+                                const isExcluded = excludedVideoIds.has(video.id);
+                                return (
+                                  <div
+                                    key={video.id}
+                                    onClick={() => toggleVideoExclusion(video.id)}
+                                    style={{
+                                      padding: '6px 10px',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      opacity: isExcluded ? 0.4 : 1,
+                                      transition: 'opacity 0.15s ease'
+                                    }}
+                                  >
+                                    <div style={{
+                                      width: '14px',
+                                      height: '14px',
+                                      borderRadius: '3px',
+                                      border: `1px solid ${isExcluded ? 'rgba(255,255,255,0.3)' : '#3b82f6'}`,
+                                      background: isExcluded ? 'transparent' : '#3b82f6',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      fontSize: '9px',
+                                      color: 'white'
+                                    }}>
+                                      {!isExcluded && '\u2713'}
+                                    </div>
+                                    <span style={{
+                                      color: 'rgba(255, 255, 255, 0.8)',
+                                      fontSize: '11px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {video.title}
+                                    </span>
+                                    <span style={{
+                                      marginLeft: 'auto',
+                                      color: 'rgba(255, 255, 255, 0.4)',
+                                      fontSize: '10px',
+                                      flexShrink: 0
+                                    }}>
+                                      {video.views.toLocaleString()} views
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -4,6 +4,17 @@ import '../../styles/journal.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
 
+const normalizePublicationName = (publication) => {
+    if (!publication) return 'Unknown';
+    if (publication.startsWith('Innovations in Clinical Neuroscience') && publication !== 'Innovations in Clinical Neuroscience') {
+        return 'Innovations in Clinical Neuroscience';
+    }
+    if (publication.startsWith('Bariatric Times') && publication !== 'Bariatric Times') {
+        return 'Bariatric Times';
+    }
+    return publication;
+};
+
 const DigitalJournals = () => {
     const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
     const [dataSource, setDataSource] = useState('walsworth');
@@ -26,6 +37,11 @@ const DigitalJournals = () => {
     const [walsworthModalOpen, setWalsworthModalOpen] = useState(false);
     const [walsworthTimeFilter, setWalsworthTimeFilter] = useState('all');
     const walsworthModalRef = useRef(null);
+    const [selectedPublications, setSelectedPublications] = useState([]);
+    const [selectedProperties, setSelectedProperties] = useState([]);
+    const [gaModalTab, setGaModalTab] = useState('overview');
+    const [walsworthViewMode, setWalsworthViewMode] = useState('all');
+    const [gaViewMode, setGaViewMode] = useState('all');
     
     const BANNED_TITLES = [
         'no title',
@@ -38,6 +54,28 @@ const DigitalJournals = () => {
         if (!title || typeof title !== 'string') return true;
         const normalizedTitle = title.toLowerCase().trim();
         return BANNED_TITLES.includes(normalizedTitle);
+    };
+
+    const getUniquePublications = () => {
+        const pubs = [...new Set(walsworthData.map(item => item.publication).filter(Boolean))];
+        return pubs.sort();
+    };
+
+    const getUniqueProperties = () => {
+        const props = [...new Set(journalsData.map(item => item.property_name).filter(Boolean))];
+        return props.sort();
+    };
+
+    const togglePublication = (pub) => {
+        setSelectedPublications(prev =>
+            prev.includes(pub) ? prev.filter(p => p !== pub) : [...prev, pub]
+        );
+    };
+
+    const toggleProperty = (prop) => {
+        setSelectedProperties(prev =>
+            prev.includes(prop) ? prev.filter(p => p !== prop) : [...prev, prop]
+        );
     };
 
     const extractBaseUrl = (url) => {
@@ -225,7 +263,6 @@ const DigitalJournals = () => {
                     setGoogleAnalyticsLastUpdated(jsonData.last_updated);
                 }
             } catch (error) {
-                // Silently handle fetch errors
             }
         }
         fetchUrlData();
@@ -273,7 +310,6 @@ const DigitalJournals = () => {
                         setGoogleAnalyticsLastUpdated(jsonData.last_updated);
                     }
                 } catch (error) {
-                    // Silently handle reprocessing errors
                 }
             };
             reprocessData();
@@ -288,7 +324,11 @@ const DigitalJournals = () => {
                 const jsonData = await response.json();
 
                 if (jsonData.issues && Array.isArray(jsonData.issues)) {
-                    const sortedData = jsonData.issues.sort((a, b) => {
+                    const normalizedData = jsonData.issues.map(issue => ({
+                        ...issue,
+                        publication: normalizePublicationName(issue.publication)
+                    }));
+                    const sortedData = normalizedData.sort((a, b) => {
                         const aDate = parseIssueDateFromName(a.issue || a.issue_name);
                         const bDate = parseIssueDateFromName(b.issue || b.issue_name);
                         return bDate - aDate;
@@ -301,7 +341,6 @@ const DigitalJournals = () => {
                     }
                 }
             } catch (error) {
-                // Silently handle fetch errors
             }
         }
         fetchWalsworthData();
@@ -311,12 +350,14 @@ const DigitalJournals = () => {
         if (walsworthData.length > 0) {
             const filtered = walsworthData.filter(issue => {
                 const name = issue.issue_name || '';
-                return matchesSearchTerm(name, search);
+                const matchesSearch = matchesSearchTerm(name, search);
+                const matchesPub = selectedPublications.length === 0 || selectedPublications.includes(issue.publication);
+                return matchesSearch && matchesPub;
             });
             setWalsworthFilteredData(filtered);
             calculateWalsworthAggregates(filtered);
         }
-    }, [search, walsworthData]);
+    }, [search, walsworthData, selectedPublications]);
 
     useEffect(() => {
         function handleWalsworthClickOutside(event) {
@@ -558,7 +599,9 @@ const DigitalJournals = () => {
         const newFilteredData = journalsData.filter(item => {
             if (isTitleBanned(item.title)) return false;
             const displayText = getDisplayTitle(item);
-            return matchesSearchTerm(displayText, searchValue);
+            const matchesSearch = matchesSearchTerm(displayText, searchValue);
+            const matchesProp = selectedProperties.length === 0 || selectedProperties.includes(item.property_name);
+            return matchesSearch && matchesProp;
         });
 
         setFilteredData(newFilteredData);
@@ -566,6 +609,20 @@ const DigitalJournals = () => {
 
         calculateAggregateMetrics(newFilteredData, timeframeFilter);
     };
+
+    useEffect(() => {
+        if (journalsData.length > 0) {
+            const newFilteredData = journalsData.filter(item => {
+                if (isTitleBanned(item.title)) return false;
+                const displayText = getDisplayTitle(item);
+                const matchesSearch = matchesSearchTerm(displayText, search);
+                const matchesProp = selectedProperties.length === 0 || selectedProperties.includes(item.property_name);
+                return matchesSearch && matchesProp;
+            });
+            setFilteredData(newFilteredData);
+            calculateAggregateMetrics(newFilteredData, timeframeFilter);
+        }
+    }, [selectedProperties]);
 
     const handleRowsPerPageChange = (e) => {
         setRowsPerPage(Number(e.target.value));
@@ -578,6 +635,7 @@ const DigitalJournals = () => {
 
     const handleJournalClick = (journal) => {
         setSelectedJournal(journal);
+        setGaModalTab('overview');
         setIsModalOpen(true);
     };
 
@@ -778,6 +836,22 @@ const DigitalJournals = () => {
                                     ))}
                                 </select>
                             </div>
+                            {getUniquePublications().length > 0 && (
+                                <div className="view-mode-toggle">
+                                    <div
+                                        className={`view-mode-option ${walsworthViewMode === 'all' ? 'active' : ''}`}
+                                        onClick={() => { setWalsworthViewMode('all'); setSelectedPublications([]); }}
+                                    >
+                                        All Issues ({walsworthData.length})
+                                    </div>
+                                    <div
+                                        className={`view-mode-option ${walsworthViewMode === 'publication' ? 'active' : ''}`}
+                                        onClick={() => setWalsworthViewMode('publication')}
+                                    >
+                                        By Publication
+                                    </div>
+                                </div>
+                            )}
                             {walsworthLastUpdated && (
                                 <div className="last-updated-tag">
                                     Last Updated: {new Date(walsworthLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -785,6 +859,33 @@ const DigitalJournals = () => {
                             )}
                         </div>
                     </div>
+
+                    {walsworthViewMode === 'publication' && getUniquePublications().length > 0 && (
+                        <div className="filter-chips-container">
+                            <div className="filter-chips-scroll">
+                                {getUniquePublications().map(pub => (
+                                    <div
+                                        key={pub}
+                                        className={`filter-chip ${selectedPublications.includes(pub) ? 'active' : ''}`}
+                                        onClick={() => togglePublication(pub)}
+                                    >
+                                        <span className="filter-chip-title">{pub}</span>
+                                        <span className="filter-chip-count">
+                                            {walsworthData.filter(i => i.publication === pub).length}
+                                        </span>
+                                    </div>
+                                ))}
+                                {selectedPublications.length > 0 && (
+                                    <div
+                                        className="filter-chip clear-all"
+                                        onClick={() => setSelectedPublications([])}
+                                    >
+                                        Clear All
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <table className="digital-journals-table">
                         <thead>
@@ -872,6 +973,22 @@ const DigitalJournals = () => {
                                     ))}
                                 </select>
                             </div>
+                            {getUniqueProperties().length > 0 && (
+                                <div className="view-mode-toggle">
+                                    <div
+                                        className={`view-mode-option ${gaViewMode === 'all' ? 'active' : ''}`}
+                                        onClick={() => { setGaViewMode('all'); setSelectedProperties([]); }}
+                                    >
+                                        All URLs ({journalsData.length})
+                                    </div>
+                                    <div
+                                        className={`view-mode-option ${gaViewMode === 'property' ? 'active' : ''}`}
+                                        onClick={() => setGaViewMode('property')}
+                                    >
+                                        By Property
+                                    </div>
+                                </div>
+                            )}
                             {googleAnalyticsLastUpdated && (
                                 <div className="last-updated-tag">
                                     Last Updated: {new Date(googleAnalyticsLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -880,10 +997,38 @@ const DigitalJournals = () => {
                         </div>
                     </div>
 
+                    {gaViewMode === 'property' && getUniqueProperties().length > 0 && (
+                        <div className="filter-chips-container">
+                            <div className="filter-chips-scroll">
+                                {getUniqueProperties().map(prop => (
+                                    <div
+                                        key={prop}
+                                        className={`filter-chip ${selectedProperties.includes(prop) ? 'active' : ''}`}
+                                        onClick={() => toggleProperty(prop)}
+                                    >
+                                        <span className="filter-chip-title">{prop}</span>
+                                        <span className="filter-chip-count">
+                                            {journalsData.filter(i => i.property_name === prop).length}
+                                        </span>
+                                    </div>
+                                ))}
+                                {selectedProperties.length > 0 && (
+                                    <div
+                                        className="filter-chip clear-all"
+                                        onClick={() => setSelectedProperties([])}
+                                    >
+                                        Clear All
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <table className="digital-journals-table">
                     <thead>
                         <tr>
                             <th className="journal-title-column">Title</th>
+                            <th>Property</th>
                             <th>Total Users</th>
                             <th>Avg Duration</th>
                             <th>Bounce Rate</th>
@@ -899,6 +1044,7 @@ const DigitalJournals = () => {
                                 >
                                     {getDisplayTitle(item)}
                                 </td>
+                                <td className="property-cell">{item.property_name || '-'}</td>
                                 <td>{formatNumber(item.totalUsers || 0)}</td>
                                 <td>{formatEngagement(item.avgDuration || 0)}</td>
                                 <td>{formatBounceRate(item.bounceRate || 0)}</td>
@@ -950,166 +1096,367 @@ const DigitalJournals = () => {
                         
                         <div className="journal-modal-url">
                             {selectedJournal.fullUrl || selectedJournal.url}
-                        </div>
-                        
-                        <div className="journal-modal-controls">
-                            <div className="timeframe-filter">
-                                <label htmlFor="modalTimeframeFilter">Timeframe:</label>
-                                <select
-                                    id="modalTimeframeFilter"
-                                    value={timeframeFilter}
-                                    onChange={handleGlobalTimeframeChange}
-                                >
-                                    <option value="all">All Time</option>
-                                    <option value="12">Last 12 Months</option>
-                                    <option value="6">Last 6 Months</option>
-                                    <option value="3">Last 3 Months</option>
-                                    <option value="1">Last Month</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div className="journal-modal-metrics">
-                            <div className="metric-card">
-                                <div className="metric-label">Total Users</div>
-                                <div className="metric-value">
-                                    {formatNumber(selectedJournal.totalUsers || 0)}
-                                </div>
-                            </div>
-                            <div className="metric-card">
-                                <div className="metric-label">Avg Duration</div>
-                                <div className="metric-value">
-                                    {formatEngagement(selectedJournal.avgDuration || 0)}
-                                </div>
-                            </div>
-                            <div className="metric-card">
-                                <div className="metric-label">Bounce Rate</div>
-                                <div className="metric-value">
-                                    {formatBounceRate(selectedJournal.bounceRate || 0)}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="journal-modal-monthly">
-                            <h4>Historical Data</h4>
-
-                            {selectedJournal.history && selectedJournal.history.length > 0 ? (
-                                <>
-                                    <table className="detail-table monthly-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Users</th>
-                                                <th>Avg Duration</th>
-                                                <th>Bounce Rate</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedJournal.history.slice().reverse().map((data, index) => (
-                                                <tr key={index}>
-                                                    <td>{data.date}</td>
-                                                    <td>{formatNumber(data.total_users || 0)}</td>
-                                                    <td>{formatEngagement(data.avg_duration || 0)}</td>
-                                                    <td>{((data.bounce_rate || 0) * 100).toFixed(2)}%</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-
-                                    <div className="journal-chart-container">
-                                        <ResponsiveContainer width="100%" height={300}>
-                                            <LineChart
-                                                data={selectedJournal.history}
-                                                margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="date" />
-                                                <YAxis yAxisId="left" />
-                                                <YAxis yAxisId="right" orientation="right" />
-                                                <Tooltip />
-                                                <Legend />
-                                                <Line
-                                                    yAxisId="left"
-                                                    type="monotone"
-                                                    dataKey="total_users"
-                                                    stroke="#8884d8"
-                                                    name="Users"
-                                                    activeDot={{ r: 8 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="avg_duration"
-                                                    stroke="#82ca9d"
-                                                    name="Avg Duration (sec)"
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </>
-                            ) : (
-                                <p>No monthly data available</p>
+                            {selectedJournal.property_name && (
+                                <span className="property-tag">{selectedJournal.property_name}</span>
                             )}
                         </div>
-                        
-                        <div className="journal-modal-details">
-                            <div className="device-breakdown">
-                                <h4>Device Breakdown</h4>
-                                {selectedJournal.devices && Object.entries(selectedJournal.devices).length > 0 ? (
-                                    <table className="detail-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Device</th>
-                                                <th>Users</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {Object.entries(selectedJournal.devices)
-                                                .sort(([, a], [, b]) => b - a)
-                                                .map(([device, count], index) => (
-                                                    <tr key={index}>
-                                                        <td>{device.charAt(0).toUpperCase() + device.slice(1)}</td>
-                                                        <td>{formatNumber(count)}</td>
-                                                    </tr>
-                                                ))
-                                            }
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <p>No device data available</p>
-                                )}
+
+                        <div className="modal-tabs">
+                            <div
+                                className={`modal-tab ${gaModalTab === 'overview' ? 'active' : ''}`}
+                                onClick={() => setGaModalTab('overview')}
+                            >
+                                Overview
                             </div>
-                            
-                            <div className="source-breakdown">
-                                <h4>Traffic Sources</h4>
-                                {selectedJournal.sources && Object.entries(selectedJournal.sources).length > 0 ? (
-                                    <table className="detail-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Source</th>
-                                                <th>Sessions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {Object.entries(selectedJournal.sources)
-                                                .sort(([, a], [, b]) => b - a)
-                                                .slice(0, 10) 
-                                                .map(([source, count], index) => (
-                                                    <tr key={index}>
-                                                        <td>{source}</td>
-                                                        <td>{formatNumber(count)}</td>
-                                                    </tr>
-                                                ))
-                                            }
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <p>No source data available</p>
-                                )}
+                            <div
+                                className={`modal-tab ${gaModalTab === 'traffic' ? 'active' : ''}`}
+                                onClick={() => setGaModalTab('traffic')}
+                            >
+                                Traffic Sources
                             </div>
+                            <div
+                                className={`modal-tab ${gaModalTab === 'geography' ? 'active' : ''}`}
+                                onClick={() => setGaModalTab('geography')}
+                            >
+                                Geography
+                            </div>
+                            <div
+                                className={`modal-tab ${gaModalTab === 'demographics' ? 'active' : ''}`}
+                                onClick={() => setGaModalTab('demographics')}
+                            >
+                                Demographics
+                            </div>
+                            <div
+                                className={`modal-tab ${gaModalTab === 'technology' ? 'active' : ''}`}
+                                onClick={() => setGaModalTab('technology')}
+                            >
+                                Technology
+                            </div>
+                            {groupByTitle && selectedJournal.combinedUrls && selectedJournal.combinedUrls.length > 1 && (
+                                <div
+                                    className={`modal-tab ${gaModalTab === 'pages' ? 'active' : ''}`}
+                                    onClick={() => setGaModalTab('pages')}
+                                >
+                                    Pages ({selectedJournal.combinedUrls.length})
+                                </div>
+                            )}
                         </div>
 
-                        {groupByTitle && selectedJournal.combinedUrls && selectedJournal.combinedUrls.length > 1 && (
+                        {gaModalTab === 'overview' && (
+                            <>
+                                <div className="journal-modal-controls">
+                                    <div className="timeframe-filter">
+                                        <label htmlFor="modalTimeframeFilter">Timeframe:</label>
+                                        <select
+                                            id="modalTimeframeFilter"
+                                            value={timeframeFilter}
+                                            onChange={handleGlobalTimeframeChange}
+                                        >
+                                            <option value="all">All Time</option>
+                                            <option value="12">Last 12 Months</option>
+                                            <option value="6">Last 6 Months</option>
+                                            <option value="3">Last 3 Months</option>
+                                            <option value="1">Last Month</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="journal-modal-metrics">
+                                    <div className="metric-card">
+                                        <div className="metric-label">Total Users</div>
+                                        <div className="metric-value">
+                                            {formatNumber(selectedJournal.totalUsers || 0)}
+                                        </div>
+                                    </div>
+                                    <div className="metric-card">
+                                        <div className="metric-label">Avg Duration</div>
+                                        <div className="metric-value">
+                                            {formatEngagement(selectedJournal.avgDuration || 0)}
+                                        </div>
+                                    </div>
+                                    <div className="metric-card">
+                                        <div className="metric-label">Bounce Rate</div>
+                                        <div className="metric-value">
+                                            {formatBounceRate(selectedJournal.bounceRate || 0)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="journal-modal-monthly">
+                                    <h4>Historical Data</h4>
+                                    {selectedJournal.history && selectedJournal.history.length > 0 ? (
+                                        <>
+                                            <table className="detail-table monthly-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Date</th>
+                                                        <th>Users</th>
+                                                        <th>Avg Duration</th>
+                                                        <th>Bounce Rate</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {selectedJournal.history.slice().reverse().map((data, index) => (
+                                                        <tr key={index}>
+                                                            <td>{data.date}</td>
+                                                            <td>{formatNumber(data.total_users || 0)}</td>
+                                                            <td>{formatEngagement(data.avg_duration || 0)}</td>
+                                                            <td>{((data.bounce_rate || 0) * 100).toFixed(2)}%</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            <div className="journal-chart-container">
+                                                <ResponsiveContainer width="100%" height={300}>
+                                                    <LineChart
+                                                        data={selectedJournal.history}
+                                                        margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="date" />
+                                                        <YAxis yAxisId="left" />
+                                                        <YAxis yAxisId="right" orientation="right" />
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Line yAxisId="left" type="monotone" dataKey="total_users" stroke="#8884d8" name="Users" activeDot={{ r: 8 }} />
+                                                        <Line yAxisId="right" type="monotone" dataKey="avg_duration" stroke="#82ca9d" name="Avg Duration (sec)" />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p>No historical data available</p>
+                                    )}
+                                </div>
+
+                            </>
+                        )}
+
+                        {gaModalTab === 'traffic' && (
+                            <div className="journal-modal-details">
+                                <div className="device-breakdown full-width">
+                                    <h4>Traffic Sources</h4>
+                                    {selectedJournal.sources && Object.entries(selectedJournal.sources).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Source</th>
+                                                    <th>Sessions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.sources)
+                                                    .sort(([, a], [, b]) => b - a)
+                                                    .map(([source, count], index) => (
+                                                        <tr key={index}>
+                                                            <td>{source}</td>
+                                                            <td>{formatNumber(count)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No traffic source data available</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {gaModalTab === 'geography' && (
+                            <div className="journal-modal-details">
+                                <div className="device-breakdown">
+                                    <h4>Top Countries</h4>
+                                    {selectedJournal.breakdowns?.geography?.countries && Object.keys(selectedJournal.breakdowns.geography.countries).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Country</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.geography.countries)
+                                                    .sort(([,a], [,b]) => (b.users || b) - (a.users || a))
+                                                    .map(([country, data], index) => (
+                                                        <tr key={index}>
+                                                            <td>{country}</td>
+                                                            <td>{formatNumber(data.users || data)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No country data available</p>
+                                    )}
+                                </div>
+                                <div className="source-breakdown">
+                                    <h4>Top Cities</h4>
+                                    {selectedJournal.breakdowns?.geography?.cities && Object.keys(selectedJournal.breakdowns.geography.cities).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>City</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.geography.cities)
+                                                    .sort(([,a], [,b]) => b - a)
+                                                    .map(([city, users], index) => (
+                                                        <tr key={index}>
+                                                            <td>{city}</td>
+                                                            <td>{formatNumber(users)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No city data available</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {gaModalTab === 'demographics' && (
+                            <div className="journal-modal-details">
+                                <div className="device-breakdown">
+                                    <h4>Age Groups</h4>
+                                    {selectedJournal.breakdowns?.demographics?.ageGroups && Object.keys(selectedJournal.breakdowns.demographics.ageGroups).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Age</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.demographics.ageGroups)
+                                                    .sort(([a], [b]) => a.localeCompare(b))
+                                                    .map(([age, users], index) => (
+                                                        <tr key={index}>
+                                                            <td>{age}</td>
+                                                            <td>{formatNumber(users)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No age data available</p>
+                                    )}
+                                </div>
+                                <div className="source-breakdown">
+                                    <h4>Gender</h4>
+                                    {selectedJournal.breakdowns?.demographics?.genders && Object.keys(selectedJournal.breakdowns.demographics.genders).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Gender</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.demographics.genders)
+                                                    .sort(([,a], [,b]) => b - a)
+                                                    .map(([gender, users], index) => (
+                                                        <tr key={index}>
+                                                            <td>{gender}</td>
+                                                            <td>{formatNumber(users)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No gender data available</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {gaModalTab === 'technology' && (
+                            <>
+                            <div className="journal-modal-details">
+                                <div className="device-breakdown">
+                                    <h4>Device Breakdown</h4>
+                                    {selectedJournal.devices && Object.entries(selectedJournal.devices).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Device</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.devices)
+                                                    .sort(([, a], [, b]) => b - a)
+                                                    .map(([device, count], index) => (
+                                                        <tr key={index}>
+                                                            <td>{device.charAt(0).toUpperCase() + device.slice(1)}</td>
+                                                            <td>{formatNumber(count)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No device data available</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="journal-modal-details">
+                                <div className="device-breakdown">
+                                    <h4>Browsers</h4>
+                                    {selectedJournal.breakdowns?.technology?.browsers && Object.keys(selectedJournal.breakdowns.technology.browsers).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Browser</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.technology.browsers)
+                                                    .sort(([,a], [,b]) => b - a)
+                                                    .map(([browser, users], index) => (
+                                                        <tr key={index}>
+                                                            <td>{browser}</td>
+                                                            <td>{formatNumber(users)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No browser data available</p>
+                                    )}
+                                </div>
+                                <div className="source-breakdown">
+                                    <h4>Operating Systems</h4>
+                                    {selectedJournal.breakdowns?.technology?.operatingSystems && Object.keys(selectedJournal.breakdowns.technology.operatingSystems).length > 0 ? (
+                                        <table className="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>OS</th>
+                                                    <th>Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(selectedJournal.breakdowns.technology.operatingSystems)
+                                                    .sort(([,a], [,b]) => b - a)
+                                                    .map(([os, users], index) => (
+                                                        <tr key={index}>
+                                                            <td>{os}</td>
+                                                            <td>{formatNumber(users)}</td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <p>No OS data available</p>
+                                    )}
+                                </div>
+                            </div>
+                            </>
+                        )}
+
+                        {gaModalTab === 'pages' && groupByTitle && selectedJournal.combinedUrls && selectedJournal.combinedUrls.length > 1 && (
                             <div className="journal-modal-combined-urls">
                                 <h4>Combined Pages ({selectedJournal.combinedUrls.length} URLs)</h4>
                                 <div className="combined-urls-grid">
@@ -1140,6 +1487,8 @@ const DigitalJournals = () => {
                                 </div>
                             </div>
                         )}
+
+
                     </div>
                 </div>
             )}

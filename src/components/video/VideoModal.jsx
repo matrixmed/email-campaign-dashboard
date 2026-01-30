@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import '../../styles/video.css';
 
 const VideoModal = ({ video, onClose, videoSource }) => {
@@ -8,8 +8,12 @@ const VideoModal = ({ video, onClose, videoSource }) => {
     const modalRef = useRef(null);
     const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
     const [showCustomPicker, setShowCustomPicker] = useState(false);
+    const [activeTab, setActiveTab] = useState('overview');
 
     const isYoutubeVideo = videoSource === 'youtube';
+    const breakdowns = video.breakdowns || {};
+
+    const hasHistory = video.history && (Array.isArray(video.history) ? video.history.length > 0 : Object.keys(video.history).length > 0);
 
     useEffect(() => {
         const allTimeMetrics = {
@@ -22,7 +26,7 @@ const VideoModal = ({ video, onClose, videoSource }) => {
 
         if (timeframeFilter === 'all') {
             setDisplayMetrics(allTimeMetrics);
-        } else if (video.history && video.history.length > 0) {
+        } else if (hasHistory) {
             const timeframeData = getTimeframeData();
 
             if (timeframeData.length === 0) {
@@ -31,8 +35,8 @@ const VideoModal = ({ video, onClose, videoSource }) => {
             }
 
             const views = timeframeData.reduce((sum, day) => sum + (day.views || 0), 0);
-            const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
             const impressions = timeframeData.reduce((sum, day) => sum + (day.impressions || 0), 0);
+            const watchTimeHours = timeframeData.reduce((sum, day) => sum + (day.watchTimeHours || 0), 0);
 
             const avgViewPercentage = views > 0
                 ? timeframeData.reduce((sum, day) => sum + ((day.averageViewPercentage || 0) * (day.views || 0)), 0) / views
@@ -45,12 +49,12 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                 impressions,
                 watchTimeHours,
                 averageViewPercentage: avgViewPercentage,
-                impressionsCtr: impressionsCtr
+                impressionsCtr
             });
         } else {
             setDisplayMetrics(allTimeMetrics);
         }
-    }, [timeframeFilter, video, customDateRange]);
+    }, [timeframeFilter, video, customDateRange, hasHistory]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -139,18 +143,33 @@ const VideoModal = ({ video, onClose, videoSource }) => {
             historyArray = video.history.map(item => ({
                 date: item.date,
                 views: item.views || 0,
-                impressions: item.impressions || 0,
-                watchTimeHours: (item.total_seconds_watched || 0) / 3600,
-                averageViewDuration: item.avg_seconds_watched || 0,
-                averageViewPercentage: item.mean_percent_watched || item.avg_percent_watched || 0,
+                watchTimeHours: (item.total_seconds_watched || item.estimatedMinutesWatched * 60 || 0) / 3600,
+                estimatedMinutesWatched: item.estimatedMinutesWatched || 0,
+                averageViewDuration: item.avg_seconds_watched || item.averageViewDuration || 0,
+                averageViewPercentage: item.mean_percent_watched || item.avg_percent_watched || item.averageViewPercentage || 0,
                 subscribersGained: item.subscribersGained || 0,
-                subscribersLost: item.subscribersLost || 0
+                subscribersLost: item.subscribersLost || 0,
+                likes: item.likes || 0,
+                comments: item.comments || 0,
+                shares: item.shares || 0
             }));
         } else {
-            historyArray = Object.entries(video.history).map(([date, data]) => ({
-                date,
-                ...(data.totals || data)
-            }));
+            historyArray = Object.entries(video.history).map(([date, data]) => {
+                const d = data.totals || data;
+                return {
+                    date,
+                    views: d.views || 0,
+                    watchTimeHours: (d.estimatedMinutesWatched || 0) / 60,
+                    estimatedMinutesWatched: d.estimatedMinutesWatched || 0,
+                    averageViewDuration: d.averageViewDuration || 0,
+                    averageViewPercentage: d.averageViewPercentage || 0,
+                    subscribersGained: d.subscribersGained || 0,
+                    subscribersLost: d.subscribersLost || 0,
+                    likes: d.likes || 0,
+                    comments: d.comments || 0,
+                    shares: d.shares || 0
+                };
+            });
         }
 
         historyArray = historyArray.filter(item => {
@@ -220,7 +239,6 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                     date: weekKey,
                     views: 0,
                     watchTimeHours: 0,
-                    impressions: 0,
                     averageViewDuration: 0,
                     averageViewPercentage: 0,
                     subscribersGained: 0,
@@ -234,7 +252,6 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                 const dayData = dateMap[dateString];
                 weeklyData[weekKey].views += dayData.views || 0;
                 weeklyData[weekKey].watchTimeHours += dayData.watchTimeHours || 0;
-                weeklyData[weekKey].impressions += dayData.impressions || 0;
                 weeklyData[weekKey].subscribersGained += dayData.subscribersGained || 0;
                 weeklyData[weekKey].subscribersLost += dayData.subscribersLost || 0;
                 
@@ -272,7 +289,6 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                     date: monthKey,
                     views: 0,
                     watchTimeHours: 0,
-                    impressions: 0,
                     averageViewDuration: 0,
                     averageViewPercentage: 0,
                     subscribersGained: 0,
@@ -285,7 +301,6 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                 const dayData = dateMap[dateString];
                 monthlyData[monthKey].views += dayData.views || 0;
                 monthlyData[monthKey].watchTimeHours += dayData.watchTimeHours || 0;
-                monthlyData[monthKey].impressions += dayData.impressions || 0;
                 monthlyData[monthKey].subscribersGained += dayData.subscribersGained || 0;
                 monthlyData[monthKey].subscribersLost += dayData.subscribersLost || 0;
                 
@@ -332,7 +347,6 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                     date: dateString,
                     views: 0,
                     watchTimeHours: 0,
-                    impressions: 0,
                     averageViewDuration: 0,
                     averageViewPercentage: 0,
                     subscribersGained: 0,
@@ -498,45 +512,78 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                                 {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : `vimeo.com/${video.id}`}
                             </a>
                         </div>
-                        {video.fullData?.snippet?.tags && (
+                        {video.tags && video.tags.length > 0 && (
                             <div className="video-tags">
-                                {video.fullData.snippet.tags.slice(0, 5).map((tag, index) => (
+                                {video.tags.slice(0, 5).map((tag, index) => (
                                     <span key={index} className="video-tag">{tag}</span>
                                 ))}
-                                {video.fullData.snippet.tags.length > 5 && (
-                                    <span className="more-tags">+{video.fullData.snippet.tags.length - 5} more</span>
+                                {video.tags.length > 5 && (
+                                    <span className="more-tags">+{video.tags.length - 5} more</span>
                                 )}
                             </div>
                         )}
                     </div>
+                    {isYoutubeVideo && video.current && (
+                        <div className="video-engagement-stats">
+                            <div className="engagement-stat">
+                                <span className="engagement-label">Likes</span>
+                                <span className="engagement-value">{formatNumber(video.current.likes || 0)}</span>
+                            </div>
+                            <div className="engagement-stat">
+                                <span className="engagement-label">Comments</span>
+                                <span className="engagement-value">{formatNumber(video.current.comments || 0)}</span>
+                            </div>
+                            <div className="engagement-stat">
+                                <span className="engagement-label">Shares</span>
+                                <span className="engagement-value">{formatNumber(video.current.shares || 0)}</span>
+                            </div>
+                            <div className="engagement-stat">
+                                <span className="engagement-label">Net Subs</span>
+                                <span className="engagement-value" style={{ color: (video.current.netSubscribers || 0) >= 0 ? '#0f0' : '#f00' }}>
+                                    {(video.current.netSubscribers || 0) >= 0 ? '+' : ''}{formatNumber(video.current.netSubscribers || 0)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
                 <div className="video-modal-metrics">
                     <div className="metrics-top-row">
-                        <div className="metric-card large-card">
-                            <div className="metric-label">Impressions</div>
-                            <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
-                        </div>
+                        {!isYoutubeVideo && (
+                            <div className="metric-card large-card">
+                                <div className="metric-label">Impressions</div>
+                                <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
+                            </div>
+                        )}
                         <div className="metric-card large-card">
                             <div className="metric-label">Views</div>
                             <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
                         </div>
-                    </div>
-                    <div className="metrics-bottom-row">
-                        <div className="metric-card">
-                            <div className="metric-label">Impressions CTR</div>
-                            <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
-                        </div>
-                        <div className="metric-card">
+                        {!isYoutubeVideo && (
+                            <div className="metric-card large-card">
+                                <div className="metric-label">Impressions CTR</div>
+                                <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
+                            </div>
+                        )}
+                        <div className="metric-card large-card">
                             <div className="metric-label">Avg. % Watched</div>
                             <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
                         </div>
-                        <div className="metric-card">
+                        <div className="metric-card large-card">
                             <div className="metric-label">Total Time Watched</div>
                             <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
                         </div>
                     </div>
                 </div>
+
+                {isYoutubeVideo && Object.keys(breakdowns).length > 0 && (
+                    <div className="modal-tabs">
+                        <div className={`modal-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</div>
+                        <div className={`modal-tab ${activeTab === 'traffic' ? 'active' : ''}`} onClick={() => setActiveTab('traffic')}>Traffic Sources</div>
+                        <div className={`modal-tab ${activeTab === 'geography' ? 'active' : ''}`} onClick={() => setActiveTab('geography')}>Geography</div>
+                        <div className={`modal-tab ${activeTab === 'audience' ? 'active' : ''}`} onClick={() => setActiveTab('audience')}>Audience</div>
+                    </div>
+                )}
 
                 {hasData && (
                     <div className="video-modal-controls">
@@ -579,110 +626,321 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                     </div>
                 )}
 
-                {hasData ? (
+                {(activeTab === 'overview' || !isYoutubeVideo) && (
                     <>
-                        <div className="video-modal-charts">
-                            <div className="views-chart-container views-chart-container">
-                                <h4>Views Over Time</h4>
-                                <ResponsiveContainer>
-                                    <LineChart
-                                        data={timeframeData}
-                                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis 
-                                            dataKey="date" 
-                                            tickFormatter={(date) => {
-                                                const d = new Date(date);
-                                                if (timeframeFilter === 'all') {
-                                                    const daysDiff = timeframeData.length > 0 
-                                                        ? Math.ceil((new Date(timeframeData[timeframeData.length - 1].date) - new Date(timeframeData[0].date)) / (1000 * 60 * 60 * 24))
-                                                        : 0;
-                                                    
-                                                    if (daysDiff > 365) {
-                                                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                                                    } else if (daysDiff > 60) {
-                                                        return `${d.getMonth() + 1}/${d.getDate()}`;
-                                                    }
-                                                }
-                                                return `${d.getMonth()+1}/${d.getDate()}`;
-                                            }}
-                                        />
-                                        <YAxis allowDecimals={false} />
-                                        <Tooltip 
-                                            formatter={(value, name) => [formatNumber(value), name]}
-                                            labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                                        />
-                                        <Legend />
-                                        <Line 
-                                            type="monotone" 
-                                            dataKey="views" 
-                                            stroke="#0ff" 
-                                            name="Views" 
-                                            strokeWidth={2}
-                                            activeDot={{ r: 6 }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
+                        {hasData ? (
+                            <>
+                                <div className="video-modal-charts">
+                                    <div className="views-chart-container">
+                                        <h4>Views Over Time</h4>
+                                        <ResponsiveContainer width="100%" height={250}>
+                                            <LineChart
+                                                data={timeframeData}
+                                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    tickFormatter={(date) => {
+                                                        const d = new Date(date);
+                                                        if (timeframeFilter === 'all') {
+                                                            const daysDiff = timeframeData.length > 0
+                                                                ? Math.ceil((new Date(timeframeData[timeframeData.length - 1].date) - new Date(timeframeData[0].date)) / (1000 * 60 * 60 * 24))
+                                                                : 0;
+
+                                                            if (daysDiff > 365) {
+                                                                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                                            } else if (daysDiff > 60) {
+                                                                return `${d.getMonth() + 1}/${d.getDate()}`;
+                                                            }
+                                                        }
+                                                        return `${d.getMonth()+1}/${d.getDate()}`;
+                                                    }}
+                                                />
+                                                <YAxis allowDecimals={false} />
+                                                <Tooltip
+                                                    formatter={(value, name) => [formatNumber(value), name]}
+                                                    labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                                                />
+                                                <Legend />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="views"
+                                                    stroke="#0ff"
+                                                    name="Views"
+                                                    strokeWidth={2}
+                                                    activeDot={{ r: 6 }}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                <div className="video-modal-daily">
+                                    <h4>Daily Performance</h4>
+                                    <div className="daily-table-container">
+                                        <table className="detail-table daily-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Views</th>
+                                                    <th>Watch Time</th>
+                                                    <th>Avg Duration %</th>
+                                                    {isYoutubeVideo && <th>Likes</th>}
+                                                    {isYoutubeVideo && <th>Subscribers +/-</th>}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {timeframeData
+                                                    .slice()
+                                                    .reverse()
+                                                    .map((data, index) => (
+                                                        <tr key={index}>
+                                                            <td>{formatDate(data.date)}</td>
+                                                            <td>{formatNumber(data.views)}</td>
+                                                            <td>{formatWatchTime(data.watchTimeHours || (data.estimatedMinutesWatched || 0) / 60)}</td>
+                                                            <td>{formatPercent(data.averageViewPercentage)}</td>
+                                                            {isYoutubeVideo && <td>{formatNumber(data.likes || 0)}</td>}
+                                                            {isYoutubeVideo && (
+                                                                <td>
+                                                                    {data.subscribersGained || data.subscribersLost ? (
+                                                                        <span className={
+                                                                            ((data.subscribersGained || 0) - (data.subscribersLost || 0)) >= 0
+                                                                            ? "positive-subs"
+                                                                            : "negative-subs"
+                                                                        }>
+                                                                            {(data.subscribersGained || 0) - (data.subscribersLost || 0) > 0 ? '+' : ''}
+                                                                            {(data.subscribersGained || 0) - (data.subscribersLost || 0)}
+                                                                        </span>
+                                                                    ) : '-'}
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="no-data-message">
+                                <p>No historical data available for this video.</p>
                             </div>
-                        </div>
-                        
-                        <div className="video-modal-daily">
-                            <h4>Daily Performance</h4>
-                            <div className="daily-table-container">
-                                <table className="detail-table daily-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Impressions</th>
-                                            <th>Views</th>
-                                            <th>Watch Time</th>
-                                            <th>Avg Duration %</th>
-                                            <th>Impressions CTR</th>
-                                            {isYoutubeVideo && <th>Subscribers +/-</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {timeframeData
-                                            .slice()
-                                            .reverse()
-                                            .map((data, index) => {
-                                                const impressionsCtr = (data.impressions || 0) > 0
-                                                    ? ((data.views || 0) / data.impressions * 100)
-                                                    : 0;
-                                                return (
-                                                    <tr key={index}>
-                                                        <td>{formatDate(data.date)}</td>
-                                                        <td>{formatNumber(data.impressions)}</td>
-                                                        <td>{formatNumber(data.views)}</td>
-                                                        <td>{formatWatchTime(data.watchTimeHours)}</td>
-                                                        <td>{formatPercent(data.averageViewPercentage)}</td>
-                                                        <td>{formatPercent(impressionsCtr)}</td>
-                                                        {isYoutubeVideo && (
-                                                            <td>
-                                                                {data.subscribersGained || data.subscribersLost ? (
-                                                                    <span className={
-                                                                        (data.subscribersGained - data.subscribersLost) >= 0
-                                                                        ? "positive-subs"
-                                                                        : "negative-subs"
-                                                                    }>
-                                                                        {(data.subscribersGained || 0) - (data.subscribersLost || 0) > 0 ? '+' : ''}
-                                                                        {(data.subscribersGained || 0) - (data.subscribersLost || 0)}
-                                                                    </span>
-                                                                ) : '-'}
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        )}
                     </>
-                ) : (
-                    <div className="no-data-message">
-                        <p>No historical data available for this video.</p>
+                )}
+
+                {activeTab === 'traffic' && isYoutubeVideo && (
+                    <div className="breakdown-section">
+                        <div className="breakdown-grid">
+                            <div className="breakdown-card">
+                                <h4>Traffic Sources</h4>
+                                {breakdowns.trafficSources && Object.keys(breakdowns.trafficSources).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.trafficSources)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .map(([source, data]) => (
+                                                <div key={source} className="breakdown-item">
+                                                    <span className="breakdown-name">{source}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No traffic source data available</p>
+                                )}
+                            </div>
+
+                            <div className="breakdown-card">
+                                <h4>Playback Locations</h4>
+                                {breakdowns.playbackLocations && Object.keys(breakdowns.playbackLocations).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.playbackLocations)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .map(([location, data]) => (
+                                                <div key={location} className="breakdown-item">
+                                                    <span className="breakdown-name">{location}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No playback location data available</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {breakdowns.trafficDetails && (
+                            <div className="breakdown-grid">
+                                {breakdowns.trafficDetails.externalUrls && breakdowns.trafficDetails.externalUrls.length > 0 && (
+                                    <div className="breakdown-card">
+                                        <h4>Top External URLs</h4>
+                                        <div className="breakdown-list">
+                                            {breakdowns.trafficDetails.externalUrls.slice(0, 10).map((item, i) => (
+                                                <div key={i} className="breakdown-item">
+                                                    <span className="breakdown-name url">{item.url}</span>
+                                                    <span className="breakdown-value">{formatNumber(item.views)} views</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {breakdowns.trafficDetails.searchTerms && breakdowns.trafficDetails.searchTerms.length > 0 && (
+                                    <div className="breakdown-card">
+                                        <h4>Top Search Terms</h4>
+                                        <div className="breakdown-list">
+                                            {breakdowns.trafficDetails.searchTerms.slice(0, 10).map((item, i) => (
+                                                <div key={i} className="breakdown-item">
+                                                    <span className="breakdown-name">{item.term}</span>
+                                                    <span className="breakdown-value">{formatNumber(item.views)} views</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'geography' && isYoutubeVideo && (
+                    <div className="breakdown-section">
+                        <div className="breakdown-grid three-col">
+                            <div className="breakdown-card">
+                                <h4>Top Countries</h4>
+                                {breakdowns.geography?.countries && Object.keys(breakdowns.geography.countries).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.geography.countries)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .slice(0, 15)
+                                            .map(([country, data]) => (
+                                                <div key={country} className="breakdown-item">
+                                                    <span className="breakdown-name">{country}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No country data available</p>
+                                )}
+                            </div>
+
+                            <div className="breakdown-card">
+                                <h4>US States</h4>
+                                {breakdowns.geography?.usStates && Object.keys(breakdowns.geography.usStates).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.geography.usStates)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .slice(0, 15)
+                                            .map(([state, data]) => (
+                                                <div key={state} className="breakdown-item">
+                                                    <span className="breakdown-name">{state.replace('US-', '')}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No US state data available</p>
+                                )}
+                            </div>
+
+                            <div className="breakdown-card">
+                                <h4>Top Cities</h4>
+                                {breakdowns.geography?.cities && breakdowns.geography.cities.length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {breakdowns.geography.cities.slice(0, 15).map((item, i) => (
+                                            <div key={i} className="breakdown-item">
+                                                <span className="breakdown-name">{item.city}</span>
+                                                <span className="breakdown-value">{formatNumber(item.views)} views</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No city data available</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'audience' && isYoutubeVideo && (
+                    <div className="breakdown-section">
+                        <div className="breakdown-grid">
+                            <div className="breakdown-card">
+                                <h4>Devices</h4>
+                                {breakdowns.devices && Object.keys(breakdowns.devices).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.devices)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .map(([device, data]) => (
+                                                <div key={device} className="breakdown-item">
+                                                    <span className="breakdown-name">{device}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No device data available</p>
+                                )}
+                            </div>
+
+                            <div className="breakdown-card">
+                                <h4>Operating Systems</h4>
+                                {breakdowns.operatingSystems && Object.keys(breakdowns.operatingSystems).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.operatingSystems)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .map(([os, data]) => (
+                                                <div key={os} className="breakdown-item">
+                                                    <span className="breakdown-name">{os}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No OS data available</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="breakdown-grid">
+                            <div className="breakdown-card">
+                                <h4>Subscription Status</h4>
+                                {breakdowns.subscriptionStatus && Object.keys(breakdowns.subscriptionStatus).length > 0 ? (
+                                    <div className="breakdown-list">
+                                        {Object.entries(breakdowns.subscriptionStatus)
+                                            .sort((a, b) => (b[1].views || 0) - (a[1].views || 0))
+                                            .map(([status, data]) => (
+                                                <div key={status} className="breakdown-item">
+                                                    <span className="breakdown-name">{status}</span>
+                                                    <span className="breakdown-value">{formatNumber(data.views || 0)} views</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data-text">No subscription data available</p>
+                                )}
+                            </div>
+
+                        </div>
+
+                        {breakdowns.sharingServices && Object.keys(breakdowns.sharingServices).length > 0 && (
+                            <div className="breakdown-card full-width">
+                                <h4>Sharing Services</h4>
+                                <div className="breakdown-list horizontal">
+                                    {Object.entries(breakdowns.sharingServices)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .slice(0, 10)
+                                        .map(([service, shares]) => (
+                                            <div key={service} className="breakdown-item">
+                                                <span className="breakdown-name">{service}</span>
+                                                <span className="breakdown-value">{formatNumber(shares)} shares</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

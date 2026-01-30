@@ -191,7 +191,9 @@ const VideoMetrics = () => {
 
         const totalViews = filteredData.reduce((sum, v) => sum + (v.views || 0), 0);
         const totalImpressions = filteredData.reduce((sum, v) => sum + (v.impressions || 0), 0);
-        const avgPercentWatched = filteredData.reduce((sum, v) => sum + (v.avgPercentWatched || 0), 0) / filteredData.length;
+        const avgPercentWatched = totalViews > 0
+            ? filteredData.reduce((sum, v) => sum + ((v.avgPercentWatched || 0) * (v.views || 0)), 0) / totalViews
+            : 0;
         const totalWatchTimeSeconds = filteredData.reduce((sum, v) => sum + (v.totalWatchTimeSeconds || 0), 0);
         const totalLikes = filteredData.reduce((sum, v) => sum + (v.current?.likes || 0), 0);
         const totalComments = filteredData.reduce((sum, v) => sum + (v.current?.comments || 0), 0);

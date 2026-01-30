@@ -42,7 +42,7 @@ const AppLayout = ({ children }) => {
     { path: '/specialty', label: 'Specialty Metrics' },
     { path: '/video', label: 'Video Metrics' },
     { path: '/journals', label: 'Journal Metrics' },
-    //{ path: '/content-analysis', label: 'Content Analysis' },
+    { path: '/content-analysis', label: 'Content Analysis' },
   ];
 
   const isDashboardBuilder = location.pathname === '/dashboard-builder';

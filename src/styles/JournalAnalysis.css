@@ -376,7 +376,7 @@
 .ja-matrix-table tbody td.publication-cell {
   text-align: left;
   font-weight: 600;
-  color: #0ff;
+  color: #fff;
 }
 
 .ja-matrix-table tbody tr:last-child td {
@@ -1601,4 +1601,18 @@
 .demo-age-cell span,
 .demo-gender-cell span {
   font-weight: 600;
+}
+
+.ja-issue-table thead th {
+  text-align: left;
+}
+
+.ja-issue-table tbody td {
+  text-align: left;
+}
+
+.ja-issue-table tbody td.issue-name-cell {
+  text-align: left;
+  font-weight: 600;
+  color: #fff;
 }

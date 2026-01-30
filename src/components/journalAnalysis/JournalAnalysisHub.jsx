@@ -119,7 +119,7 @@ const JournalAnalysisHub = () => {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);

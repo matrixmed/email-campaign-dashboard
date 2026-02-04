@@ -1271,8 +1271,9 @@ const ReportsManager = () => {
     const generateCMIJSON = (report, specificWeek = null, overrideMeta = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const baseMeta = findMatchingMetadata(report) || {};
+        const dbMeta = report.agency_metadata || {};
         const manualMeta = manualMetadata[report.id] || {};
-        const matchedMeta = overrideMeta || { ...baseMeta, ...manualMeta };
+        const matchedMeta = overrideMeta || { ...baseMeta, ...dbMeta, ...manualMeta };
 
         const formatISODateTime = (date, isEndOfDay = false) => {
             const year = date.getFullYear();
@@ -1401,7 +1402,7 @@ const ReportsManager = () => {
     const generateBIJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : currentTimeframe.start.toLocaleString('default', { month: 'long' });
 
@@ -1417,7 +1418,7 @@ const ReportsManager = () => {
     const generateAMGJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
         const brandUpper = (meta.brand_name || report.brand || '').toUpperCase();
         const formatDateCompact = (date) => `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
 
@@ -1452,7 +1453,7 @@ const ReportsManager = () => {
     const generateSunJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1464,7 +1465,7 @@ const ReportsManager = () => {
     const generateCasJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1476,7 +1477,7 @@ const ReportsManager = () => {
     const generateDeerJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1490,7 +1491,7 @@ const ReportsManager = () => {
     const generateGoodJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1518,7 +1519,7 @@ const ReportsManager = () => {
     const generateKlikJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1543,7 +1544,7 @@ const ReportsManager = () => {
     const generateLucidJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1558,7 +1559,7 @@ const ReportsManager = () => {
     const generatePHMJSON = (report, specificWeek = null) => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
         return {
             "start_date": formatISODateTime(currentTimeframe.start),
@@ -1583,7 +1584,7 @@ const ReportsManager = () => {
 
     const generateOMDJSON = (report, specificWeek = null) => {
         const cleanedCampaignName = (report.standardized_campaign_name || cleanCampaignName(report.campaign_name || '')).replace(/[():#'\[\]]/g, '').trim();
-        const meta = manualMetadata[report.id] || {};
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
         const monthMatch = cleanedCampaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
         const month = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1).toLowerCase() : new Date().toLocaleString('default', { month: 'long' });
 
@@ -1653,8 +1654,9 @@ const ReportsManager = () => {
         const campaigns = {};
         sortedCMIReports.forEach(report => {
             const baseMeta = findMatchingMetadata(report) || {};
+            const dbMeta = report.agency_metadata || {};
             const manualMeta = manualMetadata[report.id] || {};
-            const matchedMeta = { ...baseMeta, ...manualMeta };
+            const matchedMeta = { ...baseMeta, ...dbMeta, ...manualMeta };
             const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
             const placementId = matchedMeta?.cmi_placement_id || report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id || '';
             const contractInfo = getContractInfo(placementId);
@@ -1808,7 +1810,7 @@ const ReportsManager = () => {
             const fileNames = [];
             sortedReports.forEach(report => {
                 const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
-                const meta = manualMetadata[report.id] || {};
+                const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
                 campaigns.push(campaignName);
                 fileNames.push(meta.file_name || '');
             });
@@ -1825,7 +1827,7 @@ const ReportsManager = () => {
             const brands = [];
             sortedReports.forEach(report => {
                 const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
-                const meta = manualMetadata[report.id] || {};
+                const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
                 campaigns.push(campaignName);
                 brands.push(meta.brand || report.brand || '');
             });
@@ -1840,7 +1842,7 @@ const ReportsManager = () => {
         const campaigns = {};
         sortedReports.forEach(report => {
             const campaignName = cleanName(report.standardized_campaign_name || report.campaign_name || '');
-            const meta = manualMetadata[report.id] || {};
+            const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
 
             if (agencyLower === 'klick' || agencyLower === 'klik') {
                 campaigns[campaignName] = {
@@ -1909,8 +1911,8 @@ const ReportsManager = () => {
                     campaigns: sortedReports.map(r => ({
                         campaign_name: cleanName(r.standardized_campaign_name || r.campaign_name || ''),
                         topic_brand: (r.brand || '').toUpperCase(),
-                        topic_therapeutic_area: manualMetadata[r.id]?.topic_therapeutic_area || 'IMMUNOLOGY',
-                        topic_asset_ids: manualMetadata[r.id]?.topic_asset_ids || ['']
+                        topic_therapeutic_area: manualMetadata[r.id]?.topic_therapeutic_area || r.agency_metadata?.topic_therapeutic_area || 'IMMUNOLOGY',
+                        topic_asset_ids: manualMetadata[r.id]?.topic_asset_ids || r.agency_metadata?.topic_asset_ids || ['']
                     })),
                     folder: month || currentTimeframe.start.toLocaleString('default', { month: 'long' }),
                     channel: 'Email',
@@ -1961,8 +1963,9 @@ const ReportsManager = () => {
     const openCMIModal = async (report, specificWeek = null, campaignsList = null) => {
         const matchedMeta = findMatchingMetadata(report);
         const manualMeta = manualMetadata[report.id];
+        const dbMeta = report.agency_metadata;
         const dbPlacementId = report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id;
-        const hasMetadata = matchedMeta || manualMeta || dbPlacementId;
+        const hasMetadata = matchedMeta || manualMeta || dbMeta || dbPlacementId;
 
         if (!hasMetadata && report.agency === 'CMI') {
             setPlacementIdReport(report);
@@ -1975,7 +1978,7 @@ const ReportsManager = () => {
         const jsonData = generateAgencyJSON(report, specificWeek);
         const confidence = matchedMeta?.match_confidence !== undefined
             ? (matchedMeta.match_confidence * 100).toFixed(0) + '%'
-            : manualMeta ? 'Manual' : 'N/A';
+            : (manualMeta || dbMeta) ? 'Manual' : 'N/A';
         setSelectedCMIReport({ ...jsonData, _confidence: confidence, _report: report });
         setEditFormData(jsonData);
         setEditedJSON(JSON.stringify(jsonData, null, 2));
@@ -2019,10 +2022,11 @@ const ReportsManager = () => {
 
             const matchedMeta = findMatchingMetadata(nextReport);
             const manualMeta = manualMetadata[nextReport.id];
+            const dbMeta = nextReport.agency_metadata;
             const jsonData = generateAgencyJSON(nextReport);
             const confidence = matchedMeta?.match_confidence !== undefined
                 ? (matchedMeta.match_confidence * 100).toFixed(0) + '%'
-                : manualMeta ? 'Manual' : 'N/A';
+                : (manualMeta || dbMeta) ? 'Manual' : 'N/A';
 
             setSelectedCMIReport({ ...jsonData, _confidence: confidence, _report: nextReport });
             setEditFormData(jsonData);
@@ -2299,6 +2303,20 @@ const ReportsManager = () => {
                 };
             }
 
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${reportId}/metadata`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agency_metadata: agencyMeta })
+                });
+                if (response.ok) {
+                    setReportsData(prev => prev.map(r =>
+                        r.id === reportId ? { ...r, agency_metadata: agencyMeta } : r
+                    ));
+                }
+            } catch (err) {
+            }
+
             const updatedManualMetadata = {
                 ...manualMetadata,
                 [reportId]: {
@@ -2514,9 +2532,11 @@ const ReportsManager = () => {
 
         const matchedMeta = findMatchingMetadata(report);
         const manualMeta = manualMetadata[report.id];
+        const dbMeta = report.agency_metadata;
         const placementId = report.cmi_placement_id ||
                            report.cmi_metadata?.cmi_placement_id ||
                            matchedMeta?.cmi_placement_id ||
+                           dbMeta?.cmi_placement_id ||
                            manualMeta?.cmi_placement_id;
         const isCMIExpected = isCMI && placementId && campaignsWithExpectedStatus.has(String(placementId));
 

@@ -15,6 +15,7 @@ import DigitalJournalsPage from '../pages/DigitalJournalsPage';
 import JournalAnalysisPage from '../pages/JournalAnalysisPage';
 import BasisOptimizationPage from '../pages/BasisOptimizationPage';
 import TrackingPage from '../pages/TrackingPage';
+import ABTestingPage from '../pages/ABTestingPage';
 import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
 
 const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
@@ -26,6 +27,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
         <Routes>
           <Route path="/" element={<Navigate to="/campaigns" replace />} />
           <Route path="/campaigns" element={<CampaignPerformancePage />} />
+          <Route path="/ab-testing" element={<ABTestingPage />} />
           <Route path="/dashboard-builder" element={<DashboardCanvas />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/reports" element={<ReportsPage />} />

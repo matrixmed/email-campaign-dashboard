@@ -184,6 +184,45 @@ def update_placement_id(report_id):
             'message': str(e)
         }), 500
 
+@cmi_reports_bp.route('/reports/<int:report_id>/metadata', methods=['PUT', 'OPTIONS'])
+@cross_origin()
+def update_report_metadata(report_id):
+    try:
+        data = request.json
+        session = get_session()
+
+        report = session.query(CampaignReportManager).filter_by(id=report_id).first()
+
+        if not report:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'Report not found'
+            }), 404
+
+        agency_metadata = data.get('agency_metadata', {})
+        report.agency_metadata = agency_metadata
+
+        if agency_metadata.get('cmi_placement_id'):
+            report.cmi_placement_id = agency_metadata['cmi_placement_id']
+
+        report.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Metadata updated successfully',
+            'agency_metadata': agency_metadata
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @cmi_reports_bp.route('/reports/<int:report_id>/not-needed', methods=['PUT', 'OPTIONS'])
 @cross_origin()
 def toggle_not_needed(report_id):
@@ -445,7 +484,8 @@ def get_all_reports():
                 'media_tactic_id': contract_data.get('media_tactic_id'),
                 'contract_notes': contract_data.get('notes'),
                 'contract_metric': contract_data.get('metric'),
-                'has_contract_match': bool(contract_data)
+                'has_contract_match': bool(contract_data),
+                'agency_metadata': r.agency_metadata
             }
 
             if r.is_cmi_brand and r.cmi_placement_id:

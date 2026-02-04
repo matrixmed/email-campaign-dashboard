@@ -34,6 +34,10 @@ const CampaignPerformancePage = () => {
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
   };
 
+  const stripAbGroup = (name) => {
+    return name.replace(/\s*[-–—]\s*group\s+[a-z]\b/i, '').trim();
+  };
+
   const filterByDeployment = (data) => {
     if (selectedDeployment === 'all') return data;
 
@@ -64,7 +68,7 @@ const CampaignPerformancePage = () => {
     const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
     const groupedCampaigns = _.groupBy(validDeliveries, item => cleanCampaignName(item.Campaign));
 
-    return Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
+    const deploymentMerged = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
       if (deployments.length === 1) {
         return { ...deployments[0], Campaign: campaignName };
       }
@@ -106,6 +110,47 @@ const CampaignPerformancePage = () => {
         Total_Click_Rate: (totalTotalClicks / totalTotalOpens) * 100,
         Filtered_Bot_Clicks: totalBotClicks,
         DeploymentCount: deployments.length
+      };
+    });
+
+    const abGrouped = _.groupBy(deploymentMerged, item => stripAbGroup(item.Campaign));
+
+    return Object.entries(abGrouped).map(([baseName, groups]) => {
+      if (groups.length === 1) {
+        return { ...groups[0], Campaign: baseName };
+      }
+
+      const totalSent = _.sumBy(groups, 'Sent');
+      const totalDelivered = _.sumBy(groups, 'Delivered');
+      const totalUniqueOpens = _.sumBy(groups, 'Unique_Opens');
+      const totalTotalOpens = _.sumBy(groups, 'Total_Opens');
+      const totalUniqueClicks = _.sumBy(groups, 'Unique_Clicks');
+      const totalTotalClicks = _.sumBy(groups, 'Total_Clicks');
+      const totalHardBounces = _.sumBy(groups, 'Hard_Bounces');
+      const totalSoftBounces = _.sumBy(groups, 'Soft_Bounces');
+      const totalBounces = _.sumBy(groups, 'Total_Bounces');
+      const totalBotClicks = _.sumBy(groups, 'Filtered_Bot_Clicks');
+
+      return {
+        Campaign: baseName,
+        Send_Date: groups[0].Send_Date,
+        Sent: totalSent,
+        Total_Bounces: totalBounces,
+        Hard_Bounces: totalHardBounces,
+        Soft_Bounces: totalSoftBounces,
+        Delivered: totalDelivered,
+        Delivery_Rate: totalSent > 0 ? (totalDelivered / totalSent) * 100 : 0,
+        Unique_Opens: totalUniqueOpens,
+        Total_Opens: totalTotalOpens,
+        Unique_Open_Rate: totalDelivered > 0 ? (totalUniqueOpens / totalDelivered) * 100 : 0,
+        Total_Open_Rate: totalDelivered > 0 ? (totalTotalOpens / totalDelivered) * 100 : 0,
+        Unique_Clicks: totalUniqueClicks,
+        Total_Clicks: totalTotalClicks,
+        Unique_Click_Rate: totalUniqueOpens > 0 ? (totalUniqueClicks / totalUniqueOpens) * 100 : 0,
+        Total_Click_Rate: totalTotalOpens > 0 ? (totalTotalClicks / totalTotalOpens) * 100 : 0,
+        Filtered_Bot_Clicks: totalBotClicks,
+        DeploymentCount: _.sumBy(groups, d => d.DeploymentCount || 1),
+        ABGroupCount: groups.length
       };
     });
   };

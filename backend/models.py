@@ -216,6 +216,7 @@ class CampaignReportManager(Base):
 
     is_reportable = Column(Boolean, default=True)
     notes = Column(Text)
+    agency_metadata = Column(JSON)
     requires_manual_review = Column(Boolean, default=False)
 
     is_submitted = Column(Boolean, default=False, index=True)
@@ -736,6 +737,35 @@ class UserAction(Base):
         Index('idx_action_fingerprint_type', 'fingerprint', 'action_type'),
         Index('idx_action_session', 'session_id', 'timestamp'),
         Index('idx_action_env', 'environment', 'timestamp'),
+    )
+
+class ABTest(Base):
+    __tablename__ = 'ab_tests'
+
+    id = Column(Integer, primary_key=True)
+    base_campaign_name = Column(String(500), unique=True, nullable=False, index=True)
+    description = Column(Text)
+    category = Column(String(255), index=True)
+    market = Column(String(255), index=True)
+    notes = Column(Text)
+    status = Column(String(50), default='active', index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+   
+class ABTestGroup(Base):
+    __tablename__ = 'ab_test_groups'
+
+    id = Column(Integer, primary_key=True)
+    ab_test_id = Column(Integer, nullable=False, index=True)
+    group_label = Column(String(10), nullable=False)
+    campaign_name_pattern = Column(String(500))
+    subcategory = Column(String(255))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ab_group_test', 'ab_test_id', 'group_label'),
     )
 
 def init_db():

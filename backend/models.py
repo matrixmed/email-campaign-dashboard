@@ -107,6 +107,9 @@ class CMIContractValue(Base):
     data_type = Column(String(50))
     notes = Column(Text)
     year = Column(Integer, default=2025, index=True)
+    gcm_placement_ids = Column(JSON)
+    last_attached_campaign_name = Column(String(500))
+    last_attached_campaign_brand = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

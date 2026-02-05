@@ -41,7 +41,10 @@ def get_all_contracts():
             'metric': c.metric,
             'data_type': c.data_type,
             'notes': c.notes,
-            'year': c.year
+            'year': c.year,
+            'gcm_placement_ids': c.gcm_placement_ids,
+            'last_attached_campaign_name': c.last_attached_campaign_name,
+            'last_attached_campaign_brand': c.last_attached_campaign_brand
         } for c in contracts]
 
         session.close()
@@ -149,6 +152,8 @@ def update_contract(contract_id):
         contract.data_type = data.get('data_type', contract.data_type)
         contract.notes = data.get('notes', contract.notes)
         contract.year = data.get('year', contract.year)
+        if 'gcm_placement_ids' in data:
+            contract.gcm_placement_ids = data['gcm_placement_ids']
         contract.updated_at = datetime.utcnow()
 
         session.commit()
@@ -157,6 +162,58 @@ def update_contract(contract_id):
         return jsonify({
             'status': 'success',
             'message': 'Contract updated successfully'
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@cmi_contracts_bp.route('/by-placement/<placement_id>', methods=['PUT'])
+def update_contract_by_placement(placement_id):
+    try:
+        data = request.json
+        session = get_session()
+
+        contract = session.query(CMIContractValue).filter_by(placement_id=str(placement_id)).first()
+
+        if not contract:
+            session.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'Contract not found'
+            }), 404
+
+        if 'metric' in data:
+            contract.metric = data['metric']
+        if 'gcm_placement_ids' in data:
+            contract.gcm_placement_ids = data['gcm_placement_ids']
+        if 'last_attached_campaign_name' in data:
+            contract.last_attached_campaign_name = data['last_attached_campaign_name']
+        if 'last_attached_campaign_brand' in data:
+            contract.last_attached_campaign_brand = data['last_attached_campaign_brand']
+        contract.updated_at = datetime.utcnow()
+
+        session.commit()
+
+        result = {
+            'id': contract.id,
+            'placement_id': contract.placement_id,
+            'metric': contract.metric,
+            'gcm_placement_ids': contract.gcm_placement_ids,
+            'last_attached_campaign_name': contract.last_attached_campaign_name,
+            'last_attached_campaign_brand': contract.last_attached_campaign_brand,
+            'brand': contract.brand,
+            'notes': contract.notes
+        }
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Contract updated successfully',
+            'contract': result
         }), 200
 
     except Exception as e:

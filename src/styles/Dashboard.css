@@ -526,7 +526,6 @@ body.light .compare-button:hover {
 .table-container {
   overflow-x: auto;
   position: relative;
-  overflow-y: visible !important;
 }
 
 table {

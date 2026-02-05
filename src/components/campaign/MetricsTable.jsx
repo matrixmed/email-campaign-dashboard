@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
 import CampaignModal from './CampaignModal';
 
@@ -9,13 +10,16 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
     const [selectedCampaign, setSelectedCampaign] = useState(null);
     const [deploymentDropdownOpen, setDeploymentDropdownOpen] = useState(false);
     const [rowsDropdownOpen, setRowsDropdownOpen] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
     const tableContainerRef = useRef(null);
     const deploymentDropdownRef = useRef(null);
     const rowsDropdownRef = useRef(null);
+    const metricDropdownRef = useRef(null);
     
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (!event.target.closest('th')) {
+            const isInMetricDropdown = metricDropdownRef.current && metricDropdownRef.current.contains(event.target);
+            if (!event.target.closest('th') && !isInMetricDropdown) {
                 setActiveDropdown(null);
             }
             if (deploymentDropdownRef.current && !deploymentDropdownRef.current.contains(event.target)) {
@@ -32,8 +36,25 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
         };
     }, []);
 
-    const toggleDropdown = (colKey) => {
-        setActiveDropdown(activeDropdown === colKey ? null : colKey);
+    useEffect(() => {
+        if (activeDropdown) {
+            const handleScroll = () => setActiveDropdown(null);
+            window.addEventListener('scroll', handleScroll, true);
+            return () => window.removeEventListener('scroll', handleScroll, true);
+        }
+    }, [activeDropdown]);
+
+    const toggleDropdown = (colKey, e) => {
+        if (activeDropdown === colKey) {
+            setActiveDropdown(null);
+        } else {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setDropdownPosition({
+                top: rect.bottom + 2,
+                left: rect.left,
+            });
+            setActiveDropdown(colKey);
+        }
     };
 
     const getTooltipPosition = (index) => {
@@ -221,24 +242,24 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                             <th className="campaign-column">Campaign</th>
                             <th className="date-column">Send Date</th>
                             {Object.entries(selectedColumn).map(([colKey, colValue]) => (
-                                <th 
+                                <th
                                     key={colKey}
                                     className="sortable-header"
-                                    onClick={() => toggleDropdown(colKey)}
+                                    onClick={(e) => toggleDropdown(colKey, e)}
                                 >
                                     <div className="header-content">
                                         <span>{metricDisplayNames[colValue]}</span>
                                         <span className="dropdown-arrow">
-                                            <svg 
-                                                width="12" 
-                                                height="12" 
-                                                viewBox="0 0 24 24" 
-                                                fill="none" 
-                                                stroke="currentColor" 
+                                            <svg
+                                                width="12"
+                                                height="12"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
                                                 strokeWidth="2"
-                                                strokeLinecap="round" 
+                                                strokeLinecap="round"
                                                 strokeLinejoin="round"
-                                                style={{ 
+                                                style={{
                                                     transform: activeDropdown === colKey ? 'rotate(180deg)' : 'rotate(0deg)',
                                                     transition: 'transform 0.2s'
                                                 }}
@@ -247,25 +268,7 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                                             </svg>
                                         </span>
                                     </div>
-                                    {activeDropdown === colKey && (
-                                        <div className="dropdown">
-                                            {availableMetrics.map((metric, index) => (
-                                                <div
-                                                    key={index}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleColumnChange(colKey, metric);
-                                                        setActiveDropdown(null);
-                                                    }}
-                                                    className="dropdown-item"
-                                                >
-                                                    {metricDisplayNames[metric]}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </th>
-                                
                             ))}
                         </tr>
                     </thead>
@@ -343,6 +346,34 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                 allCampaigns={currentRows}
                 onNavigate={handleModalNavigate}
             />
+
+            {activeDropdown && ReactDOM.createPortal(
+                <div
+                    ref={metricDropdownRef}
+                    className="dropdown"
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPosition.top}px`,
+                        left: `${dropdownPosition.left}px`,
+                        margin: 0,
+                    }}
+                >
+                    {availableMetrics.map((metric, index) => (
+                        <div
+                            key={index}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleColumnChange(activeDropdown, metric);
+                                setActiveDropdown(null);
+                            }}
+                            className="dropdown-item"
+                        >
+                            {metricDisplayNames[metric]}
+                        </div>
+                    ))}
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

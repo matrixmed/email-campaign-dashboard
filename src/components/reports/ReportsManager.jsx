@@ -51,6 +51,14 @@ const ReportsManager = () => {
     const [addAggError, setAddAggError] = useState('');
     const [addAggExistingId, setAddAggExistingId] = useState(null);
 
+    const [showAggModal, setShowAggModal] = useState(false);
+    const [selectedAggReport, setSelectedAggReport] = useState(null);
+    const [aggModalData, setAggModalData] = useState({
+        agg_value: '',
+        metric: '',
+        gcm_placement_ids: []
+    });
+
     const [manualMetadata, setManualMetadata] = useState(() => {
         const saved = localStorage.getItem('manualMetadata');
         return saved ? JSON.parse(saved) : {};
@@ -269,7 +277,8 @@ const ReportsManager = () => {
                 }
 
                 try {
-                    const contractsResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=2025`);
+                    const currentYear = new Date().getFullYear();
+                    const contractsResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=${currentYear}`);
                     if (contractsResponse.ok) {
                         const contractsResult = await contractsResponse.json();
                         if (contractsResult.status === 'success') {
@@ -356,7 +365,30 @@ const ReportsManager = () => {
         setMovingReport(report);
         setMoveNote('');
         setMoveMode('attach');
-        setSelectedAttachTarget(null);
+
+        const placementId = report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id;
+        const contract = placementId ? cmiContractValues.find(c => String(c.placement_id) === String(placementId)) : null;
+
+        let autoSelectedTarget = null;
+        if (contract?.last_attached_campaign_name || contract?.last_attached_campaign_brand) {
+            const attachable = getCurrentWeekReports.filter(r => r.agency === 'CMI' && !r.is_no_data_report);
+
+            autoSelectedTarget = attachable.find(campaign => {
+                if (contract.last_attached_campaign_name) {
+                    const lastClean = cleanCampaignName(contract.last_attached_campaign_name).toLowerCase();
+                    const currentClean = cleanCampaignName(campaign.campaign_name).toLowerCase();
+                    if (lastClean === currentClean || currentClean.includes(lastClean) || lastClean.includes(currentClean)) {
+                        return true;
+                    }
+                }
+                if (contract.last_attached_campaign_brand && campaign.brand) {
+                    return campaign.brand.toLowerCase() === contract.last_attached_campaign_brand.toLowerCase();
+                }
+                return false;
+            });
+        }
+
+        setSelectedAttachTarget(autoSelectedTarget);
         setShowMoveModal(true);
     };
 
@@ -386,6 +418,119 @@ const ReportsManager = () => {
         setAddAggError('');
         setAddAggLoading(false);
         setAddAggExistingId(null);
+    };
+
+    const openAggModal = (aggReport, isStandalone = false) => {
+        const placementId = aggReport.cmi_placement_id;
+        const contract = cmiContractValues.find(c => String(c.placement_id) === String(placementId));
+
+        setSelectedAggReport({ ...aggReport, isStandalone });
+        setAggModalData({
+            agg_value: aggReport.agg_value || '',
+            metric: aggReport.agg_metric || aggReport.contract_metric || contract?.metric || '',
+            gcm_placement_ids: contract?.gcm_placement_ids || []
+        });
+        setShowAggModal(true);
+    };
+
+    const closeAggModal = () => {
+        setShowAggModal(false);
+        setSelectedAggReport(null);
+        setAggModalData({ agg_value: '', metric: '', gcm_placement_ids: [] });
+    };
+
+    const handleAggModalSave = async () => {
+        if (!selectedAggReport) return;
+
+        try {
+            if (selectedAggReport.id) {
+                await fetch(`${API_BASE_URL}/api/cmi/expected/${selectedAggReport.id}/agg-values`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agg_metric: aggModalData.metric,
+                        agg_value: parseInt(aggModalData.agg_value) || 0
+                    })
+                });
+            }
+
+            const placementId = selectedAggReport.cmi_placement_id;
+            if (placementId) {
+                await fetch(`${API_BASE_URL}/api/cmi-contracts/by-placement/${placementId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        metric: aggModalData.metric,
+                        gcm_placement_ids: aggModalData.gcm_placement_ids
+                    })
+                });
+
+                const contractsResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=${new Date().getFullYear()}`);
+                if (contractsResponse.ok) {
+                    const contractsResult = await contractsResponse.json();
+                    if (contractsResult.status === 'success') {
+                        setCmiContractValues(contractsResult.contracts);
+                    }
+                }
+            }
+
+            await refreshAGGData();
+            closeAggModal();
+        } catch (error) {
+            console.error('Error saving aggregate data:', error);
+        }
+    };
+
+    const handleAggGcmAdd = () => {
+        setAggModalData(prev => ({
+            ...prev,
+            gcm_placement_ids: [...(prev.gcm_placement_ids || []), '']
+        }));
+    };
+
+    const handleAggGcmRemove = (index) => {
+        setAggModalData(prev => ({
+            ...prev,
+            gcm_placement_ids: prev.gcm_placement_ids.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleAggGcmChange = (index, value) => {
+        setAggModalData(prev => {
+            const newIds = [...(prev.gcm_placement_ids || [])];
+            newIds[index] = value;
+            return { ...prev, gcm_placement_ids: newIds };
+        });
+    };
+
+    const handleAggCheckboxChange = async (aggId) => {
+        const key = `agg_${aggId}`;
+        const newCheckedState = !checkedReports[key];
+
+        setCheckedReports(prev => ({
+            ...prev,
+            [key]: newCheckedState
+        }));
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/expected/${aggId}/submit`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_submitted: newCheckedState })
+            });
+
+            if (!response.ok) {
+                setCheckedReports(prev => ({
+                    ...prev,
+                    [key]: !newCheckedState
+                }));
+            }
+        } catch (error) {
+            setCheckedReports(prev => ({
+                ...prev,
+                [key]: !newCheckedState
+            }));
+        }
     };
 
     const handleAddAggLookup = () => {
@@ -542,6 +687,17 @@ const ReportsManager = () => {
                     });
                 }
 
+                if (movingReport.cmi_placement_id) {
+                    await fetch(`${API_BASE_URL}/api/cmi-contracts/by-placement/${movingReport.cmi_placement_id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            last_attached_campaign_name: selectedAttachTarget.campaign_name,
+                            last_attached_campaign_brand: selectedAttachTarget.brand
+                        })
+                    });
+                }
+
             } else if (moveMode === 'standalone') {
                 await fetch(`${API_BASE_URL}/api/cmi/expected/${movingReport.id}/attach`, {
                     method: 'POST',
@@ -573,6 +729,14 @@ const ReportsManager = () => {
             });
 
             await refreshAGGData();
+
+            const contractsResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=${new Date().getFullYear()}`);
+            if (contractsResponse.ok) {
+                const contractsResult = await contractsResponse.json();
+                if (contractsResult.status === 'success') {
+                    setCmiContractValues(contractsResult.contracts);
+                }
+            }
         } catch (error) {
         }
 
@@ -684,9 +848,15 @@ const ReportsManager = () => {
                     const attached = {};
                     const standalone = [];
                     const movedPLD = [];
+                    const aggCheckedStates = {};
 
                     result.reports.forEach(report => {
+                        const isMonthly = (report.expected_data_frequency || report.contract_frequency || '').toLowerCase() === 'monthly';
                         if (report.status === 'moved_to_due' || report.status === 'attached' || report.status === 'standalone') {
+                            if (report.is_submitted) {
+                                aggCheckedStates[`agg_${report.id}`] = true;
+                            }
+
                             if (report.attached_to_campaign_id) {
                                 if (!attached[report.attached_to_campaign_id]) {
                                     attached[report.attached_to_campaign_id] = [];
@@ -697,7 +867,8 @@ const ReportsManager = () => {
                                     contract_metric: report.agg_metric || report.contract_metric,
                                     contract_notes: report.contract_notes || report.notes || report.placement_description,
                                     placement_description: report.placement_description,
-                                    frequency: report.expected_data_frequency || report.contract_frequency
+                                    frequency: report.expected_data_frequency || report.contract_frequency,
+                                    is_monthly_agg: isMonthly
                                 });
                             } else if (report.is_standalone || report.is_agg_only) {
                                 standalone.push({
@@ -706,7 +877,8 @@ const ReportsManager = () => {
                                     contract_metric: report.agg_metric || report.contract_metric,
                                     contract_notes: report.contract_notes || report.notes || report.placement_description,
                                     placement_description: report.placement_description,
-                                    frequency: report.expected_data_frequency || report.contract_frequency
+                                    frequency: report.expected_data_frequency || report.contract_frequency,
+                                    is_monthly_agg: isMonthly
                                 });
                             } else if (!report.is_agg_only && report.data_type !== 'AGG') {
                                 movedPLD.push({
@@ -721,6 +893,8 @@ const ReportsManager = () => {
                     setAttachedAGGs(attached);
                     setStandaloneAGGs(standalone);
                     setMovedPLDAGGs(movedPLD);
+
+                    setCheckedReports(prev => ({ ...prev, ...aggCheckedStates }));
                 }
             }
         } catch (error) {
@@ -1692,12 +1866,12 @@ const ReportsManager = () => {
         const allAggs = [...Object.values(attachedAGGs).flat(), ...standaloneAGGs];
         allAggs.forEach(agg => {
             const contractInfo = getContractInfo(agg.cmi_placement_id);
-            const aggName = cleanName(agg.notes || agg.placement_description || `${agg.brand || ''} - ${agg.cmi_placement_id || ''}`);
+            const aggName = cleanName(agg.contract_notes || agg.notes || agg.placement_description || `${agg.brand || ''} - ${agg.cmi_placement_id || ''}`);
 
             aggregate[aggName] = {
                 cmi_placement_id: agg.cmi_placement_id || '',
                 creative_code: '',
-                gcm_placement_id: [],
+                gcm_placement_id: contractInfo?.gcm_placement_ids || [],
                 brand_name: contractInfo?.brand || agg.brand || '',
                 vehicle_name: contractInfo?.vehicle || agg.vehicle || '',
                 media_tactic_id: contractInfo?.media_tactic_id || agg.media_tactic_id || '',
@@ -2470,9 +2644,10 @@ const ReportsManager = () => {
         const notes = report.contract_notes || '';
         const hasContractMatch = report.has_contract_match;
         const uniqueKey = report.unique_key || `expected_${report.id}_${placementId}`;
+        const isMonthly = frequency.toLowerCase() === 'monthly';
 
         return (
-            <tr key={uniqueKey} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${hasContractMatch ? 'has-contract' : 'no-contract'}`}>
+            <tr key={uniqueKey} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${hasContractMatch ? 'has-contract' : 'no-contract'} ${isMonthly ? 'monthly-agg-row' : ''}`}>
                 <td className="campaign-column">
                     <div className="no-data-info">
                         <span className="no-data-brand" title={displayName}>
@@ -2668,12 +2843,22 @@ const ReportsManager = () => {
                 </tr>
                 {campaignAttachedAGGs.map((agg, aggIndex) => {
                     const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                    const isMonthlyAgg = agg.is_monthly_agg;
+                    const contract = contractsByPlacementId[String(agg.cmi_placement_id)];
+                    const hasGcmIds = contract?.gcm_placement_ids?.length > 0;
                     return (
-                        <tr key={`${report.unique_key}_agg_${aggIndex}`} className="agg-report-row attached-agg-row">
+                        <tr
+                            key={`${report.unique_key}_agg_${aggIndex}`}
+                            className={`agg-report-row attached-agg-row ${isMonthlyAgg ? 'monthly-agg-row' : ''} clickable-row`}
+                            onClick={() => openAggModal(agg, false)}
+                            style={{ cursor: 'pointer' }}
+                        >
                             <td className="campaign-column">
                                 <div className="agg-notes-cell attached">
                                     <span className="attached-agg-indicator">└─</span>
+                                    {isMonthlyAgg && <span className="standalone-agg-badge monthly-agg-badge" style={{marginRight: '6px'}}>Monthly</span>}
                                     {notes || <span className="no-notes">-</span>}
+                                    {hasGcmIds && <span className="gcm-indicator" title="Has GCM IDs">📎</span>}
                                 </div>
                             </td>
                             <td className="brand-column">
@@ -2683,17 +2868,20 @@ const ReportsManager = () => {
                                 <span className="agency-badge cmi">CMI</span>
                             </td>
                             <td className="date-column-report">
-                                <input
-                                    type="text"
-                                    className="agg-value-input-styled"
-                                    placeholder="Value"
-                                    value={agg.agg_value || ''}
-                                    onChange={(e) => handleUpdateAttachedAGG(report.id, aggIndex, 'agg_value', e.target.value)}
-                                />
+                                <span className="agg-value-display">{agg.agg_value || '-'}</span>
+                            </td>
+                            <td className="week-column" onClick={(e) => e.stopPropagation()}>
+                                <label className="checkbox-container">
+                                    <input
+                                        type="checkbox"
+                                        checked={checkedReports[`agg_${agg.id}`] || false}
+                                        onChange={() => handleAggCheckboxChange(agg.id)}
+                                    />
+                                    <span className="checkmark"></span>
+                                </label>
                             </td>
                             <td className="week-column"></td>
-                            <td className="week-column"></td>
-                            <td className="week-column">
+                            <td className="week-column" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     className="agg-remove-btn"
                                     onClick={() => handleDetachAGG(report.id, aggIndex)}
@@ -2882,12 +3070,21 @@ const ReportsManager = () => {
                                                 })}
                                                 {agency === 'CMI' && standaloneAGGs.map((agg, index) => {
                                                     const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                                                    const isMonthly = agg.is_monthly_agg;
+                                                    const contract = contractsByPlacementId[String(agg.cmi_placement_id)];
+                                                    const hasGcmIds = contract?.gcm_placement_ids?.length > 0;
                                                     return (
-                                                        <tr key={`standalone_agg_${index}`} className="agg-report-row standalone-agg-row">
+                                                        <tr
+                                                            key={`standalone_agg_${index}`}
+                                                            className={`agg-report-row standalone-agg-row ${isMonthly ? 'monthly-agg-row' : ''} clickable-row`}
+                                                            onClick={() => openAggModal(agg, true)}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
                                                             <td className="campaign-column">
                                                                 <div className="agg-notes-cell">
-                                                                    <span className="standalone-agg-badge">Standalone</span>
+                                                                    <span className={`standalone-agg-badge ${isMonthly ? 'monthly-agg-badge' : ''}`}>{isMonthly ? 'Monthly AGG' : 'Standalone'}</span>
                                                                     {notes || <span className="no-notes">-</span>}
+                                                                    {hasGcmIds && <span className="gcm-indicator" title="Has GCM IDs">📎</span>}
                                                                 </div>
                                                             </td>
                                                             <td className="brand-column">
@@ -2897,17 +3094,20 @@ const ReportsManager = () => {
                                                                 <span className="agency-badge cmi">CMI</span>
                                                             </td>
                                                             <td className="date-column-report">
-                                                                <input
-                                                                    type="text"
-                                                                    className="agg-value-input-styled"
-                                                                    placeholder="Value"
-                                                                    value={agg.agg_value || ''}
-                                                                    onChange={(e) => handleUpdateStandaloneAGG(index, 'agg_value', e.target.value)}
-                                                                />
+                                                                <span className="agg-value-display">{agg.agg_value || '-'}</span>
+                                                            </td>
+                                                            <td className="week-column" onClick={(e) => e.stopPropagation()}>
+                                                                <label className="checkbox-container">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={checkedReports[`agg_${agg.id}`] || false}
+                                                                        onChange={() => handleAggCheckboxChange(agg.id)}
+                                                                    />
+                                                                    <span className="checkmark"></span>
+                                                                </label>
                                                             </td>
                                                             <td className="week-column"></td>
-                                                            <td className="week-column"></td>
-                                                            <td className="week-column">
+                                                            <td className="week-column" onClick={(e) => e.stopPropagation()}>
                                                                 <button
                                                                     className="agg-remove-btn"
                                                                     onClick={() => handleRemoveStandaloneAGG(index)}
@@ -3726,30 +3926,45 @@ const ReportsManager = () => {
 
                             {moveMode === 'attach' && (
                                 <div className="move-modal-campaign-list">
-                                    {getAttachableCampaigns.length === 0 ? (
-                                        <div className="move-modal-no-campaigns">No CMI campaigns available</div>
-                                    ) : (
-                                        getAttachableCampaigns.map(campaign => (
-                                            <div
-                                                key={campaign.id}
-                                                className={`move-modal-campaign-option ${selectedAttachTarget?.id === campaign.id ? 'selected' : ''}`}
-                                                onClick={() => setSelectedAttachTarget(campaign)}
-                                            >
-                                                <div className="campaign-option-name">
-                                                    {cleanCampaignName(campaign.campaign_name)}
-                                                </div>
-                                                <div className="campaign-option-details">
-                                                    <span className="campaign-option-brand">{campaign.brand}</span>
-                                                    <span className="campaign-option-date">{formatSendDate(campaign.send_date)}</span>
-                                                    {attachedAGGs[campaign.id]?.length > 0 && (
-                                                        <span className="campaign-option-attached-count">
-                                                            +{attachedAGGs[campaign.id].length} AGG
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                    {(() => {
+                                        const placementId = movingReport.cmi_placement_id || movingReport.cmi_metadata?.cmi_placement_id;
+                                        const contract = placementId ? cmiContractValues.find(c => String(c.placement_id) === String(placementId)) : null;
+                                        const hasAutoMatch = contract?.last_attached_campaign_name || contract?.last_attached_campaign_brand;
+
+                                        if (getAttachableCampaigns.length === 0) {
+                                            return <div className="move-modal-no-campaigns">No CMI campaigns available</div>;
+                                        }
+
+                                        return (
+                                            <>
+                                                {hasAutoMatch && selectedAttachTarget && (
+                                                    <div className="auto-attach-notice">
+                                                        Auto-selected based on previous attachment
+                                                    </div>
+                                                )}
+                                                {getAttachableCampaigns.map(campaign => (
+                                                    <div
+                                                        key={campaign.id}
+                                                        className={`move-modal-campaign-option ${selectedAttachTarget?.id === campaign.id ? 'selected' : ''}`}
+                                                        onClick={() => setSelectedAttachTarget(campaign)}
+                                                    >
+                                                        <div className="campaign-option-name">
+                                                            {cleanCampaignName(campaign.campaign_name)}
+                                                        </div>
+                                                        <div className="campaign-option-details">
+                                                            <span className="campaign-option-brand">{campaign.brand}</span>
+                                                            <span className="campaign-option-date">{formatSendDate(campaign.send_date)}</span>
+                                                            {attachedAGGs[campaign.id]?.length > 0 && (
+                                                                <span className="campaign-option-attached-count">
+                                                                    +{attachedAGGs[campaign.id].length} AGG
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             )}
 
@@ -3958,6 +4173,83 @@ const ReportsManager = () => {
                                     </div>
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAggModal && selectedAggReport && (
+                <div className="edit-form-modal-overlay" onClick={closeAggModal}>
+                    <div className="edit-form-modal-content" style={{ width: '600px' }} onClick={e => e.stopPropagation()}>
+                        <div className="edit-form-modal-header">
+                            <h3>{selectedAggReport.brand || 'Unknown Brand'} - {selectedAggReport.cmi_placement_id || 'AGG'}</h3>
+                            <button className="edit-form-modal-close" onClick={closeAggModal}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="edit-form-modal-body">
+                            {(selectedAggReport.contract_notes || selectedAggReport.notes) && (
+                                <div className="agg-modal-description">
+                                    {selectedAggReport.contract_notes || selectedAggReport.notes}
+                                </div>
+                            )}
+
+                            <div className="edit-form-grid">
+                                <div className="edit-form-field">
+                                    <label>Value</label>
+                                    <input
+                                        type="number"
+                                        value={aggModalData.agg_value}
+                                        onChange={(e) => setAggModalData(prev => ({ ...prev, agg_value: e.target.value }))}
+                                        placeholder="Enter value"
+                                    />
+                                </div>
+
+                                <div className="edit-form-field">
+                                    <label>Metric</label>
+                                    <input
+                                        type="text"
+                                        value={aggModalData.metric}
+                                        onChange={(e) => setAggModalData(prev => ({ ...prev, metric: e.target.value }))}
+                                        placeholder="e.g., Impressions"
+                                    />
+                                </div>
+
+                                <div className="edit-form-field full-width">
+                                    <label>GCM Placement IDs</label>
+                                    <div className="agg-gcm-list">
+                                        {(aggModalData.gcm_placement_ids || []).map((gcmId, index) => (
+                                            <div key={index} className="agg-gcm-row">
+                                                <input
+                                                    type="text"
+                                                    value={gcmId}
+                                                    onChange={(e) => handleAggGcmChange(index, e.target.value)}
+                                                    placeholder="Enter GCM Placement ID"
+                                                />
+                                                <button
+                                                    className="agg-gcm-remove"
+                                                    onClick={() => handleAggGcmRemove(index)}
+                                                    title="Remove"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button className="agg-gcm-add" onClick={handleAggGcmAdd}>
+                                            + Add GCM ID
+                                        </button>
+                                    </div>
+                                    <p className="agg-gcm-note">GCM IDs persist at the contract level and auto-populate for future weeks/months.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="edit-form-modal-footer">
+                            <button className="edit-form-cancel-btn" onClick={closeAggModal}>
+                                Cancel
+                            </button>
+                            <button className="edit-form-save-btn" onClick={handleAggModalSave}>
+                                Save
+                            </button>
                         </div>
                     </div>
                 </div>

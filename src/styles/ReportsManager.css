@@ -1228,6 +1228,28 @@ body.light .cmi-expected-row:hover {
   font-size: 13px;
 }
 
+.auto-attach-notice {
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.08) 0%, rgba(0, 255, 255, 0.03) 100%);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+  font-size: 12px;
+  color: var(--color-accent, #0ff);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-attach-notice::before {
+  content: '✓';
+  font-weight: bold;
+}
+
+body.light .auto-attach-notice {
+  background: linear-gradient(135deg, rgba(0, 136, 204, 0.08) 0%, rgba(0, 136, 204, 0.03) 100%);
+  border-bottom-color: rgba(0, 136, 204, 0.15);
+  color: #0088cc;
+}
+
 .move-modal-campaign-option {
   padding: 10px 12px;
   border-bottom: 1px solid #252527;
@@ -2397,6 +2419,156 @@ body.light .standalone-agg-badge {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: #3b82f6;
   color: #2563eb;
+}
+
+.monthly-agg-badge {
+  background-color: rgba(34, 197, 94, 0.2) !important;
+  border-color: #22c55e !important;
+  color: #4ade80 !important;
+}
+
+body.light .monthly-agg-badge {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+  border-color: #22c55e !important;
+  color: #16a34a !important;
+}
+
+.monthly-agg-row {
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+body.light .monthly-agg-row {
+  background-color: rgba(34, 197, 94, 0.04);
+}
+
+.monthly-agg-metric {
+  font-size: 11px;
+  color: var(--color-text-secondary, #999);
+  font-style: italic;
+}
+
+.agg-modal-description {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #111;
+  border-radius: 6px;
+  border-left: 3px solid #0ff;
+}
+
+.agg-gcm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agg-gcm-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.agg-gcm-row input {
+  flex: 1;
+  padding: 10px 12px;
+  background-color: #111;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.agg-gcm-row input:focus {
+  outline: none;
+  border-color: #0ff;
+}
+
+.agg-gcm-remove {
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #666;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.agg-gcm-remove:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.agg-gcm-add {
+  background: transparent;
+  border: 1px dashed #333;
+  border-radius: 6px;
+  color: #666;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-top: 4px;
+  transition: all 0.2s;
+}
+
+.agg-gcm-add:hover {
+  border-color: #0ff;
+  color: #0ff;
+}
+
+.agg-gcm-note {
+  font-size: 11px;
+  color: #555;
+  margin-top: 8px;
+}
+
+body.light .agg-modal-description {
+  background: #f5f5f5;
+  color: #555;
+  border-left-color: #3b82f6;
+}
+
+body.light .agg-gcm-row input {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+  color: #111;
+}
+
+body.light .agg-gcm-row input:focus {
+  border-color: #3b82f6;
+}
+
+body.light .agg-gcm-remove {
+  border-color: #d1d5db;
+  color: #666;
+}
+
+body.light .agg-gcm-add {
+  border-color: #d1d5db;
+  color: #666;
+}
+
+body.light .agg-gcm-add:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.clickable-row:hover {
+  background-color: rgba(0, 255, 255, 0.05) !important;
+}
+
+.agg-value-display {
+  font-size: 13px;
+  color: var(--color-text-primary, #fff);
+}
+
+.gcm-indicator {
+  margin-left: 8px;
+  font-size: 12px;
 }
 
 body.light .pld-agg-badge {

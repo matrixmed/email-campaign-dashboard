@@ -3,6 +3,7 @@ import VideoModal from './VideoModal';
 import '../../styles/video.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
+import { MATRIX_COLORS, JCAD_COLORS, ICNS_COLORS, ONCOLOGY_COLORS } from '../dashboardBuilder/template/LayoutTemplates';
 
 const VideoMetrics = () => {
     const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
@@ -21,6 +22,20 @@ const VideoMetrics = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState('all');
     const [selectedPlaylists, setSelectedPlaylists] = useState([]);
+    const [selectedChannels, setSelectedChannels] = useState([]);
+
+    const CHANNEL_COLORS = {
+        'Matrix Medical Communications': MATRIX_COLORS.secondary,
+        'Oncology Matrix': ONCOLOGY_COLORS.primary,
+        'ICNS': ICNS_COLORS.primary,
+        'JCAD': JCAD_COLORS.primary,
+    };
+
+    const toggleChannel = (channelName) => {
+        setSelectedChannels(prev =>
+            prev.includes(channelName) ? prev.filter(c => c !== channelName) : [...prev, channelName]
+        );
+    };
 
     const togglePlaylist = (playlistId) => {
         setSelectedPlaylists(prev =>
@@ -90,7 +105,9 @@ const VideoMetrics = () => {
                     tags: video.tags || [],
                     playlists: video.playlists || [],
                     breakdowns: video.breakdowns || {},
-                    current: current
+                    current: current,
+                    channelId: video.channelId || '',
+                    channelName: video.channelName || 'Matrix Medical Communications'
                 };
             });
         } else {
@@ -134,13 +151,17 @@ const VideoMetrics = () => {
             filtered = filtered.filter(v => allPlaylistVideoIds.has(v.id));
         }
 
+        if (viewMode === 'channel' && selectedChannels.length > 0 && videoSource === 'youtube') {
+            filtered = filtered.filter(v => selectedChannels.includes(v.channelName));
+        }
+
         if (search) {
             filtered = filtered.filter(item => matchesSearchTerm(item.title || '', search));
         }
 
         setFilteredData(filtered);
         setCurrentPage(1);
-    }, [videoSource, youtubeData, vimeoData, search, viewMode, selectedPlaylists]);
+    }, [videoSource, youtubeData, vimeoData, search, viewMode, selectedPlaylists, selectedChannels]);
 
     const handleSearchChange = (e) => {
         const searchValue = e.target.value;
@@ -221,6 +242,18 @@ const VideoMetrics = () => {
             itemCount: pl.itemCount,
             videoIds: pl.videoIds || []
         })).sort((a, b) => b.itemCount - a.itemCount);
+    };
+
+    const getChannels = () => {
+        if (videoSource !== 'youtube') return [];
+        const channelCounts = {};
+        videosList.forEach(video => {
+            const channelName = video.channelName || 'Matrix Medical Communications';
+            channelCounts[channelName] = (channelCounts[channelName] || 0) + 1;
+        });
+        return Object.entries(channelCounts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
     };
 
     const handleRowsPerPageChange = (e) => {
@@ -386,20 +419,30 @@ const VideoMetrics = () => {
                                     ))}
                                 </select>
                             </div>
-                            {videoSource === 'youtube' && getPlaylists().length > 0 && (
+                            {videoSource === 'youtube' && (
                                 <div className="playlist-toggle">
                                     <div
                                         className={`playlist-toggle-option ${viewMode === 'all' ? 'active' : ''}`}
-                                        onClick={() => { setViewMode('all'); setSelectedPlaylists([]); }}
+                                        onClick={() => { setViewMode('all'); setSelectedPlaylists([]); setSelectedChannels([]); }}
                                     >
                                         All Videos ({videosList.length})
                                     </div>
-                                    <div
-                                        className={`playlist-toggle-option ${viewMode === 'playlist' ? 'active' : ''}`}
-                                        onClick={() => setViewMode('playlist')}
-                                    >
-                                        By Playlist
-                                    </div>
+                                    {getChannels().length > 1 && (
+                                        <div
+                                            className={`playlist-toggle-option ${viewMode === 'channel' ? 'active' : ''}`}
+                                            onClick={() => { setViewMode('channel'); setSelectedPlaylists([]); }}
+                                        >
+                                            By Channel
+                                        </div>
+                                    )}
+                                    {getPlaylists().length > 0 && (
+                                        <div
+                                            className={`playlist-toggle-option ${viewMode === 'playlist' ? 'active' : ''}`}
+                                            onClick={() => { setViewMode('playlist'); setSelectedChannels([]); }}
+                                        >
+                                            By Playlist
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {(videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated) && (
@@ -410,6 +453,36 @@ const VideoMetrics = () => {
                             
                         </div>
                     </div>
+
+                    {viewMode === 'channel' && videoSource === 'youtube' && (
+                        <div className="channel-selector">
+                            {getChannels().map(ch => (
+                                <div
+                                    key={ch.name}
+                                    className={`channel-selector-item ${selectedChannels.includes(ch.name) ? 'active' : ''}`}
+                                    onClick={() => toggleChannel(ch.name)}
+                                    style={{
+                                        '--channel-color': CHANNEL_COLORS[ch.name] || '#575757',
+                                    }}
+                                >
+                                    <span
+                                        className="channel-color-dot"
+                                        style={{ backgroundColor: CHANNEL_COLORS[ch.name] || '#575757' }}
+                                    ></span>
+                                    <span className="channel-selector-title">{ch.name}</span>
+                                    <span className="channel-selector-count">{ch.count}</span>
+                                </div>
+                            ))}
+                            {selectedChannels.length > 0 && (
+                                <div
+                                    className="channel-selector-item clear-all"
+                                    onClick={() => setSelectedChannels([])}
+                                >
+                                    Clear All
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {viewMode === 'playlist' && videoSource === 'youtube' && (
                         <div className="playlist-selector">
@@ -438,6 +511,9 @@ const VideoMetrics = () => {
                         <thead>
                             <tr>
                                 <th className="title-column">Title</th>
+                                {videoSource === 'youtube' && (
+                                    <th className="channel-column">Channel</th>
+                                )}
                                 {videoSource === 'youtube' && (
                                     <th className="playlist-column">Playlist</th>
                                 )}
@@ -473,6 +549,18 @@ const VideoMetrics = () => {
                                             <span className="video-title-text">{item.title}</span>
                                         </div>
                                     </td>
+                                    {videoSource === 'youtube' && (
+                                        <td className="channel-column">
+                                            <span
+                                                className="channel-badge"
+                                                style={{
+                                                    '--channel-color': CHANNEL_COLORS[item.channelName] || '#575757'
+                                                }}
+                                            >
+                                                {item.channelName === 'Matrix Medical Communications' ? 'Matrix' : item.channelName}
+                                            </span>
+                                        </td>
+                                    )}
                                     {videoSource === 'youtube' && (
                                         <td className="playlist-column">
                                             {item.playlists && item.playlists.length > 0 && (

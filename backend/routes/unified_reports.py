@@ -18,7 +18,6 @@ def get_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
-
 def get_current_reporting_week():
     today = datetime.now()
     days_since_monday = today.weekday()
@@ -27,6 +26,17 @@ def get_current_reporting_week():
     reporting_sunday = reporting_monday + timedelta(days=6)
     return reporting_monday.date(), reporting_sunday.date()
 
+def get_monthly_report_period():
+    today = datetime.now()
+    days_since_monday = today.weekday()
+    current_monday = today - timedelta(days=days_since_monday)
+    is_first_week = current_monday.day <= 7
+
+    if is_first_week:
+        prev_month_end = current_monday.replace(day=1) - timedelta(days=1)
+        prev_month_start = prev_month_end.replace(day=1)
+        return prev_month_start.date(), True
+    return None, False
 
 CLIENT_ID_MAPPINGS = {
     "Lilly": "contact_lilly_id",
@@ -38,7 +48,6 @@ CLIENT_ID_MAPPINGS = {
     "DSI": "contact_dsi_id"
 }
 
-
 def get_client_id_field(client_name):
     if not client_name:
         return None
@@ -46,7 +55,6 @@ def get_client_id_field(client_name):
         if key.lower() in client_name.lower():
             return value
     return None
-
 
 @unified_reports_bp.route('/due-this-week', methods=['GET'])
 @cross_origin()
@@ -85,9 +93,16 @@ def get_due_this_week():
             if c.placement_id:
                 contracts_by_placement[str(c.placement_id)] = c
 
-        expected_reports = session.query(CMIExpectedReport).filter(
-            CMIExpectedReport.reporting_week_start == week_start
-        ).all()
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
+        expected_reports = session.query(CMIExpectedReport).filter(or_(*filters)).all()
         expected_placement_ids = {str(e.cmi_placement_id) for e in expected_reports if e.cmi_placement_id}
 
         result = []
@@ -165,7 +180,6 @@ def get_due_this_week():
             'message': str(e)
         }), 500
 
-
 @unified_reports_bp.route('/no-data', methods=['GET'])
 @cross_origin()
 def get_no_data_reports():
@@ -178,9 +192,16 @@ def get_no_data_reports():
             week_start = datetime.strptime(week_param, '%Y-%m-%d').date()
             week_end = week_start + timedelta(days=6)
 
-        expected_reports = session.query(CMIExpectedReport).filter(
-            CMIExpectedReport.reporting_week_start == week_start
-        ).all()
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
+        expected_reports = session.query(CMIExpectedReport).filter(or_(*filters)).all()
 
         contracts = session.query(CMIContractValue).all()
         contracts_by_placement = {}
@@ -302,7 +323,6 @@ def get_no_data_reports():
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @unified_reports_bp.route('/batch-json', methods=['POST'])
 @cross_origin()
@@ -442,7 +462,6 @@ def generate_batch_json():
             'status': 'error',
             'message': str(e)
         }), 500
-
 
 @unified_reports_bp.route('/contract-values', methods=['GET'])
 @cross_origin()

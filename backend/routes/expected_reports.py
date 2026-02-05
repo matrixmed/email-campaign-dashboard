@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine, or_, and_
 from models import CMIExpectedReport, CampaignReportingMetadata, CMIContractValue
 from datetime import datetime, timedelta
 import os
@@ -21,6 +21,18 @@ def get_current_reporting_week():
     reporting_sunday = reporting_monday + timedelta(days=6)
     return reporting_monday.date(), reporting_sunday.date()
 
+def get_monthly_report_period():
+    today = datetime.now()
+    days_since_monday = today.weekday()
+    current_monday = today - timedelta(days=days_since_monday)
+    is_first_week = current_monday.day <= 7
+
+    if is_first_week:
+        prev_month_end = current_monday.replace(day=1) - timedelta(days=1)
+        prev_month_start = prev_month_end.replace(day=1)
+        return prev_month_start.date(), True
+    return None, False
+
 @expected_reports_bp.route('/expected', methods=['GET'])
 @cross_origin()
 def get_expected_reports():
@@ -33,9 +45,16 @@ def get_expected_reports():
             week_start = datetime.strptime(week_param, '%Y-%m-%d').date()
             week_end = week_start + timedelta(days=6)
 
-        reports = session.query(CMIExpectedReport).filter(
-            CMIExpectedReport.reporting_week_start == week_start
-        ).order_by(
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
+        reports = session.query(CMIExpectedReport).filter(or_(*filters)).order_by(
             CMIExpectedReport.is_matched,
             CMIExpectedReport.brand_name
         ).all()
@@ -247,6 +266,37 @@ def set_agg_values(report_id):
             'message': str(e)
         }), 500
 
+@expected_reports_bp.route('/expected/<int:report_id>/submit', methods=['PUT'])
+@cross_origin()
+def submit_expected_report(report_id):
+    try:
+        session = get_session()
+        data = request.json
+
+        report = session.query(CMIExpectedReport).filter_by(id=report_id).first()
+        if not report:
+            session.close()
+            return jsonify({'status': 'error', 'message': 'Report not found'}), 404
+
+        is_submitted = data.get('is_submitted', False)
+        report.is_submitted = is_submitted
+        report.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Submission status updated',
+            'is_submitted': is_submitted
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @expected_reports_bp.route('/expected/<int:report_id>/move-to-due', methods=['POST'])
 @cross_origin()
 def move_to_due(report_id):
@@ -302,8 +352,17 @@ def auto_match_expected_reports():
         session = get_session()
         week_start, week_end = get_current_reporting_week()
 
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
         expected_reports = session.query(CMIExpectedReport).filter(
-            CMIExpectedReport.reporting_week_start == week_start,
+            or_(*filters),
             CMIExpectedReport.is_matched == False
         ).all()
 
@@ -361,9 +420,18 @@ def create_from_placement():
 
         week_start, week_end = get_current_reporting_week()
 
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
         existing = session.query(CMIExpectedReport).filter(
             CMIExpectedReport.cmi_placement_id == str(placement_id),
-            CMIExpectedReport.reporting_week_start == week_start
+            or_(*filters)
         ).first()
 
         if existing:
@@ -442,8 +510,17 @@ def get_no_data_reports():
         if week_param:
             week_start = datetime.strptime(week_param, '%Y-%m-%d').date()
 
+        monthly_start, is_first_week = get_monthly_report_period()
+        filters = [CMIExpectedReport.reporting_week_start == week_start]
+        if is_first_week and monthly_start:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
         reports = session.query(CMIExpectedReport).filter(
-            CMIExpectedReport.reporting_week_start == week_start,
+            or_(*filters),
             CMIExpectedReport.is_matched == False,
             CMIExpectedReport.status.in_(['pending', 'no_data'])
         ).order_by(

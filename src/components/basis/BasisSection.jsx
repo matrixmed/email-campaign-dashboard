@@ -14,6 +14,7 @@ const BasisSection = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState(searchTerms.basisOptimization || '');
   const [pendingCount, setPendingCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const [timeframe, setTimeframe] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -49,6 +50,33 @@ const BasisSection = () => {
     };
     fetchPendingCount();
   }, []);
+
+  useEffect(() => {
+    const fetchLastUpdated = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/basis/last-updated`);
+        const data = await res.json();
+        if (data.status === 'success' && data.last_updated) {
+          setLastUpdated(data.last_updated);
+        }
+      } catch (err) {
+      }
+    };
+    fetchLastUpdated();
+  }, []);
+
+  const formatLastUpdated = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -195,6 +223,18 @@ const BasisSection = () => {
             <span>Recommendations{pendingCount > 0 ? ` (${pendingCount})` : ''}</span>
           </button>
         </div>
+
+        {(activeTab === 'overview' || activeTab === 'recommendations') && lastUpdated && (
+          <div className="tab-controls">
+            <div className="last-updated-tag">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span>Last updated: {formatLastUpdated(lastUpdated)}</span>
+            </div>
+          </div>
+        )}
 
         {(activeTab === 'exchanges' || activeTab === 'brands' || activeTab === 'bids' || activeTab === 'domains') && (
           <div className="tab-controls">

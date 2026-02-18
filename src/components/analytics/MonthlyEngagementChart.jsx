@@ -250,38 +250,6 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
     'Total_Click_Rate': 'Total Click Rate'
   };
 
-  const getMatrixStats = () => {
-    if (!yearData) return { min: 0, max: 0, avg: 0 };
-    const allValues = [];
-    Object.values(yearData).forEach(yearValues => {
-      yearValues.forEach(val => {
-        if (val !== null) allValues.push(val);
-      });
-    });
-    if (allValues.length === 0) return { min: 0, max: 0, avg: 0 };
-    return {
-      min: Math.min(...allValues),
-      max: Math.max(...allValues),
-      avg: allValues.reduce((a, b) => a + b, 0) / allValues.length
-    };
-  };
-
-  const getValueClass = (value, stats) => {
-    if (value === null) return '';
-    const { min, max } = stats;
-    const range = max - min;
-    if (range === 0) return '';
-
-    const normalized = (value - min) / range;
-
-    if (normalized >= 0.7) {
-      return 'matrix-high';
-    } else if (normalized <= 0.3) {
-      return 'matrix-low';
-    }
-    return '';
-  };
-
   const getYearLabel = () => {
     if (availableYears.length === 0) return `${selectedYears.length} years`;
     const active = availableYears.filter(y => selectedYears.includes(y));
@@ -289,6 +257,49 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
     if (active.length === availableYears.length) return 'All years';
     if (active.length <= 3) return active.join(', ');
     return `${active.length} years selected`;
+  };
+
+  const getMoMChangeData = () => {
+    if (!yearData) return null;
+    const sortedYears = Object.keys(yearData).sort((a, b) => a - b).map(Number);
+    if (sortedYears.length === 0) return null;
+
+    const changeData = {};
+    sortedYears.forEach(year => {
+      changeData[year] = [];
+      for (let month = 0; month < 12; month++) {
+        const currentVal = yearData[year]?.[month];
+
+        let prevVal = null;
+        if (month === 0) {
+          const prevYear = year - 1;
+          if (yearData[prevYear]) {
+            prevVal = yearData[prevYear][11];
+          }
+        } else {
+          prevVal = yearData[year]?.[month - 1];
+        }
+
+        if (currentVal !== null && prevVal !== null && prevVal !== 0) {
+          const pctChange = ((currentVal - prevVal) / prevVal) * 100;
+          changeData[year].push({
+            value: currentVal,
+            change: pctChange,
+            direction: pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : 'flat'
+          });
+        } else if (currentVal !== null) {
+          changeData[year].push({
+            value: currentVal,
+            change: null,
+            direction: null
+          });
+        } else {
+          changeData[year].push(null);
+        }
+      }
+    });
+
+    return { years: sortedYears, data: changeData };
   };
 
   return (
@@ -524,50 +535,54 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
       )}
       </div>
 
-      {yearData && Object.keys(yearData).length > 0 && (
-        <div className="monthly-matrix-section">
-          <h4>Monthly {metricLabels[selectedMetric]} Matrix</h4>
-          <div className="matrix-table-wrapper">
-            <table className="monthly-matrix-table">
-              <thead>
-                <tr>
-                  <th className="month-header">Month</th>
-                  {Object.keys(yearData).sort((a, b) => a - b).map((year, idx) => (
-                    <th key={year} style={{ color: colors[idx % colors.length] }}>{year}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  const stats = getMatrixStats();
-                  return months.map((month, monthIdx) => (
-                    <tr key={month}>
-                      <td className="month-cell">{month}</td>
-                      {Object.keys(yearData).sort((a, b) => a - b).map((year, idx) => {
-                        const value = yearData[year][monthIdx];
-                        const valueClass = getValueClass(value, stats);
-                        return (
-                          <td key={year} className="matrix-value-cell">
-                            {value !== null ? (
-                              <span className={`matrix-value ${valueClass}`}>{value.toFixed(2)}%</span>
-                            ) : (
-                              <span className="matrix-no-data">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
+      {yearData && Object.keys(yearData).length > 0 && (() => {
+        const momData = getMoMChangeData();
+        if (!momData) return null;
+        return (
+          <div className="monthly-matrix-section">
+            <h4>Month-over-Month {metricLabels[selectedMetric]} Change</h4>
+            <div className="matrix-table-wrapper">
+              <table className="monthly-matrix-table mom-change-table">
+                <thead>
+                  <tr>
+                    <th className="month-header">Year</th>
+                    {months.map(month => (
+                      <th key={month}>{month}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {momData.years.map(year => (
+                    <tr key={year}>
+                      <td className="month-cell">{year}</td>
+                      {momData.data[year].map((cell, monthIdx) => (
+                        <td key={monthIdx} className="matrix-value-cell">
+                          {cell !== null ? (
+                            <span className={`matrix-value ${cell.change !== null ? (cell.direction === 'up' ? 'mom-up' : cell.direction === 'down' ? 'mom-down' : '') : ''}`}>
+                              {cell.value.toFixed(2)}%
+                              {cell.change !== null && (
+                                <span className={`mom-change-badge ${cell.direction === 'up' ? 'mom-badge-up' : 'mom-badge-down'}`}>
+                                  {cell.direction === 'up' ? '+' : ''}{cell.change.toFixed(1)}%
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="matrix-no-data">—</span>
+                          )}
+                        </td>
+                      ))}
                     </tr>
-                  ));
-                })()}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="matrix-legend">
+              <span className="legend-item"><span className="legend-color mom-up"></span> Increase from prior month</span>
+              <span className="legend-item"><span className="legend-color mom-down"></span> Decrease from prior month</span>
+            </div>
           </div>
-          <div className="matrix-legend">
-            <span className="legend-item"><span className="legend-color matrix-high"></span> Above Average</span>
-            <span className="legend-item"><span className="legend-color matrix-low"></span> Below Average</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -9,6 +9,31 @@ from collections import defaultdict
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from db_pool import get_db_connection
 
+DMA_MAPPING_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    'src', 'components', 'listanalysis', 'DMACodeMapping'
+)
+
+_dma_cache = None
+
+def load_dma_mapping():
+    global _dma_cache
+    if _dma_cache is not None:
+        return _dma_cache
+    _dma_cache = {}
+    try:
+        with open(DMA_MAPPING_PATH, 'r') as f:
+            header = f.readline()
+            for line in f:
+                parts = line.strip().split('\t')
+                if len(parts) >= 3:
+                    zip_code = parts[0].strip().zfill(5)
+                    dma_code = parts[1].strip()
+                    _dma_cache[zip_code] = dma_code
+    except FileNotFoundError:
+        print(f"DMA mapping file not found at {DMA_MAPPING_PATH}")
+    return _dma_cache
+
 list_analysis_bp = Blueprint('list_analysis', __name__)
 
 def find_npi_column(df):
@@ -631,3 +656,96 @@ def export_results():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+def find_zip_column(df):
+    for col in df.columns:
+        col_upper = col.upper().replace(' ', '').replace('_', '').replace('-', '')
+        if col_upper in ['ZIPCODE', 'ZIP', 'POSTALCODE', 'POSTAL']:
+            return col
+
+    potential_cols = [col for col in df.columns if 'ZIP' in col.upper() or 'POSTAL' in col.upper()]
+    for col in potential_cols:
+        non_null = df[col].dropna().astype(str)
+        if len(non_null) == 0:
+            continue
+        numeric_count = sum(1 for val in non_null if val.replace('.', '').replace('-', '').strip()[:5].isdigit())
+        if numeric_count / len(non_null) >= 0.7:
+            return col
+
+    return None
+
+
+@list_analysis_bp.route('/dma-breakdown', methods=['POST'])
+def dma_breakdown():
+    try:
+        input_files = request.files.getlist('input_files')
+
+        if not input_files or len(input_files) == 0:
+            return jsonify({'error': 'At least one input file is required'}), 400
+
+        dma_mapping = load_dma_mapping()
+        if not dma_mapping:
+            return jsonify({'error': 'DMA code mapping file could not be loaded.'}), 500
+
+        all_zips = []
+        file_summaries = []
+        unmapped_count = 0
+
+        for idx, input_file in enumerate(input_files):
+            if not input_file.filename:
+                return jsonify({'error': f'File #{idx + 1} has no filename'}), 400
+
+            df, error = read_file_to_dataframe(input_file)
+            if error:
+                return jsonify({'error': error}), 400
+
+            zip_col = find_zip_column(df)
+            if not zip_col:
+                available_columns = ', '.join(df.columns.tolist()[:10])
+                more = '...' if len(df.columns) > 10 else ''
+                return jsonify({
+                    'error': f'Zip code column not found in "{input_file.filename}". '
+                             f'Available columns: {available_columns}{more}. '
+                             f'Please ensure the file contains a column with zip codes.'
+                }), 400
+
+            zips = df[zip_col].dropna().astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+            zips = zips[zips != ''].tolist()
+            cleaned_zips = [z.split('-')[0].split('.')[0].zfill(5)[:5] for z in zips]
+            all_zips.extend(cleaned_zips)
+            file_summaries.append({
+                'filename': input_file.filename,
+                'row_count': len(cleaned_zips)
+            })
+
+        dma_counts = defaultdict(int)
+        for zip_code in all_zips:
+            dma_code = dma_mapping.get(zip_code)
+            if dma_code:
+                dma_counts[dma_code] += 1
+            else:
+                unmapped_count += 1
+
+        results = []
+        for dma_code in sorted(dma_counts.keys(), key=lambda x: int(x) if x.isdigit() else 0):
+            results.append({
+                'dma_code': int(dma_code) if dma_code.isdigit() else dma_code,
+                'count': dma_counts[dma_code]
+            })
+
+        grand_total = sum(r['count'] for r in results)
+
+        return jsonify({
+            'results': results,
+            'grand_total': grand_total,
+            'total_records': len(all_zips),
+            'unmapped_count': unmapped_count,
+            'file_summaries': file_summaries
+        }), 200
+
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"DMA breakdown error: {error_trace}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500

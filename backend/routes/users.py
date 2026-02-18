@@ -275,10 +275,10 @@ def engagement_patterns():
         data = request.get_json()
 
         pattern_type = data.get('pattern_type', 'infrequent_responders')
-        min_campaigns = data.get('min_campaigns', 5)
+        min_campaigns = data.get('min_campaigns', 10)
         export_csv = data.get('export_csv', False)
 
-        infrequent_threshold = data.get('infrequent_threshold', 30)
+        infrequent_threshold = data.get('infrequent_threshold', 10)
         hyper_engaged_threshold = data.get('hyper_engaged_threshold', 70)
         fast_open_minutes = data.get('fast_open_minutes', 30)
 
@@ -391,16 +391,18 @@ def engagement_patterns():
                     SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name,
                         MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
                         MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
-                        ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence
+                        ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence,
+                        COUNT(*) OVER (PARTITION BY up.email) as total_user_campaigns
                     FROM user_profiles up
                     JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
                 ),
                 early_late_comparison AS (
-                    SELECT email, npi, first_name, last_name, specialty, COUNT(*) as total_campaigns,
-                        AVG(CASE WHEN campaign_sequence <= (COUNT(*) OVER (PARTITION BY email) * 0.4) THEN was_opened ELSE NULL END) as early_open_rate,
-                        AVG(CASE WHEN campaign_sequence > (COUNT(*) OVER (PARTITION BY email) * 0.6) THEN was_opened ELSE NULL END) as late_open_rate
+                    SELECT email, npi, first_name, last_name, specialty,
+                        MAX(total_user_campaigns) as total_campaigns,
+                        AVG(CASE WHEN campaign_sequence <= total_user_campaigns * 0.4 THEN was_opened ELSE NULL END) as early_open_rate,
+                        AVG(CASE WHEN campaign_sequence > total_user_campaigns * 0.6 THEN was_opened ELSE NULL END) as late_open_rate
                     FROM campaign_timeline GROUP BY email, npi, first_name, last_name, specialty
                 )
                 SELECT email, npi, first_name, last_name, specialty, total_campaigns,
@@ -454,18 +456,20 @@ def engagement_patterns():
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     WHERE ci.event_type = 'open'
                 ),
-                opens_after_delay AS (
-                    SELECT email, npi, first_name, last_name, specialty, campaign_base_name, day_of_week,
+                delayed_campaign_opens AS (
+                    SELECT DISTINCT ON (email, campaign_base_name)
+                        email, npi, first_name, last_name, specialty, campaign_base_name,
                         CASE WHEN day_of_week IN (0, 6) THEN 1 ELSE 0 END as is_weekend
                     FROM open_timing
                     WHERE timestamp > sent_time + INTERVAL '4 hours'
+                    ORDER BY email, campaign_base_name, timestamp
                 ),
                 user_patterns AS (
                     SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(DISTINCT campaign_base_name) as total_delayed_opens,
+                        COUNT(*) as total_delayed_opens,
                         SUM(is_weekend) as weekend_opens,
                         COUNT(*) - SUM(is_weekend) as weekday_opens
-                    FROM opens_after_delay
+                    FROM delayed_campaign_opens
                     GROUP BY email, npi, first_name, last_name, specialty
                 )
                 SELECT email, npi, first_name, last_name, specialty, total_delayed_opens, weekend_opens, weekday_opens,
@@ -488,9 +492,9 @@ def engagement_patterns():
                     JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                     WHERE ci.event_type = 'open'
                 ),
-                binge_sessions AS (
+                binge_stats AS (
                     SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(DISTINCT campaign_base_name) as total_opens,
+                        COUNT(*) as total_opens,
                         SUM(CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open_time)) <= 1800 THEN 1 ELSE 0 END) as rapid_opens,
                         COUNT(DISTINCT CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open_time)) <= 1800
                             THEN DATE_TRUNC('hour', timestamp) END) as binge_sessions
@@ -500,7 +504,7 @@ def engagement_patterns():
                 )
                 SELECT email, npi, first_name, last_name, specialty, total_opens, rapid_opens, binge_sessions,
                     ROUND((rapid_opens::numeric / NULLIF(total_opens, 0) * 100), 2) as binge_rate
-                FROM binge_sessions
+                FROM binge_stats
                 WHERE total_opens >= %s AND rapid_opens >= 3
                 ORDER BY binge_rate DESC, rapid_opens DESC LIMIT 1000
             """
@@ -535,6 +539,39 @@ def engagement_patterns():
             """
             cursor.execute(query, (min_campaigns,))
 
+        elif pattern_type == 'fast_openers':
+            query = """
+                WITH open_timing AS (
+                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
+                        ci.campaign_id, cd.campaign_base_name,
+                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
+                        MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) as first_open_time
+                    FROM user_profiles up
+                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
+                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, ci.campaign_id, cd.campaign_base_name
+                    HAVING MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) IS NOT NULL
+                        AND MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) IS NOT NULL
+                ),
+                user_speed AS (
+                    SELECT email, npi, first_name, last_name, specialty,
+                        COUNT(*) as campaigns_opened,
+                        AVG(EXTRACT(EPOCH FROM (first_open_time - sent_time)) / 60) as avg_open_minutes,
+                        SUM(CASE WHEN EXTRACT(EPOCH FROM (first_open_time - sent_time)) / 60 <= %s THEN 1 ELSE 0 END) as fast_opens
+                    FROM open_timing
+                    WHERE first_open_time > sent_time
+                    GROUP BY email, npi, first_name, last_name, specialty
+                )
+                SELECT email, npi, first_name, last_name, specialty, campaigns_opened,
+                    ROUND(avg_open_minutes::numeric, 1) as avg_open_minutes,
+                    fast_opens,
+                    ROUND((fast_opens::numeric / NULLIF(campaigns_opened, 0) * 100), 2) as fast_open_rate
+                FROM user_speed
+                WHERE campaigns_opened >= %s AND fast_opens >= 2
+                ORDER BY fast_open_rate DESC, avg_open_minutes ASC LIMIT 1000
+            """
+            cursor.execute(query, (fast_open_minutes, min_campaigns))
+
         elif pattern_type == 'early_birds_night_owls':
             query = """
                 WITH open_timing AS (
@@ -556,14 +593,16 @@ def engagement_patterns():
                         COUNT(*) as total_delayed_opens,
                         AVG(hour_of_day) as avg_hour,
                         SUM(CASE WHEN hour_of_day BETWEEN 5 AND 9 THEN 1 ELSE 0 END) as early_morning_opens,
-                        SUM(CASE WHEN hour_of_day BETWEEN 20 AND 23 THEN 1 ELSE 0 END) as night_opens
+                        SUM(CASE WHEN hour_of_day BETWEEN 20 AND 23 OR hour_of_day BETWEEN 0 AND 4 THEN 1 ELSE 0 END) as night_opens
                     FROM delayed_opens
                     GROUP BY email, npi, first_name, last_name, specialty
                 )
                 SELECT email, npi, first_name, last_name, specialty, total_delayed_opens,
                     ROUND(avg_hour::numeric, 1) as avg_hour,
                     early_morning_opens, night_opens,
-                    CASE WHEN avg_hour < 10 THEN 'Early Bird' WHEN avg_hour > 18 THEN 'Night Owl' ELSE 'Midday' END as reader_type
+                    CASE WHEN avg_hour >= 5 AND avg_hour <= 9 THEN 'Early Bird'
+                         WHEN avg_hour >= 20 OR avg_hour <= 4 THEN 'Night Owl'
+                         ELSE 'Midday' END as reader_type
                 FROM user_patterns
                 WHERE total_delayed_opens >= %s AND (early_morning_opens > 0 OR night_opens > 0)
                 ORDER BY avg_hour ASC LIMIT 1000

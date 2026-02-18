@@ -70,7 +70,16 @@ const CampaignPerformancePage = () => {
 
     const deploymentMerged = Object.entries(groupedCampaigns).map(([campaignName, deployments]) => {
       if (deployments.length === 1) {
-        return { ...deployments[0], Campaign: campaignName };
+        const d = deployments[0];
+        return {
+          ...d,
+          Campaign: campaignName,
+          Delivery_Rate: d.Sent > 0 ? (d.Delivered / d.Sent) * 100 : 0,
+          Unique_Open_Rate: d.Delivered > 0 ? (d.Unique_Opens / d.Delivered) * 100 : 0,
+          Total_Open_Rate: d.Delivered > 0 ? (d.Total_Opens / d.Delivered) * 100 : 0,
+          Unique_Click_Rate: d.Unique_Opens > 0 ? (d.Unique_Clicks / d.Unique_Opens) * 100 : 0,
+          Total_Click_Rate: d.Total_Opens > 0 ? (d.Total_Clicks / d.Total_Opens) * 100 : 0,
+        };
       }
 
       const deployment1 = deployments.find(d => {

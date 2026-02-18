@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from azure.storage.blob import BlobServiceClient
 import json
+import re
 import pandas as pd
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -2247,3 +2248,440 @@ def geographic_state_detail():
             'total_npis': 0,
             'urban_breakdown': {}
         }), 500
+
+
+@analytics_bp.route('/specialty-breakdown', methods=['POST'])
+def specialty_breakdown():
+    try:
+        metadata = get_blob_data('completed_campaign_metadata.json')
+        if not metadata:
+            return jsonify({'error': 'Failed to load campaign metadata'}), 500
+
+        bucket_topic_specialty = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {
+            'sent': 0, 'delivered': 0, 'unique_opens': 0
+        })))
+
+        for campaign in metadata:
+            campaign_name = campaign.get('base_campaign_name') or campaign.get('campaign_name', '')
+            audience = campaign.get('audience_breakdown')
+            if not campaign_name or not audience:
+                continue
+
+            classification = classify_campaign(campaign_name)
+            bucket = classification['bucket']
+            topic = classification['topic']
+
+            for spec_name, spec_data in audience.items():
+                if not spec_name or not spec_name.strip():
+                    continue
+                delivered = spec_data.get('delivered', 0) or 0
+                opens = spec_data.get('opens', 0) or 0
+                if delivered < 1:
+                    continue
+
+                bucket_topic_specialty[bucket][topic][spec_name]['delivered'] += delivered
+                bucket_topic_specialty[bucket][topic][spec_name]['sent'] += delivered
+                bucket_topic_specialty[bucket][topic][spec_name]['unique_opens'] += opens
+
+        result = {}
+        for bucket, topics in bucket_topic_specialty.items():
+            result[bucket] = {}
+            for topic, specialties in topics.items():
+                agg_sent = sum(s['sent'] for s in specialties.values())
+                agg_delivered = sum(s['delivered'] for s in specialties.values())
+                agg_opens = sum(s['unique_opens'] for s in specialties.values())
+                agg_rate = round((agg_opens / agg_delivered * 100), 2) if agg_delivered > 0 else 0
+
+                spec_dict = {}
+                for spec_name, stats in specialties.items():
+                    rate = round((stats['unique_opens'] / stats['delivered'] * 100), 2) if stats['delivered'] > 0 else 0
+                    spec_dict[spec_name] = {
+                        'Sent': stats['sent'],
+                        'Delivered': stats['delivered'],
+                        'Unique_Opens': stats['unique_opens'],
+                        'Unique_Open_Rate': rate
+                    }
+
+                result[bucket][topic] = {
+                    'Aggregate': {
+                        'Sent': agg_sent,
+                        'Delivered': agg_delivered,
+                        'Unique_Opens': agg_opens,
+                        'Unique_Open_Rate': agg_rate
+                    },
+                    'Specialties': spec_dict
+                }
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"[SPECIALTY-BREAKDOWN] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@analytics_bp.route('/click-analytics', methods=['POST'])
+def click_analytics():
+    try:
+        metadata = get_blob_data('completed_campaign_metadata.json')
+        if not metadata:
+            return jsonify({'error': 'Failed to load campaign metadata'}), 500
+
+        url_stats = defaultdict(lambda: {'total_clicks': 0, 'campaigns': set()})
+        campaigns_map = defaultdict(lambda: {'campaign_name': '', 'bucket': '', 'topic': '', 'links': [], 'total_clicks': 0})
+        domain_stats = defaultdict(lambda: {'total_clicks': 0})
+
+        for campaign in metadata:
+            campaign_name = campaign.get('base_campaign_name') or campaign.get('campaign_name', '')
+            clicked = campaign.get('what_was_clicked')
+            if not clicked or not clicked.get('links'):
+                continue
+
+            classification = classify_campaign(campaign_name)
+
+            for link in clicked['links']:
+                url = link.get('url', '')
+                clicks = link.get('clicks', 0) or 0
+                if not url or clicks < 1:
+                    continue
+
+                url_stats[url]['total_clicks'] += clicks
+                url_stats[url]['campaigns'].add(campaign_name)
+
+                if not campaigns_map[campaign_name]['campaign_name']:
+                    campaigns_map[campaign_name]['campaign_name'] = campaign_name
+                    campaigns_map[campaign_name]['bucket'] = classification['bucket']
+                    campaigns_map[campaign_name]['topic'] = classification['topic']
+                campaigns_map[campaign_name]['links'].append({
+                    'url': url,
+                    'total_clicks': clicks
+                })
+                campaigns_map[campaign_name]['total_clicks'] += clicks
+
+                domain_match = re.match(r'^https?://([^/]+)', url)
+                if domain_match:
+                    domain_stats[domain_match.group(1)]['total_clicks'] += clicks
+
+        top_links = []
+        for url, stats in url_stats.items():
+            top_links.append({
+                'url': url,
+                'total_clicks': stats['total_clicks'],
+                'unique_clickers': stats['total_clicks'],
+                'campaigns_appeared_in': len(stats['campaigns'])
+            })
+        top_links.sort(key=lambda x: x['total_clicks'], reverse=True)
+        top_links = top_links[:100]
+
+        by_campaign = sorted(campaigns_map.values(), key=lambda x: x['total_clicks'], reverse=True)[:50]
+
+        by_domain = []
+        for domain, stats in domain_stats.items():
+            by_domain.append({
+                'domain': domain,
+                'total_clicks': stats['total_clicks'],
+                'unique_clickers': stats['total_clicks']
+            })
+        by_domain.sort(key=lambda x: x['total_clicks'], reverse=True)
+        by_domain = by_domain[:50]
+
+        total_clicks = sum(l['total_clicks'] for l in top_links)
+        total_urls = len(top_links)
+
+        return jsonify({
+            'top_links': top_links,
+            'by_campaign': by_campaign,
+            'by_domain': by_domain,
+            'summary': {
+                'total_clicks': total_clicks,
+                'total_unique_clickers': total_clicks,
+                'total_unique_urls': total_urls,
+                'total_campaigns': len(by_campaign)
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"[CLICK-ANALYTICS] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@analytics_bp.route('/subject-line-analysis', methods=['POST'])
+def subject_line_analysis():
+    try:
+        campaigns = get_blob_data('completed_campaign_metrics.json')
+        if not campaigns:
+            return jsonify({'error': 'Failed to load campaign data'}), 500
+
+        rows = []
+        for campaign in campaigns:
+            subject = campaign.get('Subject_Line', '')
+            if not subject or not subject.strip():
+                continue
+            sent = campaign.get('Sent', 0) or 0
+            if sent < 50:
+                continue
+            delivered = campaign.get('Delivered', 0) or 0
+            unique_opens = campaign.get('Unique_Opens', 0) or 0
+            unique_clicks = campaign.get('Unique_Clicks', 0) or 0
+            open_rate = round((unique_opens / delivered * 100), 2) if delivered > 0 else 0
+
+            words = subject.split()
+            wc = len(words)
+
+            rows.append({
+                'campaign_subject': subject,
+                'campaign_name': campaign.get('Campaign', ''),
+                'sent': sent,
+                'delivered': delivered,
+                'unique_opens': unique_opens,
+                'unique_clicks': unique_clicks,
+                'open_rate': open_rate,
+                'subject_length': len(subject),
+                'word_count': wc
+            })
+
+        rows.sort(key=lambda x: x['open_rate'], reverse=True)
+
+        subjects = []
+        first_word_counts = defaultdict(lambda: {'count': 0, 'total_rate': 0, 'rates': []})
+        word_count_buckets = defaultdict(lambda: {'count': 0, 'total_rate': 0, 'rates': []})
+        structure_stats = {
+            'question': {'count': 0, 'total_rate': 0}, 'statement': {'count': 0, 'total_rate': 0},
+            'with_number': {'count': 0, 'total_rate': 0}, 'without_number': {'count': 0, 'total_rate': 0},
+            'with_colon': {'count': 0, 'total_rate': 0}, 'without_colon': {'count': 0, 'total_rate': 0},
+            'personalized': {'count': 0, 'total_rate': 0}, 'not_personalized': {'count': 0, 'total_rate': 0}
+        }
+        keyword_map = defaultdict(lambda: {'count': 0, 'total_rate': 0})
+
+        for row in rows:
+            subject = row['campaign_subject']
+            rate = row['open_rate']
+            wc = row['word_count']
+            words = subject.split()
+
+            first_word = words[0].lower().rstrip(':,!?') if words else ''
+            has_question = '?' in subject
+            has_number = bool(re.search(r'\d', subject))
+            has_colon = ':' in subject
+            is_personalized = any(w in subject.lower() for w in ['your', 'you', 'dr.'])
+
+            if wc <= 3:
+                bucket = '1-3'
+            elif wc <= 6:
+                bucket = '4-6'
+            elif wc <= 9:
+                bucket = '7-9'
+            elif wc <= 12:
+                bucket = '10-12'
+            else:
+                bucket = '13+'
+
+            subjects.append({
+                'subject': subject,
+                'campaign_name': row['campaign_name'],
+                'sent': row['sent'],
+                'delivered': row['delivered'],
+                'unique_opens': row['unique_opens'],
+                'unique_clicks': row['unique_clicks'],
+                'open_rate': rate,
+                'subject_length': row['subject_length'],
+                'word_count': wc,
+                'first_word': first_word,
+                'has_question': has_question,
+                'has_number': has_number,
+                'has_colon': has_colon,
+                'is_personalized': is_personalized
+            })
+
+            if first_word:
+                first_word_counts[first_word]['count'] += 1
+                first_word_counts[first_word]['total_rate'] += rate
+                first_word_counts[first_word]['rates'].append(rate)
+
+            word_count_buckets[bucket]['count'] += 1
+            word_count_buckets[bucket]['total_rate'] += rate
+            word_count_buckets[bucket]['rates'].append(rate)
+
+            if has_question:
+                structure_stats['question']['count'] += 1
+                structure_stats['question']['total_rate'] += rate
+            else:
+                structure_stats['statement']['count'] += 1
+                structure_stats['statement']['total_rate'] += rate
+
+            if has_number:
+                structure_stats['with_number']['count'] += 1
+                structure_stats['with_number']['total_rate'] += rate
+            else:
+                structure_stats['without_number']['count'] += 1
+                structure_stats['without_number']['total_rate'] += rate
+
+            if has_colon:
+                structure_stats['with_colon']['count'] += 1
+                structure_stats['with_colon']['total_rate'] += rate
+            else:
+                structure_stats['without_colon']['count'] += 1
+                structure_stats['without_colon']['total_rate'] += rate
+
+            if is_personalized:
+                structure_stats['personalized']['count'] += 1
+                structure_stats['personalized']['total_rate'] += rate
+            else:
+                structure_stats['not_personalized']['count'] += 1
+                structure_stats['not_personalized']['total_rate'] += rate
+
+            for word in words:
+                w = word.lower().strip(',:;!?.()')
+                if len(w) >= 3:
+                    keyword_map[w]['count'] += 1
+                    keyword_map[w]['total_rate'] += rate
+
+        first_word_analysis = []
+        for word, stats in first_word_counts.items():
+            if stats['count'] >= 3:
+                first_word_analysis.append({
+                    'word': word,
+                    'count': stats['count'],
+                    'avg_open_rate': round(stats['total_rate'] / stats['count'], 2)
+                })
+        first_word_analysis.sort(key=lambda x: x['avg_open_rate'], reverse=True)
+
+        wc_analysis = []
+        for bucket_name in ['1-3', '4-6', '7-9', '10-12', '13+']:
+            stats = word_count_buckets[bucket_name]
+            wc_analysis.append({
+                'bucket': bucket_name,
+                'count': stats['count'],
+                'avg_open_rate': round(stats['total_rate'] / stats['count'], 2) if stats['count'] > 0 else 0
+            })
+
+        struct_analysis = {}
+        for key, stats in structure_stats.items():
+            struct_analysis[key] = {
+                'count': stats['count'],
+                'avg_open_rate': round(stats['total_rate'] / stats['count'], 2) if stats['count'] > 0 else 0
+            }
+
+        keyword_analysis = []
+        for word, stats in keyword_map.items():
+            if stats['count'] >= 5:
+                keyword_analysis.append({
+                    'keyword': word,
+                    'count': stats['count'],
+                    'avg_open_rate': round(stats['total_rate'] / stats['count'], 2)
+                })
+        keyword_analysis.sort(key=lambda x: x['avg_open_rate'], reverse=True)
+        keyword_analysis = keyword_analysis[:100]
+
+        all_rates = [s['open_rate'] for s in subjects]
+        summary = {
+            'total_subjects': len(subjects),
+            'avg_open_rate': round(sum(all_rates) / len(all_rates), 2) if all_rates else 0,
+            'best_subject': subjects[0]['subject'] if subjects else '',
+            'best_open_rate': subjects[0]['open_rate'] if subjects else 0,
+            'worst_subject': subjects[-1]['subject'] if subjects else '',
+            'worst_open_rate': subjects[-1]['open_rate'] if subjects else 0,
+            'avg_word_count': round(sum(s['word_count'] for s in subjects) / len(subjects), 1) if subjects else 0
+        }
+
+        return jsonify({
+            'subjects': subjects[:200],
+            'first_word_analysis': first_word_analysis[:50],
+            'word_count_analysis': wc_analysis,
+            'structure_analysis': struct_analysis,
+            'keyword_analysis': keyword_analysis,
+            'summary': summary
+        }), 200
+
+    except Exception as e:
+        print(f"[SUBJECT-LINE] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@analytics_bp.route('/geographic-rates', methods=['POST'])
+def geographic_rates():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT up.state as state_abbrev,
+                COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' AND COALESCE(cd.deployment_number, 1) = 1 THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as total_sent,
+                COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_opens,
+                COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_clicks
+            FROM campaign_interactions ci
+            INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
+            LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+            WHERE up.state IS NOT NULL AND up.state != ''
+            GROUP BY up.state ORDER BY total_sent DESC
+        """
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        state_rates = []
+        total_sent_all = 0
+        total_opens_all = 0
+        total_clicks_all = 0
+
+        for row in rows:
+            abbrev = row['state_abbrev']
+            full_name = state_abbrev_to_full_name(abbrev)
+            if not full_name:
+                continue
+
+            sent = row['total_sent'] or 0
+            opens = row['unique_opens'] or 0
+            clicks = row['unique_clicks'] or 0
+            open_rate = min(round((opens / sent * 100), 2), 100) if sent > 0 else 0
+            click_rate = min(round((clicks / sent * 100), 2), 100) if sent > 0 else 0
+            click_to_open = min(round((clicks / opens * 100), 2), 100) if opens > 0 else 0
+
+            total_sent_all += sent
+            total_opens_all += opens
+            total_clicks_all += clicks
+
+            state_rates.append({
+                'state_abbrev': abbrev,
+                'state_name': full_name,
+                'total_sent': sent,
+                'unique_opens': opens,
+                'unique_clicks': clicks,
+                'open_rate': open_rate,
+                'click_rate': click_rate,
+                'click_to_open_rate': click_to_open
+            })
+
+        national_open_rate = min(round((total_opens_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
+        national_click_rate = min(round((total_clicks_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
+        national_cto = min(round((total_clicks_all / total_opens_all * 100), 2), 100) if total_opens_all > 0 else 0
+
+        sorted_by_open = sorted(state_rates, key=lambda x: x['open_rate'], reverse=True)
+        top_states = sorted_by_open[:5]
+        bottom_states = sorted_by_open[-5:][::-1] if len(sorted_by_open) >= 5 else []
+
+        return jsonify({
+            'state_rates': state_rates,
+            'summary': {
+                'total_states': len(state_rates),
+                'total_sent': total_sent_all,
+                'national_open_rate': national_open_rate,
+                'national_click_rate': national_click_rate,
+                'national_click_to_open_rate': national_cto
+            },
+            'top_states': top_states,
+            'bottom_states': bottom_states
+        }), 200
+
+    except Exception as e:
+        print(f"[GEOGRAPHIC-RATES] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

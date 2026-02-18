@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/CampaignBenchmarks.css';
+import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 
-const CampaignBenchmarks = () => {
+const CampaignBenchmarks = ({ onClearCache }) => {
   const [loading, setLoading] = useState(false);
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -248,6 +249,18 @@ const CampaignBenchmarks = () => {
 
   return (
     <div className="campaign-benchmarks">
+      <div className="section-header-bar">
+        <h3>Campaign Benchmarks</h3>
+        {onClearCache && (
+          <button
+            className="clear-cache-button"
+            onClick={onClearCache}
+            title="Clear cached data and reload"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="benchmark-filters">
         <button
           type="button"

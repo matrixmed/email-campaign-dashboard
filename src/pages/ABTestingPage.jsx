@@ -151,6 +151,7 @@ const ABTestingPage = () => {
               dbId: storedGroup?.id || null,
               subcategory: storedGroup?.subcategory || '',
               notes: storedGroup?.notes || '',
+              sendTime: item.Send_Date || '',
               metrics: {
                 Sent: item.Sent || 0,
                 Delivered: item.Delivered || 0,
@@ -297,17 +298,6 @@ const ABTestingPage = () => {
     });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="ab-testing-page">
-        <div className="ab-loading">
-          <div className="ab-loading-spinner"></div>
-          <span>Loading campaign data...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="ab-testing-page analytics-hub">
       <div className="page-header">
@@ -320,7 +310,7 @@ const ABTestingPage = () => {
             className={`tab-button ${activeTab === 'active' ? 'active' : ''}`}
             onClick={() => setActiveTab('active')}
           >
-            <span>Active Tests ({filteredTests.length})</span>
+            <span>Active Tests ({loading ? '...' : filteredTests.length})</span>
           </button>
           <button
             className={`tab-button ${activeTab === 'historical' ? 'active' : ''}`}
@@ -360,7 +350,12 @@ const ABTestingPage = () => {
         </div>
       </div>
 
-      {activeTab === 'active' && (
+      {loading ? (
+        <div className="ab-loading">
+          <div className="ab-loading-spinner"></div>
+          <span>Loading campaign data...</span>
+        </div>
+      ) : activeTab === 'active' ? (
         <>
           {filteredTests.length === 0 ? (
             <div className="ab-empty-state">
@@ -386,9 +381,9 @@ const ABTestingPage = () => {
             </div>
           )}
         </>
-      )}
+      ) : null}
 
-      {activeTab === 'historical' && (
+      {!loading && activeTab === 'historical' && (
         <HistoricalResults
           filterCategory={filterCategory}
           filterMarket={filterMarket}

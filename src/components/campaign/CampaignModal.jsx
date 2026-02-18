@@ -23,6 +23,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
         adImages: false
     });
     const [audienceLimit, setAudienceLimit] = useState(8);
+    const [clicksLimit, setClicksLimit] = useState(5);
 
     const currentIndex = campaign && allCampaigns.length > 0
         ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
@@ -36,6 +37,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             setUploadFiles({ targetList: null, tags: null, adImages: [] });
             setManualPlacementId('');
             setAudienceLimit(8);
+            setClicksLimit(5);
         }
     }, [campaign?.Campaign, isOpen]);
 
@@ -525,7 +527,14 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 {hasMetadata ? 'Update Metadata' : 'Upload Metadata'}
                             </button>
                         </div>
-                        
+
+                        {campaignMetadata?.subject_line && (
+                            <div className="campaign-modal-subject-line">
+                                <span className="subject-line-label">Subject Line</span>
+                                <span className="subject-line-value">{campaignMetadata.subject_line}</span>
+                            </div>
+                        )}
+
                         <div className="campaign-modal-metrics">
                             {keyMetrics.map((metric, index) => (
                                 <div className="metric-card" key={index}>
@@ -608,33 +617,75 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 </table>
                             </div>
                         </div>
-                        
-                        <div className="campaign-chart-section">
-                            <h4>Campaign Performance Visualization</h4>
-                            <div className="campaign-chart">
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart
-                                        data={[
-                                            { name: 'Unique Open Rate', value: campaign.Unique_Open_Rate },
-                                            { name: 'Total Open Rate', value: campaign.Total_Open_Rate },
-                                            { name: 'Unique Click Rate', value: campaign.Unique_Click_Rate },
-                                            { name: 'Total Click Rate', value: campaign.Total_Click_Rate }
-                                        ]}
-                                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" />
-                                        <YAxis />
-                                        <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}%`, null]} />
-                                        <Legend />
-                                        <Bar dataKey="value" fill="#0088FE" name="Percentage" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
 
                         {campaignMetadata && (
                             <>
+                                {campaignMetadata.what_was_clicked && (() => {
+                                    const allLinks = campaignMetadata.what_was_clicked.links;
+                                    const visibleLinks = allLinks.slice(0, clicksLimit);
+                                    const hasMore = allLinks.length > clicksLimit;
+                                    const remaining = allLinks.length - clicksLimit;
+
+                                    return (
+                                        <div className="clicks-section">
+                                            <h4>What Was Clicked</h4>
+                                            <div className="clicks-summary">
+                                                <div className="clicks-stat">
+                                                    <span className="clicks-label">Total Clicks (Filtered):</span>
+                                                    <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_clicks_after_filtering)}</span>
+                                                </div>
+                                                <div className="clicks-stat">
+                                                    <span className="clicks-label">Bot Clicks Removed:</span>
+                                                    <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_bot_clicks_removed)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="clicks-links">
+                                                {visibleLinks.map((link, index) => (
+                                                    <div key={index} className="click-link-card">
+                                                        <div className="link-url">
+                                                            <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                                                {link.url}
+                                                            </a>
+                                                        </div>
+                                                        <div className="link-stats">
+                                                            <span className="link-clicks">{formatNumber(link.clicks)} clicks</span>
+                                                            <span className="link-percentage">({formatPercentage(link.percentage)})</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {hasMore && (
+                                                <button
+                                                    className="load-more-button"
+                                                    onClick={() => setClicksLimit(prev => prev + 5)}
+                                                >
+                                                    Show More ({remaining} remaining)
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
+                                {campaignMetadata.device_breakdown && (
+                                    <div className="device-section">
+                                        <h4>Device Usage</h4>
+                                        <div className="device-stats">
+                                            <div className="device-card">
+                                                <div className="device-label">Desktop</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.desktop_rate)}</div>
+                                            </div>
+                                            <div className="device-card">
+                                                <div className="device-label">Mobile</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.mobile_rate)}</div>
+                                            </div>
+                                            <div className="device-card">
+                                                <div className="device-label">Unknown</div>
+                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.unknown_rate)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {campaignMetadata.time_based_open_rates && (
                                     <div className="time-based-section">
                                         <h4>Time-Based Open Rates</h4>
@@ -657,25 +708,48 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
 
                                 {campaignMetadata.geographic_breakdown && (
                                     <div className="geographic-section">
-                                        <h4>Geographic Metrics</h4>
-                                        <div className="geo-bars-container">
+                                        <h4>Geographic Breakdown</h4>
+                                        <div className="geo-legend">
+                                            <span className="geo-legend-item">
+                                                <span className="geo-legend-dot geo-legend-audience"></span>
+                                                Audience Share
+                                            </span>
+                                            <span className="geo-legend-item">
+                                                <span className="geo-legend-dot geo-legend-openrate"></span>
+                                                Open Rate
+                                            </span>
+                                        </div>
+                                        <div className="geo-grid">
                                             {Object.entries(campaignMetadata.geographic_breakdown)
-                                                .sort((a, b) => b[1].percentage_of_audience - a[1].percentage_of_audience)
+                                                .filter(([region]) => region.toLowerCase() !== 'unknown')
+                                                .sort((a, b) => {
+                                                    const order = ['west', 'northeast', 'midwest', 'southeast', 'southwest'];
+                                                    const idxA = order.indexOf(a[0].toLowerCase());
+                                                    const idxB = order.indexOf(b[0].toLowerCase());
+                                                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                                                })
                                                 .map(([region, data]) => (
-                                                    <div key={region} className="geo-bar-item">
-                                                        <div className="geo-bar-header">
-                                                            <span className="geo-region-name">{region.toUpperCase()}</span>
-                                                            <span className="geo-open-rate">{formatPercentage(data.open_rate)}</span>
-                                                        </div>
-                                                        <div className="geo-bar-track">
-                                                            <div
-                                                                className="geo-bar-fill"
-                                                                style={{ width: `${Math.min(data.percentage_of_audience, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <div className="geo-bar-stats">
-                                                            <span>{formatPercentage(data.percentage_of_audience)} of audience</span>
-                                                            <span>{formatNumber(data.delivered)} sent</span>
+                                                    <div key={region} className="geo-cell">
+                                                        <div className="geo-cell-name">{region.toUpperCase()}</div>
+                                                        <div className="geo-dual-bars">
+                                                            <div className="geo-dual-row">
+                                                                <div className="geo-dual-track">
+                                                                    <div
+                                                                        className="geo-dual-fill geo-fill-audience"
+                                                                        style={{ width: `${Math.min(data.percentage_of_audience, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="geo-dual-value">{formatPercentage(data.percentage_of_audience)}</span>
+                                                            </div>
+                                                            <div className="geo-dual-row">
+                                                                <div className="geo-dual-track">
+                                                                    <div
+                                                                        className="geo-dual-fill geo-fill-openrate"
+                                                                        style={{ width: `${Math.min(data.open_rate, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="geo-dual-value">{formatPercentage(data.open_rate)}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -717,56 +791,6 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                     );
                                 })()}
 
-                                  {campaignMetadata.device_breakdown && (
-                                    <div className="device-section">
-                                        <h4>Device Usage</h4>
-                                        <div className="device-stats">
-                                            <div className="device-card">
-                                                <div className="device-label">Desktop</div>
-                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.desktop_rate)}</div>
-                                            </div>
-                                            <div className="device-card">
-                                                <div className="device-label">Mobile</div>
-                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.mobile_rate)}</div>
-                                            </div>
-                                            <div className="device-card">
-                                                <div className="device-label">Unknown</div>
-                                                <div className="device-value">{formatPercentage(campaignMetadata.device_breakdown.unknown_rate)}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {campaignMetadata.what_was_clicked && (
-                                    <div className="clicks-section">
-                                        <h4>What Was Clicked</h4>
-                                        <div className="clicks-summary">
-                                            <div className="clicks-stat">
-                                                <span className="clicks-label">Total Clicks (Filtered):</span>
-                                                <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_clicks_after_filtering)}</span>
-                                            </div>
-                                            <div className="clicks-stat">
-                                                <span className="clicks-label">Bot Clicks Removed:</span>
-                                                <span className="clicks-value">{formatNumber(campaignMetadata.what_was_clicked.total_bot_clicks_removed)}</span>
-                                            </div>
-                                        </div>
-                                        <div className="clicks-links">
-                                            {campaignMetadata.what_was_clicked.links.map((link, index) => (
-                                                <div key={index} className="click-link-card">
-                                                    <div className="link-url">
-                                                        <a href={link.url} target="_blank" rel="noopener noreferrer">
-                                                            {link.url}
-                                                        </a>
-                                                    </div>
-                                                    <div className="link-stats">
-                                                        <span className="link-clicks">{formatNumber(link.clicks)} clicks</span>
-                                                        <span className="link-percentage">({formatPercentage(link.percentage)})</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         )}
 

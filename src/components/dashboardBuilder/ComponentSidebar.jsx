@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { THEME_INFO, AVAILABLE_METRICS, TABLE_TYPES, TABLE_DEFINITIONS } from './template/LayoutTemplates';
+import { THEME_INFO, AVAILABLE_METRICS } from './template/LayoutTemplates';
 import { API_BASE_URL } from '../../config/api';
 import { matchesSearchTerm } from '../../utils/searchUtils';
+import '../../styles/DashboardBuilder.css';
 
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 const YOUTUBE_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2026-01-23T22:10:53Z&se=2028-02-03T06:25:53Z&spr=https&sv=2024-11-04&sr=b&sig=5a4p0mFtPn4d9In830LMCQOJlaqkcuPCt7okIDLSHBA%3D";
@@ -13,11 +14,11 @@ const ComponentSidebar = ({
   selectedCampaign,
   currentTheme,
   costComparisonMode,
-  showPatientImpact,
+  showTotalSends,
   specialtyMergeMode,
   onThemeChange,
   onCostModeChange,
-  onPatientImpactToggle,
+  onTotalSendsToggle,
   onCampaignChange,
   onToggleSpecialtyMerge,
   onAddComponent,
@@ -28,8 +29,6 @@ const ComponentSidebar = ({
   onBudgetedCostChange,
   onActualCostChange,
   currentTemplate = 'single',
-  selectedTableTypes = {},
-  onTableTypeChange,
   onRestoreDashboard,
   selectedRowInfo = null,
   onAddJournalMetricRow,
@@ -39,8 +38,6 @@ const ComponentSidebar = ({
 }) => {
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
-  const [customTableRows, setCustomTableRows] = useState(2);
-  const [customTableCols, setCustomTableCols] = useState(2);
 
   const [savedDashboards, setSavedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
@@ -427,7 +424,7 @@ const ComponentSidebar = ({
       id: 'add-components',
       label: 'Add Components',
       icon: '➕',
-      count: AVAILABLE_METRICS.length + Object.keys(TABLE_TYPES).length + 1
+      count: AVAILABLE_METRICS.length + 1
     },
     {
       id: 'restore',
@@ -483,44 +480,6 @@ const ComponentSidebar = ({
     };
       onAddComponent?.(component);
   }, [selectedCampaign, campaigns, onAddComponent]);
-
-  const handleAddCustomTable = useCallback(() => {
-    const rows = Math.max(1, Math.min(8, customTableRows));
-    const cols = Math.max(1, Math.min(8, customTableCols)); 
-    
-    const tableData = [];
-    for (let i = 0; i < rows; i++) {
-      const row = [];
-      for (let j = 0; j < cols; j++) {
-        if (i === 0) {
-          row.push(`Header ${j + 1}`);
-        } else {
-          row.push(`Row ${i} Col ${j + 1}`);
-        }
-      }
-      tableData.push(row);
-    }
-    
-    const component = {
-      id: `custom-table-${rows}x${cols}-${Date.now()}`,
-      type: 'table',
-      title: `Custom Table (${rows}x${cols})`,
-      config: {
-        customData: tableData,
-        headers: tableData[0],
-        dataType: 'custom',
-        dimensions: { rows, cols }
-      },
-      position: { 
-        x: 100 + Math.random() * 200, 
-        y: 100 + Math.random() * 200, 
-        width: Math.max(280, cols * 80), 
-        height: Math.max(180, rows * 35) 
-      }
-    };
-
-    onAddComponent?.(component);
-  }, [customTableRows, customTableCols, onAddComponent]);
 
   const handleAddGenericCard = useCallback(() => {
     const component = {
@@ -807,7 +766,7 @@ const ComponentSidebar = ({
           ))}
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}>
+        <div className="dc-sidebar-scroll" style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}>
           {activeSection === 'controls' && (
             <div className="dc-sidebar-section">
               <div style={{ marginBottom: '24px' }}>
@@ -1796,75 +1755,91 @@ const ComponentSidebar = ({
                 }}>
                   <input
                     type="checkbox"
-                    checked={showPatientImpact}
-                    onChange={onPatientImpactToggle}
+                    checked={showTotalSends}
+                    onChange={onTotalSendsToggle}
                     style={{ margin: 0 }}
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
-                      Show Patient Impact
+                      Show Total Sends
                     </div>
                   </div>
                 </label>
               </div>
-
-              {(currentTemplate === 'single-two' || currentTemplate === 'single-three' || currentTemplate === 'multi-two' || currentTemplate === 'multi-three') && (
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>
-                    Table Configuration
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {Array.from({ length: (currentTemplate === 'single-two' || currentTemplate === 'multi-two') ? 2 : 3 }, (_, index) => {
-                      const tablePosition = index + 1;
-                      const currentSelection = selectedTableTypes[`table${tablePosition}`] || TABLE_TYPES.ONLINE_JOURNAL;
-                      
-                      return (
-                        <div key={tablePosition} style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          padding: '12px',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(255, 255, 255, 0.1)'
-                        }}>
-                          <label style={{ 
-                            color: 'white', 
-                            display: 'block', 
-                            marginBottom: '6px', 
-                            fontWeight: '600',
-                            fontSize: '13px'
-                          }}>
-                            Table {tablePosition}
-                          </label>
-                          <select 
-                            value={currentSelection}
-                            onChange={(e) => onTableTypeChange?.(`table${tablePosition}`, e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '8px',
-                              borderRadius: '4px',
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              background: 'rgba(255, 255, 255, 0.1)',
-                              color: 'white',
-                              fontSize: '12px'
-                            }}
-                          >
-                            {Object.entries(TABLE_DEFINITIONS).map(([key, definition]) => (
-                              <option key={key} value={key} style={{ background: '#1e293b', color: 'white' }}>
-                                {definition.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
             </div>
           )}
 
           {activeSection === 'add-components' && (
             <div className="dc-sidebar-section">
+
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+                  Ready-Made Tables
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    onClick={handleAddLandingPageImpressions}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Landing Page Impressions
+                  </button>
+                  <button
+                    onClick={handleAddVideoMetricsTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Video Metrics
+                  </button>
+                  <button
+                    onClick={handleAddJournalMetricsTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Online Journal Metrics
+                  </button>
+                  <button
+                    onClick={handleAddSocialMediaTable}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    LinkedIn Social Media Metrics
+                  </button>
+                </div>
+              </div>
 
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
@@ -1955,141 +1930,6 @@ const ComponentSidebar = ({
                 </div>
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-                  Ready-Made Tables
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <button
-                    onClick={handleAddLandingPageImpressions}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    Landing Page Impressions
-                  </button>
-                  <button
-                    onClick={handleAddVideoMetricsTable}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    Video Metrics
-                  </button>
-                  <button
-                    onClick={handleAddJournalMetricsTable}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    Online Journal Metrics
-                  </button>
-                  <button
-                    onClick={handleAddSocialMediaTable}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      textAlign: 'left'
-                    }}
-                  >
-                    LinkedIn Social Media Metrics
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-                  Custom Table Builder
-                </h4>
-                <div style={{ 
-                  background: 'rgba(255, 255, 255, 0.05)', 
-                  padding: '12px', 
-                  borderRadius: '6px',
-                  marginBottom: '12px'
-                }}>
-                  <div style={{ marginBottom: '8px' }}>
-                    <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                      Rows (1-8):
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="8"
-                      value={customTableRows}
-                      onChange={(e) => setCustomTableRows(parseInt(e.target.value))}
-                      style={{
-                        marginBottom: '4px'
-                      }}
-                    />
-                    <div style={{ color: 'white', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
-                      {customTableRows} rows
-                    </div>
-                  </div>
-                  
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                      Columns (1-8):
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="8"
-                      value={customTableCols}
-                      onChange={(e) => setCustomTableCols(parseInt(e.target.value))}
-                      style={{
-                        marginBottom: '4px'
-                      }}
-                    />
-                    <div style={{ color: 'white', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
-                      {customTableCols} columns
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleAddCustomTable}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Create {customTableRows}×{customTableCols} Table
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 

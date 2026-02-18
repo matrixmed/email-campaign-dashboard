@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/TimingIntelligence.css';
+import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 
-const TimingIntelligence = () => {
+const TimingIntelligence = ({ onClearCache }) => {
   const [loading, setLoading] = useState(false);
   const [timingData, setTimingData] = useState(null);
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
@@ -433,6 +434,18 @@ const TimingIntelligence = () => {
 
   return (
     <div className="timing-intelligence">
+      <div className="section-header-bar">
+        <h3>Timing Intelligence</h3>
+        {onClearCache && (
+          <button
+            className="clear-cache-button"
+            onClick={onClearCache}
+            title="Clear cached data and reload"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="timing-filters">
         <div className="filter-row">
           <div className="filter-group">

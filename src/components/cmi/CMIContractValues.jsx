@@ -280,19 +280,6 @@ const CMIContractValues = () => {
     return 0;
   });
 
-  if (loading) {
-    return (
-      <div className="cmi-contract-values">
-        <div className="loading-container">
-          <div className="spinner">
-            <div></div><div></div><div></div><div></div><div></div><div></div>
-          </div>
-          <p>Loading contracts...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="cmi-contract-values">
       <div className="page-header">
@@ -308,6 +295,15 @@ const CMIContractValues = () => {
         </div>
       </div>
 
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <p>Loading contracts...</p>
+        </div>
+      ) : (
+      <>
       <div className="cmi-controls-top">
         <div className="year-tabs">
           <button
@@ -403,6 +399,8 @@ const CMIContractValues = () => {
         <div className="cmi-empty">
           No contracts found. Click "Add Row" to create one.
         </div>
+      )}
+      </>
       )}
     </div>
   );

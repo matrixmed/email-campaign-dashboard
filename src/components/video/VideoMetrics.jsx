@@ -5,9 +5,9 @@ import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
 import { MATRIX_COLORS, JCAD_COLORS, ICNS_COLORS, ONCOLOGY_COLORS } from '../dashboardBuilder/template/LayoutTemplates';
 
-const VideoMetrics = () => {
+const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
     const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
-    const [videoSource, setVideoSource] = useState('youtube');
+    const [videoSource, setVideoSource] = useState(forceSource || 'youtube');
     const [youtubeData, setYoutubeData] = useState({ videos: {}, playlists: {} });
     const [vimeoData, setVimeoData] = useState({ videos: [] });
     const [videosList, setVideosList] = useState([]);
@@ -25,16 +25,66 @@ const VideoMetrics = () => {
     const [selectedChannels, setSelectedChannels] = useState([]);
 
     const CHANNEL_COLORS = {
-        'Matrix Medical Communications': MATRIX_COLORS.secondary,
-        'Oncology Matrix': ONCOLOGY_COLORS.primary,
+        'Matrix': MATRIX_COLORS.secondary,
+        'Oncology': ONCOLOGY_COLORS.primary,
         'ICNS': ICNS_COLORS.primary,
         'JCAD': JCAD_COLORS.primary,
+        'Multiple': '#9333ea',
+    };
+
+    const getDisplayChannelName = (channelName) => {
+        const mapping = {
+            'Matrix Medical Communications': 'Matrix',
+            'Oncology Matrix': 'Oncology',
+            'Multiple Channels': 'Multiple',
+        };
+        return mapping[channelName] || channelName;
     };
 
     const toggleChannel = (channelName) => {
         setSelectedChannels(prev =>
             prev.includes(channelName) ? prev.filter(c => c !== channelName) : [...prev, channelName]
         );
+    };
+
+    const normalizeTitle = (title) => {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    const mergeVideosByTitle = (videos) => {
+        const titleMap = new Map();
+
+        videos.forEach(video => {
+            const normalizedTitle = normalizeTitle(video.title);
+
+            if (titleMap.has(normalizedTitle)) {
+                const existing = titleMap.get(normalizedTitle);
+                existing.views += video.views;
+                existing.totalWatchTimeSeconds += video.totalWatchTimeSeconds;
+                existing.current.likes = (existing.current.likes || 0) + (video.current?.likes || 0);
+                existing.current.comments = (existing.current.comments || 0) + (video.current?.comments || 0);
+                existing.current.shares = (existing.current.shares || 0) + (video.current?.shares || 0);
+                if (!existing.mergedChannels) {
+                    existing.mergedChannels = [{ id: existing.id, channelName: existing.channelName, views: existing.views - video.views }];
+                }
+                existing.mergedChannels.push({ id: video.id, channelName: video.channelName, views: video.views });
+                existing.channelName = 'Multiple';
+                const totalViews = existing.views;
+                if (totalViews > 0) {
+                    const existingWeight = (existing.views - video.views) * (existing.avgPercentWatched || 0);
+                    const newWeight = video.views * (video.avgPercentWatched || 0);
+                    existing.avgPercentWatched = (existingWeight + newWeight) / totalViews;
+                }
+            } else {
+                titleMap.set(normalizedTitle, { ...video });
+            }
+        });
+
+        return Array.from(titleMap.values());
     };
 
     const togglePlaylist = (playlistId) => {
@@ -140,6 +190,11 @@ const VideoMetrics = () => {
 
         let filtered = sortedVideos;
 
+        if (videoSource === 'youtube' && viewMode !== 'channel') {
+            filtered = mergeVideosByTitle(filtered);
+            filtered = filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
+        }
+
         if (viewMode === 'playlist' && selectedPlaylists.length > 0 && videoSource === 'youtube') {
             const allPlaylistVideoIds = new Set();
             selectedPlaylists.forEach(playlistId => {
@@ -162,6 +217,13 @@ const VideoMetrics = () => {
         setFilteredData(filtered);
         setCurrentPage(1);
     }, [videoSource, youtubeData, vimeoData, search, viewMode, selectedPlaylists, selectedChannels]);
+
+    useEffect(() => {
+        if (externalSearch !== undefined) {
+            setSearch(externalSearch);
+            setCurrentPage(1);
+        }
+    }, [externalSearch]);
 
     const handleSearchChange = (e) => {
         const searchValue = e.target.value;
@@ -351,33 +413,37 @@ const VideoMetrics = () => {
 
     return (
         <div className="video-metrics-container">
-            <div className="page-header">
-                <h1>Video Metrics</h1>
-                <div className="search-container">
-                    <input
-                        type="text"
-                        className="search-input"
-                        placeholder="Search"
-                        value={search}
-                        onChange={handleSearchChange}
-                    />
+            {!embedded && (
+                <div className="page-header">
+                    <h1>Video Metrics</h1>
+                    <div className="search-container">
+                        <input
+                            type="text"
+                            className="search-input"
+                            placeholder="Search"
+                            value={search}
+                            onChange={handleSearchChange}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
 
-            <div className="data-source-toggle">
-                <div
-                    className={`data-source-option ${videoSource === 'youtube' ? 'active' : ''}`}
-                    onClick={() => { setVideoSource('youtube'); setCurrentPage(1); setViewMode('all'); setSelectedPlaylists([]); }}
-                >
-                    YouTube
+            {!forceSource && (
+                <div className="data-source-toggle">
+                    <div
+                        className={`data-source-option ${videoSource === 'youtube' ? 'active' : ''}`}
+                        onClick={() => { setVideoSource('youtube'); setCurrentPage(1); setViewMode('all'); setSelectedPlaylists([]); }}
+                    >
+                        YouTube
+                    </div>
+                    <div
+                        className={`data-source-option ${videoSource === 'vimeo' ? 'active' : ''}`}
+                        onClick={() => { setVideoSource('vimeo'); setCurrentPage(1); setViewMode('all'); setSelectedPlaylists([]); }}
+                    >
+                        Vimeo
+                    </div>
                 </div>
-                <div
-                    className={`data-source-option ${videoSource === 'vimeo' ? 'active' : ''}`}
-                    onClick={() => { setVideoSource('vimeo'); setCurrentPage(1); setViewMode('all'); setSelectedPlaylists([]); }}
-                >
-                    Vimeo
-                </div>
-            </div>
+            )}
 
             <div className="video-metrics-summary">
                 <div className="metric-summary-card">
@@ -456,23 +522,26 @@ const VideoMetrics = () => {
 
                     {viewMode === 'channel' && videoSource === 'youtube' && (
                         <div className="channel-selector">
-                            {getChannels().map(ch => (
-                                <div
-                                    key={ch.name}
-                                    className={`channel-selector-item ${selectedChannels.includes(ch.name) ? 'active' : ''}`}
-                                    onClick={() => toggleChannel(ch.name)}
-                                    style={{
-                                        '--channel-color': CHANNEL_COLORS[ch.name] || '#575757',
-                                    }}
-                                >
-                                    <span
-                                        className="channel-color-dot"
-                                        style={{ backgroundColor: CHANNEL_COLORS[ch.name] || '#575757' }}
-                                    ></span>
-                                    <span className="channel-selector-title">{ch.name}</span>
-                                    <span className="channel-selector-count">{ch.count}</span>
-                                </div>
-                            ))}
+                            {getChannels().map(ch => {
+                                const displayName = getDisplayChannelName(ch.name);
+                                return (
+                                    <div
+                                        key={ch.name}
+                                        className={`channel-selector-item ${selectedChannels.includes(ch.name) ? 'active' : ''}`}
+                                        onClick={() => toggleChannel(ch.name)}
+                                        style={{
+                                            '--channel-color': CHANNEL_COLORS[displayName] || '#575757',
+                                        }}
+                                    >
+                                        <span
+                                            className="channel-color-dot"
+                                            style={{ backgroundColor: CHANNEL_COLORS[displayName] || '#575757' }}
+                                        ></span>
+                                        <span className="channel-selector-title">{displayName}</span>
+                                        <span className="channel-selector-count">{ch.count}</span>
+                                    </div>
+                                );
+                            })}
                             {selectedChannels.length > 0 && (
                                 <div
                                     className="channel-selector-item clear-all"
@@ -554,10 +623,10 @@ const VideoMetrics = () => {
                                             <span
                                                 className="channel-badge"
                                                 style={{
-                                                    '--channel-color': CHANNEL_COLORS[item.channelName] || '#575757'
+                                                    '--channel-color': CHANNEL_COLORS[getDisplayChannelName(item.channelName)] || '#575757'
                                                 }}
                                             >
-                                                {item.channelName === 'Matrix Medical Communications' ? 'Matrix' : item.channelName}
+                                                {getDisplayChannelName(item.channelName)}
                                             </span>
                                         </td>
                                     )}

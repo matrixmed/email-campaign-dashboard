@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import '../../styles/ListEfficiencyAnalysis.css';
-
+import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 
-const ListEfficiencyAnalysis = forwardRef((props, ref) => {
+const ListEfficiencyAnalysis = () => {
     const loadPersistedState = () => {
         try {
             const saved = localStorage.getItem('listAnalysisState');
@@ -100,10 +100,6 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
         setError(null);
         localStorage.removeItem('listAnalysisState');
     };
-
-    useImperativeHandle(ref, () => ({
-        clearAnalysis
-    }));
 
     const uploadLists = async () => {
         if (!iqviaFile || targetFiles.length === 0) {
@@ -314,6 +310,11 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
     }, [getTierTableState, updateTierTableState]);
 
     return (
+        <>
+        <div className="section-header-bar">
+            <h3>List Efficiency Analysis</h3>
+            <button className="section-header-clear-btn" onClick={clearAnalysis}>Clear</button>
+        </div>
         <div className="list-analysis-container">
             <div className="analysis-content">
                 {error && (
@@ -702,7 +703,8 @@ const ListEfficiencyAnalysis = forwardRef((props, ref) => {
             )}
             </div>
         </div>
+        </>
     );
-});
+};
 
 export default ListEfficiencyAnalysis;

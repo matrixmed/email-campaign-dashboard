@@ -94,10 +94,10 @@ body {
 
 .chart-section, .table-section, .insights-section, .buffer-section, .live-campaign-metrics {
   margin: 20px 0;
-  background-color: #222;
+  background-color: var(--color-bg-elevated, #222224);
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #333336);
 }
   
 .buffer-section {
@@ -194,7 +194,7 @@ h1 {
   background-color: #333 !important;
   color: #0ff !important;
   font-weight: 600 !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
 }
 
 .dashboard-container td,
@@ -211,7 +211,7 @@ h1 {
 .chart-section tbody tr:nth-child(even),
 .insights-section tbody tr:nth-child(even),
 .live-campaign-metrics tbody tr:nth-child(even) {
-  background-color: #2a2a2d !important;
+  background-color: var(--color-bg-elevated, #222224) !important;
 }
 
 .dashboard-container tbody tr:nth-child(odd),
@@ -219,7 +219,7 @@ h1 {
 .chart-section tbody tr:nth-child(odd),
 .insights-section tbody tr:nth-child(odd),
 .live-campaign-metrics tbody tr:nth-child(odd) {
-  background-color: #222 !important;
+  background-color: var(--color-bg-card, #2a2a2d) !important;
 }
 
 .dashboard-container tr:hover,
@@ -227,7 +227,7 @@ h1 {
 .chart-section tr:hover,
 .insights-section tr:hover,
 .live-campaign-metrics tr:hover {
-  background-color: #2a2a2d !important;
+  background-color: var(--color-bg-card, #2a2a2d) !important;
 }
  
 .dropdown {
@@ -843,12 +843,12 @@ body.light .live-campaign-metrics {
 }
 
 body.light th {
-  background-color: #f3f3f3;
+  background-color: #e9ecef;
   color: #333;
 }
 
 body.light tr:nth-child(even) {
-  background-color: #f5f5f5;
+  background-color: #f8f9fa;
 }
 
 body.light .pagination button {
@@ -870,7 +870,7 @@ body.light h2 {
 
 body.light table th {
   background-color: #e9ecef;
-  color: #495057;
+  color: #333;
 }
 
 body.light table td {

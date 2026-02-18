@@ -15,9 +15,9 @@ const normalizePublicationName = (publication) => {
     return publication;
 };
 
-const DigitalJournals = () => {
+const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
     const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
-    const [dataSource, setDataSource] = useState('walsworth');
+    const [dataSource, setDataSource] = useState(forceSource || 'walsworth');
     const [journalsData, setJournalsData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [walsworthData, setWalsworthData] = useState([]);
@@ -591,6 +591,13 @@ const DigitalJournals = () => {
         };
     }, [isModalOpen]);
 
+    useEffect(() => {
+        if (externalSearch !== undefined) {
+            setSearch(externalSearch);
+            setCurrentPage(1);
+        }
+    }, [externalSearch]);
+
     const handleSearchChange = (e) => {
         const searchValue = e.target.value;
         setSearch(searchValue);
@@ -751,33 +758,37 @@ const DigitalJournals = () => {
 
     return (
         <div className="digital-journals-container">
-            <div className="page-header">
-                <h1>Digital Journal Metrics</h1>
-                <div className="search-container">
-                    <input
-                        type="text"
-                        className="search-input"
-                        placeholder="Search"
-                        value={search}
-                        onChange={handleSearchChange}
-                    />
+            {!embedded && (
+                <div className="page-header">
+                    <h1>Digital Journal Metrics</h1>
+                    <div className="search-container">
+                        <input
+                            type="text"
+                            className="search-input"
+                            placeholder="Search"
+                            value={search}
+                            onChange={handleSearchChange}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
 
-            <div className="data-source-toggle">
-                <div
-                    className={`data-source-option ${dataSource === 'walsworth' ? 'active' : ''}`}
-                    onClick={() => { setDataSource('walsworth'); setCurrentPage(1); }}
-                >
-                    Walsworth
+            {!forceSource && (
+                <div className="data-source-toggle">
+                    <div
+                        className={`data-source-option ${dataSource === 'walsworth' ? 'active' : ''}`}
+                        onClick={() => { setDataSource('walsworth'); setCurrentPage(1); }}
+                    >
+                        Walsworth
+                    </div>
+                    <div
+                        className={`data-source-option ${dataSource === 'google' ? 'active' : ''}`}
+                        onClick={() => { setDataSource('google'); setCurrentPage(1); }}
+                    >
+                        Google Analytics
+                    </div>
                 </div>
-                <div
-                    className={`data-source-option ${dataSource === 'google' ? 'active' : ''}`}
-                    onClick={() => { setDataSource('google'); setCurrentPage(1); }}
-                >
-                    Google Analytics
-                </div>
-            </div>
+            )}
 
             {dataSource === 'walsworth' ? (
                 <div className="journal-metrics-summary">

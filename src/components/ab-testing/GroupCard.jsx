@@ -21,10 +21,10 @@ const GroupCard = ({
   }, [group]);
 
   useEffect(() => {
-    if ((category === 'Subject Line' || category === 'Time of Day') && group.campaign_name_pattern) {
+    if (category === 'Time of Day' && !group.sendTime && group.campaign_name_pattern) {
       fetchCampaignDetails(group.campaign_name_pattern);
     }
-  }, [category, group.campaign_name_pattern]);
+  }, [category, group.campaign_name_pattern, group.sendTime]);
 
   const fetchCampaignDetails = async (pattern) => {
     try {
@@ -72,33 +72,34 @@ const GroupCard = ({
   };
 
   const renderContextDisplay = () => {
-    if (category === 'Subject Line' && contextInfo?.subject) {
-      return (
-        <div className="ab-group-context">
-          <span className="ab-group-context-label">Subject:</span>
-          <span className="ab-group-context-value">{contextInfo.subject}</span>
-        </div>
-      );
-    }
-    if (category === 'Time of Day' && contextInfo?.send_time) {
-      const date = new Date(contextInfo.send_time);
-      return (
-        <div className="ab-group-context">
-          <span className="ab-group-context-label">Send Time:</span>
-          <span className="ab-group-context-value">
-            {date.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}
-          </span>
-        </div>
-      );
-    }
+    const elements = [];
+
     if (group.campaign_name_pattern) {
-      return (
-        <div className="ab-group-context">
+      elements.push(
+        <div key="name" className="ab-group-context">
           <span className="ab-group-context-value ab-group-context-name">{group.campaign_name_pattern}</span>
         </div>
       );
     }
-    return null;
+
+    if (category === 'Time of Day') {
+      const sendTime = group.sendTime || contextInfo?.send_time;
+      if (sendTime) {
+        const date = new Date(sendTime);
+        if (!isNaN(date)) {
+          elements.push(
+            <div key="time" className="ab-group-context">
+              <span className="ab-group-context-label">Send Time:</span>
+              <span className="ab-group-context-value">
+                {date.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}
+              </span>
+            </div>
+          );
+        }
+      }
+    }
+
+    return elements.length > 0 ? <>{elements}</> : null;
   };
 
   const metricRows = [

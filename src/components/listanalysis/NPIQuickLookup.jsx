@@ -1,6 +1,7 @@
-import React, { useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useState } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import '../../styles/NPIQuickLookup.css';
+import '../../styles/SectionHeaders.css';
 import { getSpecialtyFromTaxonomy } from './taxonomyMapping';
 
 const formatZipcode = (zip) => {
@@ -36,7 +37,7 @@ const getSpecialty = (profile) => {
   return "";
 };
 
-const NPIQuickLookup = forwardRef((props, ref) => {
+const NPIQuickLookup = () => {
   const [npiInput, setNpiInput] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -148,14 +149,13 @@ const NPIQuickLookup = forwardRef((props, ref) => {
     });
   };
 
-  useImperativeHandle(ref, () => ({
-    clearLookup
-  }));
-
   return (
-    <div className="npi-quick-lookup">
-      <h2>NPI Quick Lookup</h2>
-
+    <>
+      <div className="section-header-bar">
+        <h3>NPI Lookup</h3>
+        <button className="section-header-clear-btn" onClick={clearLookup}>Clear</button>
+      </div>
+      <div className="npi-quick-lookup">
       <textarea
         className="npi-input-textarea"
         placeholder="1234567890&#10;9876543210&#10;1122334455"
@@ -299,7 +299,8 @@ const NPIQuickLookup = forwardRef((props, ref) => {
         );
       })()}
     </div>
+    </>
   );
-});
+};
 
 export default NPIQuickLookup;

@@ -57,24 +57,28 @@
 
 .analytics-tabs-container {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  justify-content: space-between;
   margin-bottom: 25px;
+  border-bottom: 1px solid #444;
+  gap: 12px;
+}
+
+.analytics-tabs-container .analytics-tabs {
+  margin-bottom: 0;
+  border-bottom: none;
 }
 
 .analytics-tabs {
   display: flex;
-  justify-content: flex-start;
   align-items: center;
   gap: 4px;
+  width: 100%;
+  margin-bottom: 25px;
+  border-bottom: 1px solid #444;
   overflow-x: auto;
-  overflow-y: hidden;
-  max-width: 80%;
-  flex: 1;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  border-bottom: 1px solid #444;
 }
 
 .analytics-tabs::-webkit-scrollbar {
@@ -143,12 +147,35 @@
   top: calc(100% + 4px);
   right: 0;
   min-width: 100%;
+  width: max-content;
   background: var(--color-bg-elevated, #222224);
   border: 1px solid var(--color-border, #333336);
   border-radius: var(--radius-sm, 4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 100;
-  overflow: hidden;
+}
+
+.year-dropdown-scroll {
+  max-height: 250px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.year-dropdown-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.year-dropdown-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.year-dropdown-scroll::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.year-dropdown-scroll::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
 
 .custom-dropdown-option {
@@ -160,6 +187,7 @@
   transition: background 0.15s ease;
   color: #ccc;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .custom-dropdown-option:hover {
@@ -206,15 +234,11 @@
 }
 
 .tab-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 12px 20px;
   background: none;
   border: none;
   color: #aaa;
   cursor: pointer;
-  border-radius: 8px 8px 0 0;
   transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 500;

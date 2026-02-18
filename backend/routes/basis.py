@@ -52,8 +52,6 @@ def get_recommendations():
             win_rate = (impr / bids * 100) if bids > 0 else 0
             vol_pct = (impr / total_impr * 100) if total_impr > 0 else 0
             ecpm_vs_avg = ((ecpm - avg_ecpm) / avg_ecpm * 100) if avg_ecpm > 0 else 0
-            # Industry standard: 10-20% win rate is ideal, 35%+ indicates overbidding
-            # Target 20% win rate for growth calculations
             potential_impr = int(bids * 0.20) - impr if bids > 0 and win_rate < 20 else 0
             potential_impr = max(0, potential_impr)
 
@@ -71,10 +69,6 @@ def get_recommendations():
                 'potential_gain': potential_impr
             })
 
-        # Industry benchmarks (from adjoe, Choozle, programmatic research):
-        # - 10-20% win rate is normal/ideal
-        # - 35%+ indicates potential overbidding
-        # - 50%+ is severe overbidding (paying significantly more than needed)
 
         for ex in exchange_analysis:
             win_rate = ex['win_rate']
@@ -84,7 +78,6 @@ def get_recommendations():
             potential = ex['potential_gain']
             name = ex['name']
 
-            # Severe overbidding: 50%+ win rate means you're winning way too much
             if win_rate >= 50 and vol_pct >= 1:
                 overbid_pct = min(40, int((win_rate - 20) / 1.5))
                 savings = ex['spend'] * (overbid_pct / 100)
@@ -119,7 +112,6 @@ def get_recommendations():
                     }
                 })
 
-            # Moderate overbidding: 35-50% win rate - still above optimal
             elif win_rate >= 35 and win_rate < 50 and vol_pct >= 3:
                 overbid_pct = min(25, int((win_rate - 20) / 2))
                 savings = ex['spend'] * (overbid_pct / 100)
@@ -154,8 +146,6 @@ def get_recommendations():
                     }
                 })
 
-            # Growth opportunity: Win rate below 10% means there's potential to capture more inventory
-            # Only recommend if eCPM is good (below avg) - don't chase expensive inventory
             if win_rate < 10 and win_rate > 0 and potential > 5000 and ecpm_vs_avg < 0:
                 multiplier = round(1.0 + ((20 - win_rate) / 50), 2)
                 multiplier = min(1.4, multiplier)
@@ -191,7 +181,6 @@ def get_recommendations():
                     }
                 })
 
-            # Moderate growth: Win rate 10-15% with good eCPM - slight room to grow
             elif win_rate >= 10 and win_rate < 15 and potential > 3000 and ecpm_vs_avg < 10:
                 multiplier = round(1.0 + ((20 - win_rate) / 80), 2)
                 est_cost = (potential / 1000) * ecpm * multiplier
@@ -224,8 +213,6 @@ def get_recommendations():
                     }
                 })
 
-            # Only recommend disabling if expensive AND low volume AND poor CTR
-            # Don't disable if CTR is good - that engagement has value
             ctr = ex['ctr']
             ctr_vs_avg = ((ctr - avg_ctr) / avg_ctr * 100) if avg_ctr > 0 else 0
             if vol_pct < 1 and ecpm_vs_avg > 50 and ex['impressions'] < 5000 and ctr_vs_avg < 0:
@@ -256,7 +243,6 @@ def get_recommendations():
                     }
                 })
 
-        # Volume concentration warning - risky if one exchange dominates
         top_exchange = max(exchange_analysis, key=lambda x: x['volume_pct']) if exchange_analysis else None
         if top_exchange and top_exchange['volume_pct'] > 40:
             recommendations.append({
@@ -317,7 +303,6 @@ def get_recommendations():
                 ecpm_vs_avg = ((ecpm - dom_avg_ecpm) / dom_avg_ecpm * 100) if dom_avg_ecpm > 0 else 0
                 vol_pct = (impr / dom_total_impr * 100) if dom_total_impr > 0 else 0
 
-                # High CTR domains - candidates for allowlist
                 if ctr >= dom_avg_ctr * 2 and ctr >= 0.05 and impr >= 1000:
                     high_ctr_domains.append({
                         'name': d.property_name,
@@ -328,9 +313,6 @@ def get_recommendations():
                         'ctr_vs_avg': round((ctr / dom_avg_ctr - 1) * 100, 0) if dom_avg_ctr > 0 else 0
                     })
 
-                # Only flag domains that are BOTH expensive AND low value
-                # A cheap domain with 0 clicks is still providing impressions at good value
-                # Only block if: expensive (>30% above avg eCPM) AND low volume (<1% of total) AND zero/low CTR
                 if ecpm_vs_avg > 30 and vol_pct < 1 and ctr < dom_avg_ctr * 0.5 and spend >= 10:
                     expensive_low_value_domains.append({
                         'name': d.property_name,
@@ -343,7 +325,6 @@ def get_recommendations():
                         'ctr': ctr
                     })
 
-            # Expensive low-value domains - recommend blocking only the worst offenders
             expensive_low_value_domains.sort(key=lambda x: x['ecpm_vs_avg'], reverse=True)
             for dom in expensive_low_value_domains[:3]:
                 recommendations.append({
@@ -360,7 +341,7 @@ def get_recommendations():
                         'domain': dom['name']
                     },
                     'impact': {
-                        'estimated_savings': round(dom['spend'] * 0.3, 2),  # Conservative - could shift to cheaper inventory
+                        'estimated_savings': round(dom['spend'] * 0.3, 2),
                         'impressions_lost': dom['impressions'],
                         'volume_pct_lost': round(dom['vol_pct'], 2),
                         'confidence': 'medium'
@@ -417,7 +398,6 @@ def get_recommendations():
             freq_impr = freq_cap.get('impressions', 0)
             freq_hours = freq_cap.get('periodInHours', 0)
 
-            # Only flag if no frequency cap at all - don't be prescriptive about specific values
             if freq_impr == 0 or freq_hours == 0:
                 recommendations.append({
                     'id': f'camp_freq_{camp.basis_campaign_id}',
@@ -493,7 +473,6 @@ def get_last_updated():
     try:
         session = get_session()
 
-        # Get the most recent report_date from exchange stats
         result = session.query(func.max(BasisExchangeStats.report_date)).scalar()
 
         session.close()
@@ -671,11 +650,9 @@ def get_exchange_stats():
             is_cheap = ecpm_ratio < 0.85
             is_expensive = ecpm_ratio > 1.3
             is_very_expensive = ecpm_ratio > 1.6
-            # Industry standard: 10-20% is ideal, 35%+ is overbidding
             has_opportunity = win_rate < 10 and win_rate > 0
             is_overbidding = win_rate > 35
 
-            # Industry standard: target 15-20% win rate
             current_impressions = item.get('impressions', 0)
             bids = item.get('bids', 0)
             if bids > 0 and win_rate < 20:

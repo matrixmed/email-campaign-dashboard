@@ -1,5 +1,7 @@
 .list-analysis-container {
-    padding: 0;
+    background-color: var(--color-bg-card, #222);
+    border-radius: 8px;
+    padding: 20px;
 }
 
 .list-analysis-container .header-spacer {
@@ -9,10 +11,7 @@
 }
 
 .analysis-content {
-    padding: 20px;
-    background-color: #222;
-    border-radius: 8px;
-    margin-top: 20px;
+    padding: 0;
 }
 
 .list-analysis-container h3 {

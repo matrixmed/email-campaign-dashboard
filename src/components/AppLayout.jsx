@@ -32,18 +32,15 @@ const AppLayout = ({ children }) => {
   const navItems = [
     { path: '/campaigns', label: 'Campaign Performance' },
     { path: '/analytics', label: 'Campaign Analytics' },
-    { path: '/ab-testing', label: 'A/B Testing' },
-    { path: '/basis', label: 'Basis Optimization' },
     { path: '/dashboard-builder', label: 'Dashboard Builder' },
+    { path: '/ab-testing', label: 'A/B Testing' },
     { path: '/reports', label: 'Reports Management' },
-    { path: '/brands', label: 'Brand Management' },
+    { path: '/audience', label: 'Audience Analytics' },
+    { path: '/basis', label: 'Basis Performance' },
+    { path: '/content', label: 'Content Performance' },
+    { path: '/content-analysis', label: 'Content Analytics' },
     { path: '/cmi-contracts', label: 'CMI Contracts' },
-    { path: '/list-analysis', label: 'List Analysis' },
-    { path: '/audience', label: 'Audience Analysis' },
-    { path: '/specialty', label: 'Specialty Metrics' },
-    { path: '/video', label: 'Video Metrics' },
-    { path: '/journals', label: 'Journal Metrics' },
-    { path: '/content-analysis', label: 'Content Analysis' },
+    { path: '/brands', label: 'Brand Management' },
   ];
 
   const isDashboardBuilder = location.pathname === '/dashboard-builder';

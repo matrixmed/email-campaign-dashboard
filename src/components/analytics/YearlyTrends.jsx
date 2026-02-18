@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 import '../../styles/YearlyTrends.css';
+import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 
-const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] }) => {
+const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'], selectedYears = [], metricOptions = [], onMetricToggle, availableYears = [], onYearToggle }) => {
+  const [metricDropdownOpen, setMetricDropdownOpen] = useState(false);
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+  const metricDropdownRef = useRef(null);
+  const yearDropdownRef = useRef(null);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [yearlyData, setYearlyData] = useState([]);
@@ -17,6 +22,12 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
     const handleClickOutside = (event) => {
       if (campaignDropdownRef.current && !campaignDropdownRef.current.contains(event.target)) {
         setCampaignDropdownOpen(false);
+      }
+      if (metricDropdownRef.current && !metricDropdownRef.current.contains(event.target)) {
+        setMetricDropdownOpen(false);
+      }
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target)) {
+        setYearDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -42,7 +53,7 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
     if (campaigns.length > 0) {
       calculateYearlyData();
     }
-  }, [campaigns, searchTerm, selectedMetrics, excludedCampaigns]);
+  }, [campaigns, searchTerm, selectedMetrics, excludedCampaigns, selectedYears]);
 
   const cleanCampaignName = (name) => {
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
@@ -116,8 +127,6 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
       };
     });
 
-    const currentYear = new Date().getFullYear();
-    const startYear = currentYear - 4;
     const yearGroups = {};
 
     combinedCampaigns.forEach(campaign => {
@@ -125,7 +134,7 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
       if (!sendDate) return;
 
       const year = new Date(sendDate).getFullYear();
-      if (isNaN(year) || year < startYear) return;
+      if (isNaN(year) || (selectedYears.length > 0 && !selectedYears.includes(year))) return;
 
       if (!yearGroups[year]) {
         yearGroups[year] = {
@@ -217,8 +226,95 @@ const YearlyTrends = ({ searchTerm = '', selectedMetrics = ['Unique_Open_Rate'] 
     });
   };
 
+  const getMetricLabel = () => {
+    if (selectedMetrics.length === 0) return 'Select metrics';
+    if (selectedMetrics.length === 1) {
+      return metricOptions.find(m => m.key === selectedMetrics[0])?.label;
+    }
+    return `${selectedMetrics.length} metrics selected`;
+  };
+
+  const getYearLabel = () => {
+    if (availableYears.length === 0) return `${selectedYears.length} years`;
+    const active = availableYears.filter(y => selectedYears.includes(y));
+    if (active.length === 0) return 'Select years';
+    if (active.length === availableYears.length) return 'All years';
+    if (active.length <= 3) return active.join(', ');
+    return `${active.length} years selected`;
+  };
+
   return (
     <div className="yearly-trends">
+      <div className="section-header-bar">
+        <h3>Yearly Trends</h3>
+        <div className="section-header-stats">
+          <div className="metric-selector" ref={metricDropdownRef}>
+            <label>Metrics:</label>
+            <div className="custom-dropdown">
+              <button
+                className="custom-dropdown-trigger"
+                onClick={() => setMetricDropdownOpen(!metricDropdownOpen)}
+              >
+                <span className="dropdown-value">{getMetricLabel()}</span>
+                <svg className={`dropdown-arrow ${metricDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {metricDropdownOpen && (
+                <div className="custom-dropdown-menu multi-select" onMouseDown={(e) => e.stopPropagation()}>
+                  {metricOptions.map(option => (
+                    <label
+                      key={option.key}
+                      className={`custom-dropdown-option ${selectedMetrics.includes(option.key) ? 'selected' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMetrics.includes(option.key)}
+                        onChange={() => onMetricToggle(option.key)}
+                      />
+                      <span className="metric-color-dot" style={{ backgroundColor: option.color }}></span>
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="metric-selector" ref={yearDropdownRef}>
+            <label>Years:</label>
+            <div className="custom-dropdown">
+              <button
+                className="custom-dropdown-trigger"
+                onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
+              >
+                <span className="dropdown-value">{getYearLabel()}</span>
+                <svg className={`dropdown-arrow ${yearDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {yearDropdownOpen && (
+                <div className="custom-dropdown-menu multi-select" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="year-dropdown-scroll">
+                    {availableYears.slice().reverse().map(year => (
+                      <label
+                        key={year}
+                        className={`custom-dropdown-option ${selectedYears.includes(year) ? 'selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedYears.includes(year)}
+                          onChange={() => onYearToggle(year)}
+                        />
+                        <span>{year}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       {searchTerm && (
         <div className="search-results-bar">
           <div className="search-indicator">

@@ -376,19 +376,6 @@ const BrandManagement = () => {
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="brand-management">
-        <div className="loading-container">
-          <div className="spinner">
-            <div></div><div></div><div></div><div></div><div></div><div></div>
-          </div>
-          <p>Loading brands...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="brand-management">
       <div className="page-header">
@@ -404,6 +391,15 @@ const BrandManagement = () => {
         </div>
       </div>
 
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner">
+            <div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <p>Loading brands...</p>
+        </div>
+      ) : (
+      <>
       <div className="brand-header-row">
         <table className="reports-table">
           <thead>
@@ -467,7 +463,8 @@ const BrandManagement = () => {
           </tbody>
         </table>
       </div>
-
+      </>
+      )}
     </div>
   );
 };

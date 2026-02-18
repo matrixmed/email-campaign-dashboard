@@ -745,7 +745,7 @@ body.light .exchange-table th {
 
 .overview-summary-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
 }
 
@@ -4255,7 +4255,6 @@ body.light .domain-item .domain-metrics {
   }
 }
 
-/* New Recommendations Styles */
 .rec-category-filters {
   display: flex;
   gap: 8px;
@@ -4567,7 +4566,6 @@ body.light .how-to-text {
   color: #64748b;
 }
 
-/* Last Updated Tag */
 .last-updated-tag {
   display: flex;
   align-items: center;
@@ -4596,15 +4594,10 @@ body.light .last-updated-tag svg {
   color: #64748b;
 }
 
-/* ========================================
-   RECOMMENDATIONS - AB Testing Style
-   ======================================== */
-
 .basis-recommendations {
   width: 100%;
 }
 
-/* Subheader - similar to reports management */
 .basis-rec-subheader {
   display: flex;
   align-items: center;
@@ -4678,7 +4671,6 @@ body.light .last-updated-tag svg {
 .basis-rec-priority.medium { background: var(--color-warning, #f59e0b); }
 .basis-rec-priority.low { background: var(--color-success, #10b981); }
 
-/* Category badge colors */
 .ab-badge-cost_savings {
   background: rgba(16, 185, 129, 0.1);
   color: var(--color-success, #10b981);
@@ -4737,7 +4729,6 @@ body.light .last-updated-tag svg {
   color: var(--color-text-tertiary, #8a8a8a);
 }
 
-/* Card body content */
 .basis-rec-description {
   font-family: var(--font-body, 'Rubik', sans-serif);
   font-size: 0.85rem;
@@ -4807,7 +4798,6 @@ body.light .last-updated-tag svg {
   font-size: 0.8rem;
 }
 
-/* Metrics row */
 .basis-rec-metrics-row {
   display: flex;
   flex-wrap: wrap;
@@ -4848,7 +4838,6 @@ body.light .last-updated-tag svg {
   margin-top: 2px;
 }
 
-/* Domain list */
 .basis-rec-domain-list {
   display: flex;
   flex-direction: column;
@@ -4878,7 +4867,6 @@ body.light .last-updated-tag svg {
   color: var(--color-text-tertiary, #8a8a8a);
 }
 
-/* How-to section */
 .basis-rec-howto {
   padding: var(--spacing-md, 16px);
   background: rgba(139, 92, 246, 0.05);
@@ -4905,7 +4893,6 @@ body.light .last-updated-tag svg {
   line-height: 1.5;
 }
 
-/* Light mode */
 body.light .basis-rec-subheader {
   background: #f8fafc;
   border-color: #e2e8f0;
@@ -4962,7 +4949,6 @@ body.light .basis-rec-howto label {
   color: #7c3aed;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .basis-rec-details-grid {
     grid-template-columns: 1fr;

@@ -1,9 +1,12 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, distinct, text
-from models import ABTest, ABTestGroup, BrandEditorAgency, CampaignInteraction
+from models import ABTest, ABTestGroup, BrandEditorAgency
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
+
+PLATFORM_TZ = ZoneInfo('America/Chicago')
 
 ab_testing_bp = Blueprint('ab_testing', __name__)
 
@@ -254,23 +257,21 @@ def get_campaign_details():
         if not pattern:
             return jsonify({'status': 'error', 'message': 'pattern required'}), 400
 
-        session = get_session()
-        interactions = session.query(
-            CampaignInteraction.campaign_name,
-            CampaignInteraction.campaign_subject,
-            CampaignInteraction.timestamp
-        ).filter(
-            CampaignInteraction.campaign_name.ilike(f'%{pattern}%'),
-            CampaignInteraction.event_type == 'sent'
-        ).order_by(CampaignInteraction.timestamp.desc()).limit(50).all()
+        engine = create_engine(os.getenv('DATABASE_URL'))
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT cd.full_campaign_name, cd.subject_line, cd.send_date
+                FROM campaign_deployments cd
+                WHERE cd.full_campaign_name ILIKE :pattern
+                LIMIT 10
+            """), {'pattern': f'%{pattern}%'})
 
-        results = [{
-            'campaign_name': i.campaign_name,
-            'subject': i.campaign_subject,
-            'send_time': i.timestamp.isoformat() if i.timestamp else None
-        } for i in interactions]
+            results = [{
+                'campaign_name': r.full_campaign_name,
+                'subject': r.subject_line,
+                'send_time': r.send_date.replace(tzinfo=PLATFORM_TZ).isoformat() if r.send_date else None
+            } for r in rows]
 
-        session.close()
         return jsonify({
             'status': 'success',
             'details': results
@@ -354,9 +355,13 @@ def get_ab_campaigns():
             campaign_meta = {}
             campaign_ids = []
             for row in deployments:
+                send_date_str = None
+                if row.send_date:
+                    send_date_str = row.send_date.replace(tzinfo=PLATFORM_TZ).isoformat()
+
                 campaign_meta[row.campaign_id] = {
                     'name': row.full_campaign_name,
-                    'send_date': row.send_date.isoformat() if row.send_date else None,
+                    'send_date': send_date_str,
                     'subject_line': row.subject_line,
                 }
                 campaign_ids.append(row.campaign_id)

@@ -259,6 +259,12 @@
   color: #00d4c4;
 }
 
+.channel-badge[style*="--channel-color: #9333ea"] {
+  background: rgba(147, 51, 234, 0.2);
+  border-color: rgba(147, 51, 234, 0.5);
+  color: #a855f7;
+}
+
 body.light .channel-selector {
   background: #f5f5f5;
   border-color: #ddd;
@@ -663,11 +669,26 @@ body.light .engagement-value {
 }
 
 body.light .video-metrics-table th {
+  background-color: #e9ecef;
+  color: #333;
   border-bottom-color: #ddd;
 }
 
+body.light .video-metrics-table th.sortable:hover {
+  background-color: #dee2e6;
+}
+
 body.light .video-metrics-table td {
+  color: #333;
   border-bottom-color: #eee;
+}
+
+body.light .video-metrics-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+body.light .video-metrics-table tbody tr:nth-child(odd) {
+  background-color: #fff;
 }
 
 body.light .video-metrics-table tr:hover {

@@ -2897,24 +2897,11 @@ const ReportsManager = () => {
         );
     };
 
-    if (loading) {
-        return (
-            <div className="reports-manager">
-                <div className="loading-container">
-                    <div className="spinner">
-                        <div></div><div></div><div></div><div></div><div></div><div></div>
-                    </div>
-                    <p>Loading reports data...</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="reports-manager">
             <div className="reports-sticky-header">
                 <div className="page-header">
-                    <h1>Reports Manager</h1>
+                    <h1>Reports Management</h1>
                     <div className="search-container">
                         <input
                             type="text"
@@ -2966,6 +2953,14 @@ const ReportsManager = () => {
                 </div>
             </div>
 
+            {loading ? (
+                <div className="loading-container">
+                    <div className="spinner">
+                        <div></div><div></div><div></div><div></div><div></div><div></div>
+                    </div>
+                    <p>Loading reports data...</p>
+                </div>
+            ) : (
             <div className="reports-scrollable-content">
 
             {activeTab === 'current' && (() => {
@@ -3330,6 +3325,7 @@ const ReportsManager = () => {
             })()}
 
             </div>
+            )}
 
             {showModal && selectedCMIReport && (
                 <div className="edit-form-modal-overlay" onClick={() => setShowModal(false)}>

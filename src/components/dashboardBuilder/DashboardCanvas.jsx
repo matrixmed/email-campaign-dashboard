@@ -53,7 +53,7 @@ const DashboardCanvasContent = () => {
   const [budgetedCost, setBudgetedCost] = useState(initialState?.budgetedCost || 10.00);
   const [actualCost, setActualCost] = useState(initialState?.actualCost || 5.00);
   const [costComparisonMode, setCostComparisonMode] = useState(initialState?.costComparisonMode || 'none');
-  const [showPatientImpact, setShowPatientImpact] = useState(initialState?.showPatientImpact || false);
+  const [showTotalSends, setShowTotalSends] = useState(initialState?.showTotalSends || false);
   const [currentTheme, setCurrentTheme] = useState(initialState?.currentTheme || 'matrix');
   const [userModifications, setUserModifications] = useState(new Map());
   const [userEdits, setUserEdits] = useState(() => {
@@ -142,21 +142,21 @@ const DashboardCanvasContent = () => {
       currentTheme,
       specialtyMergeMode,
       costComparisonMode,
-      showPatientImpact,
+      showTotalSends,
       budgetedCost,
       actualCost,
       selectedTableTypes,
       deletedCardIds: Array.from(deletedCardIds)
     };
     localStorage.setItem('dashboard-canvas-state', JSON.stringify(stateToSave));
-  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, deletedCardIds]);
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, deletedCardIds]);
 
   const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
 
   useEffect(() => {
     if (isRestoring) return;
 
-    const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showPatientImpact}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
+    const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showTotalSends}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
 
     if (triggerKey !== lastRegenerationTrigger && cards.length > 0 && currentTemplate) {
       let templateConfig;
@@ -169,7 +169,7 @@ const DashboardCanvasContent = () => {
           type: 'single',
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
-          showPatientImpact: showPatientImpact,
+          showTotalSends: showTotalSends,
           selectedTableTypes: selectedTableTypes
         };
       } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
@@ -180,7 +180,7 @@ const DashboardCanvasContent = () => {
           type: 'multi',
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
-          showPatientImpact: showPatientImpact,
+          showTotalSends: showTotalSends,
           selectedTableTypes: selectedTableTypes
         };
       }
@@ -223,8 +223,8 @@ const DashboardCanvasContent = () => {
             !deletedCardIds.has(comp.id)
           );
           
-          const structuralChangeKeys = ['costComparisonMode', 'showPatientImpact'];
-          const currentStructuralState = `${costComparisonMode}-${showPatientImpact}`;
+          const structuralChangeKeys = ['costComparisonMode', 'showTotalSends'];
+          const currentStructuralState = `${costComparisonMode}-${showTotalSends}`;
           const lastStructuralState = lastRegenerationTrigger.split('-').slice(1, 3).join('-');
           const isStructuralChange = currentStructuralState !== lastStructuralState;
           
@@ -252,7 +252,7 @@ const DashboardCanvasContent = () => {
         }
       }
     }
-  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes, isRestoring]);
+  }, [specialtyMergeMode, costComparisonMode, showTotalSends, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes, isRestoring]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
     const normalizedData = { ...newData };
@@ -380,7 +380,7 @@ const DashboardCanvasContent = () => {
         ...templateConfig,
         mergeSubspecialties: specialtyMergeMode,
         costComparisonMode: costComparisonMode,
-        showPatientImpact: showPatientImpact,
+        showTotalSends: showTotalSends,
         selectedTableTypes: selectedTableTypes
       });
       setCards(generatedComponents);
@@ -399,7 +399,7 @@ const DashboardCanvasContent = () => {
       }
     } catch (error) {
     }
-  }, [specialtyMergeMode, costComparisonMode, showPatientImpact, selectedTableTypes]);
+  }, [specialtyMergeMode, costComparisonMode, showTotalSends, selectedTableTypes]);
 
   const handleThemeChange = useCallback((newTheme) => {
     setCurrentTheme(newTheme);
@@ -646,9 +646,9 @@ const DashboardCanvasContent = () => {
     setCostComparisonMode(mode);
   }, []);
 
-  const handlePatientImpactToggle = useCallback(() => {
-    setShowPatientImpact(!showPatientImpact);
-  }, [showPatientImpact]);
+  const handleTotalSendsToggle = useCallback(() => {
+    setShowTotalSends(!showTotalSends);
+  }, [showTotalSends]);
 
   const handleAddCard = useCallback((cardType, customData = {}) => {
     const themeColors = getThemeColors(currentTheme);
@@ -860,7 +860,7 @@ const DashboardCanvasContent = () => {
       theme: currentTheme,
       specialtyMergeMode,
       costComparisonMode,
-      showPatientImpact,
+      showTotalSends,
       budgetedCost,
       actualCost,
       selectedTableTypes,
@@ -885,7 +885,7 @@ const DashboardCanvasContent = () => {
       }
     } catch (error) {
     }
-  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showPatientImpact, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
 
   const handleRestoreDashboard = useCallback(async (dashboardId) => {
     setIsRestoring(true);
@@ -920,8 +920,8 @@ const DashboardCanvasContent = () => {
           setCostComparisonMode(state.costComparisonMode);
         }
 
-        if (state.showPatientImpact !== undefined) {
-          setShowPatientImpact(state.showPatientImpact);
+        if (state.showTotalSends !== undefined) {
+          setShowTotalSends(state.showTotalSends);
         }
 
         if (state.budgetedCost !== undefined) {
@@ -958,7 +958,7 @@ const DashboardCanvasContent = () => {
           setCurrentTemplate({ id: state.currentTemplate });
         }
 
-        const triggerKey = `${state.specialtyMergeMode || false}-${state.costComparisonMode || 'none'}-${state.showPatientImpact || false}-${state.theme || 'matrix'}-${state.selectedCampaign || ''}-${restoredMultiCampaigns?.length || 0}-${state.currentTemplate || ''}-${JSON.stringify(state.selectedTableTypes || {})}`;
+        const triggerKey = `${state.specialtyMergeMode || false}-${state.costComparisonMode || 'none'}-${state.showTotalSends || false}-${state.theme || 'matrix'}-${state.selectedCampaign || ''}-${restoredMultiCampaigns?.length || 0}-${state.currentTemplate || ''}-${JSON.stringify(state.selectedTableTypes || {})}`;
         setLastRegenerationTrigger(triggerKey);
       } else {
       }
@@ -1228,11 +1228,11 @@ const DashboardCanvasContent = () => {
             selectedCampaign={selectedCampaign}
             currentTheme={currentTheme}
             costComparisonMode={costComparisonMode}
-            showPatientImpact={showPatientImpact}
+            showTotalSends={showTotalSends}
             specialtyMergeMode={specialtyMergeMode}
             onThemeChange={handleThemeChange}
             onCostModeChange={handleCostModeChange}
-            onPatientImpactToggle={handlePatientImpactToggle}
+            onTotalSendsToggle={handleTotalSendsToggle}
             onCampaignChange={handleCampaignChange}
             onToggleSpecialtyMerge={() => setSpecialtyMergeMode(!specialtyMergeMode)}
             onAddComponent={handleAddMetric}

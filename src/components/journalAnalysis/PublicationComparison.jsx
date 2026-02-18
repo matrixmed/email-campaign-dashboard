@@ -96,7 +96,9 @@ const PublicationComparison = ({
     return num.toLocaleString();
   };
 
-  const tableData = publicationData.filter(p => matchesSearchTerm(p.publication, searchTerm));
+  const tableData = publicationData
+    .filter(p => selectedPublications.includes(p.publication))
+    .filter(p => matchesSearchTerm(p.publication, searchTerm));
 
   const chartData = publicationData
     .filter(p => selectedPublications.includes(p.publication))

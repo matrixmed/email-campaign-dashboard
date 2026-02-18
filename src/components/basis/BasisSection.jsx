@@ -172,7 +172,7 @@ const BasisSection = () => {
   return (
     <div className="basis-section">
       <div className="page-header">
-        <h1>Basis Optimization</h1>
+        <h1>Basis Performance</h1>
         <div className="search-container">
           <input
             type="text"

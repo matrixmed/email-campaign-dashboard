@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/AudienceQueryBuilder.css';
+import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 
-const AudienceQueryBuilder = forwardRef((props, ref) => {
+const AudienceQueryBuilder = ({ activeSection }) => {
     const loadPersistedState = () => {
         try {
             const saved = localStorage.getItem('audienceQueryState');
@@ -210,10 +211,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
 
         localStorage.removeItem('audienceQueryState');
     };
-
-    useImperativeHandle(ref, () => ({
-        clearAll
-    }));
 
     const handleSpecialtyToggle = (specialty) => {
         setSelectedSpecialties(prev => {
@@ -706,9 +703,10 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
     return (
         <div className="audience-query-builder">
             <div className="query-sections-wrapper">
-                <div className="query-section discovery-section">
-                    <div className="query-section-title">
+                <div className="query-section discovery-section" style={activeSection && activeSection !== 'find' ? { display: 'none' } : undefined}>
+                    <div className="section-header-bar">
                         <h3>Find Users</h3>
+                        <button className="section-header-clear-btn" onClick={clearFindUsers}>Clear</button>
                     </div>
                     <div className="query-section-content">
                         <div className="query-form">
@@ -974,9 +972,10 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
                     </div>
                 </div>
 
-                <div className="query-section analysis-section">
-                    <div className="query-section-title">
+                <div className="query-section analysis-section" style={activeSection && activeSection !== 'analyze' ? { display: 'none' } : undefined}>
+                    <div className="section-header-bar">
                         <h3>Analyze Users</h3>
+                        <button className="section-header-clear-btn" onClick={clearAnalyzeUsers}>Clear</button>
                     </div>
                     <div className="query-section-content">
                         <form onSubmit={handleAnalysisSubmit} className="query-form">
@@ -1732,6 +1731,6 @@ const AudienceQueryBuilder = forwardRef((props, ref) => {
             )}
         </div>
     );
-});
+};
 
 export default AudienceQueryBuilder;

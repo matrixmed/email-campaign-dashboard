@@ -124,7 +124,7 @@ body.light .data-source-option:not(.active):hover {
 }
 
 .digital-journals-container .table-section {
-  background: var(--color-bg-card, #2a2a2d);
+  background: var(--color-bg-elevated, #222224);
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--color-border, #333336);
   padding: 20px;
@@ -297,13 +297,22 @@ body.light .journal-title:hover {
 }
 
 body.light .digital-journals-table th {
-  background-color: #f5f5f5;
+  background-color: #e9ecef;
   color: #333;
   border-bottom-color: #ddd;
 }
 
 body.light .digital-journals-table td {
+  color: #333;
   border-bottom-color: #eee;
+}
+
+body.light .digital-journals-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+body.light .digital-journals-table tbody tr:nth-child(odd) {
+  background-color: #fff;
 }
 
 body.light .digital-journals-table tr:hover {

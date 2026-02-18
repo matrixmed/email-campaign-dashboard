@@ -1,11 +1,14 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import '../../styles/AnalyticsHub.css';
 import MonthlyEngagementChart from './MonthlyEngagementChart';
 import YearlyTrends from './YearlyTrends';
 import AnomalyDetection from './AnomalyDetection';
 import TimingIntelligence from './TimingIntelligence';
 import CampaignBenchmarks from './CampaignBenchmarks';
-import GeographicInsights from './GeographicInsights';
+import SpecialtyBreakdown from './SpecialtyBreakdown';
+import ClickAnalytics from './ClickAnalytics';
+import SubjectLineAnalysis from './SubjectLineAnalysis';
+import GeographicRates from './GeographicRates';
 import { useSearch } from '../../context/SearchContext';
 
 const AnalyticsHub = () => {
@@ -15,11 +18,12 @@ const AnalyticsHub = () => {
   const [selectedMetric, setSelectedMetric] = useState('Unique_Open_Rate');
   const [analyzeBy, setAnalyzeBy] = useState('content');
   const [detectByDisease, setDetectByDisease] = useState(false);
-  const [monthlyDropdownOpen, setMonthlyDropdownOpen] = useState(false);
-  const [yearlyDropdownOpen, setYearlyDropdownOpen] = useState(false);
   const [selectedYearlyMetrics, setSelectedYearlyMetrics] = useState(['Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate']);
-  const monthlyDropdownRef = useRef(null);
-  const yearlyDropdownRef = useRef(null);
+  const [availableYears, setAvailableYears] = useState([]);
+  const [selectedYears, setSelectedYears] = useState(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 5 }, (_, i) => currentYear - 4 + i);
+  });
 
   const metricOptions = [
     { key: 'Unique_Open_Rate', label: 'Unique Open Rate', color: '#0ff' },
@@ -28,18 +32,6 @@ const AnalyticsHub = () => {
     { key: 'Total_Click_Rate', label: 'Total Click Rate', color: '#ffd93d' },
   ];
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (monthlyDropdownRef.current && !monthlyDropdownRef.current.contains(event.target)) {
-        setMonthlyDropdownOpen(false);
-      }
-      if (yearlyDropdownRef.current && !yearlyDropdownRef.current.contains(event.target)) {
-        setYearlyDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleYearlyMetricToggle = (metricKey) => {
     setSelectedYearlyMetrics(prev => {
@@ -51,13 +43,22 @@ const AnalyticsHub = () => {
     });
   };
 
-  const getYearlySelectedLabel = () => {
-    if (selectedYearlyMetrics.length === 0) return 'Select metrics';
-    if (selectedYearlyMetrics.length === 1) {
-      return metricOptions.find(m => m.key === selectedYearlyMetrics[0])?.label;
-    }
-    return `${selectedYearlyMetrics.length} metrics selected`;
+  const handleYearToggle = (year) => {
+    setSelectedYears(prev => {
+      if (prev.includes(year)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(y => y !== year);
+      }
+      return [...prev, year].sort((a, b) => a - b);
+    });
   };
+
+  const handleAvailableYears = useCallback((years) => {
+    setAvailableYears(prev => {
+      if (prev.length === years.length && prev.every((y, i) => y === years[i])) return prev;
+      return years;
+    });
+  }, []);
 
   const [visitedTabs, setVisitedTabs] = useState({ monthly: true });
 
@@ -65,12 +66,15 @@ const AnalyticsHub = () => {
     timing: 0,
     benchmarks: 0,
     geographic: 0,
-    deliverability: 0,
+    specialty: 0,
+    clicks: 0,
     'subject-lines': 0,
+    'geographic-rates': 0,
+    deliverability: 0,
     journeys: 0
   });
 
-  const cacheableTabs = ['timing', 'benchmarks', 'geographic', 'deliverability', 'subject-lines', 'journeys'];
+  const cacheableTabs = ['timing', 'benchmarks', 'geographic', 'specialty', 'clicks', 'subject-lines', 'geographic-rates', 'deliverability', 'journeys'];
 
   const handleTabChange = useCallback((tab) => {
     setActiveView(tab);
@@ -88,8 +92,6 @@ const AnalyticsHub = () => {
     }
   }, [activeView]);
 
-  const showClearButton = cacheableTabs.includes(activeView);
-
   return (
     <div className="analytics-hub">
       <div className="page-header">
@@ -97,7 +99,7 @@ const AnalyticsHub = () => {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search campaigns"
+            placeholder="Search"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -108,229 +110,82 @@ const AnalyticsHub = () => {
         </div>
       </div>
 
-      <div className="analytics-tabs-container">
-        <div className="analytics-tabs">
-          <button
-            className={`tab-button ${activeView === 'monthly' ? 'active' : ''}`}
-            onClick={() => handleTabChange('monthly')}
-          >
-            <span>Monthly Trends</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'yearly' ? 'active' : ''}`}
-            onClick={() => handleTabChange('yearly')}
-          >
-            <span>Yearly Trends</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'anomaly' ? 'active' : ''}`}
-            onClick={() => handleTabChange('anomaly')}
-          >
-            <span>Anomaly Detection</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'benchmarks' ? 'active' : ''}`}
-            onClick={() => handleTabChange('benchmarks')}
-          >
-            <span>Campaign Benchmarks</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'timing' ? 'active' : ''}`}
-            onClick={() => handleTabChange('timing')}
-          >
-            <span>Timing Intelligence</span>
-          </button>
-          {/*
-          <button
-            className={`tab-button ${activeView === 'geographic' ? 'active' : ''}`}
-            onClick={() => handleTabChange('geographic')}
-          >
-            <span>Geographic Insights</span>
-          </button>
-          
-          <button
-            className={`tab-button ${activeView === 'deliverability' ? 'active' : ''}`}
-            onClick={() => handleTabChange('deliverability')}
-          >
-            <span>Deliverability Monitor</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'subject-lines' ? 'active' : ''}`}
-            onClick={() => handleTabChange('subject-lines')}
-          >
-            <span>Subject Lines</span>
-          </button>
-          <button
-            className={`tab-button ${activeView === 'journeys' ? 'active' : ''}`}
-            onClick={() => handleTabChange('journeys')}
-          >
-            <span>User Journeys</span>
-          </button>
-          */}
-        </div>
-
-        <div className="tab-controls">
-          {activeView === 'monthly' && (
-            <div className="metric-selector" ref={monthlyDropdownRef}>
-              <label>Metric:</label>
-              <div className="custom-dropdown">
-                <button
-                  className="custom-dropdown-trigger"
-                  onClick={() => setMonthlyDropdownOpen(!monthlyDropdownOpen)}
-                >
-                  <span className="dropdown-value">
-                    {metricOptions.find(m => m.key === selectedMetric)?.label}
-                  </span>
-                  <svg className={`dropdown-arrow ${monthlyDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {monthlyDropdownOpen && (
-                  <div className="custom-dropdown-menu">
-                    {metricOptions.map(option => (
-                      <div
-                        key={option.key}
-                        className={`custom-dropdown-option ${selectedMetric === option.key ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedMetric(option.key);
-                          setMonthlyDropdownOpen(false);
-                        }}
-                      >
-                        <span className="metric-color-dot" style={{ backgroundColor: option.color }}></span>
-                        <span>{option.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeView === 'yearly' && (
-            <div className="metric-selector" ref={yearlyDropdownRef}>
-              <label>Metrics:</label>
-              <div className="custom-dropdown">
-                <button
-                  className="custom-dropdown-trigger"
-                  onClick={() => setYearlyDropdownOpen(!yearlyDropdownOpen)}
-                >
-                  <span className="dropdown-value">{getYearlySelectedLabel()}</span>
-                  <svg className={`dropdown-arrow ${yearlyDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {yearlyDropdownOpen && (
-                  <div className="custom-dropdown-menu multi-select">
-                    {metricOptions.map(option => (
-                      <label
-                        key={option.key}
-                        className={`custom-dropdown-option ${selectedYearlyMetrics.includes(option.key) ? 'selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedYearlyMetrics.includes(option.key)}
-                          onChange={() => handleYearlyMetricToggle(option.key)}
-                        />
-                        <span className="metric-color-dot" style={{ backgroundColor: option.color }}></span>
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeView === 'anomaly' && (
-            <div className="metric-selector anomaly-controls">
-              <span className="control-label">Group by</span>
-              <div className="anomaly-mode-toggle">
-                <button
-                  className={`mode-toggle-btn ${analyzeBy === 'content' ? 'active' : ''}`}
-                  onClick={() => setAnalyzeBy('content')}
-                >
-                  Content
-                </button>
-                <button
-                  className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
-                  onClick={() => setAnalyzeBy('industry')}
-                >
-                  Industry
-                </button>
-              </div>
-              <span className="control-divider">→</span>
-              <div className="anomaly-mode-toggle">
-                <button
-                  className={`mode-toggle-btn ${!detectByDisease ? 'active' : ''}`}
-                  onClick={() => setDetectByDisease(false)}
-                >
-                  All
-                </button>
-                <button
-                  className={`mode-toggle-btn ${detectByDisease ? 'active' : ''}`}
-                  onClick={() => setDetectByDisease(true)}
-                >
-                  By Disease
-                </button>
-              </div>
-            </div>
-          )}
-
-          {showClearButton && (
-            <button
-              className="clear-cache-button"
-              onClick={handleClearCache}
-              title="Clear cached data and reload"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+      <div className="analytics-tabs">
+        <button className={`tab-button ${activeView === 'monthly' ? 'active' : ''}`} onClick={() => handleTabChange('monthly')}>Monthly Trends</button>
+        <button className={`tab-button ${activeView === 'yearly' ? 'active' : ''}`} onClick={() => handleTabChange('yearly')}>Yearly Trends</button>
+        <button className={`tab-button ${activeView === 'benchmarks' ? 'active' : ''}`} onClick={() => handleTabChange('benchmarks')}>Campaign Benchmarks</button>
+        <button className={`tab-button ${activeView === 'anomaly' ? 'active' : ''}`} onClick={() => handleTabChange('anomaly')}>Anomaly Detection</button>
+        <button className={`tab-button ${activeView === 'subject-lines' ? 'active' : ''}`} onClick={() => handleTabChange('subject-lines')}>Subject Lines</button>
+        <button className={`tab-button ${activeView === 'clicks' ? 'active' : ''}`} onClick={() => handleTabChange('clicks')}>Click Analytics</button>
+        <button className={`tab-button ${activeView === 'specialty' ? 'active' : ''}`} onClick={() => handleTabChange('specialty')}>Specialty Breakdown</button>
+        <button className={`tab-button ${activeView === 'geographic-rates' ? 'active' : ''}`} onClick={() => handleTabChange('geographic-rates')}>Geographic Rates</button>
+        <button className={`tab-button ${activeView === 'timing' ? 'active' : ''}`} onClick={() => handleTabChange('timing')}>Timing Intelligence</button>
       </div>
 
       <div className="analytics-content">
         <div style={{ display: activeView === 'monthly' ? 'block' : 'none' }}>
-          <MonthlyEngagementChart searchTerm={searchTerm} selectedMetric={selectedMetric} />
+          <MonthlyEngagementChart
+            searchTerm={searchTerm}
+            selectedMetric={selectedMetric}
+            selectedYears={selectedYears}
+            onAvailableYears={handleAvailableYears}
+            metricOptions={metricOptions}
+            onMetricChange={setSelectedMetric}
+            availableYears={availableYears}
+            onYearToggle={handleYearToggle}
+          />
         </div>
         <div style={{ display: activeView === 'yearly' ? 'block' : 'none' }}>
-          <YearlyTrends searchTerm={searchTerm} selectedMetrics={selectedYearlyMetrics} />
+          <YearlyTrends
+            searchTerm={searchTerm}
+            selectedMetrics={selectedYearlyMetrics}
+            selectedYears={selectedYears}
+            metricOptions={metricOptions}
+            onMetricToggle={handleYearlyMetricToggle}
+            availableYears={availableYears}
+            onYearToggle={handleYearToggle}
+          />
         </div>
         <div style={{ display: activeView === 'anomaly' ? 'block' : 'none' }}>
-          <AnomalyDetection searchTerm={searchTerm} detectByDisease={detectByDisease} analyzeBy={analyzeBy} />
+          <AnomalyDetection
+            searchTerm={searchTerm}
+            detectByDisease={detectByDisease}
+            analyzeBy={analyzeBy}
+            onAnalyzeByChange={setAnalyzeBy}
+            onDetectByDiseaseChange={setDetectByDisease}
+          />
         </div>
 
         {visitedTabs.timing && (
           <div style={{ display: activeView === 'timing' ? 'block' : 'none' }}>
-            <TimingIntelligence key={`timing-${clearKeys.timing}`} />
+            <TimingIntelligence key={`timing-${clearKeys.timing}`} onClearCache={handleClearCache} />
           </div>
         )}
         {visitedTabs.benchmarks && (
           <div style={{ display: activeView === 'benchmarks' ? 'block' : 'none' }}>
-            <CampaignBenchmarks key={`benchmarks-${clearKeys.benchmarks}`} />
+            <CampaignBenchmarks key={`benchmarks-${clearKeys.benchmarks}`} onClearCache={handleClearCache} />
           </div>
         )}
-        {/*
-        {visitedTabs.geographic && (
-          <div style={{ display: activeView === 'geographic' ? 'block' : 'none' }}>
-            <GeographicInsights key={`geographic-${clearKeys.geographic}`} />
+        {visitedTabs.specialty && (
+          <div style={{ display: activeView === 'specialty' ? 'block' : 'none' }}>
+            <SpecialtyBreakdown key={`specialty-${clearKeys.specialty}`} searchTerm={searchTerm} />
           </div>
         )}
-        {visitedTabs.deliverability && (
-          <div style={{ display: activeView === 'deliverability' ? 'block' : 'none' }}>
-            <PlaceholderComponent key={`deliverability-${clearKeys.deliverability}`} title="Deliverability Monitor" />
+        {visitedTabs.clicks && (
+          <div style={{ display: activeView === 'clicks' ? 'block' : 'none' }}>
+            <ClickAnalytics key={`clicks-${clearKeys.clicks}`} searchTerm={searchTerm} />
           </div>
         )}
         {visitedTabs['subject-lines'] && (
           <div style={{ display: activeView === 'subject-lines' ? 'block' : 'none' }}>
-            <PlaceholderComponent key={`subject-lines-${clearKeys['subject-lines']}`} title="Subject Line Analysis" />
+            <SubjectLineAnalysis key={`subject-lines-${clearKeys['subject-lines']}`} searchTerm={searchTerm} />
           </div>
         )}
-        {visitedTabs.journeys && (
-          <div style={{ display: activeView === 'journeys' ? 'block' : 'none' }}>
-            <PlaceholderComponent key={`journeys-${clearKeys.journeys}`} title="User Journeys" />
+        {visitedTabs['geographic-rates'] && (
+          <div style={{ display: activeView === 'geographic-rates' ? 'block' : 'none' }}>
+            <GeographicRates key={`geographic-rates-${clearKeys['geographic-rates']}`} searchTerm={searchTerm} />
           </div>
         )}
-        */}
       </div>
     </div>
   );

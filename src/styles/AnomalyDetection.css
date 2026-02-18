@@ -1,118 +1,61 @@
 .anomaly-detection-container {
+  padding: 0;
+}
+
+.anomaly-content-section {
   background: var(--color-bg-card, #2a2a2d);
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--color-border, #333336);
-  padding: 2rem;
+  padding: 20px;
 }
 
-.anomaly-header {
+.anomaly-section-title {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+  align-items: baseline;
+  gap: 0;
 }
 
-.anomaly-title-row {
+.anomaly-prefix-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  margin-right: 1px;
+}
+
+.anomaly-prefix-text {
+  color: #0ff;
+  display: inline-block;
+  font-weight: 600;
+  animation: prefixSlideIn 0.25s ease;
+}
+
+@keyframes prefixSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anomaly-prefix-icon {
+  color: #0ff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+}
+
+.anomaly-prefix-toggle:hover .anomaly-prefix-icon {
+  opacity: 0.5;
+}
+
+.anomaly-controls-inline {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.anomaly-header h2 {
-  margin: 0;
-  color: var(--color-text-primary, #ffffff);
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.info-icon-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: help;
-}
-
-.info-icon {
-  color: #666;
-  transition: color 0.2s ease;
-}
-
-.info-icon-wrapper:hover .info-icon {
-  color: #0ff;
-}
-
-.topics-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 8px;
-  width: 340px;
-  background: #1a1a1c;
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 16px;
-  z-index: 1000;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.tooltip-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #333;
-}
-
-.tooltip-section {
-  margin-bottom: 12px;
-}
-
-.tooltip-section:last-child {
-  margin-bottom: 0;
-}
-
-.tooltip-topic-header {
-  font-size: 12px;
-  font-weight: 600;
-  color: #0ff;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-}
-
-.tooltip-subtopics {
-  font-size: 11px;
-  color: #999;
-  line-height: 1.5;
-}
-
-.performance-toggle {
-  display: flex;
-  gap: 4px;
-  background: var(--color-bg-elevated, #1e1e20);
-  border-radius: 6px;
-  padding: 4px;
-}
-
-.performance-toggle .toggle-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #888;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.performance-toggle .toggle-btn:hover {
-  color: #fff;
-}
-
-.performance-toggle .toggle-btn.active {
-  background: var(--color-bg-card, #2a2a2d);
-  color: #fff;
 }
 
 .loading,
@@ -285,4 +228,12 @@
   color: #fff;
   font-size: 14px;
   font-weight: 500;
+}
+
+body.light .anomaly-prefix-text {
+  color: #0077ff;
+}
+
+body.light .anomaly-prefix-icon {
+  color: #0077ff;
 }

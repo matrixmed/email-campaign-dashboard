@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
 import '../../styles/AnomalyDetection.css';
+import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { API_BASE_URL } from '../../config/api';
 
-const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy = 'content' }) => {
+const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy = 'content', onAnalyzeByChange, onDetectByDiseaseChange }) => {
   const [anomalies, setAnomalies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showOverperforming, setShowOverperforming] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
   const [brandIndustryMap, setBrandIndustryMap] = useState({});
   const [brands, setBrands] = useState([]);
 
@@ -376,131 +376,139 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
 
   return (
     <div className="anomaly-detection-container">
-      <div className="anomaly-header">
-        <div className="anomaly-title-row">
-          <h2>{showOverperforming ? 'Overperforming Campaigns' : 'Underperforming Campaigns'}</h2>
-          <div
-            className="info-icon-wrapper"
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
+      <div className="section-header-bar">
+        <h3 className="anomaly-section-title">
+          <span
+            className="anomaly-prefix-toggle"
+            onClick={() => setShowOverperforming(!showOverperforming)}
           >
-            <svg className="info-icon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            <span key={showOverperforming ? 'over' : 'under'} className="anomaly-prefix-text">
+              {showOverperforming ? 'Over' : 'Under'}
+            </span>
+            <svg className="anomaly-prefix-icon" width="14" height="14" viewBox="0 0 14 14">
+              <path d="M7 1.5L10 4.5H4L7 1.5Z" fill="currentColor"/>
+              <path d="M7 12.5L4 9.5H10L7 12.5Z" fill="currentColor"/>
             </svg>
-            {showTooltip && (
-              <div className="topics-tooltip">
-                <div className="tooltip-title">Anomaly Detection Categories</div>
-                <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Content Types</div>
-                  <div className="tooltip-subtopics">Clinical Updates, Expert Perspectives, Hot Topics, Custom Email</div>
-                </div>
-                <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Industries</div>
-                  <div className="tooltip-subtopics">Oncology, Dermatology, Neurology, Allergy, Endocrinology, Hematology, Bariatrics, Ophthalmology, Immunology</div>
-                </div>
-                <div className="tooltip-section">
-                  <div className="tooltip-topic-header">Diseases</div>
-                  <div className="tooltip-subtopics">Acne, Allergy & Pulmonology, Alzheimers, Atopic Dermatitis, Breast Cancer, Cardiology, CLL, Colorectal Surgery, Diabetes, Gastroenterology, GPP, Infectious Disease, Inflammatory Diseases, MCL, Melanoma, Metastatic Breast Cancer, Multiple Myeloma, Neonatology, Neuroscience, NSCLC, Oncology, Ophthalmology, Pigmented Lesions, RCC, Skincare Science, Vitiligo</div>
-                </div>
-              </div>
-            )}
+          </span>
+          performing Campaigns
+        </h3>
+        <div className="section-header-stats">
+          <div className="anomaly-controls-inline">
+            <span className="control-label">Group by</span>
+            <div className="anomaly-mode-toggle">
+              <button
+                className={`mode-toggle-btn ${analyzeBy === 'content' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange('content')}
+              >
+                Content
+              </button>
+              <button
+                className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange('industry')}
+              >
+                Industry
+              </button>
+            </div>
+            <span className="control-divider">→</span>
+            <div className="anomaly-mode-toggle">
+              <button
+                className={`mode-toggle-btn ${!detectByDisease ? 'active' : ''}`}
+                onClick={() => onDetectByDiseaseChange(false)}
+              >
+                All
+              </button>
+              <button
+                className={`mode-toggle-btn ${detectByDisease ? 'active' : ''}`}
+                onClick={() => onDetectByDiseaseChange(true)}
+              >
+                By Disease
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="performance-toggle">
-          <button
-            className={`toggle-btn ${!showOverperforming ? 'active' : ''}`}
-            onClick={() => setShowOverperforming(false)}
-          >
-            Underperforming
-          </button>
-          <button
-            className={`toggle-btn ${showOverperforming ? 'active' : ''}`}
-            onClick={() => setShowOverperforming(true)}
-          >
-            Overperforming
-          </button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="loading-container">
-          <div className="spinner">
-            <div></div><div></div><div></div><div></div><div></div><div></div>
-          </div>
-          <p>Analyzing campaigns...</p>
-        </div>
-      ) : filteredAnomalies.length > 0 ? (
-        <div className="anomalies-grid">
-          {filteredAnomalies.map((anomaly, idx) => (
-            <div
-              key={idx}
-              className={`anomaly-card ${showOverperforming ? 'overperforming' : ''} ${anomaly.isLive ? 'live-campaign' : ''}`}
-              style={anomaly.isLive ? {
-                borderColor: showOverperforming ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 107, 107, 0.5)',
-                boxShadow: showOverperforming
-                  ? '0 0 0 1px rgba(76, 175, 80, 0.3)'
-                  : '0 0 0 1px rgba(255, 107, 107, 0.3)'
-              } : {}}
-            >
-              {anomaly.isLive && (
-                <div className="live-badge">LIVE</div>
-              )}
-              <div className="anomaly-card-header">
-                <span className={`anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
-                  {getSeverityLabel(anomaly.zScore)}
-                </span>
-                <span className="anomaly-bucket">{anomaly.Bucket}</span>
-              </div>
-              <div className="anomaly-category-label">{anomaly.Topic}</div>
-              <h3 className="anomaly-campaign-name">{anomaly.CleanedName}</h3>
-              <div className="anomaly-date">{formatDate(anomaly.Send_Date)}</div>
-
-              <div className="anomaly-metrics">
-                <div className="anomaly-metric">
-                  <span className="anomaly-metric-label">Unique Open Rate</span>
-                  <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
-                    {anomaly.Unique_Open_Rate.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="anomaly-metric">
-                  <span className="anomaly-metric-label">
-                    {detectByDisease ? 'Disease' : (analyzeBy === 'industry' ? 'Industry' : 'Content')} Average
-                  </span>
-                  <span className="anomaly-metric-value">
-                    {anomaly.topicMean.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="anomaly-metric highlight">
-                  <span className="anomaly-metric-label">Deviation</span>
-                  <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
-                    {showOverperforming ? '+' : ''}{anomaly.deviationPercent.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="anomaly-stats">
-                <div className="anomaly-stat-item">
-                  <span className="anomaly-stat-label">Delivered</span>
-                  <span className="anomaly-stat-value">{anomaly.Delivered.toLocaleString()}</span>
-                </div>
-                <div className="anomaly-stat-item">
-                  <span className="anomaly-stat-label">Z-Score</span>
-                  <span className="anomaly-stat-value">{showOverperforming ? '+' : ''}{anomaly.zScore.toFixed(2)}</span>
-                </div>
-              </div>
+      <div className="anomaly-content-section">
+        {isLoading ? (
+          <div className="loading-container">
+            <div className="spinner">
+              <div></div><div></div><div></div><div></div><div></div><div></div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="no-anomalies">
-          <p>No significant {showOverperforming ? 'overperformers' : 'anomalies'} detected{searchTerm ? ' matching search' : ''}.</p>
-          <p className="no-anomalies-subtitle">
-            {showOverperforming
-              ? 'No campaigns are significantly exceeding expected performance.'
-              : 'All campaigns are performing within expected ranges.'}
-          </p>
-        </div>
-      )}
+            <p>Analyzing campaigns...</p>
+          </div>
+        ) : filteredAnomalies.length > 0 ? (
+          <div className="anomalies-grid">
+            {filteredAnomalies.map((anomaly, idx) => (
+              <div
+                key={idx}
+                className={`anomaly-card ${showOverperforming ? 'overperforming' : ''} ${anomaly.isLive ? 'live-campaign' : ''}`}
+                style={anomaly.isLive ? {
+                  borderColor: showOverperforming ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 107, 107, 0.5)',
+                  boxShadow: showOverperforming
+                    ? '0 0 0 1px rgba(76, 175, 80, 0.3)'
+                    : '0 0 0 1px rgba(255, 107, 107, 0.3)'
+                } : {}}
+              >
+                {anomaly.isLive && (
+                  <div className="live-badge">LIVE</div>
+                )}
+                <div className="anomaly-card-header">
+                  <span className={`anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
+                    {getSeverityLabel(anomaly.zScore)}
+                  </span>
+                  <span className="anomaly-bucket">{anomaly.Bucket}</span>
+                </div>
+                <div className="anomaly-category-label">{anomaly.Topic}</div>
+                <h3 className="anomaly-campaign-name">{anomaly.CleanedName}</h3>
+                <div className="anomaly-date">{formatDate(anomaly.Send_Date)}</div>
+
+                <div className="anomaly-metrics">
+                  <div className="anomaly-metric">
+                    <span className="anomaly-metric-label">Unique Open Rate</span>
+                    <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
+                      {anomaly.Unique_Open_Rate.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="anomaly-metric">
+                    <span className="anomaly-metric-label">
+                      {detectByDisease ? 'Disease' : (analyzeBy === 'industry' ? 'Industry' : 'Content')} Average
+                    </span>
+                    <span className="anomaly-metric-value">
+                      {anomaly.topicMean.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="anomaly-metric highlight">
+                    <span className="anomaly-metric-label">Deviation</span>
+                    <span className={`anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
+                      {showOverperforming ? '+' : ''}{anomaly.deviationPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="anomaly-stats">
+                  <div className="anomaly-stat-item">
+                    <span className="anomaly-stat-label">Delivered</span>
+                    <span className="anomaly-stat-value">{anomaly.Delivered.toLocaleString()}</span>
+                  </div>
+                  <div className="anomaly-stat-item">
+                    <span className="anomaly-stat-label">Z-Score</span>
+                    <span className="anomaly-stat-value">{showOverperforming ? '+' : ''}{anomaly.zScore.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="no-anomalies">
+            <p>No significant {showOverperforming ? 'overperformers' : 'anomalies'} detected{searchTerm ? ' matching search' : ''}.</p>
+            <p className="no-anomalies-subtitle">
+              {showOverperforming
+                ? 'No campaigns are significantly exceeding expected performance.'
+                : 'All campaigns are performing within expected ranges.'}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

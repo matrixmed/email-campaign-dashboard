@@ -126,12 +126,6 @@ const BasisOverview = ({ searchTerm }) => {
           <span className="summary-value">{exchangeSummary.avg_ctr?.toFixed(3)}%</span>
           <span className="summary-label">Avg CTR</span>
         </div>
-        {totalPotentialGain > 0 && (
-          <div className="summary-card opportunity">
-            <span className="summary-value">+{formatNumber(totalPotentialGain)}</span>
-            <span className="summary-label">Potential Gain</span>
-          </div>
-        )}
       </div>
 
       <div className="exchange-scorecard">

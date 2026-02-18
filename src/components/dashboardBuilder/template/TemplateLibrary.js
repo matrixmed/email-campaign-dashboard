@@ -13,7 +13,7 @@ const addMatrixLogo = (components, theme) => {
   }
 };
 
-export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -28,16 +28,14 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     }
   });
 
-  const hasPatientImpact = showPatientImpact;
   const hasCostComparison = costComparisonMode !== 'none';
-  
-  const topRowCards = hasPatientImpact && hasCostComparison ? 3 : 
-                     (hasPatientImpact || hasCostComparison ? 3 : 2);
-  
+
+  const topRowCards = hasCostComparison ? 3 : 2;
+
   let cardWidth, cardSpacing, startX;
   if (topRowCards === 2) {
     cardWidth = 319;
-    cardSpacing = 41; 
+    cardSpacing = 41;
     startX = 30;
   } else if (topRowCards === 3) {
     cardWidth = 200;
@@ -59,55 +57,29 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     }
   });
 
-  if (!(hasPatientImpact && hasCostComparison)) {
-    const healthcareX = startX + cardWidth + cardSpacing;
-    components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'metric',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
-      currentTheme: theme,
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '8px'
-      }
-    });
-  }
+  const healthcareSubtitle = showTotalSends
+    ? `${(campaign.volume_metrics?.sent).toLocaleString()} Total Sends`
+    : `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`;
 
-  if (hasPatientImpact) {
-    let patientImpactX;
-    if (hasPatientImpact && hasCostComparison) {
-      patientImpactX = startX + cardWidth + cardSpacing; 
-    } else {
-      patientImpactX = startX + (2 * (cardWidth + cardSpacing));
+  const healthcareX = startX + cardWidth + cardSpacing;
+  components.push({
+    id: 'healthcare-professionals-reached',
+    type: 'metric',
+    title: 'HEALTHCARE PROFESSIONALS REACHED',
+    value: (campaign.volume_metrics?.delivered).toLocaleString(),
+    subtitle: healthcareSubtitle,
+    position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
+    currentTheme: theme,
+    style: {
+      background: themeColors.cardGradient || '#f8fafc',
+      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+      borderRadius: '8px'
     }
-      
-    components.push({
-      id: 'hero-patient-impact',
-      type: 'metric',
-      title: 'POTENTIAL PATIENT IMPACT',
-      value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-      subtitle: 'Estimated patient panel sizes',
-      position: { x: patientImpactX, y: 95, width: cardWidth, height: 88 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '8px'
-      }
-    });
-  }
+  });
 
   if (hasCostComparison) {
-    let costComparisonX;
-    if (hasPatientImpact && hasCostComparison) {
-      costComparisonX = startX + (2 * (cardWidth + cardSpacing)); 
-    } else {
-      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
-    }
-      
+    const costComparisonX = startX + (2 * (cardWidth + cardSpacing));
+
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
@@ -119,24 +91,14 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
   }
 
   const secondRowCards = [];
-  
-  if (hasPatientImpact && hasCostComparison) {
-    secondRowCards.push({
-      id: 'healthcare-professionals-second-row',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      x: 30
-    });
-  } else {
-    secondRowCards.push({
-      id: 'total-professional-engagements',
-      title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.total_opens).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
-      x: 30
-    });
-  }
+
+  secondRowCards.push({
+    id: 'total-professional-engagements',
+    title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
+    value: (campaign.volume_metrics?.total_opens).toLocaleString(),
+    subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
+    x: 30
+  });
 
   secondRowCards.push(
     {
@@ -207,8 +169,8 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
-  const components = generateSingleNoneTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
+  const components = generateSingleNoneTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
   const themeColors = getThemeColors(theme);
   
   const audienceComponent = components.find(c => c.id === 'audience-breakdown');
@@ -430,7 +392,7 @@ const generateTableForType = (tableType, position, themeColors) => {
   };
 };
 
-export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {}) => {
+export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
@@ -445,15 +407,13 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
-  const hasPatientImpact = showPatientImpact;
   const hasCostComparison = costComparisonMode !== 'none';
-  
-  const topRowCards = hasPatientImpact && hasCostComparison ? 3 : 
-                     (hasPatientImpact || hasCostComparison ? 3 : 2);
-  
+
+  const topRowCards = hasCostComparison ? 3 : 2;
+
   let cardWidth, cardSpacing, startX;
   if (topRowCards === 2) {
-    cardWidth = 319; 
+    cardWidth = 319;
     cardSpacing = 41;
     startX = 30;
   } else if (topRowCards === 3) {
@@ -476,55 +436,29 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     }
   });
 
-  if (!(hasPatientImpact && hasCostComparison)) {
-    const healthcareX = startX + cardWidth + cardSpacing;
-    components.push({
-      id: 'healthcare-professionals-reached',
-      type: 'metric',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
-      currentTheme: theme,
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '8px'
-      }
-    });
-  }
+  const healthcareSubtitle = showTotalSends
+    ? `${(campaign.volume_metrics?.sent).toLocaleString()} Total Sends`
+    : `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`;
 
-  if (hasPatientImpact) {
-    let patientImpactX;
-    if (hasPatientImpact && hasCostComparison) {
-      patientImpactX = startX + cardWidth + cardSpacing;
-    } else {
-      patientImpactX = startX + (2 * (cardWidth + cardSpacing));
+  const healthcareX = startX + cardWidth + cardSpacing;
+  components.push({
+    id: 'healthcare-professionals-reached',
+    type: 'metric',
+    title: 'HEALTHCARE PROFESSIONALS REACHED',
+    value: (campaign.volume_metrics?.delivered).toLocaleString(),
+    subtitle: healthcareSubtitle,
+    position: { x: healthcareX, y: 95, width: cardWidth, height: 88 },
+    currentTheme: theme,
+    style: {
+      background: themeColors.cardGradient || '#f8fafc',
+      border: `1px solid ${themeColors.border || '#e2e8f0'}`,
+      borderRadius: '8px'
     }
-      
-    components.push({
-      id: 'hero-patient-impact',
-      type: 'metric',
-      title: 'POTENTIAL PATIENT IMPACT',
-      value: `${((campaign.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-      subtitle: 'Estimated patient panel sizes',
-      position: { x: patientImpactX, y: 95, width: cardWidth, height: 88 },
-      style: {
-        background: themeColors.cardGradient || '#f8fafc',
-        border: `1px solid ${themeColors.border || '#e2e8f0'}`,
-        borderRadius: '8px'
-      }
-    });
-  }
+  });
 
   if (hasCostComparison) {
-    let costComparisonX;
-    if (hasPatientImpact && hasCostComparison) {
-      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
-    } else {
-      costComparisonX = startX + (2 * (cardWidth + cardSpacing));
-    }
-      
+    const costComparisonX = startX + (2 * (cardWidth + cardSpacing));
+
     components.push({
       id: 'cost-comparison',
       type: 'cost-comparison',
@@ -536,24 +470,14 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
   }
 
   const secondRowCards = [];
-  
-  if (hasPatientImpact && hasCostComparison) {
-    secondRowCards.push({
-      id: 'healthcare-professionals-second-row',
-      title: 'HEALTHCARE PROFESSIONALS REACHED',
-      value: (campaign.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.delivered / campaign.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`,
-      x: 30
-    });
-  } else {
-    secondRowCards.push({
-      id: 'total-professional-engagements',
-      title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
-      value: (campaign.volume_metrics?.total_opens).toLocaleString(),
-      subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
-      x: 30
-    });
-  }
+
+  secondRowCards.push({
+    id: 'total-professional-engagements',
+    title: 'TOTAL PROFESSIONAL ENGAGEMENTS',
+    value: (campaign.volume_metrics?.total_opens).toLocaleString(),
+    subtitle: `${((campaign.volume_metrics?.total_opens / campaign.volume_metrics?.delivered) * 100).toFixed(1)}% total open rate`,
+    x: 30
+  });
 
   secondRowCards.push(
     {
@@ -621,8 +545,8 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {}) => {
-  const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
+export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}) => {
+  const components = generateSingleTwoTemplate(campaign, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   const themeColors = getThemeColors(theme);
 
   const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
@@ -638,7 +562,7 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   return components;
 };
 
-export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
+export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
   const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
@@ -658,6 +582,10 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     }
   });
 
+  const multiHealthcareSubtitle = showTotalSends
+    ? `${(aggregatedData.volume_metrics?.sent).toLocaleString()} Total Sends`
+    : `${((aggregatedData.volume_metrics?.delivered / aggregatedData.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`;
+
   const baseCards = [
     {
       id: 'multi-unique-engagement',
@@ -667,31 +595,20 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     },
     {
       id: 'multi-healthcare-professionals',
-      title: 'HEALTHCARE PROFESSIONALS REACHED', 
+      title: 'HEALTHCARE PROFESSIONALS REACHED',
       value: (aggregatedData.volume_metrics?.delivered).toLocaleString(),
-      subtitle: `${((aggregatedData.volume_metrics?.delivered / aggregatedData.volume_metrics?.sent) * 100).toFixed(1)}% delivery rate`
+      subtitle: multiHealthcareSubtitle
     }
   ];
 
   const conditionalCards = [];
-  
-  if (!(showPatientImpact && costComparisonMode !== 'none')) {
-    conditionalCards.push({
-      id: 'multi-professional-engagements',
-      title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
-      value: (aggregatedData.volume_metrics?.unique_opens).toLocaleString(),
-      subtitle: 'Total unique professionals'
-    });
-  }
 
-  if (showPatientImpact) {
-    conditionalCards.push({
-      id: 'multi-patient-impact',
-      title: 'POTENTIAL PATIENT IMPACT',
-      value: `${((aggregatedData.cost_metrics?.estimated_patient_impact) / 1000000).toFixed(1)}M`,
-      subtitle: 'Combined impact potential'
-    });
-  }
+  conditionalCards.push({
+    id: 'multi-professional-engagements',
+    title: 'UNIQUE PROFESSIONAL ENGAGEMENTS',
+    value: (aggregatedData.volume_metrics?.unique_opens).toLocaleString(),
+    subtitle: 'Total unique professionals'
+  });
 
   const allCards = [...baseCards, ...conditionalCards];
   const totalCards = allCards.length + (costComparisonMode !== 'none' ? 1 : 0);
@@ -773,8 +690,8 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
-  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
+  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
   const themeColors = getThemeColors(theme);
 
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
@@ -805,8 +722,8 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
-  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
+  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
   const themeColors = getThemeColors(theme);
 
   const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
@@ -842,8 +759,8 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false) => {
-  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact);
+export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
+  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
   const themeColors = getThemeColors(theme);
 
   const secondTable = components.find(c => c.id === 'additional-table-2');
@@ -885,7 +802,7 @@ export const TEMPLATE_GENERATORS = {
 };
 
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showPatientImpact = false, selectedTableTypes = {} } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {} } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
   
   if (!generator) {
@@ -893,9 +810,9 @@ export const generateTemplate = (config) => {
   }
   
   if (type === 'single') {
-    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
+    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   } else {
-    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showPatientImpact, selectedTableTypes);
+    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   }
 };
 

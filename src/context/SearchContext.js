@@ -9,7 +9,8 @@ export const SearchProvider = ({ children }) => {
     journalMetrics: '',
     videoMetrics: '',
     specialtyMetrics: '',
-    basisOptimization: ''
+    basisOptimization: '',
+    socialMetrics: ''
   });
 
   const setSearchTerm = (key, value) => {

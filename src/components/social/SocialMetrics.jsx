@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../../styles/social.css';
+import '../../styles/CampaignModal.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
 import { MATRIX_COLORS, JCAD_COLORS, ICNS_COLORS, ONCOLOGY_COLORS } from '../dashboardBuilder/template/LayoutTemplates';
@@ -25,6 +26,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
+    const modalRef = useRef(null);
 
     const CHANNEL_COLORS = {
         'Matrix': MATRIX_COLORS.secondary,
@@ -35,8 +37,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     };
 
     const LINKEDIN_BLOB_URL = '';
-    const INSTAGRAM_BLOB_URL = '';
-    const FACEBOOK_BLOB_URL = '';
+    const FB_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_profile_metrics.json?sp=r&st=2026-02-18T21:02:49Z&se=2028-05-21T04:17:49Z&spr=https&sv=2024-11-04&sr=b&sig=uE7Yej8V8qJ6W3FKIzWkexVON7c074h9Xnkd1RWqOPE%3D';
+    const FB_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_engagement_metrics.json?sp=r&st=2026-02-18T21:03:59Z&se=2028-05-17T04:18:59Z&spr=https&sv=2024-11-04&sr=b&sig=mZyVxrFi1U5Z234HHVICAxysq73m14Jpm3r%2BzCOzvKs%3D';
+    const IG_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_profile_metrics.json?sp=r&st=2026-02-18T21:03:17Z&se=2028-05-27T04:18:17Z&spr=https&sv=2024-11-04&sr=b&sig=Iu%2B57JgpeateOx9zTPFEMnOEUMMFA8JMsXX8OPz5SXY%3D';
+    const IG_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_engagement_metrics.json?sp=r&st=2026-02-18T21:03:38Z&se=2028-05-16T04:18:38Z&spr=https&sv=2024-11-04&sr=b&sig=ZkHZS8lQQmkvTGjkxy3fFZVUtWNO5WGMOazVdkPNYVI%3D';
 
     useEffect(() => {
         async function fetchSocialData() {
@@ -46,32 +50,39 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
             if (LINKEDIN_BLOB_URL) {
                 try {
                     const res = await fetch(LINKEDIN_BLOB_URL + cacheBuster);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setLinkedinData(data);
-                    }
+                    if (res.ok) setLinkedinData(await res.json());
                 } catch (error) { }
             }
 
-            if (INSTAGRAM_BLOB_URL) {
-                try {
-                    const res = await fetch(INSTAGRAM_BLOB_URL + cacheBuster);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setInstagramData(data);
-                    }
-                } catch (error) { }
-            }
+            try {
+                const [fbProfileRes, fbEngagementRes] = await Promise.all([
+                    FB_PROFILE_BLOB_URL ? fetch(FB_PROFILE_BLOB_URL + cacheBuster) : Promise.resolve(null),
+                    FB_ENGAGEMENT_BLOB_URL ? fetch(FB_ENGAGEMENT_BLOB_URL + cacheBuster) : Promise.resolve(null),
+                ]);
+                const fbProfile = fbProfileRes?.ok ? await fbProfileRes.json() : {};
+                const fbEngagement = fbEngagementRes?.ok ? await fbEngagementRes.json() : {};
+                const merged = { last_updated: fbEngagement.last_updated || fbProfile.last_updated, companies: {} };
+                const allKeys = new Set([...Object.keys(fbProfile.companies || {}), ...Object.keys(fbEngagement.companies || {})]);
+                allKeys.forEach(key => {
+                    merged.companies[key] = { ...(fbProfile.companies || {})[key], ...(fbEngagement.companies || {})[key] };
+                });
+                setFacebookData(merged);
+            } catch (error) { }
 
-            if (FACEBOOK_BLOB_URL) {
-                try {
-                    const res = await fetch(FACEBOOK_BLOB_URL + cacheBuster);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setFacebookData(data);
-                    }
-                } catch (error) { }
-            }
+            try {
+                const [igProfileRes, igEngagementRes] = await Promise.all([
+                    IG_PROFILE_BLOB_URL ? fetch(IG_PROFILE_BLOB_URL + cacheBuster) : Promise.resolve(null),
+                    IG_ENGAGEMENT_BLOB_URL ? fetch(IG_ENGAGEMENT_BLOB_URL + cacheBuster) : Promise.resolve(null),
+                ]);
+                const igProfile = igProfileRes?.ok ? await igProfileRes.json() : {};
+                const igEngagement = igEngagementRes?.ok ? await igEngagementRes.json() : {};
+                const merged = { last_updated: igEngagement.last_updated || igProfile.last_updated, companies: {} };
+                const allKeys = new Set([...Object.keys(igProfile.companies || {}), ...Object.keys(igEngagement.companies || {})]);
+                allKeys.forEach(key => {
+                    merged.companies[key] = { ...(igProfile.companies || {})[key], ...(igEngagement.companies || {})[key] };
+                });
+                setInstagramData(merged);
+            } catch (error) { }
 
             setIsLoading(false);
         }
@@ -104,24 +115,33 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
         let allPosts = [];
 
         Object.entries(companies).forEach(([channelKey, channelData]) => {
-            const posts = channelData.posts || [];
-            posts.forEach(post => {
-                const current = post.current || {};
+            const items = platform === 'instagram'
+                ? (channelData.media || [])
+                : (channelData.posts || []);
+
+            items.forEach(item => {
+                const current = item.current || {};
                 allPosts.push({
-                    id: post.post_urn || post.id || `${channelKey}-${post.created_at}`,
-                    text: post.text || '',
+                    id: item.post_id || item.media_id || item.post_urn || item.id || `${channelKey}-${item.created_at}`,
+                    text: item.message || item.caption || item.text || '',
                     channel: getChannelDisplayName(channelKey),
                     channelKey,
-                    createdAt: post.created_at || '',
-                    impressions: current.impressions || 0,
-                    engagements: current.engagements || 0,
+                    createdAt: item.created_at || '',
+                    permalink: item.permalink || '',
+                    mediaType: item.media_type || '',
+                    impressions: current.impressions_unique || current.reach || current.impressions || 0,
+                    engagements: current.engagements || current.total_interactions || 0,
                     engagementRate: current.engagement_rate || 0,
                     clicks: current.clicks || 0,
-                    reactions: current.reactions || 0,
+                    reactions: current.reactions_total || current.reactions || current.likes || 0,
                     comments: current.comments || 0,
-                    reposts: current.reposts || current.shares || 0,
-                    history: post.history || [],
-                    dailyDeltas: post.daily_deltas || [],
+                    reposts: current.shares || current.reposts || 0,
+                    saved: current.saved || 0,
+                    views: current.views || 0,
+                    imageUrl: item.image_url || item.media_url || '',
+                    thumbnailUrl: item.thumbnail_url || '',
+                    history: item.history || [],
+                    dailyDeltas: item.daily_deltas || [],
                 });
             });
         });
@@ -156,20 +176,46 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
 
         if (selectedProfileChannel && companies[selectedProfileChannel]) {
             const ch = companies[selectedProfileChannel];
-            const followerDaily = ch.follower_daily || [];
-            const organicGain = followerDaily.reduce((sum, d) => sum + (d.organic_follower_gain || 0), 0);
-            const paidGain = followerDaily.reduce((sum, d) => sum + (d.paid_follower_gain || 0), 0);
 
-            const pageViews = ch.daily_page_views || [];
-            const totalPageViews = pageViews.reduce((sum, d) => sum + (d.all_page_views || 0), 0);
-
-            setProfileData({
-                totalFollowers: ch.total_followers || 0,
-                organicGain,
-                paidGain,
-                totalPageViews,
-                demographics: ch.follower_demographics || {},
-            });
+            if (platform === 'facebook') {
+                const pageViews = ch.daily_page_views || [];
+                const totalPageViews = pageViews.reduce((sum, d) => sum + (d.page_views_total || 0), 0);
+                const dailyFollows = ch.daily_followers || [];
+                const totalFollowActions = dailyFollows.reduce((sum, d) => sum + (d.page_follows || 0), 0);
+                setProfileData({
+                    totalFollowers: ch.followers_count || ch.fan_count || 0,
+                    pageName: ch.page_name || '',
+                    about: ch.about || '',
+                    website: ch.website || '',
+                    totalPageViews,
+                    totalFollowActions,
+                    demographics: {},
+                });
+            } else if (platform === 'instagram') {
+                setProfileData({
+                    totalFollowers: ch.followers_count || 0,
+                    username: ch.username || '',
+                    name: ch.name || '',
+                    biography: ch.biography || '',
+                    website: ch.website || '',
+                    followsCount: ch.follows_count || 0,
+                    mediaCount: ch.media_count || 0,
+                    demographics: ch.audience_demographics || {},
+                });
+            } else {
+                const followerDaily = ch.follower_daily || [];
+                const organicGain = followerDaily.reduce((sum, d) => sum + (d.organic_follower_gain || 0), 0);
+                const paidGain = followerDaily.reduce((sum, d) => sum + (d.paid_follower_gain || 0), 0);
+                const pageViews = ch.daily_page_views || [];
+                const totalPageViews = pageViews.reduce((sum, d) => sum + (d.all_page_views || 0), 0);
+                setProfileData({
+                    totalFollowers: ch.total_followers || 0,
+                    organicGain,
+                    paidGain,
+                    totalPageViews,
+                    demographics: ch.follower_demographics || {},
+                });
+            }
         } else {
             setProfileData(null);
         }
@@ -230,11 +276,11 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const getChannels = () => {
         const data = getPlatformData();
         const companies = data.companies || {};
-        return Object.keys(companies).map(key => ({
-            key,
-            name: getChannelDisplayName(key),
-            postCount: (companies[key].posts || []).length,
-        }));
+        return Object.keys(companies).map(key => {
+            const ch = companies[key];
+            const postCount = (ch.posts || ch.media || []).length;
+            return { key, name: getChannelDisplayName(key), postCount };
+        });
     };
 
     const calculateAggregateMetrics = () => {
@@ -300,6 +346,51 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
         setSelectedPost(null);
     };
 
+    const getModalPostIndex = () => {
+        if (!selectedPost || !filteredData.length) return -1;
+        return filteredData.findIndex(p => p.id === selectedPost.id);
+    };
+
+    const navigatePost = (direction) => {
+        const idx = getModalPostIndex();
+        if (idx === -1) return;
+        const nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+        if (nextIdx >= 0 && nextIdx < filteredData.length) {
+            setSelectedPost(filteredData[nextIdx]);
+        }
+    };
+
+    useEffect(() => {
+        if (!isModalOpen) return;
+
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                if (!event.target.closest('.modal-nav-arrow')) {
+                    closePostModal();
+                }
+            }
+        };
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                closePostModal();
+            } else if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                navigatePost('prev');
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                navigatePost('next');
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isModalOpen, selectedPost, filteredData]);
+
     const handlePlatformChange = (newPlatform) => {
         setPlatform(newPlatform);
         setCurrentPage(1);
@@ -310,7 +401,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     };
 
     const exportToCSV = () => {
-        const headers = ['Text', 'Channel', 'Date', 'Impressions', 'Engagements', 'Eng. Rate', 'Clicks'];
+        const isIg = platform === 'instagram';
+        const headers = isIg
+            ? ['Text', 'Channel', 'Date', 'Reach', 'Interactions', 'Eng. Rate', 'Likes']
+            : ['Text', 'Channel', 'Date', 'Impressions', 'Engagements', 'Eng. Rate', 'Clicks'];
 
         const rows = filteredData.map(item => [
             item.text,
@@ -319,7 +413,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
             item.impressions,
             item.engagements,
             item.engagementRate?.toFixed(2) || '0',
-            item.clicks,
+            isIg ? item.reactions : item.clicks,
         ]);
 
         const csvContent = [headers, ...rows]
@@ -352,6 +446,9 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const channels = getChannels();
     const platformData = getPlatformData();
     const lastUpdated = platformData.last_updated;
+
+    const isIg = platform === 'instagram';
+    const lastColField = isIg ? 'reactions' : 'clicks';
 
     const renderSortIndicator = (column) => {
         if (sortColumn !== column) return null;
@@ -428,15 +525,15 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
             {contentMode === 'posts' && (
                 <div className="social-metrics-summary">
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">Total Posts</div>
+                        <div className="metric-summary-label">Total {isIg ? 'Media' : 'Posts'}</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalPosts)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">Impressions</div>
+                        <div className="metric-summary-label">{isIg ? 'Reach' : 'Impressions'}</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalImpressions)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">Engagements</div>
+                        <div className="metric-summary-label">{isIg ? 'Interactions' : 'Engagements'}</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalEngagements)}</div>
                     </div>
                     <div className="metric-summary-card">
@@ -444,8 +541,8 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                         <div className="metric-summary-value">{formatPercent(aggregateMetrics.avgEngagementRate)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">Clicks</div>
-                        <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalClicks)}</div>
+                        <div className="metric-summary-label">{isIg ? 'Likes' : 'Clicks'}</div>
+                        <div className="metric-summary-value">{formatNumber(isIg ? aggregateMetrics.totalReactions : aggregateMetrics.totalClicks)}</div>
                     </div>
                 </div>
             )}
@@ -456,18 +553,46 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                         <div className="metric-summary-label">Total Followers</div>
                         <div className="metric-summary-value">{formatNumber(profileData.totalFollowers)}</div>
                     </div>
-                    <div className="metric-summary-card">
-                        <div className="metric-summary-label">Organic Gain</div>
-                        <div className="metric-summary-value">{formatNumber(profileData.organicGain)}</div>
-                    </div>
-                    <div className="metric-summary-card">
-                        <div className="metric-summary-label">Paid Gain</div>
-                        <div className="metric-summary-value">{formatNumber(profileData.paidGain)}</div>
-                    </div>
-                    <div className="metric-summary-card">
-                        <div className="metric-summary-label">Total Page Views</div>
-                        <div className="metric-summary-value">{formatNumber(profileData.totalPageViews)}</div>
-                    </div>
+                    {platform === 'facebook' && (
+                        <>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Follow Actions</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.totalFollowActions)}</div>
+                            </div>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Total Page Views</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.totalPageViews)}</div>
+                            </div>
+                        </>
+                    )}
+                    {platform === 'instagram' && (
+                        <>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Following</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.followsCount)}</div>
+                            </div>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Media Count</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.mediaCount)}</div>
+                            </div>
+                        </>
+                    )}
+                    {platform === 'linkedin' && (
+                        <>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Organic Gain</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.organicGain)}</div>
+                            </div>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Paid Gain</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.paidGain)}</div>
+                            </div>
+                            <div className="metric-summary-card">
+                                <div className="metric-summary-label">Total Page Views</div>
+                                <div className="metric-summary-value">{formatNumber(profileData.totalPageViews)}</div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -477,7 +602,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                 <div className="table-section">
                     <div className="table-header-row">
                         <h2 className="table-title">
-                            {platform === 'linkedin' ? 'LinkedIn' : platform === 'instagram' ? 'Instagram' : 'Facebook'} {contentMode === 'posts' ? 'Posts' : 'Profile'}
+                            {platform === 'linkedin' ? 'LinkedIn' : platform === 'instagram' ? 'Instagram' : 'Facebook'} {contentMode === 'posts' ? (isIg ? 'Media' : 'Posts') : 'Profile'}
                         </h2>
                         <div className="table-header-controls">
                             {contentMode === 'posts' && (
@@ -494,27 +619,13 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                     </select>
                                 </div>
                             )}
-                            <div className="playlist-toggle">
-                                <div
-                                    className={`playlist-toggle-option ${contentMode === 'posts' ? 'active' : ''}`}
-                                    onClick={() => { setContentMode('posts'); setCurrentPage(1); }}
-                                >
-                                    Posts
-                                </div>
-                                <div
-                                    className={`playlist-toggle-option ${contentMode === 'profile' ? 'active' : ''}`}
-                                    onClick={() => { setContentMode('profile'); }}
-                                >
-                                    Profile
-                                </div>
-                            </div>
                             {contentMode === 'posts' && channels.length > 1 && (
                                 <div className="playlist-toggle">
                                     <div
                                         className={`playlist-toggle-option ${viewMode === 'all' ? 'active' : ''}`}
                                         onClick={() => { setViewMode('all'); setSelectedChannels([]); }}
                                     >
-                                        All Posts ({postsList.length})
+                                        All {isIg ? 'Media' : 'Posts'} ({postsList.length})
                                     </div>
                                     <div
                                         className={`playlist-toggle-option ${viewMode === 'channel' ? 'active' : ''}`}
@@ -540,7 +651,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                             )}
                             {lastUpdated && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    Last Updated: {(() => { const d = new Date(lastUpdated + (lastUpdated.length === 10 ? 'T00:00:00' : '')); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
                                 </div>
                             )}
                         </div>
@@ -587,16 +698,16 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                             Date {renderSortIndicator('createdAt')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('impressions')}>
-                                            Impressions {renderSortIndicator('impressions')}
+                                            {isIg ? 'Reach' : 'Impressions'} {renderSortIndicator('impressions')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('engagements')}>
-                                            Engagements {renderSortIndicator('engagements')}
+                                            {isIg ? 'Interactions' : 'Engagements'} {renderSortIndicator('engagements')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('engagementRate')}>
                                             Eng. Rate {renderSortIndicator('engagementRate')}
                                         </th>
-                                        <th className="metric-column sortable" onClick={() => handleSort('clicks')}>
-                                            Clicks {renderSortIndicator('clicks')}
+                                        <th className="metric-column sortable" onClick={() => handleSort(lastColField)}>
+                                            {isIg ? 'Likes' : 'Clicks'} {renderSortIndicator(lastColField)}
                                         </th>
                                     </tr>
                                 </thead>
@@ -604,7 +715,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                     {currentRows.length === 0 ? (
                                         <tr>
                                             <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#8a8a8a' }}>
-                                                No posts data available. Data will appear once the {platform} JSON file is configured.
+                                                No {isIg ? 'media' : 'posts'} data available. Data will appear once the {platform} JSON file is configured.
                                             </td>
                                         </tr>
                                     ) : (
@@ -627,7 +738,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                                 <td className="metric-column">{formatNumber(item.impressions)}</td>
                                                 <td className="metric-column">{formatNumber(item.engagements)}</td>
                                                 <td className="metric-column">{formatPercent(item.engagementRate)}</td>
-                                                <td className="metric-column">{formatNumber(item.clicks)}</td>
+                                                <td className="metric-column">{formatNumber(isIg ? item.reactions : item.clicks)}</td>
                                             </tr>
                                         ))
                                     )}
@@ -668,19 +779,38 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                         <>
                             {profileData ? (
                                 <div className="demographics-section-inner">
-                                    <h3 className="demographics-heading">Follower Demographics</h3>
-                                    <div className="demographics-grid">
-                                        {renderDemographicsTable('By Function', profileData.demographics.followerCountsByFunction)}
-                                        {renderDemographicsTable('By Seniority', profileData.demographics.followerCountsBySeniority)}
-                                        {renderDemographicsTable('By Industry', profileData.demographics.followerCountsByIndustry)}
-                                        {renderDemographicsTable('By Country', profileData.demographics.followerCountsByGeoCountry)}
-                                    </div>
-                                    {(!profileData.demographics.followerCountsByFunction &&
-                                      !profileData.demographics.followerCountsBySeniority &&
-                                      !profileData.demographics.followerCountsByIndustry &&
-                                      !profileData.demographics.followerCountsByGeoCountry) && (
-                                        <div className="no-data-message">
-                                            No demographics data available for this channel.
+                                    {platform === 'linkedin' && (
+                                        <>
+                                            <h3 className="demographics-heading">Follower Demographics</h3>
+                                            <div className="demographics-grid">
+                                                {renderDemographicsTable('By Function', profileData.demographics.followerCountsByFunction)}
+                                                {renderDemographicsTable('By Seniority', profileData.demographics.followerCountsBySeniority)}
+                                                {renderDemographicsTable('By Industry', profileData.demographics.followerCountsByIndustry)}
+                                                {renderDemographicsTable('By Country', profileData.demographics.followerCountsByGeoCountry)}
+                                            </div>
+                                            {(!profileData.demographics.followerCountsByFunction &&
+                                              !profileData.demographics.followerCountsBySeniority &&
+                                              !profileData.demographics.followerCountsByIndustry &&
+                                              !profileData.demographics.followerCountsByGeoCountry) && (
+                                                <div className="no-data-message">
+                                                    No demographics data available for this channel.
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                    {platform === 'facebook' && (
+                                        <div className="profile-info-section">
+                                            {profileData.pageName && <p><strong>Page:</strong> {profileData.pageName}</p>}
+                                            {profileData.about && <p><strong>About:</strong> {profileData.about}</p>}
+                                            {profileData.website && <p><strong>Website:</strong> {profileData.website}</p>}
+                                        </div>
+                                    )}
+                                    {platform === 'instagram' && (
+                                        <div className="profile-info-section">
+                                            {profileData.username && <p><strong>Username:</strong> @{profileData.username}</p>}
+                                            {profileData.name && <p><strong>Name:</strong> {profileData.name}</p>}
+                                            {profileData.biography && <p><strong>Bio:</strong> {profileData.biography}</p>}
+                                            {profileData.website && <p><strong>Website:</strong> {profileData.website}</p>}
                                         </div>
                                     )}
                                 </div>
@@ -694,55 +824,253 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                 </div>
             )}
 
-            {isModalOpen && selectedPost && (
-                <div className="social-modal-overlay" onClick={closePostModal}>
-                    <div className="social-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="social-modal-header">
-                            <h3>Post Details</h3>
-                            <button className="modal-close-button" onClick={closePostModal}>&times;</button>
-                        </div>
-                        <div className="social-modal-body">
-                            <div className="post-full-text">{selectedPost.text}</div>
-                            <div className="post-meta">
-                                <span className="channel-badge" style={{ '--channel-color': CHANNEL_COLORS[selectedPost.channel] || '#575757' }}>
-                                    {selectedPost.channel}
-                                </span>
-                                <span className="post-date">{formatDate(selectedPost.createdAt)}</span>
+            {isModalOpen && selectedPost && (() => {
+                const modalIdx = getModalPostIndex();
+                const hasPrev = modalIdx > 0;
+                const hasNext = modalIdx >= 0 && modalIdx < filteredData.length - 1;
+
+                return (
+                    <div className="social-modal-overlay">
+                        {hasPrev && (
+                            <button
+                                className="modal-nav-arrow modal-nav-left"
+                                onClick={() => navigatePost('prev')}
+                                aria-label="Previous post"
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                        )}
+                        {hasNext && (
+                            <button
+                                className="modal-nav-arrow modal-nav-right"
+                                onClick={() => navigatePost('next')}
+                                aria-label="Next post"
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        )}
+
+                        <div className="social-modal" ref={modalRef}>
+                            <div className="social-modal-header">
+                                <h3>{selectedPost.channel} — {isIg ? 'Media' : 'Post'} Details</h3>
+                                <button className="modal-close-button" onClick={closePostModal}>&times;</button>
                             </div>
-                            <div className="post-metrics-grid">
-                                <div className="metric-card">
-                                    <div className="metric-label">Impressions</div>
+
+                            {(selectedPost.imageUrl || selectedPost.thumbnailUrl) ? (
+                                <div className="social-modal-preview">
+                                    <div className="social-thumbnail-preview">
+                                        <img
+                                            src={selectedPost.imageUrl || selectedPost.thumbnailUrl}
+                                            alt={selectedPost.text ? selectedPost.text.substring(0, 60) : 'Post image'}
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        {selectedPost.mediaType && (
+                                            <div className="social-media-badge">{selectedPost.mediaType}</div>
+                                        )}
+                                    </div>
+                                    <div className="social-preview-details">
+                                        <div className="social-preview-pills">
+                                            <div className="info-pill">
+                                                <span className="info-label">Channel</span>
+                                                <span className="info-value">
+                                                    <span className="channel-badge" style={{ '--channel-color': CHANNEL_COLORS[selectedPost.channel] || '#575757' }}>
+                                                        {selectedPost.channel}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="info-pill">
+                                                <span className="info-label">Posted</span>
+                                                <span className="info-value">{formatDate(selectedPost.createdAt)}</span>
+                                            </div>
+                                            {selectedPost.mediaType && (
+                                                <div className="info-pill">
+                                                    <span className="info-label">Type</span>
+                                                    <span className="info-value">{selectedPost.mediaType}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {selectedPost.text && (
+                                            <div className="social-preview-text">{selectedPost.text}</div>
+                                        )}
+                                        {selectedPost.permalink && (
+                                            <a href={selectedPost.permalink} target="_blank" rel="noopener noreferrer" className="social-preview-link">
+                                                {selectedPost.permalink}
+                                            </a>
+                                        )}
+                                        <span className="social-modal-position">{modalIdx + 1} of {filteredData.length}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="social-modal-info">
+                                        <div className="social-modal-info-left">
+                                            <div className="info-pill">
+                                                <span className="info-label">Channel</span>
+                                                <span className="info-value">
+                                                    <span className="channel-badge" style={{ '--channel-color': CHANNEL_COLORS[selectedPost.channel] || '#575757' }}>
+                                                        {selectedPost.channel}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="info-pill">
+                                                <span className="info-label">Posted</span>
+                                                <span className="info-value">{formatDate(selectedPost.createdAt)}</span>
+                                            </div>
+                                            {selectedPost.mediaType && (
+                                                <div className="info-pill">
+                                                    <span className="info-label">Type</span>
+                                                    <span className="info-value">{selectedPost.mediaType}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="social-modal-position">{modalIdx + 1} of {filteredData.length}</span>
+                                    </div>
+
+                                    {selectedPost.text && (
+                                        <div className="social-modal-post-text">
+                                            <span className="post-text-label">{isIg ? 'Caption' : 'Post'}</span>
+                                            <span className="post-text-value">{selectedPost.text}</span>
+                                        </div>
+                                    )}
+
+                                    {selectedPost.permalink && (
+                                        <div className="social-modal-url">
+                                            <a href={selectedPost.permalink} target="_blank" rel="noopener noreferrer">{selectedPost.permalink}</a>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            <div className="social-modal-metrics-top">
+                                <div className="social-metric-card large-card">
+                                    <div className="metric-label">{isIg ? 'Reach' : 'Impressions'}</div>
                                     <div className="metric-value">{formatNumber(selectedPost.impressions)}</div>
                                 </div>
-                                <div className="metric-card">
-                                    <div className="metric-label">Engagements</div>
+                                <div className="social-metric-card large-card">
+                                    <div className="metric-label">{isIg ? 'Interactions' : 'Engagements'}</div>
                                     <div className="metric-value">{formatNumber(selectedPost.engagements)}</div>
                                 </div>
-                                <div className="metric-card">
+                                <div className="social-metric-card large-card">
                                     <div className="metric-label">Eng. Rate</div>
                                     <div className="metric-value">{formatPercent(selectedPost.engagementRate)}</div>
                                 </div>
-                                <div className="metric-card">
-                                    <div className="metric-label">Clicks</div>
-                                    <div className="metric-value">{formatNumber(selectedPost.clicks)}</div>
+                                {!isIg && (
+                                    <div className="social-metric-card large-card">
+                                        <div className="metric-label">Clicks</div>
+                                        <div className="metric-value">{formatNumber(selectedPost.clicks)}</div>
+                                    </div>
+                                )}
+                                {isIg && (
+                                    <div className="social-metric-card large-card">
+                                        <div className="metric-label">Views</div>
+                                        <div className="metric-value">{formatNumber(selectedPost.views)}</div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="social-modal-details">
+                                <div className="social-detail-card">
+                                    <h4>Engagement Breakdown</h4>
+                                    <table className="detail-table">
+                                        <tbody>
+                                            <tr>
+                                                <td>{isIg ? 'Likes' : 'Reactions'}</td>
+                                                <td>{formatNumber(selectedPost.reactions)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Comments</td>
+                                                <td>{formatNumber(selectedPost.comments)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>{platform === 'linkedin' ? 'Reposts' : 'Shares'}</td>
+                                                <td>{formatNumber(selectedPost.reposts)}</td>
+                                            </tr>
+                                            {isIg && (
+                                                <tr>
+                                                    <td>Saved</td>
+                                                    <td>{formatNumber(selectedPost.saved)}</td>
+                                                </tr>
+                                            )}
+                                            {isIg && (
+                                                <tr>
+                                                    <td>Views</td>
+                                                    <td>{formatNumber(selectedPost.views)}</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div className="metric-card">
-                                    <div className="metric-label">Reactions</div>
-                                    <div className="metric-value">{formatNumber(selectedPost.reactions)}</div>
-                                </div>
-                                <div className="metric-card">
-                                    <div className="metric-label">Comments</div>
-                                    <div className="metric-value">{formatNumber(selectedPost.comments)}</div>
-                                </div>
-                                <div className="metric-card">
-                                    <div className="metric-label">Reposts</div>
-                                    <div className="metric-value">{formatNumber(selectedPost.reposts)}</div>
+
+                                <div className="social-detail-card">
+                                    <h4>Post Details</h4>
+                                    <table className="detail-table">
+                                        <tbody>
+                                            <tr>
+                                                <td>Post ID</td>
+                                                <td style={{ fontSize: '12px', wordBreak: 'break-all' }}>{selectedPost.id}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Created</td>
+                                                <td>{formatDate(selectedPost.createdAt)}</td>
+                                            </tr>
+                                            {selectedPost.mediaType && (
+                                                <tr>
+                                                    <td>Media Type</td>
+                                                    <td>{selectedPost.mediaType}</td>
+                                                </tr>
+                                            )}
+                                            <tr>
+                                                <td>Channel</td>
+                                                <td>{selectedPost.channel}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Platform</td>
+                                                <td>{platform.charAt(0).toUpperCase() + platform.slice(1)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
+
+                            {selectedPost.dailyDeltas && selectedPost.dailyDeltas.length > 0 && (
+                                <div className="social-modal-daily">
+                                    <h4>Daily Performance</h4>
+                                    <div className="daily-table-container">
+                                        <table className="detail-table social-daily-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>{isIg ? 'Reach' : 'Impressions'}</th>
+                                                    <th>{isIg ? 'Interactions' : 'Engagements'}</th>
+                                                    <th>{isIg ? 'Likes' : 'Reactions'}</th>
+                                                    <th>Comments</th>
+                                                    <th>Shares</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {selectedPost.dailyDeltas.slice().reverse().slice(0, 30).map((delta, idx) => (
+                                                    <tr key={idx}>
+                                                        <td>{formatDate(delta.date)}</td>
+                                                        <td>{formatNumber(delta.impressions_unique || delta.reach || 0)}</td>
+                                                        <td>{formatNumber(delta.engagements || delta.total_interactions || 0)}</td>
+                                                        <td>{formatNumber(isIg ? (delta.likes || 0) : (delta.reactions_total || delta.reactions || 0))}</td>
+                                                        <td>{formatNumber(delta.comments || 0)}</td>
+                                                        <td>{formatNumber(delta.shares || 0)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 };

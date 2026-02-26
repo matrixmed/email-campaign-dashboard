@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import '../../styles/journal.css';
+import '../../styles/CampaignModal.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { useSearch } from '../../context/SearchContext';
 
@@ -259,8 +260,9 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                 setFilteredData(sortedData);
 
                 calculateAggregateMetrics(sortedData, timeframeFilter);
-                if (jsonData.last_updated) {
-                    setGoogleAnalyticsLastUpdated(jsonData.last_updated);
+                const gaLastUpdated = jsonData.last_updated || jsonData.lastUpdated;
+                if (gaLastUpdated) {
+                    setGoogleAnalyticsLastUpdated(gaLastUpdated);
                 }
             } catch (error) {
             }
@@ -306,8 +308,9 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                     setFilteredData(sortedData);
 
                     calculateAggregateMetrics(sortedData, timeframeFilter);
-                    if (jsonData.last_updated) {
-                        setGoogleAnalyticsLastUpdated(jsonData.last_updated);
+                    const gaLastUpdated = jsonData.last_updated || jsonData.lastUpdated;
+                    if (gaLastUpdated) {
+                        setGoogleAnalyticsLastUpdated(gaLastUpdated);
                     }
                 } catch (error) {
                 }
@@ -359,23 +362,58 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
         }
     }, [search, walsworthData, selectedPublications]);
 
+    const navigateWalsworthIssue = (direction) => {
+        if (!selectedWalsworthIssue || walsworthFilteredData.length === 0) return;
+        const currentIdx = walsworthFilteredData.findIndex(i => i.issue_name === selectedWalsworthIssue.issue_name && i.issue_url === selectedWalsworthIssue.issue_url);
+        if (currentIdx === -1) return;
+        const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
+        if (newIdx >= 0 && newIdx < walsworthFilteredData.length) {
+            setSelectedWalsworthIssue(walsworthFilteredData[newIdx]);
+            setWalsworthTimeFilter('all');
+        }
+    };
+
+    const walsworthModalIndex = selectedWalsworthIssue && walsworthFilteredData.length > 0
+        ? walsworthFilteredData.findIndex(i => i.issue_name === selectedWalsworthIssue.issue_name && i.issue_url === selectedWalsworthIssue.issue_url)
+        : -1;
+    const walsworthHasPrev = walsworthModalIndex > 0;
+    const walsworthHasNext = walsworthModalIndex >= 0 && walsworthModalIndex < walsworthFilteredData.length - 1;
+
     useEffect(() => {
         function handleWalsworthClickOutside(event) {
             if (walsworthModalRef.current && !walsworthModalRef.current.contains(event.target)) {
+                if (!event.target.closest('.modal-nav-arrow')) {
+                    setWalsworthModalOpen(false);
+                }
+            }
+        }
+
+        function handleWalsworthKeyDown(event) {
+            if (!walsworthModalOpen) return;
+            if (event.key === 'ArrowLeft' && walsworthHasPrev) {
+                event.preventDefault();
+                navigateWalsworthIssue('prev');
+            } else if (event.key === 'ArrowRight' && walsworthHasNext) {
+                event.preventDefault();
+                navigateWalsworthIssue('next');
+            } else if (event.key === 'Escape') {
                 setWalsworthModalOpen(false);
             }
         }
 
         if (walsworthModalOpen) {
             document.addEventListener('mousedown', handleWalsworthClickOutside);
+            document.addEventListener('keydown', handleWalsworthKeyDown);
         } else {
             document.removeEventListener('mousedown', handleWalsworthClickOutside);
+            document.removeEventListener('keydown', handleWalsworthKeyDown);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleWalsworthClickOutside);
+            document.removeEventListener('keydown', handleWalsworthKeyDown);
         };
-    }, [walsworthModalOpen]);
+    }, [walsworthModalOpen, walsworthHasPrev, walsworthHasNext]);
 
     function calculateJournalMetricsForTimeframe(journal) {
         if (!journal || !journal.timeData) {
@@ -573,23 +611,61 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
         };
     };
 
+    const navigateGAJournal = (direction) => {
+        if (!selectedJournal || filteredData.length === 0) return;
+        const gaValid = filteredData.filter(item => !isTitleBanned(item.title) && item.title && item.title.trim());
+        const currentIdx = gaValid.findIndex(j => j.fullUrl === selectedJournal.fullUrl && j.title === selectedJournal.title);
+        if (currentIdx === -1) return;
+        const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
+        if (newIdx >= 0 && newIdx < gaValid.length) {
+            setSelectedJournal(gaValid[newIdx]);
+            setGaModalTab('overview');
+        }
+    };
+
+    const getGANavState = () => {
+        const gaValid = filteredData.filter(item => !isTitleBanned(item.title) && item.title && item.title.trim());
+        if (!selectedJournal || gaValid.length === 0) return { index: -1, hasPrev: false, hasNext: false, total: 0 };
+        const idx = gaValid.findIndex(j => j.fullUrl === selectedJournal.fullUrl && j.title === selectedJournal.title);
+        return { index: idx, hasPrev: idx > 0, hasNext: idx >= 0 && idx < gaValid.length - 1, total: gaValid.length };
+    };
+
     useEffect(() => {
         function handleClickOutside(event) {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
+                if (!event.target.closest('.modal-nav-arrow')) {
+                    setIsModalOpen(false);
+                }
+            }
+        }
+
+        function handleGAKeyDown(event) {
+            if (!isModalOpen) return;
+            const nav = getGANavState();
+            if (event.key === 'ArrowLeft' && nav.hasPrev) {
+                event.preventDefault();
+                navigateGAJournal('prev');
+            } else if (event.key === 'ArrowRight' && nav.hasNext) {
+                event.preventDefault();
+                navigateGAJournal('next');
+            } else if (event.key === 'Escape') {
                 setIsModalOpen(false);
             }
         }
-        
+
         if (isModalOpen) {
             document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleGAKeyDown);
         } else {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleGAKeyDown);
         }
-        
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleGAKeyDown);
         };
-    }, [isModalOpen]);
+    }, [isModalOpen, selectedJournal, filteredData]);
 
     useEffect(() => {
         if (externalSearch !== undefined) {
@@ -865,7 +941,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                             )}
                             {walsworthLastUpdated && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {new Date(walsworthLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    Last Updated: {(() => { const d = new Date(walsworthLastUpdated + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
                                 </div>
                             )}
                         </div>
@@ -1002,7 +1078,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                             )}
                             {googleAnalyticsLastUpdated && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {new Date(googleAnalyticsLastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    Last Updated: {(() => { const d = new Date(googleAnalyticsLastUpdated + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
                                 </div>
                             )}
                         </div>
@@ -1092,23 +1168,66 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
             </div>
             )}
 
-            {isModalOpen && selectedJournal && (
+            {isModalOpen && selectedJournal && (() => {
+                const gaNav = getGANavState();
+                return (
                 <div className="journal-modal-overlay">
+                    {gaNav.hasPrev && (
+                        <button
+                            className="modal-nav-arrow modal-nav-left"
+                            onClick={() => navigateGAJournal('prev')}
+                            aria-label="Previous journal"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    )}
+
+                    {gaNav.hasNext && (
+                        <button
+                            className="modal-nav-arrow modal-nav-right"
+                            onClick={() => navigateGAJournal('next')}
+                            aria-label="Next journal"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    )}
+
                     <div className="journal-modal" ref={modalRef}>
                         <div className="journal-modal-header">
                             <h3>{getDisplayTitle(selectedJournal)}</h3>
-                            <button 
+                            <button
                                 className="modal-close-button"
                                 onClick={() => setIsModalOpen(false)}
                             >
                                 ×
                             </button>
                         </div>
-                        
-                        <div className="journal-modal-url">
-                            {selectedJournal.fullUrl || selectedJournal.url}
-                            {selectedJournal.property_name && (
-                                <span className="property-tag">{selectedJournal.property_name}</span>
+
+                        <div className="journal-modal-info">
+                            <div className="journal-modal-info-left">
+                                {selectedJournal.property_name && (
+                                    <div className="info-pill">
+                                        <span className="info-label">Property</span>
+                                        <span className="info-value">{selectedJournal.property_name}</span>
+                                    </div>
+                                )}
+                                {(selectedJournal.fullUrl || selectedJournal.url) && (
+                                    <div className="info-pill">
+                                        <span className="info-label">URL</span>
+                                        <a href={selectedJournal.fullUrl || selectedJournal.url} target="_blank" rel="noopener noreferrer" className="info-value" style={{ color: '#0ff', textDecoration: 'none' }}>
+                                            {(selectedJournal.fullUrl || selectedJournal.url).length > 50
+                                                ? (selectedJournal.fullUrl || selectedJournal.url).substring(0, 50) + '...'
+                                                : (selectedJournal.fullUrl || selectedJournal.url)}
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                            {gaNav.index >= 0 && gaNav.total > 0 && (
+                                <span className="modal-position">{gaNav.index + 1} of {gaNav.total}</span>
                             )}
                         </div>
 
@@ -1175,19 +1294,19 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                                 <div className="journal-modal-metrics">
                                     <div className="metric-card">
                                         <div className="metric-label">Total Users</div>
-                                        <div className="metric-value">
+                                        <div className="campaign-metric-value">
                                             {formatNumber(selectedJournal.totalUsers || 0)}
                                         </div>
                                     </div>
                                     <div className="metric-card">
                                         <div className="metric-label">Avg Duration</div>
-                                        <div className="metric-value">
+                                        <div className="campaign-metric-value">
                                             {formatEngagement(selectedJournal.avgDuration || 0)}
                                         </div>
                                     </div>
                                     <div className="metric-card">
                                         <div className="metric-label">Bounce Rate</div>
-                                        <div className="metric-value">
+                                        <div className="campaign-metric-value">
                                             {formatBounceRate(selectedJournal.bounceRate || 0)}
                                         </div>
                                     </div>
@@ -1502,23 +1621,62 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
 
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {walsworthModalOpen && selectedWalsworthIssue && (
                 <div className="journal-modal-overlay">
+                    {walsworthHasPrev && (
+                        <button
+                            className="modal-nav-arrow modal-nav-left"
+                            onClick={() => navigateWalsworthIssue('prev')}
+                            aria-label="Previous issue"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    )}
+
+                    {walsworthHasNext && (
+                        <button
+                            className="modal-nav-arrow modal-nav-right"
+                            onClick={() => navigateWalsworthIssue('next')}
+                            aria-label="Next issue"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    )}
+
                     <div className="journal-modal" ref={walsworthModalRef}>
                         <div className="journal-modal-header">
                             <h3>{selectedWalsworthIssue.issue_name}</h3>
                             <button className="modal-close-button" onClick={() => setWalsworthModalOpen(false)}>×</button>
                         </div>
 
-                        {selectedWalsworthIssue.issue_url && (
-                            <div className="journal-modal-url">
-                                <a href={selectedWalsworthIssue.issue_url} target="_blank" rel="noopener noreferrer">
-                                    {selectedWalsworthIssue.issue_url}
-                                </a>
+                        <div className="journal-modal-info">
+                            <div className="journal-modal-info-left">
+                                {selectedWalsworthIssue.publication && (
+                                    <div className="info-pill">
+                                        <span className="info-label">Publication</span>
+                                        <span className="info-value">{selectedWalsworthIssue.publication}</span>
+                                    </div>
+                                )}
+                                {selectedWalsworthIssue.issue_url && (
+                                    <div className="info-pill">
+                                        <span className="info-label">URL</span>
+                                        <a href={selectedWalsworthIssue.issue_url} target="_blank" rel="noopener noreferrer" className="info-value" style={{ color: '#0ff', textDecoration: 'none' }}>
+                                            View Issue
+                                        </a>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                            {walsworthModalIndex >= 0 && walsworthFilteredData.length > 0 && (
+                                <span className="modal-position">{walsworthModalIndex + 1} of {walsworthFilteredData.length}</span>
+                            )}
+                        </div>
 
                         <div className="journal-modal-controls">
                             <div className="timeframe-filter">
@@ -1537,19 +1695,19 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                         <div className="journal-modal-metrics">
                             <div className="metric-card">
                                 <div className="metric-label">Total Page Views</div>
-                                <div className="metric-value">{formatNumber(selectedWalsworthIssue.current?.total_page_views || 0)}</div>
+                                <div className="campaign-metric-value">{formatNumber(selectedWalsworthIssue.current?.total_page_views || 0)}</div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-label">Unique Page Views</div>
-                                <div className="metric-value">{formatNumber(selectedWalsworthIssue.current?.unique_page_views || 0)}</div>
+                                <div className="campaign-metric-value">{formatNumber(selectedWalsworthIssue.current?.unique_page_views || 0)}</div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-label">Total Issue Visits</div>
-                                <div className="metric-value">{formatNumber(selectedWalsworthIssue.current?.total_issue_visits || 0)}</div>
+                                <div className="campaign-metric-value">{formatNumber(selectedWalsworthIssue.current?.total_issue_visits || 0)}</div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-label">Avg Time in Issue</div>
-                                <div className="metric-value">{formatTimeInIssue(selectedWalsworthIssue.current?.seconds_per_visit || 0)}</div>
+                                <div className="campaign-metric-value">{formatTimeInIssue(selectedWalsworthIssue.current?.seconds_per_visit || 0)}</div>
                             </div>
                         </div>
 

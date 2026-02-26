@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func, desc
-from models import BasisCampaign, BasisDailyStats, BasisExchangeStats
+from models import BasisCampaign, BasisDailyStats, BasisExchangeStats, BasisSyncLog
 from datetime import datetime, timedelta
 import os
 
@@ -473,20 +473,21 @@ def get_last_updated():
     try:
         session = get_session()
 
-        result = session.query(func.max(BasisExchangeStats.report_date)).scalar()
+        last_sync = session.query(func.max(BasisSyncLog.sync_completed_at)).filter(
+            BasisSyncLog.sync_status == 'success'
+        ).scalar()
+
+        latest_data = session.query(func.max(BasisDailyStats.report_date)).filter(
+            BasisDailyStats.property_name.is_(None)
+        ).scalar()
 
         session.close()
 
-        if result:
-            return jsonify({
-                'status': 'success',
-                'last_updated': result.isoformat() if hasattr(result, 'isoformat') else str(result)
-            }), 200
-        else:
-            return jsonify({
-                'status': 'success',
-                'last_updated': None
-            }), 200
+        return jsonify({
+            'status': 'success',
+            'last_updated': last_sync.isoformat() if last_sync else None,
+            'latest_data_date': latest_data.isoformat() if latest_data else None
+        }), 200
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

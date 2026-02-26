@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-const DraggableImage = ({ 
-  image, 
-  onMove, 
-  onResize, 
-  onDelete, 
+const DraggableImage = ({
+  image,
+  onMove,
+  onResize,
+  onDelete,
   onSelect,
-  isSelected = false 
+  isSelected = false,
+  showOverlay = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -14,6 +15,7 @@ const DraggableImage = ({
   const [resizeStart, setResizeStart] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [naturalDimensions, setNaturalDimensions] = useState({ width: 300, height: 200 });
+  const [currentSrc, setCurrentSrc] = useState(image.src);
   const imageRef = useRef(null);
 
   useEffect(() => {
@@ -189,6 +191,14 @@ const DraggableImage = ({
     opacity: isDragging ? 0.8 : 1
   };
 
+  const handleImageError = useCallback(() => {
+    if (image.fallbackSrc && currentSrc !== image.fallbackSrc) {
+      setCurrentSrc(image.fallbackSrc);
+    }
+  }, [image.fallbackSrc, currentSrc]);
+
+  const overlayFontSize = Math.max(8, Math.min(14, image.position.width / 18));
+
   if (!imageLoaded) {
     return (
       <div style={containerStyle}>
@@ -210,20 +220,61 @@ const DraggableImage = ({
 
   return (
     <div style={containerStyle} onMouseDown={handleMouseDown}>
-      <img 
+      <img
         ref={imageRef}
-        src={image.src} 
-        alt="Dashboard content" 
-        style={{ 
-          width: '100%', 
-          height: '100%', 
+        src={currentSrc}
+        alt="Dashboard content"
+        style={{
+          width: '100%',
+          height: '100%',
           objectFit: 'cover',
           display: 'block',
           pointerEvents: 'none'
         }}
         draggable={false}
+        onError={handleImageError}
       />
-      
+
+      {showOverlay && image.videoMetadata && (
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
+          padding: `${Math.max(4, overlayFontSize * 0.5)}px ${Math.max(6, overlayFontSize * 0.6)}px`,
+          color: 'white',
+          pointerEvents: 'none'
+        }}>
+          <div style={{ fontSize: overlayFontSize, fontWeight: '600', lineHeight: 1.3 }}>
+            {image.videoMetadata.views?.toLocaleString()} views
+          </div>
+          <div style={{ fontSize: overlayFontSize * 0.85, opacity: 0.85 }}>
+            {image.videoMetadata.avgPercentWatched?.toFixed(1)}% watched
+          </div>
+        </div>
+      )}
+
+      {showOverlay && image.socialMetadata && (
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
+          padding: `${Math.max(4, overlayFontSize * 0.5)}px ${Math.max(6, overlayFontSize * 0.6)}px`,
+          color: 'white',
+          pointerEvents: 'none'
+        }}>
+          <div style={{ fontSize: overlayFontSize, fontWeight: '600', lineHeight: 1.3 }}>
+            {(image.socialMetadata.engagements || 0).toLocaleString()} engagements
+          </div>
+          <div style={{ fontSize: overlayFontSize * 0.85, opacity: 0.85 }}>
+            {image.socialMetadata.platform ? image.socialMetadata.platform.charAt(0).toUpperCase() + image.socialMetadata.platform.slice(1) : ''}
+          </div>
+        </div>
+      )}
+
       <button
         className="draggable-image-delete-btn"
         onClick={handleDelete}

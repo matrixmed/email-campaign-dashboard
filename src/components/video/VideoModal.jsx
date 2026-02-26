@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import '../../styles/video.css';
+import '../../styles/CampaignModal.css';
 
-const VideoModal = ({ video, onClose, videoSource }) => {
+const VideoModal = ({ video, onClose, videoSource, allVideos = [], onNavigate }) => {
     const [timeframeFilter, setTimeframeFilter] = useState('all');
     const [displayMetrics, setDisplayMetrics] = useState({});
     const modalRef = useRef(null);
@@ -12,6 +13,12 @@ const VideoModal = ({ video, onClose, videoSource }) => {
 
     const isYoutubeVideo = videoSource === 'youtube';
     const breakdowns = video.breakdowns || {};
+
+    const currentIndex = video && allVideos.length > 0
+        ? allVideos.findIndex(v => v.id === video.id)
+        : -1;
+    const hasPrev = currentIndex > 0;
+    const hasNext = currentIndex >= 0 && currentIndex < allVideos.length - 1;
 
     const hasHistory = video.history && (Array.isArray(video.history) ? video.history.length > 0 : Object.keys(video.history).length > 0);
 
@@ -59,15 +66,31 @@ const VideoModal = ({ video, onClose, videoSource }) => {
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
+                if (!event.target.closest('.modal-nav-arrow')) {
+                    onClose();
+                }
+            }
+        };
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'ArrowLeft' && hasPrev && onNavigate) {
+                event.preventDefault();
+                onNavigate('prev');
+            } else if (event.key === 'ArrowRight' && hasNext && onNavigate) {
+                event.preventDefault();
+                onNavigate('next');
+            } else if (event.key === 'Escape') {
                 onClose();
             }
         };
-        
+
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [onClose]);
+    }, [onClose, hasPrev, hasNext, onNavigate]);
 
 
     const handleTimeframeChange = (e) => {
@@ -469,17 +492,41 @@ const VideoModal = ({ video, onClose, videoSource }) => {
 
     return (
         <div className="video-modal-overlay">
+            {hasPrev && onNavigate && (
+                <button
+                    className="modal-nav-arrow modal-nav-left"
+                    onClick={() => onNavigate('prev')}
+                    aria-label="Previous video"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            )}
+
+            {hasNext && onNavigate && (
+                <button
+                    className="modal-nav-arrow modal-nav-right"
+                    onClick={() => onNavigate('next')}
+                    aria-label="Next video"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            )}
+
             <div className="video-modal" ref={modalRef}>
                 <div className="video-modal-header">
                     <h3>{video.title}</h3>
-                    <button 
+                    <button
                         className="modal-close-button"
                         onClick={onClose}
                     >
                         ×
                     </button>
                 </div>
-                
+
                 <div className="video-preview-container">
                     <div className="video-thumbnail-preview">
                         <img
@@ -492,26 +539,25 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                             </div>
                         )}
                     </div>
-                    <div className="video-details">
-                        <div className="video-details-row">
-                            <span className="detail-label">Published:</span>
-                            <span className="detail-value">{formatDate(video.publishedAt)}</span>
+                    <div className="video-preview-details">
+                        <div className="video-preview-pills">
+                            <div className="info-pill">
+                                <span className="info-label">Published</span>
+                                <span className="info-value">{formatDate(video.publishedAt)}</span>
+                            </div>
+                            <div className="info-pill">
+                                <span className="info-label">Source</span>
+                                <span className="info-value">{isYoutubeVideo ? 'YouTube' : 'Vimeo'}</span>
+                            </div>
                         </div>
-                        <div className="video-details-row">
-                            <span className="detail-label">Video ID:</span>
-                            <span className="detail-value">{video.id}</span>
-                        </div>
-                        <div className="video-details-row">
-                            <span className="detail-label">URL:</span>
-                            <a
-                                href={getVideoUrl()}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="video-url"
-                            >
-                                {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : `vimeo.com/${video.id}`}
-                            </a>
-                        </div>
+                        <a
+                            href={getVideoUrl()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="video-preview-link"
+                        >
+                            {isYoutubeVideo ? `youtube.com/watch?v=${video.id}` : `vimeo.com/${video.id}`}
+                        </a>
                         {video.tags && video.tags.length > 0 && (
                             <div className="video-tags">
                                 {video.tags.slice(0, 5).map((tag, index) => (
@@ -521,6 +567,9 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                                     <span className="more-tags">+{video.tags.length - 5} more</span>
                                 )}
                             </div>
+                        )}
+                        {currentIndex >= 0 && allVideos.length > 0 && (
+                            <span className="modal-position">{currentIndex + 1} of {allVideos.length}</span>
                         )}
                     </div>
                     {isYoutubeVideo && video.current && (
@@ -550,28 +599,28 @@ const VideoModal = ({ video, onClose, videoSource }) => {
                 <div className="video-modal-metrics">
                     <div className="metrics-top-row">
                         {!isYoutubeVideo && (
-                            <div className="metric-card large-card">
+                            <div className="metric-card">
                                 <div className="metric-label">Impressions</div>
-                                <div className="metric-value">{formatNumber(displayMetrics.impressions)}</div>
+                                <div className="campaign-metric-value">{formatNumber(displayMetrics.impressions)}</div>
                             </div>
                         )}
-                        <div className="metric-card large-card">
+                        <div className="metric-card">
                             <div className="metric-label">Views</div>
-                            <div className="metric-value">{formatNumber(displayMetrics.views)}</div>
+                            <div className="campaign-metric-value">{formatNumber(displayMetrics.views)}</div>
                         </div>
                         {!isYoutubeVideo && (
-                            <div className="metric-card large-card">
+                            <div className="metric-card">
                                 <div className="metric-label">Impressions CTR</div>
-                                <div className="metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
+                                <div className="campaign-metric-value">{formatPercent(displayMetrics.impressions > 0 ? (displayMetrics.views / displayMetrics.impressions * 100) : 0)}</div>
                             </div>
                         )}
-                        <div className="metric-card large-card">
+                        <div className="metric-card">
                             <div className="metric-label">Avg. % Watched</div>
-                            <div className="metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
+                            <div className="campaign-metric-value">{formatPercent(displayMetrics.averageViewPercentage)}</div>
                         </div>
-                        <div className="metric-card large-card">
+                        <div className="metric-card">
                             <div className="metric-label">Total Time Watched</div>
-                            <div className="metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
+                            <div className="campaign-metric-value">{formatWatchTime(displayMetrics.watchTimeHours)}</div>
                         </div>
                     </div>
                 </div>

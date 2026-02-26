@@ -17,6 +17,9 @@ const CampaignPerformancePage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [liveSearchTerm, setLiveSearchTerm] = useState(searchTerms.campaignPerformance || '');
 
+  const [sortColumn, setSortColumn] = useState('Send_Date');
+  const [sortDirection, setSortDirection] = useState('desc');
+
   const [selectedColumn, setSelectedColumn] = useState({
     column1: 'Unique_Open_Rate',
     column2: 'Total_Open_Rate',
@@ -62,7 +65,14 @@ const CampaignPerformancePage = () => {
 
     if (selectedDeployment !== 'all') {
       const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
-      return validDeliveries;
+      return validDeliveries.map(d => ({
+        ...d,
+        Delivery_Rate: d.Sent > 0 ? (d.Delivered / d.Sent) * 100 : 0,
+        Unique_Open_Rate: d.Delivered > 0 ? (d.Unique_Opens / d.Delivered) * 100 : 0,
+        Total_Open_Rate: d.Delivered > 0 ? (d.Total_Opens / d.Delivered) * 100 : 0,
+        Unique_Click_Rate: d.Unique_Opens > 0 ? (d.Unique_Clicks / d.Unique_Opens) * 100 : 0,
+        Total_Click_Rate: d.Total_Opens > 0 ? (d.Total_Clicks / d.Total_Opens) * 100 : 0,
+      }));
     }
 
     const validDeliveries = data.filter(item => (item.Delivered || 0) >= 100);
@@ -223,7 +233,36 @@ const CampaignPerformancePage = () => {
     setCurrentPage(1);
   };
 
-  const sortedData = [...processedData].sort((a, b) => new Date(b.Send_Date) - new Date(a.Send_Date));
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
+
+  const sortedData = [...processedData].sort((a, b) => {
+    let valA = a[sortColumn];
+    let valB = b[sortColumn];
+
+    if (sortColumn === 'Send_Date') {
+      valA = new Date(valA);
+      valB = new Date(valB);
+    } else if (sortColumn === 'Campaign') {
+      valA = (valA || '').toLowerCase();
+      valB = (valB || '').toLowerCase();
+      return sortDirection === 'asc'
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    } else {
+      valA = typeof valA === 'number' ? valA : 0;
+      valB = typeof valB === 'number' ? valB : 0;
+    }
+
+    return sortDirection === 'asc' ? valA - valB : valB - valA;
+  });
   const totalPages = Math.ceil(sortedData.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const currentPageData = sortedData.slice(startIndex, startIndex + rowsPerPage);
@@ -303,6 +342,9 @@ const CampaignPerformancePage = () => {
         handleDeploymentChange={handleDeploymentChange}
         search={search}
         handleSearchChange={handleSearchChange}
+        handleSort={handleSort}
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
       />
       <LiveCampaignMetrics searchTerm={liveSearchTerm} />
     </div>

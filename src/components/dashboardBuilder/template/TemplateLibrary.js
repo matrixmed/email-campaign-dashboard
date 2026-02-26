@@ -1,6 +1,113 @@
 import { TEMPLATE_TYPES, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS } from './LayoutTemplates';
+import { generateHotTopicsSingle, generateHotTopicsMulti, generateExpertPerspectivesSingle, generateExpertPerspectivesMulti } from './CreativeTemplates';
 
-const addMatrixLogo = (components, theme) => {
+export const sanitizeTitle = (title) => {
+  if (!title) return title;
+  return title.replace(/\bHT\b/g, 'Hot Topics');
+};
+
+export const PHARMA_LOGO_MAP = {
+  'j&j': 'j&j.png',
+  'lilly': 'lilly.png',
+  'astrazeneca': 'az.png',
+  'sun pharma': 'sun.png',
+  'abbvie': 'abbvie.png',
+  'genentech': 'genentech.png',
+  'amgen': 'amgen.png',
+  'leo pharma': 'leo.png',
+  'exelixis': 'exelixis.png'
+};
+
+export const reformatCampaignTitle = (campaignName, brands = []) => {
+  if (!campaignName) return { displayTitle: campaignName, pharmaCompany: null, pharmaLogoFile: null };
+
+  let displayTitle = campaignName;
+  let pharmaCompany = null;
+  let pharmaLogoFile = null;
+  let matchedBrand = null;
+
+  if (brands.length > 0) {
+    const parenMatch = displayTitle.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+      const parenText = parenMatch[1].trim();
+      matchedBrand = brands.find(b =>
+        b.brand && b.brand.toLowerCase() === parenText.toLowerCase()
+      );
+      if (matchedBrand) {
+        displayTitle = displayTitle.replace(/\s*\([^)]+\)\s*/, ' ').trim();
+        displayTitle = `${matchedBrand.brand} ${displayTitle}`.replace(/\s+/g, ' ').replace(/\s*:\s*:/, ':').trim();
+        pharmaCompany = matchedBrand.pharma_company;
+      }
+    }
+
+    if (!matchedBrand) {
+      const campaignLower = campaignName.toLowerCase();
+      const sortedBrands = [...brands].sort((a, b) =>
+        (b.brand || '').length - (a.brand || '').length
+      );
+      for (const b of sortedBrands) {
+        if (b.brand && campaignLower.includes(b.brand.toLowerCase())) {
+          matchedBrand = b;
+          pharmaCompany = b.pharma_company;
+          break;
+        }
+      }
+    }
+
+    if (!matchedBrand) {
+      const campaignLower = campaignName.toLowerCase();
+      for (const b of brands) {
+        if (b.pharma_company && campaignLower.includes(b.pharma_company.toLowerCase())) {
+          matchedBrand = b;
+          pharmaCompany = b.pharma_company;
+          break;
+        }
+      }
+    }
+  }
+
+  if (pharmaCompany) {
+    const pharmaLower = pharmaCompany.toLowerCase();
+    for (const [key, logo] of Object.entries(PHARMA_LOGO_MAP)) {
+      if (pharmaLower.includes(key) || key.includes(pharmaLower)) {
+        pharmaLogoFile = logo;
+        break;
+      }
+    }
+  }
+
+  displayTitle = sanitizeTitle(displayTitle);
+
+  return { displayTitle, pharmaCompany, pharmaLogoFile };
+};
+
+export const detectMonthOnlyDifference = (campaignNames) => {
+  if (!campaignNames || campaignNames.length <= 1) {
+    return { isMonthOnly: false };
+  }
+
+  const monthNames = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december'
+  ];
+  const monthRegex = new RegExp(`\\b(${monthNames.join('|')})\\b`, 'gi');
+
+  const stripped = campaignNames.map(name => name.replace(monthRegex, '<<MONTH>>').trim());
+  const allSame = stripped.every(s => s === stripped[0]);
+
+  if (!allSame) return { isMonthOnly: false };
+
+  const months = campaignNames.map(name => {
+    const match = name.match(monthRegex);
+    return match ? match[0] : 'Unknown';
+  });
+
+  const baseName = stripped[0].replace(/<<MONTH>>/g, '').replace(/\s+/g, ' ').trim();
+
+  return { isMonthOnly: true, baseName, months };
+};
+
+export const addMatrixLogo = (components, theme) => {
   if (theme !== 'matrix') {
     components.push({
       id: 'matrix-logo-bottom',
@@ -21,7 +128,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
     id: 'campaign-title',
     type: 'title',
     title: campaign.campaign_name || 'Campaign Analysis',
-    position: { x: 20, y: -15, width: 1000, height: 100 },
+    position: { x: 27, y: -5, width: 1000, height: 100 },
     style: {
       background: 'transparent',
       color: themeColors.darkGray || '#1f2937'
@@ -202,7 +309,7 @@ export const generateSingleOneTemplate = (campaign, theme, mergeSubspecialties =
   return components;
 };
 
-function getTopSpecialties(specialtyData, mergeSubspecialties) {
+export function getTopSpecialties(specialtyData, mergeSubspecialties) {
   if (!specialtyData) return [];
   
   let processedData = Object.entries(specialtyData);
@@ -337,8 +444,11 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties) {
 }
 
 function generateMultiCampaignTableData(campaigns) {
-  const rows = campaigns.map(campaign => [
-    campaign.campaign_name || 'Unknown',
+  const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
+  const dedup = detectMonthOnlyDifference(campaignNames);
+
+  const rows = campaigns.map((campaign, index) => [
+    dedup.isMonthOnly ? dedup.months[index] : (campaign.campaign_name || 'Unknown'),
     (campaign.volume_metrics?.sent || 0).toLocaleString(),
     (campaign.volume_metrics?.delivered || 0).toLocaleString(),
     (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
@@ -349,10 +459,10 @@ function generateMultiCampaignTableData(campaigns) {
     `${(campaign.core_metrics?.total_click_rate || 0).toFixed(1)}%`
   ]);
 
-  return rows;
+  return { rows, dedup };
 }
 
-const generateTableForType = (tableType, position, themeColors) => {
+export const generateTableForType = (tableType, position, themeColors) => {
   const tableDefinition = TABLE_DEFINITIONS[tableType];
   
   if (!tableDefinition) {
@@ -400,7 +510,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
     id: 'campaign-title',
     type: 'title',
     title: campaign.campaign_name || 'Campaign Analysis',
-    position: { x: 20, y: -15, width: 1000, height: 100 },
+    position: { x: 27, y: -5, width: 1000, height: 100 },
     style: {
       background: 'transparent',
       color: themeColors.darkGray || '#1f2937'
@@ -566,16 +676,24 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   const components = [];
   const themeColors = getThemeColors(theme);
   const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
-  
-  const campaignNames = campaigns.map(c => c.campaign_name).slice(0, 3).join(' + ');
-  const titleText = campaigns.length > 3 ?
-    `${campaignNames} + ${campaigns.length - 3} more` : campaignNames;
-  
+
+  const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
+  const dedup = detectMonthOnlyDifference(campaignNames);
+
+  let titleText;
+  if (dedup.isMonthOnly) {
+    titleText = sanitizeTitle(dedup.baseName);
+  } else {
+    const joinedNames = campaignNames.slice(0, 3).join(' + ');
+    titleText = campaigns.length > 3 ?
+      `${joinedNames} + ${campaigns.length - 3} more` : joinedNames;
+  }
+
   components.push({
     id: 'multi-campaign-title',
     type: 'title',
     title: titleText,
-    position: { x: 5, y: -5, width: 800, height: 70 },
+    position: { x: 27, y: -5, width: 1000, height: 100 },
     style: {
       background: 'transparent',
       color: themeColors.darkGray || '#1f2937'
@@ -656,16 +774,17 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     });
   }
 
-  const tableData = generateMultiCampaignTableData(campaigns);
+  const tableResult = generateMultiCampaignTableData(campaigns);
+  const firstHeaderCol = tableResult.dedup.isMonthOnly ? 'Campaign Month' : 'Campaign Name';
   components.push({
     id: 'campaign-comparison-table',
     type: 'table',
     title: '',
-    config: { 
-      customData: tableData,
+    config: {
+      customData: tableResult.rows,
       headers: [
-        'Campaign Name', 'Sent', 'Delivered', 'Unique Opens', 
-        'Unique Open Rate', 'Total Opens', 'Total Open Rate', 
+        firstHeaderCol, 'Sent', 'Delivered', 'Unique Opens',
+        'Unique Open Rate', 'Total Opens', 'Total Open Rate',
         'Unique Click Rate', 'Total Click Rate'
       ]
     },
@@ -798,22 +917,48 @@ export const TEMPLATE_GENERATORS = {
   [TEMPLATE_TYPES.MULTI_NONE]: generateMultiNoneTemplate,
   [TEMPLATE_TYPES.MULTI_ONE]: generateMultiOneTemplate,
   [TEMPLATE_TYPES.MULTI_TWO]: generateMultiTwoTemplate,
-  [TEMPLATE_TYPES.MULTI_THREE]: generateMultiThreeTemplate
+  [TEMPLATE_TYPES.MULTI_THREE]: generateMultiThreeTemplate,
+  [TEMPLATE_TYPES.SINGLE_HOT_TOPICS]: generateHotTopicsSingle,
+  [TEMPLATE_TYPES.MULTI_HOT_TOPICS]: generateHotTopicsMulti,
+  [TEMPLATE_TYPES.SINGLE_EXPERT_PERSPECTIVES]: generateExpertPerspectivesSingle,
+  [TEMPLATE_TYPES.MULTI_EXPERT_PERSPECTIVES]: generateExpertPerspectivesMulti
 };
 
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {} } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, bannerImpressionsMode = false } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
-  
+
   if (!generator) {
     throw new Error(`Template ${template.id} not found`);
   }
-  
+
+  let components;
   if (type === 'single') {
-    return generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
+    components = generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   } else {
-    return generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
+    components = generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   }
+
+  if (bannerImpressionsMode) {
+    const campaign = type === 'single' ? campaigns[0] : null;
+    const tpeCard = components.find(c => c.id === 'total-professional-engagements');
+    if (tpeCard && campaign) {
+      const isExpertPerspectives = campaign.campaign_name?.toLowerCase().includes('expert perspectives');
+      const totalOpens = campaign.volume_metrics?.total_opens || 0;
+      const bannerValue = isExpertPerspectives ? totalOpens : totalOpens * 2;
+      tpeCard.title = 'eNEWSLETTER BANNER IMPRESSIONS';
+      tpeCard.value = bannerValue.toLocaleString();
+      tpeCard.subtitle = isExpertPerspectives ? 'Based on total opens' : 'Based on 2x total opens';
+    }
+  }
+
+  components.forEach(comp => {
+    if (comp.type === 'title' && comp.title) {
+      comp.title = sanitizeTitle(comp.title);
+    }
+  });
+
+  return components;
 };
 
 export default {
@@ -826,5 +971,9 @@ export default {
   generateMultiNoneTemplate,
   generateMultiOneTemplate,
   generateMultiTwoTemplate,
-  generateMultiThreeTemplate
+  generateMultiThreeTemplate,
+  sanitizeTitle,
+  reformatCampaignTitle,
+  PHARMA_LOGO_MAP,
+  detectMonthOnlyDifference
 };

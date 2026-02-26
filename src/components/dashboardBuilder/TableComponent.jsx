@@ -30,6 +30,8 @@ const TableComponent = ({
   const [isEditingCell, setIsEditingCell] = useState(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [selectedColIndex, setSelectedColIndex] = useState(null);
+  const [customColumnWidths, setCustomColumnWidths] = useState(config.columnWidths || null);
+  const [colResizing, setColResizing] = useState(null);
   const tableRef = useRef(null);
   const titleInputRef = useRef(null);
 
@@ -317,6 +319,54 @@ const TableComponent = ({
     onEdit?.(id, { config: updatedConfig });
   }, [tableData, onEdit, id, config]);
 
+  const handleColResizeStart = useCallback((e, colIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const totalCols = tableData[0]?.length || 1;
+    const tableWidth = position.width - 20;
+    const currentWidths = customColumnWidths || Array(totalCols).fill(tableWidth / totalCols);
+    setColResizing({
+      colIndex,
+      startX: e.clientX,
+      startWidths: [...currentWidths]
+    });
+  }, [tableData, position.width, customColumnWidths]);
+
+  const handleColResizeMove = useCallback((e) => {
+    if (!colResizing) return;
+    const { colIndex, startX, startWidths } = colResizing;
+    const delta = e.clientX - startX;
+    const nextCol = colIndex + 1;
+    if (nextCol >= startWidths.length) return;
+
+    const newWidths = [...startWidths];
+    newWidths[colIndex] = Math.max(30, startWidths[colIndex] + delta);
+    newWidths[nextCol] = Math.max(30, startWidths[nextCol] - delta);
+    setCustomColumnWidths(newWidths);
+  }, [colResizing]);
+
+  const handleColResizeEnd = useCallback(() => {
+    if (colResizing && customColumnWidths) {
+      onEdit?.(id, { config: { ...config, columnWidths: customColumnWidths } });
+    }
+    setColResizing(null);
+  }, [colResizing, customColumnWidths, onEdit, id, config]);
+
+  useEffect(() => {
+    if (colResizing) {
+      document.addEventListener('mousemove', handleColResizeMove);
+      document.addEventListener('mouseup', handleColResizeEnd);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      return () => {
+        document.removeEventListener('mousemove', handleColResizeMove);
+        document.removeEventListener('mouseup', handleColResizeEnd);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [colResizing, handleColResizeMove, handleColResizeEnd]);
+
   const handleTitleEdit = useCallback((newTitle) => {
     setTableTitle(newTitle);
     onEdit?.(id, { title: newTitle });
@@ -449,17 +499,30 @@ const TableComponent = ({
 
   const tableContainerStyle = {
     flex: 1,
-    overflow: 'auto',
+    overflow: 'hidden',
     border: '1px solid #e0e0e0',
     borderRadius: '4px',
     background: '#ffffff',
-    margin: isCampaignComparisonTable ? '0' : '0',
+    margin: '0',
     padding: '0'
   };
 
   const numCols = tableData[0]?.length || 3;
-  const availableWidthPerCol = (position.width - 20) / numCols;
-  const calculatedFontSize = Math.min(12, Math.max(8, availableWidthPerCol / 7));
+  const numRows = tableData.length || 1;
+  const availableWidth = position.width - 20;
+  const titleHeight = isCampaignComparisonTable ? 14 : 28;
+  const availableHeight = position.height - titleHeight - 12;
+  const cellPadding = isCampaignComparisonTable ? 4 : 8;
+  const lineHeight = 1.3;
+
+  const longestContentPerCol = (tableData[0] || []).map((_, colIndex) => {
+    return Math.min(20, Math.max(...tableData.map(row => String(row[colIndex] || '').length), 3));
+  });
+  const totalCharWidth = longestContentPerCol.reduce((sum, len) => sum + len, 0);
+
+  const maxFontByHeight = (availableHeight / numRows - cellPadding * 2) / lineHeight;
+  const maxFontByWidth = totalCharWidth > 0 ? availableWidth / (totalCharWidth * 0.48) : 12;
+  const calculatedFontSize = Math.min(14, Math.max(9, Math.min(maxFontByHeight, maxFontByWidth)));
 
   const actualTableStyle = {
     width: '100%',
@@ -470,10 +533,13 @@ const TableComponent = ({
   };
 
   const getColumnWidth = (colIndex, totalCols) => {
+    if (customColumnWidths && customColumnWidths[colIndex]) {
+      return `${customColumnWidths[colIndex]}px`;
+    }
     if (isCampaignComparisonTable && colIndex === 0) {
       return '17%';
     }
-    
+
     if (totalCols <= 3) return 'auto';
     if (totalCols <= 5) return `${100 / totalCols}%`;
     return `${Math.max(12, 100 / totalCols)}%`;
@@ -639,7 +705,7 @@ const TableComponent = ({
                     return (
                       <td
                         key={colIndex}
-                        style={getCellStyle(rowIndex, colIndex)}
+                        style={{ ...getCellStyle(rowIndex, colIndex), position: 'relative' }}
                         onDoubleClick={() => {
                           setEditValue(cell);
                           handleCellDoubleClick(rowIndex, colIndex);
@@ -668,12 +734,29 @@ const TableComponent = ({
                             autoFocus
                           />
                         ) : (
-                          <span 
+                          <span
                             title="Double-click to edit"
                             style={{ cursor: 'pointer' }}
                           >
                             {cell}
                           </span>
+                        )}
+                        {rowIndex === 0 && colIndex < row.length - 1 && (
+                          <div
+                            onMouseDown={(e) => handleColResizeStart(e, colIndex)}
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              width: '4px',
+                              height: '100%',
+                              cursor: 'col-resize',
+                              zIndex: 10,
+                              background: 'transparent'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 123, 255, 0.3)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                          />
                         )}
                       </td>
                     );

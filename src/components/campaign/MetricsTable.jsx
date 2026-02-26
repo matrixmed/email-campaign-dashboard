@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
 import CampaignModal from './CampaignModal';
 
-const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleColumnChange, currentPage, rowsPerPage, handlePagination, availableMetrics, totalPages, handleRowsPerPageChange, selectedDeployment, handleDeploymentChange }) => {
+const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleColumnChange, currentPage, rowsPerPage, handlePagination, availableMetrics, totalPages, handleRowsPerPageChange, selectedDeployment, handleDeploymentChange, handleSort, sortColumn, sortDirection }) => {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [activeTooltipRow, setActiveTooltipRow] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -160,6 +160,15 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
 
     const rowsOptions = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100];
 
+    const SortIndicator = ({ column }) => {
+        if (sortColumn !== column) return null;
+        return (
+            <span className="sort-indicator">
+                {sortDirection === 'asc' ? '▲' : '▼'}
+            </span>
+        );
+    };
+
     const getDeploymentLabel = () => {
         return deploymentOptions.find(opt => opt.value === selectedDeployment)?.label || 'All Deployments';
     };
@@ -239,33 +248,51 @@ const MetricsTable = ({ currentRows, processedFullData, selectedColumn, handleCo
                     <thead>
                         <tr>
                             
-                            <th className="campaign-column">Campaign</th>
-                            <th className="date-column">Send Date</th>
+                            <th className="campaign-column sortable-header" onDoubleClick={() => handleSort && handleSort('Campaign')}>
+                                <div className="header-content">
+                                    <span>Campaign</span>
+                                    <SortIndicator column="Campaign" />
+                                </div>
+                            </th>
+                            <th className="date-column sortable-header" onDoubleClick={() => handleSort && handleSort('Send_Date')}>
+                                <div className="header-content">
+                                    <span>Send Date</span>
+                                    <SortIndicator column="Send_Date" />
+                                </div>
+                            </th>
                             {Object.entries(selectedColumn).map(([colKey, colValue]) => (
                                 <th
                                     key={colKey}
-                                    className="sortable-header"
+                                    className={`sortable-header ${sortColumn === colValue ? 'sorted' : ''}`}
                                     onClick={(e) => toggleDropdown(colKey, e)}
+                                    onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(null);
+                                        handleSort && handleSort(colValue);
+                                    }}
                                 >
                                     <div className="header-content">
                                         <span>{metricDisplayNames[colValue]}</span>
-                                        <span className="dropdown-arrow">
-                                            <svg
-                                                width="12"
-                                                height="12"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                style={{
-                                                    transform: activeDropdown === colKey ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.2s'
-                                                }}
-                                            >
-                                                <polyline points="6 9 12 15 18 9"></polyline>
-                                            </svg>
+                                        <span className="header-icons">
+                                            <SortIndicator column={colValue} />
+                                            <span className="dropdown-arrow">
+                                                <svg
+                                                    width="12"
+                                                    height="12"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    style={{
+                                                        transform: activeDropdown === colKey ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                        transition: 'transform 0.2s'
+                                                    }}
+                                                >
+                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                </svg>
+                                            </span>
                                         </span>
                                     </div>
                                 </th>

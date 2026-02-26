@@ -336,6 +336,16 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
         setIsModalOpen(false);
     };
 
+    const handleModalNavigate = (direction) => {
+        if (!selectedVideo || filteredData.length === 0) return;
+        const currentIdx = filteredData.findIndex(v => v.id === selectedVideo.id);
+        if (currentIdx === -1) return;
+        const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
+        if (newIdx >= 0 && newIdx < filteredData.length) {
+            setSelectedVideo(filteredData[newIdx]);
+        }
+    };
+
     const formatNumber = (num) => {
         if (num === undefined || isNaN(num)) return "0";
         return num.toLocaleString();
@@ -513,7 +523,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                             )}
                             {(videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated) && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {new Date(videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    Last Updated: {(() => { const raw = videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated; const d = new Date(raw + (raw.length === 10 ? 'T00:00:00' : '')); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
                                 </div>
                             )}
                             
@@ -686,6 +696,8 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                     video={selectedVideo}
                     onClose={closeVideoModal}
                     videoSource={videoSource}
+                    allVideos={filteredData}
+                    onNavigate={handleModalNavigate}
                 />
             )}
         </div>

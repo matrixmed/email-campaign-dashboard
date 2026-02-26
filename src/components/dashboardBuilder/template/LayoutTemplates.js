@@ -1,29 +1,3 @@
-export const MATRIX_COLORS = {
-  primary: '#575757',
-  primaryDark: '#a50001',
-  secondary: '#003a6d',
-  secondaryLight: '#0066cc',
-  accent: '#00a0e6',
-
-  white: '#ffffff',
-  lightGray: '#f8f9fa',
-  gray: '#6c757d',
-  darkGray: '#2c3e50',
-  text: '#1f2937',
-  textSecondary: '#6b7280',
-  border: '#e2e8f0',
-  
-  success: '#28a745',
-  warning: '#ffc107',
-  info: '#17a2b8',
-  
-  primaryGradient: 'linear-gradient(135deg, #414141 0%, #585858 100%)',
-  secondaryGradient: 'linear-gradient(135deg, #003a6d 0%, #0066cc 100%)',
-  heroGradient: 'linear-gradient(135deg, #0066cc 0%, #003a6d 100%)',
-  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-  specialtyGradient: 'linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%)'
-};
-
 export const JCAD_COLORS = {
   primary: '#00857a',
   primaryDark: '#005954',
@@ -50,62 +24,6 @@ export const JCAD_COLORS = {
   heroGradient: 'linear-gradient(135deg, #5aa8a2 0%, #00857a 100%)',
   cardGradient: 'linear-gradient(135deg, #ffffff 0%, #e1f4f3 100%)',
   specialtyGradient: 'linear-gradient(135deg, #e1f4f3 0%, #f0fffe 100%)'
-};
-
-export const NPPA_COLORS = {
-  primary: '#543378',
-  primaryDark: '#3d2558',
-  secondary: '#008378',
-  secondaryLight: '#69727d',
-  accent: '#00a5a5',
-
-  white: '#ffffff',
-  lightGray: '#f8f9fa',
-  gray: '#6c757d',
-  darkGray: '#2c3e50',
-  text: '#2a1b3d',
-  textSecondary: '#6c757d',
-  border: '#e6e0f0',
-  surface: '#f3f1f7',
-  onSurface: '#2a1b3d',
-  
-  success: '#28a745',
-  warning: '#ffc107',
-  info: '#17a2b8',
-  
-  primaryGradient: 'linear-gradient(135deg, #543378 0%, #3d2558 100%)',
-  secondaryGradient: 'linear-gradient(135deg, #008378 0%, #69727d 100%)',
-  heroGradient: 'linear-gradient(135deg, #69727d 0%, #543378 100%)',
-  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f3f1f7 100%)',
-  specialtyGradient: 'linear-gradient(135deg, #f3f1f7 0%, #faf9fc 100%)'
-};
-
-export const ICNS_COLORS = {
-  primary: '#1a365d',
-  primaryDark: '#102a44',
-  secondary: '#2b77ad',
-  secondaryLight: '#4299e1',
-  accent: '#6366f1',
-
-  white: '#ffffff',
-  lightGray: '#f7fafc',
-  gray: '#718096',
-  darkGray: '#2d3748',
-  text: '#1a202c',
-  textSecondary: '#4a5568',
-  border: '#e2e8f0',
-  surface: '#edf2f7',
-  onSurface: '#1a202c',
-
-  success: '#059669',
-  warning: '#ed8936',
-  info: '#4299e1',
-
-  primaryGradient: 'linear-gradient(135deg, #1a365d 0%, #102a44 100%)',
-  secondaryGradient: 'linear-gradient(135deg, #2b77ad 0%, #4299e1 100%)',
-  heroGradient: 'linear-gradient(135deg, #4299e1 0%, #1a365d 100%)',
-  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f7fafc 100%)',
-  specialtyGradient: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
 };
 
 export const ONCOLOGY_COLORS = {
@@ -136,39 +54,155 @@ export const ONCOLOGY_COLORS = {
   specialtyGradient: 'linear-gradient(135deg, #f8fbfc 0%, #efefef 100%)'
 };
 
+export const ICNS_COLORS = {
+  primary: '#1a365d',
+  primaryDark: '#102a44',
+  secondary: '#2b77ad',
+  secondaryLight: '#4299e1',
+  accent: '#6366f1',
+
+  white: '#ffffff',
+  lightGray: '#f7fafc',
+  gray: '#718096',
+  darkGray: '#2d3748',
+  text: '#1a202c',
+  textSecondary: '#4a5568',
+  border: '#e2e8f0',
+  surface: '#edf2f7',
+  onSurface: '#1a202c',
+
+  success: '#059669',
+  warning: '#ed8936',
+  info: '#4299e1',
+
+  primaryGradient: 'linear-gradient(135deg, #1a365d 0%, #102a44 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #2b77ad 0%, #4299e1 100%)',
+  heroGradient: 'linear-gradient(135deg, #4299e1 0%, #1a365d 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f7fafc 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
+};
+
+export const NPPA_COLORS = {
+  primary: '#543378',
+  primaryDark: '#3d2558',
+  secondary: '#008378',
+  secondaryLight: '#69727d',
+  accent: '#00a5a5',
+
+  white: '#ffffff',
+  lightGray: '#f8f9fa',
+  gray: '#6c757d',
+  darkGray: '#2c3e50',
+  text: '#2a1b3d',
+  textSecondary: '#6c757d',
+  border: '#e6e0f0',
+  surface: '#f3f1f7',
+  onSurface: '#2a1b3d',
+  
+  success: '#28a745',
+  warning: '#ffc107',
+  info: '#17a2b8',
+  
+  primaryGradient: 'linear-gradient(135deg, #543378 0%, #3d2558 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #008378 0%, #69727d 100%)',
+  heroGradient: 'linear-gradient(135deg, #69727d 0%, #543378 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f3f1f7 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #f3f1f7 0%, #faf9fc 100%)'
+};
+
+export const MATRIX_COLORS = {
+  primary: '#575757',
+  primaryDark: '#a50001',
+  secondary: '#003a6d',
+  secondaryLight: '#0066cc',
+  accent: '#00a0e6',
+
+  white: '#ffffff',
+  lightGray: '#f8f9fa',
+  gray: '#6c757d',
+  darkGray: '#2c3e50',
+  text: '#1f2937',
+  textSecondary: '#6b7280',
+  border: '#e2e8f0',
+  
+  success: '#28a745',
+  warning: '#ffc107',
+  info: '#17a2b8',
+  
+  primaryGradient: 'linear-gradient(135deg, #414141 0%, #585858 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #003a6d 0%, #0066cc 100%)',
+  heroGradient: 'linear-gradient(135deg, #0066cc 0%, #003a6d 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%)'
+};
+
+export const NHR_COLORS = {
+  primary: '#25408f',
+  primaryDark: '#25408f',
+  secondary: '#ffffffa6',
+  secondaryLight: '#edf2f4',
+  accent: '#25408f',
+
+  white: '#ffffff',
+  lightGray: '#f8f9fa',
+  gray: '#6c757d',
+  darkGray: '#2c3e50',
+  text: '#1f2937',
+  textSecondary: '#6c757d',
+  border: '#e6e0f0',
+  surface: '#f3f1f7',
+  onSurface: '#1f2937',
+  
+  success: '#28a745',
+  warning: '#ffc107',
+  info: '#17a2b8',
+  
+  primaryGradient: 'linear-gradient(135deg, #4d64a4 0%, #25408f 100%)',
+  secondaryGradient: 'linear-gradient(135deg, #25408f 0%, #ffffffa6 100%)',
+  heroGradient: 'linear-gradient(135deg, #25408f 0%, #4d64a4 100%)',
+  cardGradient: 'linear-gradient(135deg, #ffffff 0%, #f3f1f7 100%)',
+  specialtyGradient: 'linear-gradient(135deg, #f3f1f7 0%, #faf9fc 100%)'
+};
+
 export const THEMES = {
-  MATRIX: 'matrix',
   JCAD: 'jcad',
-  NPPA: 'nppa',
+  ONCOLOGY: 'oncology',
   ICNS: 'icns',
-  ONCOLOGY: 'oncology'
+  NPPA: 'nppa',
+  MATRIX: 'matrix',
+  NHR: 'nhr'
 };
 
 export const THEME_INFO = {
-  [THEMES.MATRIX]: {
-    name: 'Matrix',
-    colors: ['#575757', '#003a6d', '#0066cc'],
-    logo: 'matrix.png',
-  },
   [THEMES.JCAD]: {
     name: 'JCAD',
     colors: ['#00857a', '#007837', '#5aa8a2'],
     logo: 'jcad.png',
   },
-  [THEMES.NPPA]: {
-    name: 'NPPA',
-    colors: ['#543378', '#008378', '#69727d'],
-    logo: 'nppa.png',
+  [THEMES.ONCOLOGY]: {
+    name: 'Oncology',
+    colors: ['#2a5fa3', '#37bbb4', '#efefef'],
+    logo: 'oncology.png',
   },
   [THEMES.ICNS]: {
     name: 'ICNS',
     colors: ['#1a365d', '#2b77ad', '#4299e1'],
     logo: 'icns.png',
   },
-  [THEMES.ONCOLOGY]: {
-    name: 'Oncology',
-    colors: ['#2a5fa3', '#37bbb4', '#efefef'],
-    logo: 'oncology.png',
+  [THEMES.NPPA]: {
+    name: 'NPPA',
+    colors: ['#543378', '#008378', '#69727d'],
+    logo: 'nppa.png',
+  },
+  [THEMES.MATRIX]: {
+    name: 'Matrix',
+    colors: ['#575757', '#003a6d', '#0066cc'],
+    logo: 'matrix.png',
+  },
+  [THEMES.NHR]: {
+    name: 'NHR',
+    colors: ['#4d64a4', '#25408f', '#ffffffa6'],
+    logo: 'nhr.png',
   }
 };
 
@@ -182,6 +216,8 @@ export const getThemeColors = (theme) => {
       return ICNS_COLORS;
     case THEMES.ONCOLOGY:
       return ONCOLOGY_COLORS;
+    case THEMES.NHR:
+      return NHR_COLORS;
     case THEMES.MATRIX:
     default:
       return MATRIX_COLORS;
@@ -195,8 +231,9 @@ export const getThemeLogo = (theme) => {
 
 export const TABLE_TYPES = {
   ONLINE_JOURNAL: 'online-journal',
-  VIDEO_METRICS: 'video-metrics', 
-  SOCIAL_MEDIA: 'social-media'
+  VIDEO_METRICS: 'video-metrics',
+  SOCIAL_MEDIA: 'social-media',
+  LANDING_PAGE: 'landing-page'
 };
 
 export const TABLE_DEFINITIONS = {
@@ -226,7 +263,50 @@ export const TABLE_DEFINITIONS = {
       ['Engagement Rate', ''],
       ['CTR', '']
     ]
+  },
+  [TABLE_TYPES.LANDING_PAGE]: {
+    title: 'Landing Page Impressions',
+    headers: ['Metric', 'Value'],
+    data: [
+      ['300x250', ''],
+      ['728x90', '']
+    ]
   }
+};
+
+export const getSmartTemplateSelection = (campaignTitle) => {
+  if (!campaignTitle) return null;
+  const title = campaignTitle.toLowerCase();
+
+  if (title.includes('expert perspectives')) {
+    return {
+      templateId: TEMPLATE_TYPES.SINGLE_EXPERT_PERSPECTIVES,
+      tableTypes: {
+        table1: TABLE_TYPES.VIDEO_METRICS,
+        table2: TABLE_TYPES.SOCIAL_MEDIA,
+        table3: TABLE_TYPES.LANDING_PAGE
+      }
+    };
+  }
+
+  if (/\bht\b/.test(title) || title.includes('hot topics')) {
+    return {
+      templateId: TEMPLATE_TYPES.SINGLE_HOT_TOPICS,
+      tableTypes: {
+        table1: TABLE_TYPES.ONLINE_JOURNAL,
+        table2: TABLE_TYPES.SOCIAL_MEDIA
+      }
+    };
+  }
+
+  if (title.includes('custom email') || title.includes('clinical updates')) {
+    return {
+      templateId: TEMPLATE_TYPES.SINGLE_NONE,
+      tableTypes: {}
+    };
+  }
+
+  return null;
 };
 
 export const getSmartTableSelection = (campaignTitle) => {
@@ -421,7 +501,11 @@ export const TEMPLATE_TYPES = {
   MULTI_NONE: 'multi-none',
   MULTI_ONE: 'multi-one',
   MULTI_TWO: 'multi-two',
-  MULTI_THREE: 'multi-three'
+  MULTI_THREE: 'multi-three',
+  SINGLE_HOT_TOPICS: 'single-hot-topics',
+  MULTI_HOT_TOPICS: 'multi-hot-topics',
+  SINGLE_EXPERT_PERSPECTIVES: 'single-expert-perspectives',
+  MULTI_EXPERT_PERSPECTIVES: 'multi-expert-perspectives'
 };
 
 export const AVAILABLE_METRICS = [
@@ -531,5 +615,6 @@ export default {
   TABLE_TYPES,
   getMetricValue,
   formatMetricValue,
-  mergeSpecialties
+  mergeSpecialties,
+  getSmartTemplateSelection
 };

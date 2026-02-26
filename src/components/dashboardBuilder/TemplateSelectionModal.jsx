@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { THEMES, THEME_INFO, TEMPLATE_TYPES } from './template/LayoutTemplates';
+import React, { useState, useEffect, useMemo } from 'react';
+import { THEMES, THEME_INFO, TEMPLATE_TYPES, getSmartTemplateSelection } from './template/LayoutTemplates';
 
 const TemplateSelectionModal = ({ 
   isOpen, 
@@ -8,12 +8,32 @@ const TemplateSelectionModal = ({
   onTemplateSelect 
 }) => {
   const [step, setStep] = useState(1);
-  const [selectedTheme, setSelectedTheme] = useState(THEMES.MATRIX);
+  const [selectedTheme, setSelectedTheme] = useState(THEMES.JCAD);
   const [campaignType, setCampaignType] = useState('single');
   const [selectedCampaigns, setSelectedCampaigns] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedSingleCampaign, setSelectedSingleCampaign] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const smartSuggestion = useMemo(() => {
+    if (campaignType !== 'single' || !selectedSingleCampaign) return null;
+    return getSmartTemplateSelection(selectedSingleCampaign.campaign_name);
+  }, [campaignType, selectedSingleCampaign]);
+
+  useEffect(() => {
+    if (step === 4 && smartSuggestion && !selectedTemplate) {
+      const sTemplates = [
+        { id: TEMPLATE_TYPES.SINGLE_NONE },
+        { id: TEMPLATE_TYPES.SINGLE_ONE },
+        { id: TEMPLATE_TYPES.SINGLE_TWO },
+        { id: TEMPLATE_TYPES.SINGLE_THREE },
+        { id: TEMPLATE_TYPES.SINGLE_HOT_TOPICS },
+        { id: TEMPLATE_TYPES.SINGLE_EXPERT_PERSPECTIVES }
+      ];
+      const suggested = sTemplates.find(t => t.id === smartSuggestion.templateId);
+      if (suggested) setSelectedTemplate(suggested);
+    }
+  }, [step, smartSuggestion, selectedTemplate]);
 
   if (!isOpen) return null;
 
@@ -22,92 +42,68 @@ const TemplateSelectionModal = ({
   );
 
   const singleTemplates = [
+        {
+      id: TEMPLATE_TYPES.SINGLE_HOT_TOPICS,
+      name: 'Hot Topics',
+      image: 'single-hot-topics.png'
+    },
+    {
+      id: TEMPLATE_TYPES.SINGLE_EXPERT_PERSPECTIVES,
+      name: 'Expert Perspectives',
+      image: 'single-expert-perspectives.png'
+    },
     {
       id: TEMPLATE_TYPES.SINGLE_NONE,
       name: 'No Tables',
-      description: 'Clean layout with full-width audience breakdown',
-      image: 'single-none.png',
-      features: [
-        '8 core metric cards',
-        'Full-width Audience breakdown'
-      ]
+      image: 'single-none.png'
     },
     {
       id: TEMPLATE_TYPES.SINGLE_ONE,
       name: 'One Table',
-      description: 'Audience breakdown + one data table',
-      image: 'single-one.png',
-      features: [
-        '8 core metric cards',
-        'Audience breakdown',
-        'One customizable table'
-      ]
+      image: 'single-one.png'
     },
     {
       id: TEMPLATE_TYPES.SINGLE_TWO,
       name: 'Two Tables',
-      description: 'Removes 2 metric cards, adds 2 tables',
-      image: 'single-two.png',
-      features: [
-        '6 core metric cards',
-        'Audience breakdown + first table',
-        'Second table replaces removed metric cards'
-      ]
+      image: 'single-two.png'
     },
     {
       id: TEMPLATE_TYPES.SINGLE_THREE,
       name: 'Three Tables',
-      description: 'Maximum data density',
-      image: 'single-three.png',
-      features: [
-        'Same as two tables layout',
-        'Minimal image space, maximum data focus'
-      ]
+      image: 'single-three.png'
     }
   ];
 
   const multiTemplates = [
     {
+      id: TEMPLATE_TYPES.MULTI_HOT_TOPICS,
+      name: 'Hot Topics Multi',
+      image: 'multi-hot-topics.png'
+    },
+    {
+      id: TEMPLATE_TYPES.MULTI_EXPERT_PERSPECTIVES,
+      name: 'Expert Perspectives Multi',
+      image: 'multi-expert-perspectives.png'
+    },
+    {
       id: TEMPLATE_TYPES.MULTI_NONE,
       name: 'Multi Comparison',
-      description: 'Campaign comparison with aggregated metrics',
-      image: 'multi-none.png',
-      features: [
-        '4 aggregated hero metrics across campaigns',
-        '9-column comparison table (all selected campaigns)',
-        'Combined audience breakdown with merged specialties'
-      ]
+      image: 'multi-none.png'
     },
     {
       id: TEMPLATE_TYPES.MULTI_ONE,
       name: 'Multi + One Table',
-      description: 'Campaign comparison + audience + additional table',
-      image: 'multi-one.png',
-      features: [
-        'Same 4 hero metrics and comparison table',
-        'Audience breakdown (half width)',
-        'One additional metrics table'
-      ]
+      image: 'multi-one.png'
     },
     {
       id: TEMPLATE_TYPES.MULTI_TWO,
       name: 'Multi + Two Tables',
-      description: 'Maximum multi-campaign view with two tables',
-      image: 'multi-two.png',
-      features: [
-        'Same core multi-campaign structure',
-        'Two additional tables side by side'
-      ]
+      image: 'multi-two.png'
     },
     {
       id: TEMPLATE_TYPES.MULTI_THREE,
       name: 'Multi + Three Tables',
-      description: 'Dense layout with stacked third table',
-      image: 'multi-three.png',
-      features: [
-        'Same as multi two tables',
-        'Third table stacked above second table'
-      ]
+      image: 'multi-three.png'
     }
   ];
 
@@ -186,11 +182,13 @@ const TemplateSelectionModal = ({
     borderRadius: '20px',
     width: '90%',
     maxWidth: '1200px',
-    maxHeight: '90vh',
+    height: '750px',
     overflow: 'hidden',
     position: 'relative',
     boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)',
-    border: '2px solid #e5e7eb'
+    border: '2px solid #e5e7eb',
+    display: 'flex',
+    flexDirection: 'column'
   };
 
   const headerStyle = {
@@ -206,10 +204,10 @@ const TemplateSelectionModal = ({
 
   const bodyStyle = {
     padding: '36px',
-    minHeight: '500px',
     background: '#ffffff',
     overflowY: 'auto',
-    maxHeight: 'calc(90vh - 180px)'
+    flex: 1,
+    minHeight: 0
   };
 
   const footerStyle = {
@@ -219,7 +217,8 @@ const TemplateSelectionModal = ({
     justifyContent: 'space-between',
     alignItems: 'center',
     background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-    borderRadius: '0 0 20px 20px'
+    borderRadius: '0 0 20px 20px',
+    flexShrink: 0
   };
 
   return (
@@ -389,14 +388,13 @@ const TemplateSelectionModal = ({
 
           {step === 3 && (
             <div>
-              <p style={{ marginBottom: '20px', marginTop: '0px', color: '#6b7280', fontSize: '14px' }}>
-                {campaignType === 'single'
-                  ? 'Choose one campaign to analyze in detail'
-                  : `Select up to 8 campaigns to compare (${selectedCampaigns.length}/8 selected)`
-                }
-              </p>
+              {campaignType !== 'single' && (
+                <p style={{ marginBottom: '20px', marginTop: '0px', color: '#6b7280', fontSize: '14px' }}>
+                  {`Select up to 8 campaigns to compare (${selectedCampaigns.length}/8 selected)`}
+                </p>
+              )}
 
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <input
                   type="text"
                   placeholder="Search campaigns"
@@ -422,7 +420,6 @@ const TemplateSelectionModal = ({
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                 gap: '16px',
-                maxHeight: '370px',
                 overflow: 'auto',
                 padding: '8px'
               }}>
@@ -438,7 +435,7 @@ const TemplateSelectionModal = ({
                       style={{
                         border: isSelected ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                         borderRadius: '8px',
-                        padding: '16px',
+                        padding: '12px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         background: isSelected ? '#eff6ff' : '#ffffff',
@@ -469,18 +466,14 @@ const TemplateSelectionModal = ({
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <h4 style={{
-                            margin: '0 0 8px 0',
-                            fontSize: '15px',
+                            margin: '0 0 6px 0',
+                            fontSize: '14px',
                             fontWeight: '600',
                             color: '#111827',
                             wordBreak: 'break-word'
                           }}>
                             {campaign.campaign_name}
                           </h4>
-                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
-                            <div>Opens: {campaign.volume_metrics?.unique_opens?.toLocaleString() || 'N/A'}</div>
-                            <div>Rate: {campaign.core_metrics?.unique_open_rate?.toFixed(1) || 'N/A'}%</div>
-                          </div>
                           <div style={{
                             background: '#f3f4f6',
                             borderRadius: '4px',
@@ -514,12 +507,11 @@ const TemplateSelectionModal = ({
 
           {step === 4 && (
             <div>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', 
-                gap: '24px',
-                overflow: 'auto',
-                maxHeight: '445px' 
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '16px',
+                overflow: 'auto'
               }}>
                 {availableTemplates.map(template => (
                   <div
@@ -529,7 +521,6 @@ const TemplateSelectionModal = ({
                       border: selectedTemplate?.id === template.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                       borderRadius: '12px',
                       cursor: 'pointer',
-                      width: '97%',
                       transition: 'all 0.2s ease',
                       background: selectedTemplate?.id === template.id ? '#eff6ff' : '#ffffff',
                       overflow: 'hidden',
@@ -552,27 +543,23 @@ const TemplateSelectionModal = ({
                       />
                     </div>
 
-                    <div style={{ padding: '20px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: '#111827' }}>
-                        {template.name}
-                      </h4>
-                      <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
-                        {template.description}
-                      </p>
-                      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                        {template.features.map((feature, index) => (
-                          <li key={index} style={{
-                            fontSize: '13px',
-                            color: '#6b7280',
-                            marginBottom: '4px',
-                            paddingLeft: '16px',
-                            position: 'relative'
-                          }}>
-                            <span style={{ position: 'absolute', left: 0, color: '#3b82f6' }}>•</span>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
+                    <div style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                          {template.name}
+                        </h4>
+                        {smartSuggestion?.templateId === template.id && (
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            color: '#059669',
+                            background: '#ecfdf5',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #a7f3d0'
+                          }}>Recommended</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

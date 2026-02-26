@@ -199,6 +199,16 @@
   font-family: var(--font-body, 'Rubik', sans-serif);
 }
 
+.modal-position {
+  color: #666;
+  font-size: 13px;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+}
+
+body.light .modal-position {
+  color: #999;
+}
+
 .campaign-modal-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

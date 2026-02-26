@@ -501,31 +501,36 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 )}
                             </div>
 
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    setShowUploadModal(true);
-                                }}
-                                style={{
-                                    padding: '8px 16px',
-                                    background: hasMetadata
-                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    fontSize: '13px',
-                                    fontWeight: '600',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                }}
-                            >
-                                {hasMetadata && <span>✓</span>}
-                                {hasMetadata ? 'Update Metadata' : 'Upload Metadata'}
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {currentIndex >= 0 && allCampaigns.length > 0 && (
+                                    <span className="modal-position">{currentIndex + 1} of {allCampaigns.length}</span>
+                                )}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        setShowUploadModal(true);
+                                    }}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: hasMetadata
+                                            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    {hasMetadata && <span>✓</span>}
+                                    {hasMetadata ? 'Update Metadata' : 'Upload Metadata'}
+                                </button>
+                            </div>
                         </div>
 
                         {campaignMetadata?.subject_line && (

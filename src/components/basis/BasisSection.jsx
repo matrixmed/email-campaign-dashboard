@@ -15,6 +15,7 @@ const BasisSection = () => {
   const [searchTerm, setSearchTerm] = useState(searchTerms.basisOptimization || '');
   const [pendingCount, setPendingCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [latestDataDate, setLatestDataDate] = useState(null);
 
   const [timeframe, setTimeframe] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -58,6 +59,9 @@ const BasisSection = () => {
         const data = await res.json();
         if (data.status === 'success' && data.last_updated) {
           setLastUpdated(data.last_updated);
+          if (data.latest_data_date) {
+            setLatestDataDate(data.latest_data_date);
+          }
         }
       } catch (err) {
       }
@@ -231,7 +235,7 @@ const BasisSection = () => {
                 <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
                 <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span>Last updated: {formatLastUpdated(lastUpdated)}</span>
+              <span>Last synced: {formatLastUpdated(lastUpdated)}{latestDataDate ? ` | Data through: ${new Date(latestDataDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</span>
             </div>
           </div>
         )}

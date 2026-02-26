@@ -7,11 +7,74 @@ import '../../styles/DashboardBuilder.css';
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 const YOUTUBE_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2026-01-23T22:10:53Z&se=2028-02-03T06:25:53Z&spr=https&sv=2024-11-04&sr=b&sig=5a4p0mFtPn4d9In830LMCQOJlaqkcuPCt7okIDLSHBA%3D";
 
+const LINKEDIN_BLOB_URL = '';
+const FB_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_profile_metrics.json?sp=r&st=2026-02-18T21:02:49Z&se=2028-05-21T04:17:49Z&spr=https&sv=2024-11-04&sr=b&sig=uE7Yej8V8qJ6W3FKIzWkexVON7c074h9Xnkd1RWqOPE%3D';
+const FB_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_engagement_metrics.json?sp=r&st=2026-02-18T21:03:59Z&se=2028-05-17T04:18:59Z&spr=https&sv=2024-11-04&sr=b&sig=mZyVxrFi1U5Z234HHVICAxysq73m14Jpm3r%2BzCOzvKs%3D';
+const IG_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_profile_metrics.json?sp=r&st=2026-02-18T21:03:17Z&se=2028-05-27T04:18:17Z&spr=https&sv=2024-11-04&sr=b&sig=Iu%2B57JgpeateOx9zTPFEMnOEUMMFA8JMsXX8OPz5SXY%3D';
+const IG_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_engagement_metrics.json?sp=r&st=2026-02-18T21:03:38Z&se=2028-05-16T04:18:38Z&spr=https&sv=2024-11-04&sr=b&sig=ZkHZS8lQQmkvTGjkxy3fFZVUtWNO5WGMOazVdkPNYVI%3D';
+
+const ABBREVIATION_MAP = {
+  'nsclc': 'non-small cell lung cancer',
+  'sclc': 'small cell lung cancer',
+  'rcc': 'renal cell carcinoma',
+  'gpp': 'generalized pustular psoriasis',
+  'ht': 'hot topics',
+  'icns': 'innovations in clinical neuroscience',
+  'jcad': 'journal of clinical and aesthetic dermatology',
+  'ad': 'atopic dermatitis',
+  'hs': 'hidradenitis suppurativa',
+  'net': 'neuroendocrine tumor',
+  'ibd': 'inflammatory bowel disease',
+  'mbc': 'metastatic breast cancer',
+  'copd': 'chronic obstructive pulmonary disease',
+  'crc': 'colorectal cancer',
+  'hcc': 'hepatocellular carcinoma',
+  'aml': 'acute myeloid leukemia',
+  'cll': 'chronic lymphocytic leukemia',
+  'dlbcl': 'diffuse large b-cell lymphoma',
+  'pso': 'psoriasis',
+  'ra': 'rheumatoid arthritis',
+  'ms': 'multiple sclerosis',
+  'uc': 'ulcerative colitis',
+  'cd': 'crohn disease'
+};
+
+const REVERSE_ABBREVIATION_MAP = Object.fromEntries(
+  Object.entries(ABBREVIATION_MAP).map(([abbr, full]) => [full, abbr])
+);
+
+const expandAbbreviations = (text) => {
+  if (!text) return [text];
+  const lower = text.toLowerCase();
+  const variants = new Set([lower]);
+
+  const words = lower.split(/[\s\-_]+/);
+  const expandedWords = words.map(w => {
+    if (ABBREVIATION_MAP[w]) return [w, ABBREVIATION_MAP[w]];
+    if (REVERSE_ABBREVIATION_MAP[w]) return [w, REVERSE_ABBREVIATION_MAP[w]];
+    return [w];
+  });
+
+  const expanded = words.map(w => ABBREVIATION_MAP[w] || w).join(' ');
+  variants.add(expanded);
+
+  let collapsed = lower;
+  for (const [full, abbr] of Object.entries(REVERSE_ABBREVIATION_MAP)) {
+    if (collapsed.includes(full)) {
+      collapsed = collapsed.replace(full, abbr);
+    }
+  }
+  variants.add(collapsed);
+
+  return Array.from(variants);
+};
+
 const ComponentSidebar = ({
   isOpen,
   onToggle,
   campaigns = [],
   selectedCampaign,
+  selectedMultiCampaigns = [],
   currentTheme,
   costComparisonMode,
   showTotalSends,
@@ -34,8 +97,26 @@ const ComponentSidebar = ({
   onAddJournalMetricRow,
   hasJournalTable = false,
   onAddVideoMetricRow,
-  hasVideoTable = false
+  hasVideoTable = false,
+  bannerImpressionsMode = false,
+  onBannerImpressionsModeToggle,
+  onAddThumbnails,
+  thumbnailOverlayEnabled = false,
+  onThumbnailOverlayToggle,
+  showPharmaLogo = true,
+  onShowPharmaLogoToggle,
+  showBottomLogo = true,
+  onShowBottomLogoToggle,
+  onAddJournalCover,
+  onAddSocialMetricRow,
+  hasSocialTable = false,
+  onAddSocialPosts,
+  socialPostOverlayEnabled = false,
+  onSocialPostOverlayToggle
 }) => {
+  const effectiveCampaignName = selectedCampaign?.campaign_name
+    || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0 ? selectedMultiCampaigns[0]?.campaign_name : null);
+
   const [activeSection, setActiveSection] = useState('controls');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -44,21 +125,25 @@ const ComponentSidebar = ({
   const [archiveSearchTerm, setArchiveSearchTerm] = useState('');
 
   const [walsworthData, setWalsworthData] = useState([]);
-  const [matchedJournal, setMatchedJournal] = useState(null);
-  const [showJournalSelector, setShowJournalSelector] = useState(false);
+  const [selectedPublication, setSelectedPublication] = useState(null);
+  const [selectedIssueIds, setSelectedIssueIds] = useState(new Set());
+  const [showPublicationSelector, setShowPublicationSelector] = useState(false);
+  const [showIssueList, setShowIssueList] = useState(false);
   const [journalSearchTerm, setJournalSearchTerm] = useState('');
-  const [selectedMetrics, setSelectedMetrics] = useState({
-    avgTimeInIssue: false,
-    totalPageViews: false,
-    uniquePageViews: false,
-    totalIssueVisits: false
-  });
 
   const [youtubeData, setYoutubeData] = useState({ videos: {}, playlists: {} });
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
   const [excludedVideoIds, setExcludedVideoIds] = useState(new Set());
   const [showVideoDropdown, setShowVideoDropdown] = useState(false);
+
+  const [socialData, setSocialData] = useState({ facebook: {}, instagram: {} });
+  const [enabledPlatforms, setEnabledPlatforms] = useState(new Set(['facebook', 'instagram']));
+  const [selectedPostIds, setSelectedPostIds] = useState(new Set());
+  const [showSocialPostDropdown, setShowSocialPostDropdown] = useState(false);
+  const [socialPostSearchTerm, setSocialPostSearchTerm] = useState('');
+  const [videoSearchTerm, setVideoSearchTerm] = useState('');
+  const [issueSearchTerm, setIssueSearchTerm] = useState('');
 
   useEffect(() => {
     async function fetchYoutubeData() {
@@ -70,6 +155,40 @@ const ComponentSidebar = ({
       }
     }
     fetchYoutubeData();
+  }, []);
+
+  useEffect(() => {
+    async function fetchSocialData() {
+      try {
+        const [fbProfileRes, fbEngagementRes] = await Promise.all([
+          FB_PROFILE_BLOB_URL ? fetch(FB_PROFILE_BLOB_URL) : Promise.resolve(null),
+          FB_ENGAGEMENT_BLOB_URL ? fetch(FB_ENGAGEMENT_BLOB_URL) : Promise.resolve(null),
+        ]);
+        const fbProfile = fbProfileRes?.ok ? await fbProfileRes.json() : {};
+        const fbEngagement = fbEngagementRes?.ok ? await fbEngagementRes.json() : {};
+        const fbMerged = { companies: {} };
+        const fbKeys = new Set([...Object.keys(fbProfile.companies || {}), ...Object.keys(fbEngagement.companies || {})]);
+        fbKeys.forEach(key => {
+          fbMerged.companies[key] = { ...(fbProfile.companies || {})[key], ...(fbEngagement.companies || {})[key] };
+        });
+
+        const [igProfileRes, igEngagementRes] = await Promise.all([
+          IG_PROFILE_BLOB_URL ? fetch(IG_PROFILE_BLOB_URL) : Promise.resolve(null),
+          IG_ENGAGEMENT_BLOB_URL ? fetch(IG_ENGAGEMENT_BLOB_URL) : Promise.resolve(null),
+        ]);
+        const igProfile = igProfileRes?.ok ? await igProfileRes.json() : {};
+        const igEngagement = igEngagementRes?.ok ? await igEngagementRes.json() : {};
+        const igMerged = { companies: {} };
+        const igKeys = new Set([...Object.keys(igProfile.companies || {}), ...Object.keys(igEngagement.companies || {})]);
+        igKeys.forEach(key => {
+          igMerged.companies[key] = { ...(igProfile.companies || {})[key], ...(igEngagement.companies || {})[key] };
+        });
+
+        setSocialData({ facebook: fbMerged, instagram: igMerged });
+      } catch (error) {
+      }
+    }
+    fetchSocialData();
   }, []);
 
   const youtubePlaylistsList = useMemo(() => {
@@ -100,7 +219,8 @@ const ComponentSidebar = ({
           title: video.title || 'Untitled',
           views: current.views || 0,
           totalWatchTimeSeconds: (current.watchTimeHours || (current.estimatedMinutesWatched || 0) / 60) * 3600,
-          avgPercentWatched: current.averageViewPercentage || 0
+          avgPercentWatched: current.averageViewPercentage || 0,
+          publishedAt: video.publishedAt || null
         };
       })
       .filter(Boolean);
@@ -118,6 +238,99 @@ const ComponentSidebar = ({
 
     return { totalWatchTime, avgPercentWatched, totalViews, mostWatchedVideo: mostWatched.title };
   }, [playlistVideos, excludedVideoIds]);
+
+  const getChannelDisplayName = (key) => {
+    const mapping = { 'matrix': 'Matrix', 'oncology': 'Oncology', 'icns': 'ICNS', 'jcad': 'JCAD', 'nppa': 'NPPA' };
+    return mapping[key] || key.charAt(0).toUpperCase() + key.slice(1);
+  };
+
+  const allSocialPosts = useMemo(() => {
+    const posts = [];
+    for (const platform of enabledPlatforms) {
+      const platformData = socialData[platform] || {};
+      const companies = platformData.companies || {};
+      Object.entries(companies).forEach(([channelKey, channelData]) => {
+        const items = platform === 'instagram' ? (channelData.media || []) : (channelData.posts || []);
+        items.forEach(item => {
+          const current = item.current || {};
+          posts.push({
+            id: item.post_id || item.media_id || item.post_urn || item.id || `${channelKey}-${item.created_at}`,
+            text: item.message || item.caption || item.text || '',
+            channel: getChannelDisplayName(channelKey),
+            channelKey,
+            platform,
+            createdAt: item.created_at || '',
+            permalink: item.permalink || '',
+            mediaType: item.media_type || '',
+            impressions: current.impressions_unique || current.reach || current.impressions || 0,
+            engagements: current.engagements || current.total_interactions || 0,
+            engagementRate: current.engagement_rate || 0,
+            clicks: current.clicks || 0,
+            reactions: current.reactions_total || current.reactions || current.likes || 0,
+            comments: current.comments || 0,
+            reposts: current.shares || current.reposts || 0,
+            saved: current.saved || 0,
+            views: current.views || 0,
+            imageUrl: item.image_url || item.media_url || '',
+            thumbnailUrl: item.thumbnail_url || ''
+          });
+        });
+      });
+    }
+    posts.sort((a, b) => (b.engagements || 0) - (a.engagements || 0));
+    return posts;
+  }, [socialData, enabledPlatforms]);
+
+  const activeSocialPosts = useMemo(() => {
+    return allSocialPosts.filter(p => selectedPostIds.has(p.id));
+  }, [allSocialPosts, selectedPostIds]);
+
+  const socialAggregateMetrics = useMemo(() => {
+    if (!activeSocialPosts.length) return {
+      totalImpressions: 0, totalEngagements: 0, avgEngagementRate: 0,
+      totalReactions: 0, totalComments: 0, totalShares: 0, totalClicks: 0, mostEngagedPost: ''
+    };
+    const totalImpressions = activeSocialPosts.reduce((sum, p) => sum + p.impressions, 0);
+    const totalEngagements = activeSocialPosts.reduce((sum, p) => sum + p.engagements, 0);
+    const avgEngagementRate = activeSocialPosts.reduce((sum, p) => sum + p.engagementRate, 0) / activeSocialPosts.length;
+    const totalReactions = activeSocialPosts.reduce((sum, p) => sum + p.reactions, 0);
+    const totalComments = activeSocialPosts.reduce((sum, p) => sum + p.comments, 0);
+    const totalShares = activeSocialPosts.reduce((sum, p) => sum + p.reposts, 0);
+    const totalClicks = activeSocialPosts.reduce((sum, p) => sum + p.clicks, 0);
+    const mostEngaged = activeSocialPosts.reduce((best, p) => p.engagements > best.engagements ? p : best, activeSocialPosts[0]);
+    return { totalImpressions, totalEngagements, avgEngagementRate, totalReactions, totalComments, totalShares, totalClicks, mostEngagedPost: mostEngaged.text };
+  }, [activeSocialPosts]);
+
+  const togglePlatform = useCallback((platform) => {
+    setEnabledPlatforms(prev => {
+      const next = new Set(prev);
+      if (next.has(platform)) {
+        next.delete(platform);
+      } else {
+        next.add(platform);
+      }
+      return next;
+    });
+    setSelectedPostIds(new Set());
+  }, []);
+
+  const togglePostSelection = useCallback((postId) => {
+    setSelectedPostIds(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleAddSocialMetric = useCallback((metricKey, value, label) => {
+    if (onAddSocialMetricRow) {
+      onAddSocialMetricRow(label, value);
+    }
+  }, [onAddSocialMetricRow]);
 
   const formatVideoWatchTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return "0s";
@@ -150,6 +363,55 @@ const ComponentSidebar = ({
     setExcludedVideoIds(new Set());
   }, []);
 
+  const rankedPlaylists = useMemo(() => {
+    if (!effectiveCampaignName || youtubePlaylistsList.length === 0) {
+      return { topMatches: [], remaining: youtubePlaylistsList };
+    }
+    const campaignVariants = expandAbbreviations(effectiveCampaignName);
+    const campaignLower = effectiveCampaignName.toLowerCase();
+    const campaignWords = campaignLower.split(/[\s\-_]+/).filter(w => w.length > 2);
+
+    const diseaseKeywords = [
+      'nsclc', 'sclc', 'rcc', 'gpp', 'ad', 'hs', 'net', 'ibd', 'mbc', 'copd',
+      'non-small cell lung cancer', 'small cell lung cancer', 'renal cell carcinoma',
+      'generalized pustular psoriasis', 'atopic dermatitis', 'hidradenitis suppurativa',
+      'neuroendocrine tumor', 'inflammatory bowel disease', 'metastatic breast cancer',
+      'chronic obstructive pulmonary disease', 'psoriasis', 'melanoma', 'oncology',
+      'dermatology', 'breast cancer', 'lung', 'kras', 'bariatric'
+    ];
+
+    const scored = youtubePlaylistsList.map(pl => {
+      const titleVariants = expandAbbreviations(pl.title);
+      let score = 0;
+      for (const kw of diseaseKeywords) {
+        const kwInCampaign = campaignVariants.some(v => v.includes(kw));
+        const kwInTitle = titleVariants.some(v => v.includes(kw));
+        if (kwInCampaign && kwInTitle) score += 15;
+      }
+      for (const word of campaignWords) {
+        if (pl.title.toLowerCase().includes(word) && !diseaseKeywords.includes(word)) {
+          score += 5;
+        }
+      }
+      return { ...pl, matchScore: score };
+    }).sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      return b.itemCount - a.itemCount;
+    });
+
+    const topMatches = scored.filter(p => p.matchScore > 0).slice(0, 3);
+    const topIds = new Set(topMatches.map(p => p.id));
+    const remaining = scored.filter(p => !topIds.has(p.id));
+    return { topMatches, remaining };
+  }, [effectiveCampaignName, youtubePlaylistsList]);
+
+  useEffect(() => {
+    if (effectiveCampaignName && !selectedPlaylistId && rankedPlaylists.topMatches.length > 0) {
+      setSelectedPlaylistId(rankedPlaylists.topMatches[0].id);
+      setExcludedVideoIds(new Set());
+    }
+  }, [effectiveCampaignName, rankedPlaylists.topMatches, selectedPlaylistId]);
+
   const toggleVideoExclusion = useCallback((videoId) => {
     setExcludedVideoIds(prev => {
       const next = new Set(prev);
@@ -176,205 +438,194 @@ const ComponentSidebar = ({
     fetchWalsworthData();
   }, []);
 
-  const matchJournalToCampaign = useCallback((campaignName) => {
-    if (!campaignName || walsworthData.length === 0) return null;
-
-    const name = campaignName.toLowerCase();
-
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    let extractedMonth = null;
-    for (const month of months) {
-      if (name.includes(month)) {
-        extractedMonth = month;
-        break;
-      }
-    }
-
+  const getIssueDateScore = useCallback((issueName) => {
+    const name = (issueName || '').toLowerCase();
     const yearMatch = name.match(/20\d{2}/);
-    const extractedYear = yearMatch ? yearMatch[0] : null;
-
-    let publicationType = null;
-    if (name.includes('ht ') || name.includes('ht-') || name.startsWith('ht ') || name.includes('hot topics')) {
-      publicationType = 'hot topics';
-    } else if (name.includes('jcad') && (name.includes('np') || name.includes('pa'))) {
-      publicationType = 'jcad np+pa';
-    } else if (name.includes('jcad')) {
-      publicationType = 'jcad';
-    } else if (name.includes('icns') || name.includes('innovations in clinical neuroscience')) {
-      publicationType = 'icns';
-    }
-
-    const diseaseKeywords = [
-      'inflammatory', 'myeloma', 'breast cancer', 'nsclc', 'lung', 'dermatology', 'melanoma',
-      'alopecia', 'prurigo', 'gpp', 'psoriasis', 'eczema', 'acne', 'rosacea', 'vitiligo',
-      'atopic', 'hidradenitis', 'net', 'rcc', 'sclc', 'oncology', 'bariatric'
-    ];
-    const extractedDiseases = diseaseKeywords.filter(kw => name.includes(kw));
-
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (const journal of walsworthData) {
-      const journalName = (journal.issue_name || '').toLowerCase();
-      let score = 0;
-
-      if (extractedMonth && journalName.includes(extractedMonth)) {
-        score += 30;
-      }
-      if (extractedYear && journalName.includes(extractedYear)) {
-        score += 30;
-      }
-
-      if (publicationType === 'hot topics' && journalName.includes('hot topics')) {
-        score += 25;
-      } else if (publicationType === 'jcad np+pa' && journalName.includes('jcad np+pa')) {
-        score += 25;
-      } else if (publicationType === 'jcad' && (journalName.includes('journal of clinical and aesthetic dermatology') || journalName.startsWith('jcad'))) {
-        score += 20;
-      } else if (publicationType === 'icns' && journalName.includes('innovations in clinical neuroscience')) {
-        score += 25;
-      }
-
-      for (const disease of extractedDiseases) {
-        if (journalName.includes(disease)) {
-          score += 15;
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = { ...journal, matchScore: score };
-      }
-    }
-
-    return bestScore >= 45 ? bestMatch : null;
-  }, [walsworthData]);
-
-  const getRankedJournals = useCallback((campaignName) => {
-    if (!campaignName || walsworthData.length === 0) return { topMatches: [], remainingJournals: [] };
-
-    const name = campaignName.toLowerCase();
-
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    let extractedMonth = null;
-    for (const month of months) {
-      if (name.includes(month)) {
-        extractedMonth = month;
-        break;
-      }
-    }
-
-    const yearMatch = name.match(/20\d{2}/);
-    const extractedYear = yearMatch ? yearMatch[0] : null;
-
-    let publicationType = null;
-    if (name.includes('ht ') || name.includes('ht-') || name.startsWith('ht ') || name.includes('hot topics')) {
-      publicationType = 'hot topics';
-    } else if (name.includes('jcad') && (name.includes('np') || name.includes('pa'))) {
-      publicationType = 'jcad np+pa';
-    } else if (name.includes('jcad')) {
-      publicationType = 'jcad';
-    } else if (name.includes('icns') || name.includes('innovations in clinical neuroscience')) {
-      publicationType = 'icns';
-    }
-
-    const diseaseKeywords = [
-      'inflammatory', 'myeloma', 'breast cancer', 'nsclc', 'lung', 'dermatology', 'melanoma',
-      'alopecia', 'prurigo', 'gpp', 'psoriasis', 'eczema', 'acne', 'rosacea', 'vitiligo',
-      'atopic', 'hidradenitis', 'net', 'rcc', 'sclc', 'oncology', 'bariatric'
-    ];
-    const extractedDiseases = diseaseKeywords.filter(kw => name.includes(kw));
-
-    const scoredJournals = walsworthData.map(journal => {
-      const journalName = (journal.issue_name || '').toLowerCase();
-      let score = 0;
-
-      if (extractedMonth && journalName.includes(extractedMonth)) {
-        score += 30;
-      }
-      if (extractedYear && journalName.includes(extractedYear)) {
-        score += 30;
-      }
-
-      if (publicationType === 'hot topics' && journalName.includes('hot topics')) {
-        score += 25;
-      } else if (publicationType === 'jcad np+pa' && journalName.includes('jcad np+pa')) {
-        score += 25;
-      } else if (publicationType === 'jcad' && (journalName.includes('journal of clinical and aesthetic dermatology') || journalName.startsWith('jcad'))) {
-        score += 20;
-      } else if (publicationType === 'icns' && journalName.includes('innovations in clinical neuroscience')) {
-        score += 25;
-      }
-
-      for (const disease of extractedDiseases) {
-        if (journalName.includes(disease)) {
-          score += 15;
-        }
-      }
-
-      return { ...journal, matchScore: score };
-    });
-
-    const sortedByScore = [...scoredJournals].sort((a, b) => {
-      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-      return (a.issue_name || '').localeCompare(b.issue_name || '');
-    });
-
-    const topMatches = sortedByScore.filter(j => j.matchScore > 0).slice(0, 5);
-    const topMatchIds = new Set(topMatches.map(j => j.issue_name));
-
-    const remainingJournals = scoredJournals
-      .filter(j => !topMatchIds.has(j.issue_name))
-      .sort((a, b) => {
-        const getDateScore = (journal) => {
-          const name = (journal.issue_name || '').toLowerCase();
-          const yearMatch = name.match(/20\d{2}/);
-          const year = yearMatch ? parseInt(yearMatch[0]) : 0;
-
-          const monthOrder = {
-            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
-            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
-          };
-          let month = 0;
-          for (const [monthName, monthNum] of Object.entries(monthOrder)) {
-            if (name.includes(monthName)) {
-              month = Math.max(month, monthNum);
-            }
-          }
-          return year * 100 + month;
-        };
-        return getDateScore(b) - getDateScore(a);
-      });
-
-    return { topMatches, remainingJournals };
-  }, [walsworthData]);
-
-  const rankedJournals = useMemo(() => {
-    if (!selectedCampaign?.campaign_name) return { topMatches: [], remainingJournals: [] };
-    return getRankedJournals(selectedCampaign.campaign_name);
-  }, [selectedCampaign?.campaign_name, getRankedJournals]);
-
-  const filteredRankedJournals = useMemo(() => {
-    if (!journalSearchTerm.trim()) return rankedJournals;
-
-    const filterJournals = (journals) =>
-      journals.filter(j => matchesSearchTerm(j.issue_name, journalSearchTerm));
-
-    return {
-      topMatches: filterJournals(rankedJournals.topMatches),
-      remainingJournals: filterJournals(rankedJournals.remainingJournals)
+    const year = yearMatch ? parseInt(yearMatch[0]) : 0;
+    const monthOrder = {
+      'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+      'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
     };
-  }, [rankedJournals, journalSearchTerm]);
+    let month = 0;
+    for (const [monthName, monthNum] of Object.entries(monthOrder)) {
+      if (name.includes(monthName)) {
+        month = Math.max(month, monthNum);
+      }
+    }
+    return year * 100 + month;
+  }, []);
+
+  const publicationsGrouped = useMemo(() => {
+    if (!walsworthData.length) return [];
+    const groups = {};
+    for (const issue of walsworthData) {
+      const pub = issue.publication || 'Unknown';
+      if (!groups[pub]) groups[pub] = [];
+      groups[pub].push(issue);
+    }
+    for (const pub of Object.keys(groups)) {
+      groups[pub].sort((a, b) => getIssueDateScore(b.issue_name) - getIssueDateScore(a.issue_name));
+    }
+    return Object.entries(groups).map(([publication, issues]) => ({ publication, issues }));
+  }, [walsworthData, getIssueDateScore]);
+
+  const matchPublicationToCampaign = useCallback((campaignName) => {
+    if (!campaignName || publicationsGrouped.length === 0) return [];
+
+    const campaignVariants = expandAbbreviations(campaignName);
+    const campaignLower = campaignName.toLowerCase();
+    const campaignWords = campaignLower.split(/[\s\-_]+/).filter(w => w.length > 2);
+
+    const diseaseKeywords = [
+      'inflammatory', 'myeloma', 'breast cancer', 'nsclc', 'lung', 'dermatology', 'melanoma',
+      'alopecia', 'prurigo', 'gpp', 'psoriasis', 'eczema', 'acne', 'rosacea', 'vitiligo',
+      'atopic', 'hidradenitis', 'net', 'rcc', 'sclc', 'oncology', 'bariatric',
+      'non-small cell lung cancer', 'small cell lung cancer', 'renal cell carcinoma',
+      'generalized pustular psoriasis', 'atopic dermatitis', 'hidradenitis suppurativa',
+      'neuroendocrine tumor', 'inflammatory bowel disease', 'metastatic breast cancer',
+      'chronic obstructive pulmonary disease', 'kras'
+    ];
+
+    return publicationsGrouped.map(({ publication, issues }) => {
+      const pubLower = publication.toLowerCase();
+      const pubVariants = expandAbbreviations(publication);
+      let score = 0;
+
+      const pubTypes = ['hot topics', 'ht', 'jcad', 'journal of clinical and aesthetic dermatology', 'icns', 'innovations in clinical neuroscience', 'jcad np+pa'];
+      for (const pt of pubTypes) {
+        const ptInCampaign = campaignVariants.some(v => v.includes(pt));
+        const ptInPub = pubVariants.some(v => v.includes(pt));
+        if (ptInCampaign && ptInPub) {
+          score += 25;
+          break;
+        }
+      }
+
+      for (const kw of diseaseKeywords) {
+        const kwInCampaign = campaignVariants.some(v => v.includes(kw));
+        const kwInPub = pubVariants.some(v => v.includes(kw));
+        if (kwInCampaign && kwInPub) {
+          score += 15;
+        }
+      }
+
+      for (const word of campaignWords) {
+        if (pubLower.includes(word) && !diseaseKeywords.includes(word) && !pubTypes.includes(word)) {
+          score += 5;
+        }
+      }
+
+      return { publication, issues, matchScore: score };
+    }).sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      return a.publication.localeCompare(b.publication);
+    });
+  }, [publicationsGrouped]);
+
+  const rankedPublications = useMemo(() => {
+    if (!effectiveCampaignName) return { topMatches: [], remaining: [] };
+    const all = matchPublicationToCampaign(effectiveCampaignName);
+    const topMatches = all.filter(p => p.matchScore > 0).slice(0, 3);
+    const topPubNames = new Set(topMatches.map(p => p.publication));
+    const remaining = all.filter(p => !topPubNames.has(p.publication));
+    return { topMatches, remaining };
+  }, [effectiveCampaignName, matchPublicationToCampaign]);
+
+  const filteredTopPublications = useMemo(() => {
+    if (!journalSearchTerm.trim()) return rankedPublications.topMatches;
+    return rankedPublications.topMatches.filter(p => matchesSearchTerm(p.publication, journalSearchTerm));
+  }, [rankedPublications.topMatches, journalSearchTerm]);
+
+  const filteredRemainingPublications = useMemo(() => {
+    if (!journalSearchTerm.trim()) return rankedPublications.remaining;
+    return rankedPublications.remaining.filter(p => matchesSearchTerm(p.publication, journalSearchTerm));
+  }, [rankedPublications.remaining, journalSearchTerm]);
+
+  const selectedIssues = useMemo(() => {
+    if (!selectedPublication) return [];
+    return selectedPublication.issues.filter(i => selectedIssueIds.has(i.issue_name));
+  }, [selectedPublication, selectedIssueIds]);
+
+  const journalAggregateMetrics = useMemo(() => {
+    if (!selectedIssues.length) return { avgTime: 0, totalPageViews: 0, uniquePageViews: 0, totalIssueVisits: 0 };
+    const totalPageViews = selectedIssues.reduce((sum, i) => sum + (i.current?.total_page_views || 0), 0);
+    const uniquePageViews = selectedIssues.reduce((sum, i) => sum + (i.current?.unique_page_views || 0), 0);
+    const totalIssueVisits = selectedIssues.reduce((sum, i) => sum + (i.current?.total_issue_visits || 0), 0);
+    const totalWeight = selectedIssues.reduce((sum, i) => sum + (i.current?.total_page_views || 1), 0);
+    const avgTime = selectedIssues.reduce((sum, i) => {
+      const weight = i.current?.total_page_views || 1;
+      return sum + (i.current?.seconds_per_visit || 0) * weight;
+    }, 0) / (totalWeight || 1);
+    return { avgTime, totalPageViews, uniquePageViews, totalIssueVisits };
+  }, [selectedIssues]);
+
+  const handleSelectPublication = useCallback((pub) => {
+    setSelectedPublication(pub);
+    if (pub.issues.length > 0) {
+      setSelectedIssueIds(new Set([pub.issues[0].issue_name]));
+    } else {
+      setSelectedIssueIds(new Set());
+    }
+    setShowPublicationSelector(false);
+    setJournalSearchTerm('');
+  }, []);
+
+  const toggleIssueSelection = useCallback((issueName) => {
+    setSelectedIssueIds(prev => {
+      const next = new Set(prev);
+      if (next.has(issueName)) {
+        next.delete(issueName);
+      } else {
+        next.add(issueName);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleAddJournalCovers = useCallback(async () => {
+    if (!selectedIssues.length || !onAddJournalCover) return;
+    const coverPromises = selectedIssues.map(async (issue) => {
+      if (!issue.issue_url) return null;
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/journal-cover?issue_url=${encodeURIComponent(issue.issue_url)}`);
+        const data = await resp.json();
+        if (data.status === 'success' && data.cover_url) {
+          return {
+            coverUrl: data.cover_url,
+            issueName: issue.issue_name,
+            publication: issue.publication
+          };
+        }
+      } catch (err) {
+      }
+      return null;
+    });
+    const covers = (await Promise.all(coverPromises)).filter(Boolean);
+    if (covers.length > 0) {
+      onAddJournalCover(covers);
+    }
+  }, [selectedIssues, onAddJournalCover]);
 
   useEffect(() => {
-    if (selectedCampaign?.campaign_name) {
-      const match = matchJournalToCampaign(selectedCampaign.campaign_name);
-      setMatchedJournal(match);
-      setSelectedMetrics({ avgTimeInIssue: false, totalPageViews: false, uniquePageViews: false, totalIssueVisits: false });
+    if (effectiveCampaignName && publicationsGrouped.length > 0) {
+      const ranked = matchPublicationToCampaign(effectiveCampaignName);
+      if (ranked.length > 0) {
+        const best = ranked[0];
+        setSelectedPublication(best);
+        if (best.issues.length > 0) {
+          setSelectedIssueIds(new Set([best.issues[0].issue_name]));
+        } else {
+          setSelectedIssueIds(new Set());
+        }
+      } else {
+        setSelectedPublication(null);
+        setSelectedIssueIds(new Set());
+      }
     } else {
-      setMatchedJournal(null);
+      setSelectedPublication(null);
+      setSelectedIssueIds(new Set());
     }
-  }, [selectedCampaign, matchJournalToCampaign]);
+  }, [effectiveCampaignName, publicationsGrouped, matchPublicationToCampaign]);
 
   const formatTimeInIssue = (seconds) => {
     if (isNaN(seconds) || seconds <= 0) return "0s";
@@ -393,11 +644,6 @@ const ComponentSidebar = ({
     }
   }, [onAddJournalMetricRow]);
 
-  const handleSelectJournal = useCallback((journal) => {
-    setMatchedJournal(journal);
-    setShowJournalSelector(false);
-    setJournalSearchTerm('');
-  }, []);
 
   const fetchSavedDashboards = useCallback(async () => {
     setLoadingDashboards(true);
@@ -902,7 +1148,7 @@ const ComponentSidebar = ({
                 </select>
               </div>
 
-              {matchedJournal && hasJournalTable && (
+              {hasJournalTable && selectedPublication && (
                 <div style={{ marginBottom: '24px' }}>
                   <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                     Online Journal Metrics
@@ -914,11 +1160,11 @@ const ComponentSidebar = ({
                     padding: '12px'
                   }}>
                     <div style={{ color: '#4ade80', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
-                      Matched Journal:
+                      Matched Publication:
                     </div>
                     <div style={{ position: 'relative' }}>
                       <div
-                        onClick={() => setShowJournalSelector(!showJournalSelector)}
+                        onClick={() => setShowPublicationSelector(!showPublicationSelector)}
                         style={{
                           color: 'white',
                           fontSize: '13px',
@@ -944,17 +1190,22 @@ const ComponentSidebar = ({
                           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                         }}
                       >
-                        <span style={{ flex: 1 }}>{matchedJournal.issue_name}</span>
+                        <span style={{ flex: 1 }}>
+                          {selectedPublication.publication}
+                          <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '6px' }}>
+                            | {selectedPublication.issues.length} issues
+                          </span>
+                        </span>
                         <span style={{ fontSize: '10px', opacity: 0.7 }}>
-                          {showJournalSelector ? '▲' : '▼'}
+                          {showPublicationSelector ? '\u25B2' : '\u25BC'}
                         </span>
                       </div>
 
-                      {showJournalSelector && (
+                      {showPublicationSelector && (
                         <>
                           <div
                             onClick={() => {
-                              setShowJournalSelector(false);
+                              setShowPublicationSelector(false);
                               setJournalSearchTerm('');
                             }}
                             style={{
@@ -981,177 +1232,350 @@ const ComponentSidebar = ({
                             flexDirection: 'column',
                             overflow: 'hidden'
                           }}>
-                          <div style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <div style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                              <input
+                                type="text"
+                                placeholder="Search publications"
+                                value={journalSearchTerm}
+                                onChange={(e) => setJournalSearchTerm(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  background: 'rgba(255, 255, 255, 0.1)',
+                                  color: 'white',
+                                  fontSize: '13px',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                                  e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1, overflow: 'auto', maxHeight: '320px' }}>
+                              {filteredTopPublications.length > 0 && (
+                                <div>
+                                  <div style={{
+                                    padding: '8px 12px',
+                                    background: 'rgba(74, 222, 128, 0.1)',
+                                    color: '#4ade80',
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 1
+                                  }}>
+                                    Best Matches
+                                  </div>
+                                  {filteredTopPublications.map((pub, index) => (
+                                    <div
+                                      key={`top-pub-${index}`}
+                                      onClick={() => handleSelectPublication(pub)}
+                                      style={{
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                        background: selectedPublication?.publication === pub.publication
+                                          ? 'rgba(74, 222, 128, 0.2)'
+                                          : 'transparent',
+                                        transition: 'background 0.15s ease'
+                                      }}
+                                      onMouseOver={(e) => {
+                                        if (selectedPublication?.publication !== pub.publication) {
+                                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                        }
+                                      }}
+                                      onMouseOut={(e) => {
+                                        if (selectedPublication?.publication !== pub.publication) {
+                                          e.currentTarget.style.background = 'transparent';
+                                        }
+                                      }}
+                                    >
+                                      <div style={{
+                                        color: 'white',
+                                        fontSize: '12px',
+                                        lineHeight: '1.4',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                      }}>
+                                        <span style={{ flex: 1 }}>{pub.publication}</span>
+                                        {selectedPublication?.publication === pub.publication && (
+                                          <span style={{ color: '#4ade80', fontSize: '10px' }}>{'\u2713'}</span>
+                                        )}
+                                        <span style={{
+                                          fontSize: '10px',
+                                          color: 'rgba(74, 222, 128, 0.8)',
+                                          background: 'rgba(74, 222, 128, 0.15)',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px'
+                                        }}>
+                                          {pub.matchScore}pts
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {filteredRemainingPublications.length > 0 && (
+                                <div>
+                                  <div style={{
+                                    padding: '8px 12px',
+                                    background: 'rgba(99, 102, 241, 0.1)',
+                                    color: 'rgba(165, 180, 252, 0.9)',
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 1
+                                  }}>
+                                    All Publications
+                                  </div>
+                                  {filteredRemainingPublications.map((pub, index) => (
+                                    <div
+                                      key={`all-pub-${index}`}
+                                      onClick={() => handleSelectPublication(pub)}
+                                      style={{
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                        background: selectedPublication?.publication === pub.publication
+                                          ? 'rgba(74, 222, 128, 0.2)'
+                                          : 'transparent',
+                                        transition: 'background 0.15s ease'
+                                      }}
+                                      onMouseOver={(e) => {
+                                        if (selectedPublication?.publication !== pub.publication) {
+                                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                        }
+                                      }}
+                                      onMouseOut={(e) => {
+                                        if (selectedPublication?.publication !== pub.publication) {
+                                          e.currentTarget.style.background = 'transparent';
+                                        }
+                                      }}
+                                    >
+                                      <div style={{
+                                        color: 'rgba(255, 255, 255, 0.9)',
+                                        fontSize: '12px',
+                                        lineHeight: '1.4',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                      }}>
+                                        <span style={{ flex: 1 }}>{pub.publication}</span>
+                                        {selectedPublication?.publication === pub.publication && (
+                                          <span style={{ color: '#4ade80', fontSize: '10px' }}>{'\u2713'}</span>
+                                        )}
+                                        <span style={{
+                                          fontSize: '10px',
+                                          color: 'rgba(255, 255, 255, 0.4)'
+                                        }}>
+                                          {pub.issues.length} issues
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {filteredTopPublications.length === 0 &&
+                               filteredRemainingPublications.length === 0 && (
+                                <div style={{
+                                  padding: '20px',
+                                  textAlign: 'center',
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  fontSize: '13px'
+                                }}>
+                                  No publications found matching "{journalSearchTerm}"
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div style={{ position: 'relative', marginBottom: '12px' }}>
+                      <div
+                        onClick={() => setShowIssueList(!showIssueList)}
+                        style={{
+                          padding: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      >
+                        <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                          Issues ({selectedIssueIds.size}/{selectedPublication.issues.length} selected)
+                        </span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '10px' }}>
+                          {showIssueList ? '\u25B2' : '\u25BC'}
+                        </span>
+                      </div>
+
+                      {showIssueList && (
+                        <div style={{
+                          marginTop: '4px',
+                          background: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(74, 222, 128, 0.2)',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                             <input
                               type="text"
-                              placeholder="Search journals"
-                              value={journalSearchTerm}
-                              onChange={(e) => setJournalSearchTerm(e.target.value)}
+                              placeholder="Search issues..."
+                              value={issueSearchTerm}
+                              onChange={(e) => setIssueSearchTerm(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
                               style={{
                                 width: '100%',
-                                padding: '10px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                background: 'rgba(255, 255, 255, 0.1)',
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                background: 'rgba(255, 255, 255, 0.08)',
                                 color: 'white',
-                                fontSize: '13px',
+                                fontSize: '11px',
                                 outline: 'none',
                                 boxSizing: 'border-box'
                               }}
                               onFocus={(e) => {
                                 e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
-                                e.target.style.background = 'rgba(255, 255, 255, 0.15)';
                               }}
                               onBlur={(e) => {
-                                e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
                               }}
                             />
                           </div>
-
-                          <div style={{ flex: 1, overflow: 'auto', maxHeight: '320px' }}>
-                            {filteredRankedJournals.topMatches.length > 0 && (
-                              <div>
+                          <div className="dc-dropdown-scroll" style={{ maxHeight: '200px' }}>
+                          {selectedPublication.issues
+                            .filter(issue => !issueSearchTerm || matchesSearchTerm(issue.issue_name || '', issueSearchTerm))
+                            .map((issue, idx) => {
+                            const isSelected = selectedIssueIds.has(issue.issue_name);
+                            const issueMonth = (() => {
+                              const n = (issue.issue_name || '').toLowerCase();
+                              const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+                              const monthAbbrs = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                              for (let i = 0; i < monthNames.length; i++) {
+                                if (n.includes(monthNames[i])) return monthAbbrs[i];
+                              }
+                              return null;
+                            })();
+                            const issueYear = (() => {
+                              const m = (issue.issue_name || '').match(/20\d{2}/);
+                              return m ? `'${m[0].slice(-2)}` : null;
+                            })();
+                            const issueVisits = issue.current?.total_issue_visits || 0;
+                            return (
+                              <div
+                                key={`issue-${idx}`}
+                                onClick={() => toggleIssueSelection(issue.issue_name)}
+                                title={issue.issue_name}
+                                style={{
+                                  padding: '6px 10px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  opacity: isSelected ? 1 : 0.6,
+                                  transition: 'opacity 0.15s ease',
+                                  position: 'relative',
+                                  minWidth: 'max-content',
+                                  paddingRight: '90px'
+                                }}
+                              >
                                 <div style={{
-                                  padding: '8px 12px',
-                                  background: 'rgba(74, 222, 128, 0.1)',
-                                  color: '#4ade80',
-                                  fontSize: '11px',
-                                  fontWeight: '600',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.5px',
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '3px',
+                                  border: `1px solid ${isSelected ? '#10b981' : 'rgba(255,255,255,0.3)'}`,
+                                  background: isSelected ? '#10b981' : 'transparent',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  fontSize: '9px',
+                                  color: 'white',
                                   position: 'sticky',
-                                  top: 0,
-                                  zIndex: 1
+                                  left: 0
                                 }}>
-                                  Best Matches
+                                  {isSelected && '\u2713'}
                                 </div>
-                                {filteredRankedJournals.topMatches.map((journal, index) => (
-                                  <div
-                                    key={`top-${journal.issue_name}-${index}`}
-                                    onClick={() => handleSelectJournal(journal)}
-                                    style={{
-                                      padding: '10px 12px',
-                                      cursor: 'pointer',
-                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                      background: matchedJournal?.issue_name === journal.issue_name
-                                        ? 'rgba(74, 222, 128, 0.2)'
-                                        : 'transparent',
-                                      transition: 'background 0.15s ease'
-                                    }}
-                                    onMouseOver={(e) => {
-                                      if (matchedJournal?.issue_name !== journal.issue_name) {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                      }
-                                    }}
-                                    onMouseOut={(e) => {
-                                      if (matchedJournal?.issue_name !== journal.issue_name) {
-                                        e.currentTarget.style.background = 'transparent';
-                                      }
-                                    }}
-                                  >
-                                    <div style={{
-                                      color: 'white',
-                                      fontSize: '12px',
-                                      lineHeight: '1.4',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px'
-                                    }}>
-                                      <span style={{ flex: 1 }}>{journal.issue_name}</span>
-                                      {matchedJournal?.issue_name === journal.issue_name && (
-                                        <span style={{ color: '#4ade80', fontSize: '10px' }}>✓</span>
-                                      )}
-                                      <span style={{
-                                        fontSize: '10px',
-                                        color: 'rgba(74, 222, 128, 0.8)',
-                                        background: 'rgba(74, 222, 128, 0.15)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px'
-                                      }}>
-                                        {journal.matchScore}pts
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {filteredRankedJournals.remainingJournals.length > 0 && (
-                              <div>
+                                <span style={{
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontSize: '11px',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {issue.issue_name}
+                                </span>
                                 <div style={{
-                                  padding: '8px 12px',
-                                  background: 'rgba(99, 102, 241, 0.1)',
-                                  color: 'rgba(165, 180, 252, 0.9)',
-                                  fontSize: '11px',
-                                  fontWeight: '600',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.5px',
                                   position: 'sticky',
-                                  top: 0,
-                                  zIndex: 1
+                                  right: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  paddingLeft: '8px',
+                                  marginLeft: 'auto',
+                                  flexShrink: 0
                                 }}>
-                                  All Journals (Most Recent First)
-                                </div>
-                                {filteredRankedJournals.remainingJournals.map((journal, index) => (
-                                  <div
-                                    key={`all-${journal.issue_name}-${index}`}
-                                    onClick={() => handleSelectJournal(journal)}
-                                    style={{
-                                      padding: '10px 12px',
-                                      cursor: 'pointer',
-                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                      background: matchedJournal?.issue_name === journal.issue_name
-                                        ? 'rgba(74, 222, 128, 0.2)'
-                                        : 'transparent',
-                                      transition: 'background 0.15s ease'
-                                    }}
-                                    onMouseOver={(e) => {
-                                      if (matchedJournal?.issue_name !== journal.issue_name) {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                      }
-                                    }}
-                                    onMouseOut={(e) => {
-                                      if (matchedJournal?.issue_name !== journal.issue_name) {
-                                        e.currentTarget.style.background = 'transparent';
-                                      }
-                                    }}
-                                  >
-                                    <div style={{
-                                      color: 'rgba(255, 255, 255, 0.9)',
-                                      fontSize: '12px',
-                                      lineHeight: '1.4',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px'
+                                  {issueMonth && (
+                                    <span style={{
+                                      fontSize: '9px',
+                                      color: 'rgba(74, 222, 128, 0.7)',
+                                      background: 'rgba(34, 197, 94, 0.1)',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px'
                                     }}>
-                                      <span style={{ flex: 1 }}>{journal.issue_name}</span>
-                                      {matchedJournal?.issue_name === journal.issue_name && (
-                                        <span style={{ color: '#4ade80', fontSize: '10px' }}>✓</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                                      {issueMonth}{issueYear ? ` ${issueYear}` : ''}
+                                    </span>
+                                  )}
+                                  <span style={{
+                                    color: 'rgba(255, 255, 255, 0.4)',
+                                    fontSize: '10px'
+                                  }}>
+                                    {issueVisits.toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-
-                            {filteredRankedJournals.topMatches.length === 0 &&
-                             filteredRankedJournals.remainingJournals.length === 0 && (
-                              <div style={{
-                                padding: '20px',
-                                textAlign: 'center',
-                                color: 'rgba(255, 255, 255, 0.5)',
-                                fontSize: '13px'
-                              }}>
-                                No journals found matching "{journalSearchTerm}"
-                              </div>
-                            )}
+                            );
+                          })}
                           </div>
                         </div>
-                        </>
                       )}
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{
                         display: 'flex',
@@ -1164,10 +1588,10 @@ const ComponentSidebar = ({
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Avg Time in Issue</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
-                            {formatTimeInIssue(matchedJournal.current?.seconds_per_visit || 0)}
+                            {formatTimeInIssue(journalAggregateMetrics.avgTime)}
                           </span>
                           <button
-                            onClick={() => handleAddMetricToTable('avgTimeInIssue', formatTimeInIssue(matchedJournal.current?.seconds_per_visit || 0), 'Avg Time in Issue')}
+                            onClick={() => handleAddMetricToTable('avgTimeInIssue', formatTimeInIssue(journalAggregateMetrics.avgTime), 'Avg Time in Issue')}
                             style={{
                               padding: '4px 8px',
                               background: '#10b981',
@@ -1191,10 +1615,10 @@ const ComponentSidebar = ({
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Page Views</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
-                            {(matchedJournal.current?.total_page_views || 0).toLocaleString()}
+                            {journalAggregateMetrics.totalPageViews.toLocaleString()}
                           </span>
                           <button
-                            onClick={() => handleAddMetricToTable('totalPageViews', (matchedJournal.current?.total_page_views || 0).toLocaleString(), 'Total Page Views')}
+                            onClick={() => handleAddMetricToTable('totalPageViews', journalAggregateMetrics.totalPageViews.toLocaleString(), 'Total Page Views')}
                             style={{
                               padding: '4px 8px',
                               background: '#10b981',
@@ -1218,10 +1642,10 @@ const ComponentSidebar = ({
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Unique Page Views</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
-                            {(matchedJournal.current?.unique_page_views || 0).toLocaleString()}
+                            {journalAggregateMetrics.uniquePageViews.toLocaleString()}
                           </span>
                           <button
-                            onClick={() => handleAddMetricToTable('uniquePageViews', (matchedJournal.current?.unique_page_views || 0).toLocaleString(), 'Unique Page Views')}
+                            onClick={() => handleAddMetricToTable('uniquePageViews', journalAggregateMetrics.uniquePageViews.toLocaleString(), 'Unique Page Views')}
                             style={{
                               padding: '4px 8px',
                               background: '#10b981',
@@ -1245,10 +1669,10 @@ const ComponentSidebar = ({
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>Total Issue Visits</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: 'white', fontWeight: '600', fontSize: '13px' }}>
-                            {(matchedJournal.current?.total_issue_visits || 0).toLocaleString()}
+                            {journalAggregateMetrics.totalIssueVisits.toLocaleString()}
                           </span>
                           <button
-                            onClick={() => handleAddMetricToTable('totalIssueVisits', (matchedJournal.current?.total_issue_visits || 0).toLocaleString(), 'Total Issue Visits')}
+                            onClick={() => handleAddMetricToTable('totalIssueVisits', journalAggregateMetrics.totalIssueVisits.toLocaleString(), 'Total Issue Visits')}
                             style={{
                               padding: '4px 8px',
                               background: '#10b981',
@@ -1262,6 +1686,23 @@ const ComponentSidebar = ({
                         </div>
                       </div>
                     </div>
+                    <button
+                      onClick={handleAddJournalCovers}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        marginTop: '12px'
+                      }}
+                    >
+                      {selectedIssueIds.size > 1 ? 'Add Cover Images' : 'Add Cover Image'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -1282,34 +1723,105 @@ const ComponentSidebar = ({
                         <div style={{ color: '#60a5fa', fontSize: '12px', marginBottom: '8px', fontWeight: '600' }}>
                           Select a YouTube Playlist:
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflow: 'auto' }}>
-                          {youtubePlaylistsList.map(pl => (
-                            <div
-                              key={pl.id}
-                              onClick={() => handleSelectPlaylist(pl)}
-                              style={{
-                                padding: '8px',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                transition: 'all 0.15s ease'
-                              }}
-                              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
-                              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-                            >
-                              <span style={{ color: 'white', fontSize: '12px', flex: 1 }}>{pl.title}</span>
-                              <span style={{
-                                fontSize: '10px',
-                                color: 'rgba(96, 165, 250, 0.8)',
-                                background: 'rgba(59, 130, 246, 0.15)',
-                                padding: '2px 6px',
-                                borderRadius: '4px'
-                              }}>{pl.itemCount} videos</span>
-                            </div>
-                          ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', maxHeight: '250px', overflow: 'auto', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                          {rankedPlaylists.topMatches.length > 0 && (
+                            <>
+                              <div style={{
+                                padding: '8px 12px',
+                                background: 'rgba(96, 165, 250, 0.1)',
+                                color: '#60a5fa',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                position: 'sticky',
+                                top: 0,
+                                zIndex: 1
+                              }}>
+                                Best Matches
+                              </div>
+                              {rankedPlaylists.topMatches.map(pl => (
+                                <div
+                                  key={pl.id}
+                                  onClick={() => handleSelectPlaylist(pl)}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                                >
+                                  <span style={{ color: 'white', fontSize: '12px', flex: 1 }}>{pl.title}</span>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: 'rgba(96, 165, 250, 0.8)',
+                                    background: 'rgba(59, 130, 246, 0.15)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    marginRight: '4px'
+                                  }}>{pl.matchScore}pts</span>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: 'rgba(96, 165, 250, 0.8)',
+                                    background: 'rgba(59, 130, 246, 0.15)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px'
+                                  }}>{pl.itemCount} videos</span>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          {rankedPlaylists.remaining.length > 0 && (
+                            <>
+                              <div style={{
+                                padding: '8px 12px',
+                                background: 'rgba(99, 102, 241, 0.1)',
+                                color: 'rgba(165, 180, 252, 0.9)',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                position: 'sticky',
+                                top: 0,
+                                zIndex: 1
+                              }}>
+                                All Playlists
+                              </div>
+                              {rankedPlaylists.remaining.map(pl => (
+                                <div
+                                  key={pl.id}
+                                  onClick={() => handleSelectPlaylist(pl)}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                  <span style={{ color: 'white', fontSize: '12px', flex: 1 }}>{pl.title}</span>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: 'rgba(96, 165, 250, 0.8)',
+                                    background: 'rgba(59, 130, 246, 0.15)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px'
+                                  }}>{pl.itemCount} videos</span>
+                                </div>
+                              ))}
+                            </>
+                          )}
                           {youtubePlaylistsList.length === 0 && (
                             <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', padding: '8px', textAlign: 'center' }}>
                               No playlists available
@@ -1379,54 +1891,284 @@ const ComponentSidebar = ({
                                 border: '1px solid rgba(96, 165, 250, 0.3)',
                                 borderRadius: '8px',
                                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                                maxHeight: '250px',
+                                maxHeight: '300px',
                                 overflow: 'auto'
                               }}>
-                                {youtubePlaylistsList.map(pl => (
-                                  <div
-                                    key={pl.id}
-                                    onClick={() => handleSelectPlaylist(pl)}
-                                    style={{
-                                      padding: '10px 12px',
-                                      cursor: 'pointer',
-                                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                      background: selectedPlaylistId === pl.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                                      transition: 'background 0.15s ease'
-                                    }}
-                                    onMouseOver={(e) => {
-                                      if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                    }}
-                                    onMouseOut={(e) => {
-                                      if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'transparent';
-                                    }}
-                                  >
+                                {rankedPlaylists.topMatches.length > 0 && (
+                                  <div>
                                     <div style={{
-                                      color: 'white',
-                                      fontSize: '12px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px'
+                                      padding: '8px 12px',
+                                      background: 'rgba(96, 165, 250, 0.1)',
+                                      color: '#60a5fa',
+                                      fontSize: '11px',
+                                      fontWeight: '600',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.5px',
+                                      position: 'sticky',
+                                      top: 0,
+                                      zIndex: 1
                                     }}>
-                                      <span style={{ flex: 1 }}>{pl.title}</span>
-                                      {selectedPlaylistId === pl.id && (
-                                        <span style={{ color: '#60a5fa', fontSize: '10px' }}>{'\u2713'}</span>
-                                      )}
-                                      <span style={{
-                                        fontSize: '10px',
-                                        color: 'rgba(96, 165, 250, 0.8)',
-                                        background: 'rgba(59, 130, 246, 0.15)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px'
-                                      }}>{pl.itemCount}</span>
+                                      Best Matches
                                     </div>
+                                    {rankedPlaylists.topMatches.map(pl => (
+                                      <div
+                                        key={pl.id}
+                                        onClick={() => handleSelectPlaylist(pl)}
+                                        style={{
+                                          padding: '10px 12px',
+                                          cursor: 'pointer',
+                                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                          background: selectedPlaylistId === pl.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                          transition: 'background 0.15s ease'
+                                        }}
+                                        onMouseOver={(e) => {
+                                          if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        <div style={{
+                                          color: 'white',
+                                          fontSize: '12px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '8px'
+                                        }}>
+                                          <span style={{ flex: 1 }}>{pl.title}</span>
+                                          {selectedPlaylistId === pl.id && (
+                                            <span style={{ color: '#60a5fa', fontSize: '10px' }}>{'\u2713'}</span>
+                                          )}
+                                          <span style={{
+                                            fontSize: '10px',
+                                            color: 'rgba(96, 165, 250, 0.8)',
+                                            background: 'rgba(59, 130, 246, 0.15)',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px'
+                                          }}>{pl.matchScore}pts</span>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
+                                {rankedPlaylists.remaining.length > 0 && (
+                                  <div>
+                                    <div style={{
+                                      padding: '8px 12px',
+                                      background: 'rgba(99, 102, 241, 0.1)',
+                                      color: 'rgba(165, 180, 252, 0.9)',
+                                      fontSize: '11px',
+                                      fontWeight: '600',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.5px',
+                                      position: 'sticky',
+                                      top: 0,
+                                      zIndex: 1
+                                    }}>
+                                      All Playlists
+                                    </div>
+                                    {rankedPlaylists.remaining.map(pl => (
+                                      <div
+                                        key={pl.id}
+                                        onClick={() => handleSelectPlaylist(pl)}
+                                        style={{
+                                          padding: '10px 12px',
+                                          cursor: 'pointer',
+                                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                          background: selectedPlaylistId === pl.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                          transition: 'background 0.15s ease'
+                                        }}
+                                        onMouseOver={(e) => {
+                                          if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          if (selectedPlaylistId !== pl.id) e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        <div style={{
+                                          color: 'white',
+                                          fontSize: '12px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '8px'
+                                        }}>
+                                          <span style={{ flex: 1 }}>{pl.title}</span>
+                                          {selectedPlaylistId === pl.id && (
+                                            <span style={{ color: '#60a5fa', fontSize: '10px' }}>{'\u2713'}</span>
+                                          )}
+                                          <span style={{
+                                            fontSize: '10px',
+                                            color: 'rgba(96, 165, 250, 0.8)',
+                                            background: 'rgba(59, 130, 246, 0.15)',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px'
+                                          }}>{pl.itemCount}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ position: 'relative', marginBottom: '12px' }}>
+                          <div
+                            onClick={() => setShowVideoDropdown(!showVideoDropdown)}
+                            style={{
+                              padding: '8px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                            }}
+                          >
+                            <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                              Videos ({playlistVideos.length - excludedVideoIds.size}/{playlistVideos.length} selected)
+                            </span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '10px' }}>
+                              {showVideoDropdown ? '\u25B2' : '\u25BC'}
+                            </span>
+                          </div>
+
+                          {showVideoDropdown && (
+                            <div style={{
+                              marginTop: '4px',
+                              background: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(96, 165, 250, 0.2)',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search videos..."
+                                  value={videoSearchTerm}
+                                  onChange={(e) => setVideoSearchTerm(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 10px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: 'white',
+                                    fontSize: '11px',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.borderColor = 'rgba(96, 165, 250, 0.5)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                  }}
+                                />
+                              </div>
+                              <div className="dc-dropdown-scroll" style={{ maxHeight: '180px' }}>
+                              {playlistVideos
+                                .filter(video => !videoSearchTerm || matchesSearchTerm(video.title || '', videoSearchTerm))
+                                .map(video => {
+                                const isExcluded = excludedVideoIds.has(video.id);
+                                return (
+                                  <div
+                                    key={video.id}
+                                    onClick={() => toggleVideoExclusion(video.id)}
+                                    style={{
+                                      padding: '6px 10px',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      opacity: isExcluded ? 0.4 : 1,
+                                      transition: 'opacity 0.15s ease',
+                                      position: 'relative',
+                                      minWidth: 'max-content',
+                                      paddingRight: '90px'
+                                    }}
+                                  >
+                                    <div style={{
+                                      width: '14px',
+                                      height: '14px',
+                                      borderRadius: '3px',
+                                      border: `1px solid ${isExcluded ? 'rgba(255,255,255,0.3)' : '#3b82f6'}`,
+                                      background: isExcluded ? 'transparent' : '#3b82f6',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      fontSize: '9px',
+                                      color: 'white',
+                                      position: 'sticky',
+                                      left: 0
+                                    }}>
+                                      {!isExcluded && '\u2713'}
+                                    </div>
+                                    <span title={video.title} style={{
+                                      color: 'rgba(255, 255, 255, 0.8)',
+                                      fontSize: '11px',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {video.title}
+                                    </span>
+                                    <div style={{
+                                      position: 'sticky',
+                                      right: 0,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      background: 'rgba(15, 23, 42, 0.95)',
+                                      paddingLeft: '8px',
+                                      marginLeft: 'auto',
+                                      flexShrink: 0
+                                    }}>
+                                      {video.publishedAt && (
+                                        <span style={{
+                                          fontSize: '9px',
+                                          color: 'rgba(96, 165, 250, 0.7)',
+                                          background: 'rgba(59, 130, 246, 0.1)',
+                                          padding: '1px 4px',
+                                          borderRadius: '3px'
+                                        }}>
+                                          {(() => {
+                                            const d = new Date(video.publishedAt);
+                                            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                            return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`;
+                                          })()}
+                                        </span>
+                                      )}
+                                      <span style={{
+                                        color: 'rgba(255, 255, 255, 0.4)',
+                                        fontSize: '10px'
+                                      }}>
+                                        {video.views.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1536,108 +2278,377 @@ const ComponentSidebar = ({
                             </div>
                           </div>
                         </div>
-
-                        <div style={{ position: 'relative' }}>
-                          <div
-                            onClick={() => setShowVideoDropdown(!showVideoDropdown)}
-                            style={{
-                              padding: '8px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                              e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.4)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                            }}
-                          >
-                            <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
-                              Videos ({playlistVideos.length - excludedVideoIds.size}/{playlistVideos.length} selected)
-                            </span>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '10px' }}>
-                              {showVideoDropdown ? '\u25B2' : '\u25BC'}
-                            </span>
-                          </div>
-
-                          {showVideoDropdown && (
-                            <div style={{
-                              marginTop: '4px',
-                              background: 'rgba(15, 23, 42, 0.95)',
-                              border: '1px solid rgba(96, 165, 250, 0.2)',
-                              borderRadius: '6px',
-                              maxHeight: '180px',
-                              overflow: 'auto'
-                            }}>
-                              {playlistVideos.map(video => {
-                                const isExcluded = excludedVideoIds.has(video.id);
-                                return (
-                                  <div
-                                    key={video.id}
-                                    onClick={() => toggleVideoExclusion(video.id)}
-                                    style={{
-                                      padding: '6px 10px',
-                                      cursor: 'pointer',
-                                      borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      opacity: isExcluded ? 0.4 : 1,
-                                      transition: 'opacity 0.15s ease'
-                                    }}
-                                  >
-                                    <div style={{
-                                      width: '14px',
-                                      height: '14px',
-                                      borderRadius: '3px',
-                                      border: `1px solid ${isExcluded ? 'rgba(255,255,255,0.3)' : '#3b82f6'}`,
-                                      background: isExcluded ? 'transparent' : '#3b82f6',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      flexShrink: 0,
-                                      fontSize: '9px',
-                                      color: 'white'
-                                    }}>
-                                      {!isExcluded && '\u2713'}
-                                    </div>
-                                    <span style={{
-                                      color: 'rgba(255, 255, 255, 0.8)',
-                                      fontSize: '11px',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap'
-                                    }}>
-                                      {video.title}
-                                    </span>
-                                    <span style={{
-                                      marginLeft: 'auto',
-                                      color: 'rgba(255, 255, 255, 0.4)',
-                                      fontSize: '10px',
-                                      flexShrink: 0
-                                    }}>
-                                      {video.views.toLocaleString()} views
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => {
+                            if (!onAddThumbnails) return;
+                            const activeVideos = playlistVideos.filter(v => !excludedVideoIds.has(v.id));
+                            const top3 = [...activeVideos].sort((a, b) => b.views - a.views).slice(0, 3);
+                            onAddThumbnails(top3.map(v => ({
+                              videoId: v.id,
+                              title: v.title,
+                              views: v.views,
+                              avgPercentWatched: v.avgPercentWatched
+                            })));
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            marginTop: '12px'
+                          }}
+                        >
+                          Add Top Thumbnails
+                        </button>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px',
+                          marginTop: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={thumbnailOverlayEnabled}
+                            onChange={onThumbnailOverlayToggle}
+                            style={{ margin: 0 }}
+                          />
+                          <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                            Show View Overlay
+                          </span>
+                        </label>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
+              {hasSocialTable && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+                    Social Media Metrics
+                  </label>
+                  <div style={{
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                      {['facebook', 'instagram', 'linkedin'].map(plat => {
+                        const isEnabled = enabledPlatforms.has(plat);
+                        const platLabel = { facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn' }[plat];
+                        const platPostCount = (() => {
+                          const platData = socialData[plat] || {};
+                          const companies = platData.companies || {};
+                          let count = 0;
+                          Object.values(companies).forEach(ch => {
+                            count += (plat === 'instagram' ? (ch.media || []) : (ch.posts || [])).length;
+                          });
+                          return count;
+                        })();
+                        return (
+                          <button
+                            key={plat}
+                            onClick={() => togglePlatform(plat)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              border: `1px solid ${isEnabled ? 'rgba(167, 139, 250, 0.6)' : 'rgba(255, 255, 255, 0.15)'}`,
+                              background: isEnabled ? 'rgba(139, 92, 246, 0.3)' : 'transparent',
+                              color: isEnabled ? '#a78bfa' : 'rgba(255, 255, 255, 0.4)',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {platLabel} ({platPostCount})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ position: 'relative', marginBottom: '12px' }}>
+                      <div
+                        onClick={() => setShowSocialPostDropdown(!showSocialPostDropdown)}
+                        style={{
+                          padding: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      >
+                        <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                          Posts ({selectedPostIds.size}/{allSocialPosts.length} selected)
+                        </span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '10px' }}>
+                          {showSocialPostDropdown ? '\u25B2' : '\u25BC'}
+                        </span>
+                      </div>
+
+                      {showSocialPostDropdown && (
+                        <div style={{
+                          marginTop: '4px',
+                          background: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(167, 139, 250, 0.2)',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <input
+                              type="text"
+                              placeholder="Search posts..."
+                              value={socialPostSearchTerm}
+                              onChange={(e) => setSocialPostSearchTerm(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                color: 'white',
+                                fontSize: '11px',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.borderColor = 'rgba(167, 139, 250, 0.5)';
+                              }}
+                              onBlur={(e) => {
+                                e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                              }}
+                            />
+                          </div>
+                          <div className="dc-dropdown-scroll" style={{ maxHeight: '180px' }}>
+                          {allSocialPosts
+                            .filter(post => !socialPostSearchTerm || matchesSearchTerm(post.text || '', socialPostSearchTerm))
+                            .map(post => {
+                            const isSelected = selectedPostIds.has(post.id);
+                            const platBadge = { facebook: 'FB', instagram: 'IG', linkedin: 'LI' }[post.platform] || post.platform;
+                            const dateStr = (() => {
+                              if (!post.createdAt) return null;
+                              try {
+                                const d = new Date(post.createdAt);
+                                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`;
+                              } catch { return null; }
+                            })();
+                            return (
+                              <div
+                                key={post.id}
+                                onClick={() => togglePostSelection(post.id)}
+                                title={post.text}
+                                style={{
+                                  padding: '6px 10px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  opacity: isSelected ? 1 : 0.4,
+                                  transition: 'opacity 0.15s ease',
+                                  position: 'relative',
+                                  minWidth: 'max-content',
+                                  paddingRight: '110px'
+                                }}
+                              >
+                                <div style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '3px',
+                                  border: `1px solid ${isSelected ? '#8b5cf6' : 'rgba(255,255,255,0.3)'}`,
+                                  background: isSelected ? '#8b5cf6' : 'transparent',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  fontSize: '9px',
+                                  color: 'white',
+                                  position: 'sticky',
+                                  left: 0
+                                }}>
+                                  {isSelected && '\u2713'}
+                                </div>
+                                <span style={{
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontSize: '11px',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {post.text ? (post.text.length > 60 ? post.text.slice(0, 60) + '...' : post.text) : '(no text)'}
+                                </span>
+                                <div style={{
+                                  position: 'sticky',
+                                  right: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  paddingLeft: '8px',
+                                  marginLeft: 'auto',
+                                  flexShrink: 0
+                                }}>
+                                  <span style={{
+                                    fontSize: '9px',
+                                    color: 'rgba(167, 139, 250, 0.8)',
+                                    background: 'rgba(139, 92, 246, 0.15)',
+                                    padding: '1px 4px',
+                                    borderRadius: '3px'
+                                  }}>
+                                    {platBadge}
+                                  </span>
+                                  {dateStr && (
+                                    <span style={{
+                                      fontSize: '9px',
+                                      color: 'rgba(167, 139, 250, 0.7)',
+                                      background: 'rgba(139, 92, 246, 0.1)',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px'
+                                    }}>
+                                      {dateStr}
+                                    </span>
+                                  )}
+                                  <span style={{
+                                    color: 'rgba(255, 255, 255, 0.4)',
+                                    fontSize: '10px'
+                                  }}>
+                                    {(post.engagements || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { label: 'Total Impressions', value: socialAggregateMetrics.totalImpressions.toLocaleString(), key: 'totalImpressions' },
+                        { label: 'Total Engagements', value: socialAggregateMetrics.totalEngagements.toLocaleString(), key: 'totalEngagements' },
+                        { label: 'Avg Engagement Rate', value: `${socialAggregateMetrics.avgEngagementRate.toFixed(2)}%`, key: 'avgEngagementRate' },
+                        { label: 'Total Reactions', value: socialAggregateMetrics.totalReactions.toLocaleString(), key: 'totalReactions' },
+                        { label: 'Total Comments', value: socialAggregateMetrics.totalComments.toLocaleString(), key: 'totalComments' },
+                        { label: 'Total Shares', value: socialAggregateMetrics.totalShares.toLocaleString(), key: 'totalShares' },
+                        { label: 'Most Engaged Post', value: socialAggregateMetrics.mostEngagedPost ? (socialAggregateMetrics.mostEngagedPost.length > 40 ? socialAggregateMetrics.mostEngagedPost.slice(0, 40) + '...' : socialAggregateMetrics.mostEngagedPost) : 'N/A', key: 'mostEngagedPost' }
+                      ].map(metric => (
+                        <div key={metric.key} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '4px'
+                        }}>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>{metric.label}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              color: 'white',
+                              fontWeight: '600',
+                              fontSize: metric.key === 'mostEngagedPost' ? '11px' : '13px',
+                              maxWidth: metric.key === 'mostEngagedPost' ? '100px' : 'none',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {metric.value}
+                            </span>
+                            <button
+                              onClick={() => handleAddSocialMetric(metric.key, metric.value, metric.label)}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#8b5cf6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                              }}
+                            >+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!onAddSocialPosts) return;
+                        const postsWithImages = activeSocialPosts.filter(p => p.imageUrl || p.thumbnailUrl);
+                        const top3 = postsWithImages.slice(0, 3);
+                        if (top3.length > 0) {
+                          onAddSocialPosts(top3.map(p => ({
+                            imageUrl: p.imageUrl || p.thumbnailUrl,
+                            text: p.text,
+                            engagements: p.engagements,
+                            platform: p.platform,
+                            postId: p.id
+                          })));
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        marginTop: '12px'
+                      }}
+                    >
+                      Add Top Posts
+                    </button>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px',
+                      marginTop: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={socialPostOverlayEnabled}
+                        onChange={onSocialPostOverlayToggle}
+                        style={{ margin: 0 }}
+                      />
+                      <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                        Show Engagement Overlay
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {!(currentTemplate?.includes?.('hot-topics') || currentTemplate?.includes?.('expert-perspectives') || (typeof currentTemplate === 'object' && (currentTemplate?.id?.includes('hot-topics') || currentTemplate?.id?.includes('expert-perspectives')))) && (<>
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                   Cost Comparison Model
@@ -1718,6 +2729,7 @@ const ComponentSidebar = ({
                   }}
                 />
               </div>
+              </>)}
 
               <div style={{ marginBottom: '24px' }}>
                 <label style={{
@@ -1743,6 +2755,7 @@ const ComponentSidebar = ({
                 </label>
               </div>
 
+              {!(currentTemplate?.includes?.('hot-topics') || currentTemplate?.includes?.('expert-perspectives') || (typeof currentTemplate === 'object' && (currentTemplate?.id?.includes('hot-topics') || currentTemplate?.id?.includes('expert-perspectives')))) && (<>
               <div style={{ marginBottom: '24px' }}>
                 <label style={{
                   display: 'flex',
@@ -1762,6 +2775,78 @@ const ComponentSidebar = ({
                   <div style={{ flex: 1 }}>
                     <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
                       Show Total Sends
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={bannerImpressionsMode}
+                    onChange={onBannerImpressionsModeToggle}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Banner Impressions
+                    </div>
+                  </div>
+                </label>
+              </div>
+              </>)}
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '24px',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showPharmaLogo}
+                    onChange={onShowPharmaLogoToggle}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Show Pharma Logo
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showBottomLogo}
+                    onChange={onShowBottomLogoToggle}
+                    style={{ margin: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                      Show Matrix Logo
                     </div>
                   </div>
                 </label>

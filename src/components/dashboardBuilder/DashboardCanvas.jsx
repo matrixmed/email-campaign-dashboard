@@ -10,6 +10,9 @@ import TableComponent from './TableComponent';
 import TitleComponent from './TitleComponent';
 import GroupComponent from './template/GroupComponent';
 import SpecialtyKPIStrips from './SpecialtyKPIStrips';
+import StatHighlight from './StatHighlight';
+import MetricStrip from './MetricStrip';
+import ImageSlot from './ImageSlot';
 import { useDragDrop } from './hooks/useDragDrop';
 import { exportDashboard, exportAsPDF } from './utils/exportUtils';
 import { calculateAlignmentGuides, AlignmentGuides } from './template/AlignmentGuides';
@@ -18,6 +21,8 @@ import TemplateSelectionModal from './TemplateSelectionModal';
 import { generateTemplate } from './template/TemplateLibrary';
 import { getThemeLogo, getMetricValue, getThemeColors, TABLE_TYPES, TABLE_DEFINITIONS, getSmartTableSelection } from './template/LayoutTemplates';
 import { API_BASE_URL } from '../../config/api';
+import '../../styles/DashboardBuilder.css';
+import { sanitizeTitle, reformatCampaignTitle } from './template/TemplateLibrary';
 
 const DashboardCanvasContent = () => {
   const loadInitialState = () => {
@@ -62,6 +67,14 @@ const DashboardCanvasContent = () => {
   });
   const [deletedCardIds, setDeletedCardIds] = useState(new Set(initialState?.deletedCardIds || []));
   const [selectedRowInfo, setSelectedRowInfo] = useState(null);
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [bannerImpressionsMode, setBannerImpressionsMode] = useState(initialState?.bannerImpressionsMode || false);
+  const [thumbnailOverlayEnabled, setThumbnailOverlayEnabled] = useState(initialState?.thumbnailOverlayEnabled || false);
+  const [socialPostOverlayEnabled, setSocialPostOverlayEnabled] = useState(initialState?.socialPostOverlayEnabled || false);
+  const [showPharmaLogo, setShowPharmaLogo] = useState(initialState?.showPharmaLogo !== undefined ? initialState.showPharmaLogo : true);
+  const [brandData, setBrandData] = useState([]);
+  const [pharmaLogoSrc, setPharmaLogoSrc] = useState(null);
+  const [showBottomLogo, setShowBottomLogo] = useState(initialState?.showBottomLogo !== undefined ? initialState.showBottomLogo : true);
 
   const [selectedTableTypes, setSelectedTableTypes] = useState(initialState?.selectedTableTypes || {
     table1: TABLE_TYPES.ONLINE_JOURNAL,
@@ -80,6 +93,43 @@ const DashboardCanvasContent = () => {
     getAuthorityMetrics
   } = useDashboardData();
   
+  useEffect(() => {
+    async function fetchBrandData() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/brand-management`);
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setBrandData(data);
+        } else if (data.brands) {
+          setBrandData(data.brands);
+        }
+      } catch (error) {
+      }
+    }
+    fetchBrandData();
+  }, []);
+
+  useEffect(() => {
+    if (brandData.length === 0 || !showPharmaLogo) {
+      setPharmaLogoSrc(null);
+      return;
+    }
+
+    const campaignName = selectedCampaign?.campaign_name ||
+      (selectedMultiCampaigns && selectedMultiCampaigns.length > 0 ? selectedMultiCampaigns[0]?.campaign_name : null);
+    if (!campaignName) {
+      setPharmaLogoSrc(null);
+      return;
+    }
+
+    const { pharmaLogoFile } = reformatCampaignTitle(campaignName, brandData);
+    if (pharmaLogoFile) {
+      setPharmaLogoSrc(`${process.env.PUBLIC_URL}/pharma/${pharmaLogoFile}`);
+    } else {
+      setPharmaLogoSrc(null);
+    }
+  }, [brandData, showPharmaLogo, selectedCampaign, selectedMultiCampaigns]);
+
   const handleBudgetedCostChange = useCallback((value) => {
     setBudgetedCost(value);
   }, []);
@@ -146,17 +196,22 @@ const DashboardCanvasContent = () => {
       budgetedCost,
       actualCost,
       selectedTableTypes,
-      deletedCardIds: Array.from(deletedCardIds)
+      deletedCardIds: Array.from(deletedCardIds),
+      bannerImpressionsMode,
+      thumbnailOverlayEnabled,
+      socialPostOverlayEnabled,
+      showPharmaLogo,
+      showBottomLogo
     };
     localStorage.setItem('dashboard-canvas-state', JSON.stringify(stateToSave));
-  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, deletedCardIds]);
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTemplate, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, deletedCardIds, bannerImpressionsMode, thumbnailOverlayEnabled, socialPostOverlayEnabled, showPharmaLogo, showBottomLogo]);
 
   const [lastRegenerationTrigger, setLastRegenerationTrigger] = useState('');
 
   useEffect(() => {
     if (isRestoring) return;
 
-    const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showTotalSends}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}`;
+    const triggerKey = `${specialtyMergeMode}-${costComparisonMode}-${showTotalSends}-${currentTheme}-${selectedCampaign?.campaign_name || ''}-${selectedMultiCampaigns?.length || 0}-${currentTemplate?.id || ''}-${JSON.stringify(selectedTableTypes)}-${bannerImpressionsMode}`;
 
     if (triggerKey !== lastRegenerationTrigger && cards.length > 0 && currentTemplate) {
       let templateConfig;
@@ -170,7 +225,8 @@ const DashboardCanvasContent = () => {
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
           showTotalSends: showTotalSends,
-          selectedTableTypes: selectedTableTypes
+          selectedTableTypes: selectedTableTypes,
+          bannerImpressionsMode: bannerImpressionsMode
         };
       } else if (selectedMultiCampaigns && selectedMultiCampaigns.length > 0) {
         templateConfig = {
@@ -181,7 +237,8 @@ const DashboardCanvasContent = () => {
           mergeSubspecialties: specialtyMergeMode,
           costComparisonMode: costComparisonMode,
           showTotalSends: showTotalSends,
-          selectedTableTypes: selectedTableTypes
+          selectedTableTypes: selectedTableTypes,
+          bannerImpressionsMode: bannerImpressionsMode
         };
       }
       
@@ -217,6 +274,14 @@ const DashboardCanvasContent = () => {
           }));
           
           const regeneratedComponents = generateTemplate(templateConfig);
+
+          const regenTitleCard = regeneratedComponents.find(c => c.type === 'title');
+          if (regenTitleCard && brandData.length > 0) {
+            const campaignNameForLogo = templateConfig.campaigns[0]?.campaign_name || regenTitleCard.title;
+            const { displayTitle } = reformatCampaignTitle(campaignNameForLogo, brandData);
+            regenTitleCard.title = displayTitle;
+          }
+
           const preservedComponents = applyPreservedEdits(regeneratedComponents);
           
           const filteredComponents = preservedComponents.filter(comp => 
@@ -252,7 +317,7 @@ const DashboardCanvasContent = () => {
         }
       }
     }
-  }, [specialtyMergeMode, costComparisonMode, showTotalSends, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes, isRestoring]);
+  }, [specialtyMergeMode, costComparisonMode, showTotalSends, currentTheme, selectedCampaign, selectedMultiCampaigns, currentTemplate, applyPreservedEdits, deletedCardIds, lastRegenerationTrigger, selectedTableTypes, isRestoring, bannerImpressionsMode]);
 
   const handleCardEdit = useCallback((cardId, newData) => {
     const normalizedData = { ...newData };
@@ -381,13 +446,25 @@ const DashboardCanvasContent = () => {
         mergeSubspecialties: specialtyMergeMode,
         costComparisonMode: costComparisonMode,
         showTotalSends: showTotalSends,
-        selectedTableTypes: selectedTableTypes
+        selectedTableTypes: selectedTableTypes,
+        bannerImpressionsMode: bannerImpressionsMode
       });
+      const titleCard = generatedComponents.find(c => c.type === 'title');
+      if (titleCard && brandData.length > 0) {
+        const { displayTitle } = reformatCampaignTitle(titleCard.title, brandData);
+        titleCard.title = displayTitle;
+      }
+
       setCards(generatedComponents);
       setCurrentTheme(templateConfig.theme);
       setCurrentTemplate(templateConfig.template);
       setDeletedCards([]);
       setDeletedCardIds(new Set());
+
+      const tplId = typeof templateConfig.template === 'string' ? templateConfig.template : templateConfig.template?.id;
+      const isCreativeTemplate = tplId?.includes('hot-topics') || tplId?.includes('expert-perspectives');
+      setShowPharmaLogo(isCreativeTemplate);
+
       setUploadedImages([]);
       
       if (templateConfig.type === 'single' && templateConfig.campaigns.length > 0) {
@@ -399,7 +476,7 @@ const DashboardCanvasContent = () => {
       }
     } catch (error) {
     }
-  }, [specialtyMergeMode, costComparisonMode, showTotalSends, selectedTableTypes]);
+  }, [specialtyMergeMode, costComparisonMode, showTotalSends, selectedTableTypes, bannerImpressionsMode]);
 
   const handleThemeChange = useCallback((newTheme) => {
     setCurrentTheme(newTheme);
@@ -521,6 +598,43 @@ const DashboardCanvasContent = () => {
       updatedCards[videoTableIndex] = videoTable;
 
       preserveEdit(videoTable.id, { config: { customData: newData } });
+
+      return updatedCards;
+    });
+  }, [preserveEdit]);
+
+  const handleAddSocialMetricRow = useCallback((label, value) => {
+    setCards(prev => {
+      const socialTableIndex = prev.findIndex(card =>
+        card.type === 'table' &&
+        (card.title === 'Social Media Metrics' || card.title?.includes('Social Media') || card.id?.includes('social'))
+      );
+
+      if (socialTableIndex === -1) return prev;
+
+      const updatedCards = [...prev];
+      const socialTable = { ...updatedCards[socialTableIndex] };
+      const currentData = socialTable.config?.customData || [];
+
+      const existingRowIndex = currentData.findIndex(row => row[0] === label);
+
+      let newData;
+      if (existingRowIndex !== -1) {
+        newData = currentData.map((row, idx) =>
+          idx === existingRowIndex ? [label, value] : row
+        );
+      } else {
+        newData = [...currentData, [label, value]];
+      }
+
+      socialTable.config = {
+        ...socialTable.config,
+        customData: newData
+      };
+
+      updatedCards[socialTableIndex] = socialTable;
+
+      preserveEdit(socialTable.id, { config: { customData: newData } });
 
       return updatedCards;
     });
@@ -775,6 +889,161 @@ const DashboardCanvasContent = () => {
     });
   }, []);
 
+  const handleAddThumbnails = useCallback((thumbnailArray) => {
+    const templateId = typeof currentTemplate === 'string' ? currentTemplate : currentTemplate?.id;
+    const isEPSingle = templateId === 'single-expert-perspectives';
+    const isEPMulti = templateId === 'multi-expert-perspectives';
+
+    let thumbsToAdd = thumbnailArray;
+    if (isEPSingle) {
+      thumbsToAdd = thumbnailArray.slice(0, 1);
+    } else if (isEPMulti) {
+      thumbsToAdd = thumbnailArray.slice(0, 2);
+    }
+
+    let startX, startY, thumbWidth, thumbHeight, gap;
+
+    if (isEPSingle) {
+      startX = 656;
+      startY = 337;
+      thumbWidth = 336;
+      thumbHeight = 192;
+      gap = 8;
+    } else if (isEPMulti) {
+      startX = 752;
+      startY = 264;
+      thumbWidth = 248;
+      thumbHeight = 136;
+      gap = 8;
+    } else {
+      startX = 800;
+      startY = 80;
+      thumbWidth = 200;
+      thumbHeight = 112;
+      gap = 8;
+    }
+
+    if (!isEPSingle && !isEPMulti) {
+      const existingMaxX = uploadedImages.reduce((max, img) => {
+        return Math.max(max, img.position.x + img.position.width);
+      }, 0);
+      if (existingMaxX > startX) startX = existingMaxX + 10;
+    }
+
+    const newImages = thumbsToAdd.map((thumb, index) => ({
+      id: `yt-thumb-${Date.now()}-${index}`,
+      src: `https://img.youtube.com/vi/${thumb.videoId}/maxresdefault.jpg`,
+      fallbackSrc: `https://img.youtube.com/vi/${thumb.videoId}/hqdefault.jpg`,
+      position: {
+        x: Math.min(startX, 1024 - thumbWidth),
+        y: startY + index * (thumbHeight + gap),
+        width: thumbWidth,
+        height: thumbHeight
+      },
+      isYouTubeThumbnail: true,
+      videoMetadata: {
+        videoId: thumb.videoId,
+        title: thumb.title,
+        views: thumb.views,
+        avgPercentWatched: thumb.avgPercentWatched
+      }
+    }));
+
+    setUploadedImages(prev => [...prev, ...newImages]);
+  }, [uploadedImages, currentTemplate]);
+
+  const handleAddJournalCover = useCallback((covers) => {
+    const coverArray = Array.isArray(covers) ? covers : [covers];
+    if (coverArray.length === 0) return;
+
+    setUploadedImages(prev => prev.filter(img => !img.isJournalCover));
+
+    const templateId = typeof currentTemplate === 'string' ? currentTemplate : currentTemplate?.id;
+    const isHotTopics = templateId === 'single-hot-topics' || templateId === 'multi-hot-topics';
+
+    const isMultiHT = templateId === 'multi-hot-topics';
+
+    if (coverArray.length === 1) {
+      const cover = coverArray[0];
+      const newImage = {
+        id: `journal-cover-${Date.now()}`,
+        src: cover.coverUrl,
+        position: isMultiHT
+          ? { x: 32, y: 208, width: 256, height: 336 }
+          : { x: 24, y: 208, width: 256, height: 336 },
+        isJournalCover: true,
+        journalMetadata: {
+          issueName: cover.issueName,
+          publication: cover.publication
+        }
+      };
+      setUploadedImages(prev => [...prev, newImage]);
+    } else {
+      const oldest = coverArray[coverArray.length - 1];
+      const newest = coverArray[0];
+
+      const olderImage = {
+        id: `journal-cover-older-${Date.now()}`,
+        src: oldest.coverUrl,
+        position: isMultiHT
+          ? { x: 32, y: 200, width: 192, height: 256 }
+          : { x: 24, y: 200, width: 192, height: 256 },
+        isJournalCover: true,
+        journalMetadata: {
+          issueName: oldest.issueName,
+          publication: oldest.publication
+        }
+      };
+
+      const newerImage = {
+        id: `journal-cover-newer-${Date.now() + 1}`,
+        src: newest.coverUrl,
+        position: isMultiHT
+          ? { x: 88, y: 288, width: 192, height: 256 }
+          : { x: 80, y: 288, width: 192, height: 256 },
+        isJournalCover: true,
+        journalMetadata: {
+          issueName: newest.issueName,
+          publication: newest.publication
+        }
+      };
+
+      setUploadedImages(prev => [...prev, olderImage, newerImage]);
+    }
+  }, [currentTemplate]);
+
+
+  const handleAddSocialPosts = useCallback((postsArray) => {
+    if (!postsArray || postsArray.length === 0) return;
+
+    setUploadedImages(prev => prev.filter(img => !img.isSocialPost));
+
+    const startY = 80;
+    const postSize = 200;
+    const gap = 8;
+    const startX = 800;
+
+    const newImages = postsArray.map((post, index) => ({
+      id: `social-post-${Date.now()}-${index}`,
+      src: post.imageUrl,
+      position: {
+        x: Math.min(startX, 1024 - postSize),
+        y: startY + index * (postSize + gap),
+        width: postSize,
+        height: postSize
+      },
+      isSocialPost: true,
+      socialMetadata: {
+        postId: post.postId,
+        text: post.text,
+        engagements: post.engagements,
+        platform: post.platform
+      }
+    }));
+
+    setUploadedImages(prev => [...prev, ...newImages]);
+  }, []);
+
   const handleImageUpload = useCallback((imageData, position = null) => {
     const newImage = {
       id: `image-${Date.now()}`,
@@ -832,6 +1101,8 @@ const DashboardCanvasContent = () => {
   }, [handleImageUpload]);
 
   const handleSaveDashboard = useCallback(async () => {
+    setSaveStatus('saving');
+
     const titleCard = cards.find(card => card.type === 'title');
     const dashboardName = titleCard?.title || (selectedCampaign
       ? selectedCampaign.campaign_name
@@ -853,7 +1124,10 @@ const DashboardCanvasContent = () => {
       uploadedImages: uploadedImages.map(img => ({
         id: img.id,
         src: img.src,
-        position: img.position
+        position: img.position,
+        fallbackSrc: img.fallbackSrc,
+        isYouTubeThumbnail: img.isYouTubeThumbnail,
+        videoMetadata: img.videoMetadata
       })),
       selectedCampaign: selectedCampaign?.campaign_name,
       selectedMultiCampaigns: selectedMultiCampaigns?.map(c => c.campaign_name),
@@ -865,7 +1139,13 @@ const DashboardCanvasContent = () => {
       actualCost,
       selectedTableTypes,
       currentTemplate: currentTemplate?.id,
-      userEdits
+      userEdits,
+      deletedCardIds: Array.from(deletedCardIds),
+      bannerImpressionsMode,
+      thumbnailOverlayEnabled,
+      socialPostOverlayEnabled,
+      showPharmaLogo,
+      showBottomLogo
     };
 
     try {
@@ -881,11 +1161,23 @@ const DashboardCanvasContent = () => {
       });
 
       const data = await response.json();
-      if (data.status !== 'success') {
+      if (data.status === 'success') {
+        setSaveStatus('success');
+        if (canvasRef.current) {
+          const canvasEl = canvasRef.current.parentElement;
+          canvasEl?.classList.add('canvas-save-flash');
+          setTimeout(() => canvasEl?.classList.remove('canvas-save-flash'), 800);
+        }
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } else {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
       }
     } catch (error) {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
-  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits]);
+  }, [cards, uploadedImages, selectedCampaign, selectedMultiCampaigns, currentTheme, specialtyMergeMode, costComparisonMode, showTotalSends, budgetedCost, actualCost, selectedTableTypes, currentTemplate, userEdits, deletedCardIds, bannerImpressionsMode, thumbnailOverlayEnabled, socialPostOverlayEnabled, showPharmaLogo, showBottomLogo]);
 
   const handleRestoreDashboard = useCallback(async (dashboardId) => {
     setIsRestoring(true);
@@ -936,6 +1228,30 @@ const DashboardCanvasContent = () => {
           setSelectedTableTypes(state.selectedTableTypes);
         }
 
+        if (state.bannerImpressionsMode !== undefined) {
+          setBannerImpressionsMode(state.bannerImpressionsMode);
+        }
+
+        if (state.thumbnailOverlayEnabled !== undefined) {
+          setThumbnailOverlayEnabled(state.thumbnailOverlayEnabled);
+        }
+
+        if (state.socialPostOverlayEnabled !== undefined) {
+          setSocialPostOverlayEnabled(state.socialPostOverlayEnabled);
+        }
+
+        if (state.showPharmaLogo !== undefined) {
+          setShowPharmaLogo(state.showPharmaLogo);
+        }
+
+        if (state.showBottomLogo !== undefined) {
+          setShowBottomLogo(state.showBottomLogo);
+        }
+
+        if (state.deletedCardIds) {
+          setDeletedCardIds(new Set(state.deletedCardIds));
+        }
+
         let restoredCampaign = null;
         if (state.selectedCampaign) {
           restoredCampaign = campaigns.find(c => c.campaign_name === state.selectedCampaign);
@@ -958,7 +1274,7 @@ const DashboardCanvasContent = () => {
           setCurrentTemplate({ id: state.currentTemplate });
         }
 
-        const triggerKey = `${state.specialtyMergeMode || false}-${state.costComparisonMode || 'none'}-${state.showTotalSends || false}-${state.theme || 'matrix'}-${state.selectedCampaign || ''}-${restoredMultiCampaigns?.length || 0}-${state.currentTemplate || ''}-${JSON.stringify(state.selectedTableTypes || {})}`;
+        const triggerKey = `${state.specialtyMergeMode || false}-${state.costComparisonMode || 'none'}-${state.showTotalSends || false}-${state.theme || 'matrix'}-${state.selectedCampaign || ''}-${restoredMultiCampaigns?.length || 0}-${state.currentTemplate || ''}-${JSON.stringify(state.selectedTableTypes || {})}-${state.bannerImpressionsMode || false}`;
         setLastRegenerationTrigger(triggerKey);
       } else {
       }
@@ -1134,12 +1450,17 @@ const DashboardCanvasContent = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={handleSaveDashboard}
-            disabled={!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0)}
+            disabled={saveStatus === 'saving' || (!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0))}
+            className={
+              saveStatus === 'saving' ? 'save-btn-saving' :
+              saveStatus === 'success' ? 'save-btn-success' :
+              saveStatus === 'error' ? 'save-btn-error' : ''
+            }
             style={{
               padding: '10px 24px',
               border: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? '2px solid #2a2a2d' : '2px solid #d1d5db',
               borderRadius: '8px',
-              cursor: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 'pointer' : 'not-allowed',
+              cursor: (saveStatus === 'saving' || (!selectedCampaign && !(selectedMultiCampaigns && selectedMultiCampaigns.length > 0))) ? 'not-allowed' : 'pointer',
               fontSize: '14px',
               fontWeight: '600',
               fontFamily: 'inherit',
@@ -1151,21 +1472,23 @@ const DashboardCanvasContent = () => {
               opacity: (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) ? 1 : 0.6
             }}
             onMouseOver={(e) => {
-              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+              if (saveStatus === 'idle' && (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0))) {
                 e.target.style.borderColor = '#1a1a1d';
                 e.target.style.color = '#1a1a1d';
                 e.target.style.background = 'rgba(42, 42, 45, 0.1)';
               }
             }}
             onMouseOut={(e) => {
-              if (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0)) {
+              if (saveStatus === 'idle' && (selectedCampaign || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0))) {
                 e.target.style.borderColor = '#2a2a2d';
                 e.target.style.color = '#2a2a2d';
                 e.target.style.background = 'rgba(42, 42, 45, 0.05)';
               }
             }}
           >
-            Save
+            {saveStatus === 'saving' ? 'Saving...' :
+             saveStatus === 'success' ? '\u2713 Saved!' :
+             saveStatus === 'error' ? 'Error' : 'Save'}
           </button>
 
           <button
@@ -1226,6 +1549,7 @@ const DashboardCanvasContent = () => {
             onToggle={() => setSidebarOpen(!sidebarOpen)}
             campaigns={campaigns}
             selectedCampaign={selectedCampaign}
+            selectedMultiCampaigns={selectedMultiCampaigns}
             currentTheme={currentTheme}
             costComparisonMode={costComparisonMode}
             showTotalSends={showTotalSends}
@@ -1251,6 +1575,21 @@ const DashboardCanvasContent = () => {
             hasJournalTable={cards.some(card => card.type === 'table' && (card.title === 'Online Journal Metrics' || card.id?.includes('journal')))}
             onAddVideoMetricRow={handleAddVideoMetricRow}
             hasVideoTable={cards.some(card => card.type === 'table' && (card.title === 'Video Metrics' || card.id?.includes('video')))}
+            bannerImpressionsMode={bannerImpressionsMode}
+            onBannerImpressionsModeToggle={() => setBannerImpressionsMode(!bannerImpressionsMode)}
+            onAddThumbnails={handleAddThumbnails}
+            thumbnailOverlayEnabled={thumbnailOverlayEnabled}
+            onThumbnailOverlayToggle={() => setThumbnailOverlayEnabled(!thumbnailOverlayEnabled)}
+            showPharmaLogo={showPharmaLogo}
+            onShowPharmaLogoToggle={() => setShowPharmaLogo(!showPharmaLogo)}
+            showBottomLogo={showBottomLogo}
+            onShowBottomLogoToggle={() => setShowBottomLogo(!showBottomLogo)}
+            onAddJournalCover={handleAddJournalCover}
+            onAddSocialMetricRow={handleAddSocialMetricRow}
+            hasSocialTable={cards.some(card => card.type === 'table' && (card.title === 'Social Media Metrics' || card.title?.includes('Social Media') || card.id?.includes('social')))}
+            onAddSocialPosts={handleAddSocialPosts}
+            socialPostOverlayEnabled={socialPostOverlayEnabled}
+            onSocialPostOverlayToggle={() => setSocialPostOverlayEnabled(!socialPostOverlayEnabled)}
           />
         </div>
 
@@ -1323,8 +1662,8 @@ const DashboardCanvasContent = () => {
                     right: '25px',
                     zIndex: 10
                   }}>
-                    <img 
-                      src={getThemeLogo(currentTheme)} 
+                    <img
+                      src={getThemeLogo(currentTheme)}
                       alt="Logo"
                       style={{
                         height: '40px',
@@ -1332,6 +1671,26 @@ const DashboardCanvasContent = () => {
                       }}
                     />
                   </div>
+
+                  {pharmaLogoSrc && showPharmaLogo && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '30px',
+                      left: '25px',
+                      zIndex: 10
+                    }}>
+                      <img
+                        src={pharmaLogoSrc}
+                        alt="Pharma Logo"
+                        style={{
+                          height: '40px',
+                          width: 'auto',
+                          maxWidth: '130px',
+                          objectFit: 'contain'
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {cards.map(card => {
                     const isComponentSelected = selectedComponents.some(comp => comp.id === card.id);
@@ -1431,6 +1790,60 @@ const DashboardCanvasContent = () => {
                       );
                     }
 
+                    if (card.type === 'stat-highlight') {
+                      return (
+                        <StatHighlight
+                          key={card.id}
+                          {...card}
+                          currentTheme={currentTheme}
+                          onEdit={handleCardEdit}
+                          onDelete={handleCardDelete}
+                          onMove={handleCardMove}
+                          onResize={handleCardResize}
+                          isEditing={isEditing}
+                          setIsEditing={setIsEditing}
+                          isSelected={selectedElement === card.id || isComponentSelected}
+                          onSelect={(e) => handleComponentClick(card.id, e || {})}
+                        />
+                      );
+                    }
+
+                    if (card.type === 'metric-strip') {
+                      return (
+                        <MetricStrip
+                          key={card.id}
+                          {...card}
+                          currentTheme={currentTheme}
+                          onEdit={handleCardEdit}
+                          onDelete={handleCardDelete}
+                          onMove={handleCardMove}
+                          onResize={handleCardResize}
+                          isEditing={isEditing}
+                          setIsEditing={setIsEditing}
+                          isSelected={selectedElement === card.id || isComponentSelected}
+                          onSelect={(e) => handleComponentClick(card.id, e || {})}
+                        />
+                      );
+                    }
+
+                    if (card.type === 'image-slot') {
+                      return (
+                        <ImageSlot
+                          key={card.id}
+                          {...card}
+                          currentTheme={currentTheme}
+                          onEdit={handleCardEdit}
+                          onDelete={handleCardDelete}
+                          onMove={handleCardMove}
+                          onResize={handleCardResize}
+                          isEditing={isEditing}
+                          setIsEditing={setIsEditing}
+                          isSelected={selectedElement === card.id || isComponentSelected}
+                          onSelect={(e) => handleComponentClick(card.id, e || {})}
+                        />
+                      );
+                    }
+
                     if (card.type === 'image') {
                       return null;
                     }
@@ -1461,10 +1874,11 @@ const DashboardCanvasContent = () => {
                       onDelete={handleImageDelete}
                       isSelected={selectedElement === image.id}
                       onSelect={() => setSelectedElement(image.id)}
+                      showOverlay={(thumbnailOverlayEnabled && image.isYouTubeThumbnail) || (socialPostOverlayEnabled && image.isSocialPost)}
                     />
                   ))}
 
-                  {cards.filter(card => card.type === 'image').map(image => (
+                  {cards.filter(card => card.type === 'image' && (showBottomLogo || card.id !== 'matrix-logo-bottom')).map(image => (
                     <img
                       key={image.id}
                       src={image.src}

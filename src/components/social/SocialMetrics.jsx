@@ -130,7 +130,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                     createdAt: item.created_at || '',
                     permalink: item.permalink || '',
                     mediaType: item.media_type || '',
-                    impressions: current.impressions_unique || current.reach || current.impressions || 0,
+                    impressions: platform === 'facebook'
+                        ? (current.views || current.impressions_unique || 0)
+                        : (current.impressions_unique || current.reach || current.impressions || 0),
+                    reach: current.reach || current.impressions_unique || 0,
                     engagements: current.engagements || current.total_interactions || 0,
                     engagementRate: current.engagement_rate || 0,
                     clicks: current.clicks || 0,
@@ -403,8 +406,11 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
 
     const exportToCSV = () => {
         const isIg = platform === 'instagram';
+        const isFbExport = platform === 'facebook';
         const headers = isIg
             ? ['Text', 'Channel', 'Date', 'Reach', 'Interactions', 'Eng. Rate', 'Likes']
+            : isFbExport
+            ? ['Text', 'Channel', 'Date', 'Views', 'Engagements', 'Eng. Rate', 'Clicks']
             : ['Text', 'Channel', 'Date', 'Impressions', 'Engagements', 'Eng. Rate', 'Clicks'];
 
         const rows = filteredData.map(item => [
@@ -449,6 +455,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const lastUpdated = platformData.last_updated;
 
     const isIg = platform === 'instagram';
+    const isFb = platform === 'facebook';
     const lastColField = isIg ? 'reactions' : 'clicks';
 
     const renderSortIndicator = (column) => {
@@ -530,7 +537,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalPosts)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">{isIg ? 'Reach' : 'Impressions'}</div>
+                        <div className="metric-summary-label">{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalImpressions)}</div>
                     </div>
                     <div className="metric-summary-card">
@@ -699,7 +706,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                             Date {renderSortIndicator('createdAt')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('impressions')}>
-                                            {isIg ? 'Reach' : 'Impressions'} {renderSortIndicator('impressions')}
+                                            {isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'} {renderSortIndicator('impressions')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('engagements')}>
                                             {isIg ? 'Interactions' : 'Engagements'} {renderSortIndicator('engagements')}
@@ -948,9 +955,15 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
 
                             <div className="social-modal-metrics-top">
                                 <div className="social-metric-card large-card">
-                                    <div className="metric-label">{isIg ? 'Reach' : 'Impressions'}</div>
+                                    <div className="metric-label">{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</div>
                                     <div className="metric-value">{formatNumber(selectedPost.impressions)}</div>
                                 </div>
+                                {isFb && (
+                                    <div className="social-metric-card large-card">
+                                        <div className="metric-label">Reach</div>
+                                        <div className="metric-value">{formatNumber(selectedPost.reach)}</div>
+                                    </div>
+                                )}
                                 <div className="social-metric-card large-card">
                                     <div className="metric-label">{isIg ? 'Interactions' : 'Engagements'}</div>
                                     <div className="metric-value">{formatNumber(selectedPost.engagements)}</div>
@@ -1045,7 +1058,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
-                                                    <th>{isIg ? 'Reach' : 'Impressions'}</th>
+                                                    <th>{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</th>
                                                     <th>{isIg ? 'Interactions' : 'Engagements'}</th>
                                                     <th>{isIg ? 'Likes' : 'Reactions'}</th>
                                                     <th>Comments</th>
@@ -1056,7 +1069,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                                 {selectedPost.dailyDeltas.slice().reverse().slice(0, 30).map((delta, idx) => (
                                                     <tr key={idx}>
                                                         <td>{formatDate(delta.date)}</td>
-                                                        <td>{formatNumber(delta.impressions_unique || delta.reach || 0)}</td>
+                                                        <td>{formatNumber(isFb ? (delta.views || delta.impressions_unique || 0) : (delta.impressions_unique || delta.reach || 0))}</td>
                                                         <td>{formatNumber(delta.engagements || delta.total_interactions || 0)}</td>
                                                         <td>{formatNumber(isIg ? (delta.likes || 0) : (delta.reactions_total || delta.reactions || 0))}</td>
                                                         <td>{formatNumber(delta.comments || 0)}</td>

@@ -36,7 +36,8 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
         'NPPA': '#8b5cf6',
     };
 
-    const LINKEDIN_BLOB_URL = '';
+    const LINKEDIN_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/linkedin_profile_metrics.json?sp=r&st=2026-03-03T19:38:32Z&se=2027-08-05T02:53:32Z&spr=https&sv=2024-11-04&sr=b&sig=gCWLltCNiATBL6XysEg4WNh4JW%2FMD%2B16BkTt8jOP914%3D';
+    const LINKEDIN_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/linkedin_engagement_metrics.json?sp=r&st=2026-03-03T19:33:54Z&se=2028-03-22T02:48:54Z&spr=https&sv=2024-11-04&sr=b&sig=rAHmId4vA4G20FmRltPMwqoFMmpmQEmD1Y8CbUsZiU0%3D';
     const FB_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_profile_metrics.json?sp=r&st=2026-02-18T21:02:49Z&se=2028-05-21T04:17:49Z&spr=https&sv=2024-11-04&sr=b&sig=uE7Yej8V8qJ6W3FKIzWkexVON7c074h9Xnkd1RWqOPE%3D';
     const FB_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_engagement_metrics.json?sp=r&st=2026-02-18T21:03:59Z&se=2028-05-17T04:18:59Z&spr=https&sv=2024-11-04&sr=b&sig=mZyVxrFi1U5Z234HHVICAxysq73m14Jpm3r%2BzCOzvKs%3D';
     const IG_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_profile_metrics.json?sp=r&st=2026-02-18T21:03:17Z&se=2028-05-27T04:18:17Z&spr=https&sv=2024-11-04&sr=b&sig=Iu%2B57JgpeateOx9zTPFEMnOEUMMFA8JMsXX8OPz5SXY%3D';
@@ -47,9 +48,9 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
             setIsLoading(true);
             const cacheBuster = `&_t=${Date.now()}`;
 
-            if (LINKEDIN_BLOB_URL) {
+            if (LINKEDIN_ENGAGEMENT_BLOB_URL) {
                 try {
-                    const res = await fetch(LINKEDIN_BLOB_URL + cacheBuster);
+                    const res = await fetch(LINKEDIN_ENGAGEMENT_BLOB_URL + cacheBuster);
                     if (res.ok) setLinkedinData(await res.json());
                 } catch (error) { }
             }

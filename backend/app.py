@@ -39,6 +39,8 @@ from routes.validation_flags import validation_flags_bp
 from routes.tracking import tracking_bp
 from routes.ab_testing import ab_testing_bp
 from routes.journal_cover import journal_cover_bp
+from routes.programs import programs_bp
+from routes.print_lists import print_lists_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
@@ -57,6 +59,8 @@ app.register_blueprint(validation_flags_bp, url_prefix='/api/validation-flags')
 app.register_blueprint(tracking_bp, url_prefix='/api/t')
 app.register_blueprint(ab_testing_bp, url_prefix='/api/ab-testing')
 app.register_blueprint(journal_cover_bp, url_prefix='/api/journal-cover')
+app.register_blueprint(programs_bp, url_prefix='/api/programs')
+app.register_blueprint(print_lists_bp, url_prefix='/api/print-lists')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

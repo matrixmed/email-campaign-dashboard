@@ -7,7 +7,8 @@ import '../../styles/DashboardBuilder.css';
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 const YOUTUBE_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/youtube_metrics.json?sp=r&st=2026-01-23T22:10:53Z&se=2028-02-03T06:25:53Z&spr=https&sv=2024-11-04&sr=b&sig=5a4p0mFtPn4d9In830LMCQOJlaqkcuPCt7okIDLSHBA%3D";
 
-const LINKEDIN_BLOB_URL = '';
+const LI_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/linkedin_profile_metrics.json?sp=r&st=2026-03-03T19:38:32Z&se=2027-08-05T02:53:32Z&spr=https&sv=2024-11-04&sr=b&sig=gCWLltCNiATBL6XysEg4WNh4JW%2FMD%2B16BkTt8jOP914%3D';
+const LI_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/linkedin_engagement_metrics.json?sp=r&st=2026-03-03T19:33:54Z&se=2028-03-22T02:48:54Z&spr=https&sv=2024-11-04&sr=b&sig=rAHmId4vA4G20FmRltPMwqoFMmpmQEmD1Y8CbUsZiU0%3D';
 const FB_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_profile_metrics.json?sp=r&st=2026-02-18T21:02:49Z&se=2028-05-21T04:17:49Z&spr=https&sv=2024-11-04&sr=b&sig=uE7Yej8V8qJ6W3FKIzWkexVON7c074h9Xnkd1RWqOPE%3D';
 const FB_ENGAGEMENT_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/facebook_engagement_metrics.json?sp=r&st=2026-02-18T21:03:59Z&se=2028-05-17T04:18:59Z&spr=https&sv=2024-11-04&sr=b&sig=mZyVxrFi1U5Z234HHVICAxysq73m14Jpm3r%2BzCOzvKs%3D';
 const IG_PROFILE_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/instagram_profile_metrics.json?sp=r&st=2026-02-18T21:03:17Z&se=2028-05-27T04:18:17Z&spr=https&sv=2024-11-04&sr=b&sig=Iu%2B57JgpeateOx9zTPFEMnOEUMMFA8JMsXX8OPz5SXY%3D';
@@ -123,6 +124,8 @@ const ComponentSidebar = ({
   const [savedDashboards, setSavedDashboards] = useState([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
   const [archiveSearchTerm, setArchiveSearchTerm] = useState('');
+  const [loadingDashboardId, setLoadingDashboardId] = useState(null);
+  const [deletingDashboardId, setDeletingDashboardId] = useState(null);
 
   const [walsworthData, setWalsworthData] = useState([]);
   const [selectedPublication, setSelectedPublication] = useState(null);
@@ -137,8 +140,8 @@ const ComponentSidebar = ({
   const [excludedVideoIds, setExcludedVideoIds] = useState(new Set());
   const [showVideoDropdown, setShowVideoDropdown] = useState(false);
 
-  const [socialData, setSocialData] = useState({ facebook: {}, instagram: {} });
-  const [enabledPlatforms, setEnabledPlatforms] = useState(new Set(['facebook', 'instagram']));
+  const [socialData, setSocialData] = useState({ facebook: {}, instagram: {}, linkedin: {} });
+  const [enabledPlatforms, setEnabledPlatforms] = useState(new Set(['facebook', 'instagram', 'linkedin']));
   const [selectedPostIds, setSelectedPostIds] = useState(new Set());
   const [showSocialPostDropdown, setShowSocialPostDropdown] = useState(false);
   const [socialPostSearchTerm, setSocialPostSearchTerm] = useState('');
@@ -148,7 +151,7 @@ const ComponentSidebar = ({
   useEffect(() => {
     async function fetchYoutubeData() {
       try {
-        const response = await fetch(YOUTUBE_BLOB_URL);
+        const response = await fetch(`${YOUTUBE_BLOB_URL}&_t=${Date.now()}`);
         const data = await response.json();
         setYoutubeData(data);
       } catch (error) {
@@ -161,8 +164,8 @@ const ComponentSidebar = ({
     async function fetchSocialData() {
       try {
         const [fbProfileRes, fbEngagementRes] = await Promise.all([
-          FB_PROFILE_BLOB_URL ? fetch(FB_PROFILE_BLOB_URL) : Promise.resolve(null),
-          FB_ENGAGEMENT_BLOB_URL ? fetch(FB_ENGAGEMENT_BLOB_URL) : Promise.resolve(null),
+          FB_PROFILE_BLOB_URL ? fetch(`${FB_PROFILE_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
+          FB_ENGAGEMENT_BLOB_URL ? fetch(`${FB_ENGAGEMENT_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
         ]);
         const fbProfile = fbProfileRes?.ok ? await fbProfileRes.json() : {};
         const fbEngagement = fbEngagementRes?.ok ? await fbEngagementRes.json() : {};
@@ -173,8 +176,8 @@ const ComponentSidebar = ({
         });
 
         const [igProfileRes, igEngagementRes] = await Promise.all([
-          IG_PROFILE_BLOB_URL ? fetch(IG_PROFILE_BLOB_URL) : Promise.resolve(null),
-          IG_ENGAGEMENT_BLOB_URL ? fetch(IG_ENGAGEMENT_BLOB_URL) : Promise.resolve(null),
+          IG_PROFILE_BLOB_URL ? fetch(`${IG_PROFILE_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
+          IG_ENGAGEMENT_BLOB_URL ? fetch(`${IG_ENGAGEMENT_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
         ]);
         const igProfile = igProfileRes?.ok ? await igProfileRes.json() : {};
         const igEngagement = igEngagementRes?.ok ? await igEngagementRes.json() : {};
@@ -184,7 +187,19 @@ const ComponentSidebar = ({
           igMerged.companies[key] = { ...(igProfile.companies || {})[key], ...(igEngagement.companies || {})[key] };
         });
 
-        setSocialData({ facebook: fbMerged, instagram: igMerged });
+        const [liProfileRes, liEngagementRes] = await Promise.all([
+          LI_PROFILE_BLOB_URL ? fetch(`${LI_PROFILE_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
+          LI_ENGAGEMENT_BLOB_URL ? fetch(`${LI_ENGAGEMENT_BLOB_URL}&_t=${Date.now()}`) : Promise.resolve(null),
+        ]);
+        const liProfile = liProfileRes?.ok ? await liProfileRes.json() : {};
+        const liEngagement = liEngagementRes?.ok ? await liEngagementRes.json() : {};
+        const liMerged = { companies: {} };
+        const liKeys = new Set([...Object.keys(liProfile.companies || {}), ...Object.keys(liEngagement.companies || {})]);
+        liKeys.forEach(key => {
+          liMerged.companies[key] = { ...(liProfile.companies || {})[key], ...(liEngagement.companies || {})[key] };
+        });
+
+        setSocialData({ facebook: fbMerged, instagram: igMerged, linkedin: liMerged });
       } catch (error) {
       }
     }
@@ -201,13 +216,30 @@ const ComponentSidebar = ({
     })).sort((a, b) => b.itemCount - a.itemCount);
   }, [youtubeData]);
 
+  const allYoutubeVideos = useMemo(() => {
+    const videosObj = youtubeData.videos || {};
+    return Object.entries(videosObj).map(([vid, video]) => {
+      const current = video.current || {};
+      return {
+        id: vid,
+        title: video.title || 'Untitled',
+        views: current.views || 0,
+        totalWatchTimeSeconds: (current.watchTimeHours || (current.estimatedMinutesWatched || 0) / 60) * 3600,
+        avgPercentWatched: current.averageViewPercentage || 0,
+        publishedAt: video.publishedAt || null
+      };
+    }).sort((a, b) => b.views - a.views);
+  }, [youtubeData]);
+
   const selectedPlaylist = useMemo(() => {
     if (!selectedPlaylistId) return null;
+    if (selectedPlaylistId === 'all-videos') return { id: 'all-videos', title: 'All Videos', itemCount: allYoutubeVideos.length, videoIds: [] };
     return youtubePlaylistsList.find(pl => pl.id === selectedPlaylistId) || null;
-  }, [selectedPlaylistId, youtubePlaylistsList]);
+  }, [selectedPlaylistId, youtubePlaylistsList, allYoutubeVideos.length]);
 
   const playlistVideos = useMemo(() => {
     if (!selectedPlaylist) return [];
+    if (selectedPlaylistId === 'all-videos') return allYoutubeVideos;
     const videosObj = youtubeData.videos || {};
     return selectedPlaylist.videoIds
       .map(vid => {
@@ -224,7 +256,7 @@ const ComponentSidebar = ({
         };
       })
       .filter(Boolean);
-  }, [selectedPlaylist, youtubeData]);
+  }, [selectedPlaylist, selectedPlaylistId, allYoutubeVideos, youtubeData]);
 
   const videoAggregateMetrics = useMemo(() => {
     if (!playlistVideos.length) return { totalWatchTime: 0, avgPercentWatched: 0, totalViews: 0, mostWatchedVideo: '' };
@@ -262,7 +294,11 @@ const ComponentSidebar = ({
             createdAt: item.created_at || '',
             permalink: item.permalink || '',
             mediaType: item.media_type || '',
-            impressions: current.impressions_unique || current.reach || current.impressions || 0,
+            impressions: platform === 'facebook'
+              ? (current.views || current.impressions_unique || 0)
+              : platform === 'instagram'
+              ? (current.views || current.reach || 0)
+              : (current.impressions || 0),
             engagements: current.engagements || current.total_interactions || 0,
             engagementRate: current.engagement_rate || 0,
             clicks: current.clicks || 0,
@@ -287,18 +323,17 @@ const ComponentSidebar = ({
 
   const socialAggregateMetrics = useMemo(() => {
     if (!activeSocialPosts.length) return {
-      totalImpressions: 0, totalEngagements: 0, avgEngagementRate: 0,
-      totalReactions: 0, totalComments: 0, totalShares: 0, totalClicks: 0, mostEngagedPost: ''
+      totalImpressions: 0, totalEngagements: 0, engRate: 0,
+      totalClicks: 0, clickRate: 0
     };
     const totalImpressions = activeSocialPosts.reduce((sum, p) => sum + p.impressions, 0);
     const totalEngagements = activeSocialPosts.reduce((sum, p) => sum + p.engagements, 0);
-    const avgEngagementRate = activeSocialPosts.reduce((sum, p) => sum + p.engagementRate, 0) / activeSocialPosts.length;
-    const totalReactions = activeSocialPosts.reduce((sum, p) => sum + p.reactions, 0);
-    const totalComments = activeSocialPosts.reduce((sum, p) => sum + p.comments, 0);
-    const totalShares = activeSocialPosts.reduce((sum, p) => sum + p.reposts, 0);
-    const totalClicks = activeSocialPosts.reduce((sum, p) => sum + p.clicks, 0);
-    const mostEngaged = activeSocialPosts.reduce((best, p) => p.engagements > best.engagements ? p : best, activeSocialPosts[0]);
-    return { totalImpressions, totalEngagements, avgEngagementRate, totalReactions, totalComments, totalShares, totalClicks, mostEngagedPost: mostEngaged.text };
+    const engRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+    const clickPosts = activeSocialPosts.filter(p => p.platform === 'facebook' || p.platform === 'linkedin');
+    const totalClicks = clickPosts.reduce((sum, p) => sum + p.clicks, 0);
+    const clickImpressions = clickPosts.reduce((sum, p) => sum + p.impressions, 0);
+    const clickRate = clickImpressions > 0 ? (totalClicks / clickImpressions) * 100 : 0;
+    return { totalImpressions, totalEngagements, engRate, totalClicks, clickRate };
   }, [activeSocialPosts]);
 
   const togglePlatform = useCallback((platform) => {
@@ -360,8 +395,13 @@ const ComponentSidebar = ({
   const handleSelectPlaylist = useCallback((playlist) => {
     setSelectedPlaylistId(playlist.id);
     setShowPlaylistSelector(false);
-    setExcludedVideoIds(new Set());
-  }, []);
+    if (playlist.id === 'all-videos') {
+      const allIds = Object.keys(youtubeData.videos || {});
+      setExcludedVideoIds(new Set(allIds));
+    } else {
+      setExcludedVideoIds(new Set());
+    }
+  }, [youtubeData]);
 
   const rankedPlaylists = useMemo(() => {
     if (!effectiveCampaignName || youtubePlaylistsList.length === 0) {
@@ -427,7 +467,7 @@ const ComponentSidebar = ({
   useEffect(() => {
     async function fetchWalsworthData() {
       try {
-        const response = await fetch(WALSWORTH_BLOB_URL);
+        const response = await fetch(`${WALSWORTH_BLOB_URL}&_t=${Date.now()}`);
         const data = await response.json();
         if (data.issues) {
           setWalsworthData(data.issues);
@@ -1454,7 +1494,7 @@ const ComponentSidebar = ({
                           <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                             <input
                               type="text"
-                              placeholder="Search issues..."
+                              placeholder="Search issues"
                               value={issueSearchTerm}
                               onChange={(e) => setIssueSearchTerm(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
@@ -1724,6 +1764,30 @@ const ComponentSidebar = ({
                           Select a YouTube Playlist:
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', maxHeight: '250px', overflow: 'auto', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                          <div
+                            onClick={() => handleSelectPlaylist({ id: 'all-videos', title: 'All Videos', itemCount: allYoutubeVideos.length, videoIds: [] })}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'rgba(168, 85, 247, 0.1)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'; }}
+                          >
+                            <span style={{ color: '#c084fc', fontSize: '12px', flex: 1, fontWeight: '600' }}>All Videos</span>
+                            <span style={{
+                              fontSize: '10px',
+                              color: 'rgba(192, 132, 252, 0.8)',
+                              background: 'rgba(168, 85, 247, 0.15)',
+                              padding: '2px 6px',
+                              borderRadius: '4px'
+                            }}>{allYoutubeVideos.length} videos</span>
+                          </div>
                           {rankedPlaylists.topMatches.length > 0 && (
                             <>
                               <div style={{
@@ -1894,6 +1958,43 @@ const ComponentSidebar = ({
                                 maxHeight: '300px',
                                 overflow: 'auto'
                               }}>
+                                <div
+                                  onClick={() => handleSelectPlaylist({ id: 'all-videos', title: 'All Videos', itemCount: allYoutubeVideos.length, videoIds: [] })}
+                                  style={{
+                                    padding: '10px 12px',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                                    background: selectedPlaylistId === 'all-videos' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(168, 85, 247, 0.05)',
+                                    transition: 'background 0.15s ease'
+                                  }}
+                                  onMouseOver={(e) => {
+                                    if (selectedPlaylistId !== 'all-videos') e.currentTarget.style.background = 'rgba(168, 85, 247, 0.15)';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    if (selectedPlaylistId !== 'all-videos') e.currentTarget.style.background = 'rgba(168, 85, 247, 0.05)';
+                                  }}
+                                >
+                                  <div style={{
+                                    color: '#c084fc',
+                                    fontSize: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    fontWeight: '600'
+                                  }}>
+                                    <span style={{ flex: 1 }}>All Videos</span>
+                                    {selectedPlaylistId === 'all-videos' && (
+                                      <span style={{ color: '#c084fc', fontSize: '10px' }}>{'\u2713'}</span>
+                                    )}
+                                    <span style={{
+                                      fontSize: '10px',
+                                      color: 'rgba(192, 132, 252, 0.8)',
+                                      background: 'rgba(168, 85, 247, 0.15)',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px'
+                                    }}>{allYoutubeVideos.length} videos</span>
+                                  </div>
+                                </div>
                                 {rankedPlaylists.topMatches.length > 0 && (
                                   <div>
                                     <div style={{
@@ -2057,7 +2158,7 @@ const ComponentSidebar = ({
                               <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                                 <input
                                   type="text"
-                                  placeholder="Search videos..."
+                                  placeholder="Search videos"
                                   value={videoSearchTerm}
                                   onChange={(e) => setVideoSearchTerm(e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
@@ -2420,7 +2521,7 @@ const ComponentSidebar = ({
                           <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                             <input
                               type="text"
-                              placeholder="Search posts..."
+                              placeholder="Search posts"
                               value={socialPostSearchTerm}
                               onChange={(e) => setSocialPostSearchTerm(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
@@ -2548,13 +2649,11 @@ const ComponentSidebar = ({
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {[
-                        { label: 'Total Impressions', value: socialAggregateMetrics.totalImpressions.toLocaleString(), key: 'totalImpressions' },
-                        { label: 'Total Engagements', value: socialAggregateMetrics.totalEngagements.toLocaleString(), key: 'totalEngagements' },
-                        { label: 'Avg Engagement Rate', value: `${socialAggregateMetrics.avgEngagementRate.toFixed(2)}%`, key: 'avgEngagementRate' },
-                        { label: 'Total Reactions', value: socialAggregateMetrics.totalReactions.toLocaleString(), key: 'totalReactions' },
-                        { label: 'Total Comments', value: socialAggregateMetrics.totalComments.toLocaleString(), key: 'totalComments' },
-                        { label: 'Total Shares', value: socialAggregateMetrics.totalShares.toLocaleString(), key: 'totalShares' },
-                        { label: 'Most Engaged Post', value: socialAggregateMetrics.mostEngagedPost ? (socialAggregateMetrics.mostEngagedPost.length > 40 ? socialAggregateMetrics.mostEngagedPost.slice(0, 40) + '...' : socialAggregateMetrics.mostEngagedPost) : 'N/A', key: 'mostEngagedPost' }
+                        { label: 'Impressions', value: socialAggregateMetrics.totalImpressions.toLocaleString(), key: 'totalImpressions' },
+                        { label: 'Engagements', value: socialAggregateMetrics.totalEngagements.toLocaleString(), key: 'totalEngagements' },
+                        { label: 'Engagement Rate', value: `${socialAggregateMetrics.engRate.toFixed(2)}%`, key: 'engRate' },
+                        { label: 'Clicks', value: socialAggregateMetrics.totalClicks.toLocaleString(), key: 'totalClicks' },
+                        { label: 'CTR', value: `${socialAggregateMetrics.clickRate.toFixed(2)}%`, key: 'clickRate' }
                       ].map(metric => (
                         <div key={metric.key} style={{
                           display: 'flex',
@@ -2569,11 +2668,7 @@ const ComponentSidebar = ({
                             <span style={{
                               color: 'white',
                               fontWeight: '600',
-                              fontSize: metric.key === 'mostEngagedPost' ? '11px' : '13px',
-                              maxWidth: metric.key === 'mostEngagedPost' ? '100px' : 'none',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
+                              fontSize: '13px'
                             }}>
                               {metric.value}
                             </span>
@@ -3088,7 +3183,7 @@ const ComponentSidebar = ({
                 </h3>
                 <input
                   type="text"
-                  placeholder="Search dashboards..."
+                  placeholder="Search dashboards"
                   value={archiveSearchTerm}
                   onChange={(e) => setArchiveSearchTerm(e.target.value)}
                   style={{
@@ -3174,22 +3269,34 @@ const ComponentSidebar = ({
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                          onClick={() => onRestoreDashboard?.(dashboard.id)}
+                          disabled={loadingDashboardId === dashboard.id}
+                          onClick={async () => {
+                            setLoadingDashboardId(dashboard.id);
+                            try {
+                              await onRestoreDashboard?.(dashboard.id);
+                            } finally {
+                              setLoadingDashboardId(null);
+                            }
+                          }}
                           style={{
                             flex: 1,
                             padding: '6px 12px',
-                            background: 'rgba(99, 102, 241, 0.2)',
+                            background: loadingDashboardId === dashboard.id ? 'rgba(99, 102, 241, 0.4)' : 'rgba(99, 102, 241, 0.2)',
                             border: '1px solid rgba(99, 102, 241, 0.4)',
                             borderRadius: '4px',
                             color: 'white',
                             fontSize: '12px',
-                            cursor: 'pointer'
+                            cursor: loadingDashboardId === dashboard.id ? 'wait' : 'pointer',
+                            opacity: loadingDashboardId === dashboard.id ? 0.7 : 1,
+                            transition: 'all 0.2s ease'
                           }}
                         >
-                          Load
+                          {loadingDashboardId === dashboard.id ? 'Loading...' : 'Load'}
                         </button>
                         <button
+                          disabled={deletingDashboardId === dashboard.id}
                           onClick={async () => {
+                            setDeletingDashboardId(dashboard.id);
                             try {
                               const response = await fetch(`${API_BASE_URL}/api/dashboards/${dashboard.id}`, {
                                 method: 'DELETE'
@@ -3199,19 +3306,23 @@ const ComponentSidebar = ({
                                 fetchSavedDashboards();
                               }
                             } catch (error) {
+                            } finally {
+                              setDeletingDashboardId(null);
                             }
                           }}
                           style={{
                             padding: '6px 12px',
-                            background: 'rgba(239, 68, 68, 0.2)',
+                            background: deletingDashboardId === dashboard.id ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.2)',
                             border: '1px solid rgba(239, 68, 68, 0.4)',
                             borderRadius: '4px',
                             color: 'white',
                             fontSize: '12px',
-                            cursor: 'pointer'
+                            cursor: deletingDashboardId === dashboard.id ? 'wait' : 'pointer',
+                            opacity: deletingDashboardId === dashboard.id ? 0.7 : 1,
+                            transition: 'all 0.2s ease'
                           }}
                         >
-                          Delete
+                          {deletingDashboardId === dashboard.id ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </div>

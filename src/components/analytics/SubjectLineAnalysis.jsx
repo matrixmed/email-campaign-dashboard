@@ -6,8 +6,6 @@ import { stripAbGroup } from '../../utils/campaignClassifier';
 
 const BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D";
 
-const INITIAL_ROWS = 25;
-
 const getBaseName = (name) => {
   return stripAbGroup(
     name
@@ -17,13 +15,132 @@ const getBaseName = (name) => {
   ).trim();
 };
 
+const getCharLengthBucket = (len) => {
+  if (len <= 15) return '1–15';
+  if (len <= 30) return '16–30';
+  if (len <= 45) return '31–45';
+  if (len <= 60) return '46–60';
+  if (len <= 75) return '61–75';
+  return '76+';
+};
+
+const getReadabilityBucket = (subject) => {
+  const words = subject.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return '< 4';
+  const avgLen = words.reduce((sum, w) => sum + w.replace(/[^a-zA-Z]/g, '').length, 0) / words.length;
+  if (avgLen < 4) return '< 4';
+  if (avgLen < 5) return '4 – 5';
+  if (avgLen < 6) return '5 – 6';
+  if (avgLen < 7) return '6 – 7';
+  if (avgLen < 8) return '7 – 8';
+  return '8+';
+};
+
+const ACTION_VERBS = ['discover', 'explore', 'learn', 'understand', 'join', 'watch', 'see', 'hear', 'read', 'get', 'find', 'unlock', 'uncover', 'review', 'examine', 'check', 'start', 'meet', 'take', 'navigate', 'optimize', 'improve', 'manage', 'address', 'consider', 'identify', 'evaluate', 'register'];
+const URGENCY_WORDS = ['now', 'new', 'coming soon', 'latest', 'just released', 'don\'t miss', 'limited', 'breaking', 'update', 'alert', 'today', 'available now'];
+
+const getStructuralTraits = (subject) => {
+  const lower = subject.toLowerCase();
+  const firstWord = lower.split(/\s+/)[0]?.replace(/[^a-z]/g, '') || '';
+  const traits = {};
+
+  traits['Action verb opener'] = ACTION_VERBS.includes(firstWord);
+  traits['Urgency words'] = URGENCY_WORDS.some(w => lower.includes(w));
+  traits['Question mark'] = subject.includes('?');
+  traits['Em/en dash'] = /[\u2013\u2014]/.test(subject) || / - /.test(subject);
+  traits['Parenthetical'] = /\(.*\)/.test(subject);
+  traits['Trademark symbols'] = /[\u00AE\u2122\u00A9]/.test(subject) || /®|™/.test(subject);
+  traits['ALL CAPS word'] = /\b[A-Z]{2,}\b/.test(subject.replace(/\b(MD|PhD|DO|NP|PA|RN|US|FDA|MOA)\b/g, ''));
+  traits['Colon separator'] = subject.includes(':');
+  traits['Number/stat'] = /\d/.test(subject);
+
+  return traits;
+};
+
+const computeAnalysis = (subjects) => {
+  const overallAvg = subjects.length > 0
+    ? subjects.reduce((sum, s) => sum + s.open_rate, 0) / subjects.length : 0;
+
+  const charBucketOrder = ['1–15', '16–30', '31–45', '46–60', '61–75', '76+'];
+  const charBuckets = {};
+  charBucketOrder.forEach(b => { charBuckets[b] = { rates: [], count: 0 }; });
+  for (const s of subjects) {
+    charBuckets[s.char_bucket].rates.push(s.open_rate);
+    charBuckets[s.char_bucket].count++;
+  }
+  const charAnalysis = charBucketOrder.map(b => ({
+    bucket: b,
+    count: charBuckets[b].count,
+    avg_rate: charBuckets[b].count > 0 ? Math.round((charBuckets[b].rates.reduce((a, c) => a + c, 0) / charBuckets[b].count) * 100) / 100 : 0
+  }));
+
+  const readBucketOrder = ['< 4', '4 – 5', '5 – 6', '6 – 7', '7 – 8', '8+'];
+  const readBuckets = {};
+  readBucketOrder.forEach(b => { readBuckets[b] = { rates: [], count: 0 }; });
+  for (const s of subjects) {
+    readBuckets[s.readability].rates.push(s.open_rate);
+    readBuckets[s.readability].count++;
+  }
+  const readabilityAnalysis = readBucketOrder.map(b => ({
+    bucket: b,
+    count: readBuckets[b].count,
+    avg_rate: readBuckets[b].count > 0 ? Math.round((readBuckets[b].rates.reduce((a, c) => a + c, 0) / readBuckets[b].count) * 100) / 100 : 0
+  }));
+
+  const wcMap = {};
+  for (const s of subjects) {
+    const wc = s.word_count;
+    if (!wcMap[wc]) wcMap[wc] = { rates: [], count: 0 };
+    wcMap[wc].rates.push(s.open_rate);
+    wcMap[wc].count++;
+  }
+  const wcKeys = Object.keys(wcMap).map(Number).sort((a, b) => a - b);
+  const minWc = wcKeys[0] || 1;
+  const maxWc = wcKeys[wcKeys.length - 1] || 1;
+  const wordAnalysis = [];
+  for (let wc = minWc; wc <= maxWc; wc++) {
+    const entry = wcMap[wc];
+    wordAnalysis.push({
+      bucket: `${wc}`,
+      count: entry?.count || 0,
+      avg_rate: entry?.count > 0 ? Math.round((entry.rates.reduce((a, c) => a + c, 0) / entry.count) * 100) / 100 : 0
+    });
+  }
+
+  const traitKeys = ['Action verb opener', 'Urgency words', 'Question mark', 'Em/en dash', 'Parenthetical', 'Trademark symbols', 'ALL CAPS word', 'Colon separator', 'Number/stat'];
+  const traitImpact = traitKeys.map(trait => {
+    const withTrait = subjects.filter(s => s.traits[trait]);
+    const withoutTrait = subjects.filter(s => !s.traits[trait]);
+    const avgWith = withTrait.length > 0 ? withTrait.reduce((sum, s) => sum + s.open_rate, 0) / withTrait.length : 0;
+    const avgWithout = withoutTrait.length > 0 ? withoutTrait.reduce((sum, s) => sum + s.open_rate, 0) / withoutTrait.length : 0;
+    return {
+      trait,
+      count_with: withTrait.length,
+      avg_with: Math.round(avgWith * 100) / 100,
+      avg_without: Math.round(avgWithout * 100) / 100,
+      impact_pp: Math.round((avgWith - avgWithout) * 100) / 100
+    };
+  }).sort((a, b) => Math.abs(b.impact_pp) - Math.abs(a.impact_pp));
+
+  return {
+    subjects,
+    overallAvg: Math.round(overallAvg * 100) / 100,
+    charAnalysis,
+    wordAnalysis,
+    traitImpact,
+    readabilityAnalysis,
+    summary: {
+      total_subjects: subjects.length,
+      avg_open_rate: Math.round(overallAvg * 100) / 100,
+      avg_word_count: subjects.length > 0 ? Math.round((subjects.reduce((a, s) => a + s.word_count, 0) / subjects.length) * 10) / 10 : 0
+    }
+  };
+};
+
 const SubjectLineAnalysis = ({ searchTerm = '' }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('insights');
-  const [showMoreSubjects, setShowMoreSubjects] = useState(false);
-  const [showMoreKeywords, setShowMoreKeywords] = useState(false);
 
   useEffect(() => {
     fetchAndAnalyze();
@@ -33,7 +150,7 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(BLOB_URL);
+      const response = await fetch(`${BLOB_URL}&_t=${Date.now()}`);
       if (!response.ok) throw new Error(`Error: ${response.status}`);
       const campaigns = await response.json();
 
@@ -46,16 +163,6 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
       }
 
       const subjects = [];
-      const firstWordCounts = {};
-      const wordCountBuckets = { '1-3': { count: 0, total: 0 }, '4-6': { count: 0, total: 0 }, '7-9': { count: 0, total: 0 }, '10-12': { count: 0, total: 0 }, '13+': { count: 0, total: 0 } };
-      const structureStats = {
-        question: { count: 0, total: 0 }, statement: { count: 0, total: 0 },
-        with_number: { count: 0, total: 0 }, without_number: { count: 0, total: 0 },
-        with_colon: { count: 0, total: 0 }, without_colon: { count: 0, total: 0 },
-        personalized: { count: 0, total: 0 }, not_personalized: { count: 0, total: 0 }
-      };
-      const keywordMap = {};
-
       for (const [baseName, deployments] of Object.entries(groups)) {
         const d1 = deployments.find(d =>
           /deployment\s*#?\s*1\s*$/i.test(d.Campaign || '')
@@ -71,87 +178,24 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
 
         const words = subject.split(/\s+/);
         const wc = words.length;
-        const firstWord = words[0] ? words[0].toLowerCase().replace(/[:,!?]+$/, '') : '';
-        const hasQuestion = subject.includes('?');
-        const hasNumber = /\d/.test(subject);
-        const hasColon = subject.includes(':');
-        const lower = subject.toLowerCase();
-        const isPersonalized = lower.includes('your') || lower.includes('you') || lower.includes('dr.');
-
-        const bucket = wc <= 3 ? '1-3' : wc <= 6 ? '4-6' : wc <= 9 ? '7-9' : wc <= 12 ? '10-12' : '13+';
+        const charLen = subject.length;
 
         subjects.push({
-          subject, campaign_name: baseName, sent, delivered,
-          unique_opens: totalOpens, open_rate: openRate, word_count: wc
+          subject,
+          campaign_name: baseName,
+          sent,
+          delivered,
+          unique_opens: totalOpens,
+          open_rate: openRate,
+          word_count: wc,
+          char_length: charLen,
+          char_bucket: getCharLengthBucket(charLen),
+          readability: getReadabilityBucket(subject),
+          traits: getStructuralTraits(subject)
         });
-
-        if (firstWord) {
-          if (!firstWordCounts[firstWord]) firstWordCounts[firstWord] = { count: 0, total: 0 };
-          firstWordCounts[firstWord].count++;
-          firstWordCounts[firstWord].total += openRate;
-        }
-
-        wordCountBuckets[bucket].count++;
-        wordCountBuckets[bucket].total += openRate;
-
-        structureStats[hasQuestion ? 'question' : 'statement'].count++;
-        structureStats[hasQuestion ? 'question' : 'statement'].total += openRate;
-        structureStats[hasNumber ? 'with_number' : 'without_number'].count++;
-        structureStats[hasNumber ? 'with_number' : 'without_number'].total += openRate;
-        structureStats[hasColon ? 'with_colon' : 'without_colon'].count++;
-        structureStats[hasColon ? 'with_colon' : 'without_colon'].total += openRate;
-        structureStats[isPersonalized ? 'personalized' : 'not_personalized'].count++;
-        structureStats[isPersonalized ? 'personalized' : 'not_personalized'].total += openRate;
-
-        for (const w of words) {
-          const kw = w.toLowerCase().replace(/^[,:;!?.()]+|[,:;!?.()]+$/g, '');
-          if (kw.length >= 3) {
-            if (!keywordMap[kw]) keywordMap[kw] = { count: 0, total: 0 };
-            keywordMap[kw].count++;
-            keywordMap[kw].total += openRate;
-          }
-        }
       }
 
-      subjects.sort((a, b) => b.open_rate - a.open_rate);
-
-      const firstWordAnalysis = Object.entries(firstWordCounts)
-        .filter(([, s]) => s.count >= 3)
-        .map(([word, s]) => ({ word, count: s.count, avg_open_rate: Math.round((s.total / s.count) * 100) / 100 }))
-        .sort((a, b) => b.avg_open_rate - a.avg_open_rate)
-        .slice(0, 50);
-
-      const wordCountAnalysis = ['1-3', '4-6', '7-9', '10-12', '13+'].map(b => ({
-        bucket: b, count: wordCountBuckets[b].count,
-        avg_open_rate: wordCountBuckets[b].count > 0 ? Math.round((wordCountBuckets[b].total / wordCountBuckets[b].count) * 100) / 100 : 0
-      }));
-
-      const structureAnalysis = {};
-      for (const [key, s] of Object.entries(structureStats)) {
-        structureAnalysis[key] = { count: s.count, avg_open_rate: s.count > 0 ? Math.round((s.total / s.count) * 100) / 100 : 0 };
-      }
-
-      const keywordAnalysis = Object.entries(keywordMap)
-        .filter(([, s]) => s.count >= 5)
-        .map(([keyword, s]) => ({ keyword, count: s.count, avg_open_rate: Math.round((s.total / s.count) * 100) / 100 }))
-        .sort((a, b) => b.avg_open_rate - a.avg_open_rate)
-        .slice(0, 100);
-
-      const allRates = subjects.map(s => s.open_rate);
-      const summary = {
-        total_subjects: subjects.length,
-        avg_open_rate: allRates.length > 0 ? Math.round((allRates.reduce((a, b) => a + b, 0) / allRates.length) * 100) / 100 : 0,
-        avg_word_count: subjects.length > 0 ? Math.round((subjects.reduce((a, s) => a + s.word_count, 0) / subjects.length) * 10) / 10 : 0
-      };
-
-      setData({
-        subjects: subjects.slice(0, 200),
-        first_word_analysis: firstWordAnalysis,
-        word_count_analysis: wordCountAnalysis,
-        structure_analysis: structureAnalysis,
-        keyword_analysis: keywordAnalysis,
-        summary
-      });
+      setData(computeAnalysis(subjects));
     } catch (err) {
       setError('Failed to load subject line data.');
     } finally {
@@ -159,24 +203,16 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
     }
   };
 
-  const filteredSubjects = useMemo(() => {
-    if (!data?.subjects) return [];
-    if (!searchTerm.trim()) return data.subjects;
-    return data.subjects.filter(s =>
+  const filtered = useMemo(() => {
+    if (!data) return null;
+    if (!searchTerm.trim()) return data;
+
+    const subjects = data.subjects.filter(s =>
       matchesSearchTerm(s.subject, searchTerm) || matchesSearchTerm(s.campaign_name, searchTerm)
     );
-  }, [data, searchTerm]);
+    if (subjects.length === 0) return null;
 
-  const filteredFirstWords = useMemo(() => {
-    if (!data?.first_word_analysis) return [];
-    if (!searchTerm.trim()) return data.first_word_analysis;
-    return data.first_word_analysis.filter(w => matchesSearchTerm(w.word, searchTerm));
-  }, [data, searchTerm]);
-
-  const filteredKeywords = useMemo(() => {
-    if (!data?.keyword_analysis) return [];
-    if (!searchTerm.trim()) return data.keyword_analysis;
-    return data.keyword_analysis.filter(k => matchesSearchTerm(k.keyword, searchTerm));
+    return computeAnalysis(subjects);
   }, [data, searchTerm]);
 
   if (loading) {
@@ -194,45 +230,18 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
     return <div className="sla-container"><div className="sla-empty">{error}</div></div>;
   }
 
-  const summary = data?.summary || {};
-  const wordCountAnalysis = data?.word_count_analysis || [];
-  const structureAnalysis = data?.structure_analysis || {};
+  if (!filtered) {
+    return <div className="sla-container"><div className="sla-empty">No matching subject lines found.</div></div>;
+  }
 
-  const bestWordCount = wordCountAnalysis.reduce((best, wc) =>
-    wc.avg_open_rate > (best?.avg_open_rate || 0) ? wc : best, null);
+  const { overallAvg, charAnalysis, wordAnalysis, traitImpact, readabilityAnalysis, summary } = filtered;
 
-  const renderStructureCard = (title, keyA, keyB, labelA, labelB) => {
-    const a = structureAnalysis[keyA] || { count: 0, avg_open_rate: 0 };
-    const b = structureAnalysis[keyB] || { count: 0, avg_open_rate: 0 };
-    const diff = Math.abs(a.avg_open_rate - b.avg_open_rate).toFixed(1);
-    const winnerA = a.avg_open_rate > b.avg_open_rate;
-    return (
-      <div className="sla-structure-card">
-        <h4>{title}</h4>
-        <div className="sla-structure-comparison">
-          <div className={`sla-structure-item ${winnerA ? 'sla-winner' : ''}`}>
-            <div className="sla-structure-label">{labelA}</div>
-            <div className="sla-structure-rate">{a.avg_open_rate}%</div>
-            <div className="sla-structure-count">{a.count} subjects</div>
-          </div>
-          <div className={`sla-structure-item ${!winnerA ? 'sla-winner' : ''}`}>
-            <div className="sla-structure-label">{labelB}</div>
-            <div className="sla-structure-rate">{b.avg_open_rate}%</div>
-            <div className="sla-structure-count">{b.count} subjects</div>
-          </div>
-        </div>
-        <div className="sla-structure-diff">
-          {winnerA ? labelA : labelB} by {diff}pp
-        </div>
-      </div>
-    );
-  };
-
-  const visibleSubjects = showMoreSubjects ? filteredSubjects : filteredSubjects.slice(0, INITIAL_ROWS);
-  const subjectsRemaining = filteredSubjects.length - INITIAL_ROWS;
-
-  const visibleKeywords = showMoreKeywords ? filteredKeywords : filteredKeywords.slice(0, INITIAL_ROWS);
-  const keywordsRemaining = filteredKeywords.length - INITIAL_ROWS;
+  const bestCharBucket = charAnalysis.filter(b => b.count >= 3).reduce((best, b) => b.avg_rate > (best?.avg_rate || 0) ? b : best, null);
+  const bestReadBucket = readabilityAnalysis.filter(b => b.count >= 3).reduce((best, b) => b.avg_rate > (best?.avg_rate || 0) ? b : best, null);
+  const bestWordCount = wordAnalysis.filter(b => b.count >= 3).reduce((best, b) => b.avg_rate > (best?.avg_rate || 0) ? b : best, null);
+  const maxCharRate = Math.max(...charAnalysis.map(c => c.avg_rate));
+  const maxReadRate = Math.max(...readabilityAnalysis.map(r => r.avg_rate));
+  const maxWordRate = Math.max(...wordAnalysis.filter(w => w.count > 0).map(w => w.avg_rate), 0);
 
   return (
     <div className="sla-container">
@@ -254,125 +263,75 @@ const SubjectLineAnalysis = ({ searchTerm = '' }) => {
         </div>
       </div>
 
-      <div className="viz-tabs">
-        <button className={`viz-tab ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>Insights</button>
-        <button className={`viz-tab ${activeTab === 'subjects' ? 'active' : ''}`} onClick={() => setActiveTab('subjects')}>Subject Lines</button>
-        <button className={`viz-tab ${activeTab === 'keywords' ? 'active' : ''}`} onClick={() => setActiveTab('keywords')}>Keywords</button>
+      <div className="sla-section">
+        <div className="sla-anatomy-grid">
+          <div className="sla-anatomy-card">
+            <h5>Character Length</h5>
+            <div className="sla-mini-chart">
+              {charAnalysis.map(c => (
+                <div className={`sla-mini-row ${c.bucket === bestCharBucket?.bucket ? 'sla-sweet-spot' : ''}`} key={c.bucket}>
+                  <div className="sla-mini-label">{c.bucket}</div>
+                  <div className="sla-mini-track">
+                    <div className="sla-mini-fill" style={{ width: `${maxCharRate > 0 ? (c.avg_rate / maxCharRate) * 100 : 0}%` }} />
+                  </div>
+                  <div className="sla-mini-value">{c.avg_rate}%</div>
+                  <div className="sla-mini-count">({c.count})</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="sla-anatomy-card">
+            <h5>Readability (Avg Word Length)</h5>
+            <div className="sla-mini-chart">
+              {readabilityAnalysis.map(r => (
+                <div className={`sla-mini-row ${r.bucket === bestReadBucket?.bucket ? 'sla-sweet-spot' : ''}`} key={r.bucket}>
+                  <div className="sla-mini-label">{r.bucket} chars</div>
+                  <div className="sla-mini-track">
+                    <div className="sla-mini-fill" style={{ width: `${maxReadRate > 0 ? (r.avg_rate / maxReadRate) * 100 : 0}%` }} />
+                  </div>
+                  <div className="sla-mini-value">{r.avg_rate}%</div>
+                  <div className="sla-mini-count">({r.count})</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="sla-anatomy-card">
+            <h5>Structure Impact</h5>
+            <div className="sla-trait-list">
+              {traitImpact.filter(t => t.count_with >= 3).map(t => (
+                <div className="sla-trait-row" key={t.trait}>
+                  <span className={`sla-trait-arrow ${t.impact_pp >= 0 ? 'sla-up' : 'sla-down'}`}>
+                    {t.impact_pp >= 0 ? '\u25B2' : '\u25BC'}
+                  </span>
+                  <span className="sla-trait-name">{t.trait}</span>
+                  <span className={`sla-trait-impact ${t.impact_pp >= 0 ? 'sla-positive' : 'sla-negative'}`}>
+                    {t.impact_pp >= 0 ? '+' : ''}{t.impact_pp}pp
+                  </span>
+                  <span className="sla-trait-n">({t.count_with})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="sla-anatomy-card">
+            <h5>Word Count</h5>
+            <div className="sla-mini-chart">
+              {wordAnalysis.filter(w => w.count > 0).map(w => (
+                <div className={`sla-mini-row ${w.bucket === bestWordCount?.bucket ? 'sla-sweet-spot' : ''}`} key={w.bucket}>
+                  <div className="sla-mini-label">{w.bucket} word{w.bucket !== '1' ? 's' : ''}</div>
+                  <div className="sla-mini-track">
+                    <div className="sla-mini-fill" style={{ width: `${maxWordRate > 0 ? (w.avg_rate / maxWordRate) * 100 : 0}%` }} />
+                  </div>
+                  <div className="sla-mini-value">{w.avg_rate}%</div>
+                  <div className="sla-mini-count">({w.count})</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-
-      {activeTab === 'insights' && (
-        <>
-          <div className="sla-structure-grid">
-            {renderStructureCard('Question vs Statement', 'question', 'statement', 'Question (?)', 'Statement')}
-            {renderStructureCard('Numbers', 'with_number', 'without_number', 'With Number', 'No Number')}
-            {renderStructureCard('Colon Usage', 'with_colon', 'without_colon', 'With Colon (:)', 'No Colon')}
-          </div>
-
-          <div className="sla-insights-row">
-            <div className="sla-table-section">
-              <div className="sla-table-title">Word Count vs Open Rate</div>
-              <table className="sla-table">
-                <thead>
-                  <tr>
-                    <th>Words</th>
-                    <th>Avg Open Rate</th>
-                    <th>Subjects</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {wordCountAnalysis.map(wc => (
-                    <tr key={wc.bucket} className={wc === bestWordCount ? 'sla-best-row' : ''}>
-                      <td className="sla-accent-cell">{wc.bucket}</td>
-                      <td>{wc.avg_open_rate}%</td>
-                      <td>{wc.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="sla-table-section">
-              <div className="sla-table-title">Top First Words</div>
-              <table className="sla-table">
-                <thead>
-                  <tr>
-                    <th>Word</th>
-                    <th>Avg Open Rate</th>
-                    <th>Used</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredFirstWords.slice(0, 10).map(w => (
-                    <tr key={w.word}>
-                      <td className="sla-accent-cell">{w.word}</td>
-                      <td>{w.avg_open_rate}%</td>
-                      <td>{w.count}x</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {activeTab === 'subjects' && (
-        <div className="sla-table-section">
-          <table className="sla-table">
-            <thead>
-              <tr>
-                <th>Subject Line</th>
-                <th>Open Rate</th>
-                <th>Sent</th>
-                <th>Words</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleSubjects.map((s, i) => (
-                <tr key={i}>
-                  <td className="sla-subject-cell" title={s.subject}>{s.subject}</td>
-                  <td>{s.open_rate}%</td>
-                  <td>{s.sent?.toLocaleString()}</td>
-                  <td>{s.word_count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {subjectsRemaining > 0 && (
-            <button className="sla-show-more" onClick={() => setShowMoreSubjects(!showMoreSubjects)}>
-              {showMoreSubjects ? 'Show less' : `Show ${subjectsRemaining} more`}
-            </button>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'keywords' && (
-        <div className="sla-table-section">
-          <table className="sla-table">
-            <thead>
-              <tr>
-                <th>Keyword</th>
-                <th>Avg Open Rate</th>
-                <th>Appearances</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleKeywords.map((k, i) => (
-                <tr key={i}>
-                  <td className="sla-accent-cell">{k.keyword}</td>
-                  <td>{k.avg_open_rate}%</td>
-                  <td>{k.count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {keywordsRemaining > 0 && (
-            <button className="sla-show-more" onClick={() => setShowMoreKeywords(!showMoreKeywords)}>
-              {showMoreKeywords ? 'Show less' : `Show ${keywordsRemaining} more`}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 };

@@ -8,6 +8,7 @@ import TrafficInsights from './TrafficInsights';
 import GeographicInsights from './GeographicInsights';
 import DemographicsInsights from './DemographicsInsights';
 import YouTubeInsights from './YouTubeInsights';
+import SocialProfileInsights from './SocialProfileInsights';
 import { useSearch } from '../../context/SearchContext';
 
 const JournalAnalysisHub = () => {
@@ -120,6 +121,7 @@ const JournalAnalysisHub = () => {
           <button className={`tab-button ${activeTab === 'walsworth' ? 'active' : ''}`} onClick={() => handleTabClick('walsworth')}>Walsworth</button>
           <button className={`tab-button ${activeTab === 'google' ? 'active' : ''}`} onClick={() => handleTabClick('google')}>Google Analytics</button>
           <button className={`tab-button ${activeTab === 'youtube' ? 'active' : ''}`} onClick={() => handleTabClick('youtube')}>YouTube</button>
+          <button className={`tab-button ${activeTab === 'social' ? 'active' : ''}`} onClick={() => handleTabClick('social')}>Social Profiles</button>
         </div>
       </div>
 
@@ -239,7 +241,6 @@ const JournalAnalysisHub = () => {
         <JournalAnomalies searchTerm={searchTerm} analyzeBy={analyzeBy} />
       </div>
 
-      {/* Google Analytics Tab */}
       {visitedTabs.google && (
         <div style={{ display: activeTab === 'google' ? 'block' : 'none' }}>
           <div className="section-header-bar">
@@ -356,6 +357,15 @@ const JournalAnalysisHub = () => {
             <h3>Audience</h3>
           </div>
           <YouTubeInsights searchTerm={searchTerm} viewMode="audience" />
+        </div>
+      )}
+
+      {visitedTabs.social && (
+        <div style={{ display: activeTab === 'social' ? 'block' : 'none' }}>
+          <div className="section-header-bar">
+            <h3>Social Profiles</h3>
+          </div>
+          <SocialProfileInsights searchTerm={searchTerm} />
         </div>
       )}
     </div>

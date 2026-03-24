@@ -57,7 +57,7 @@ const IssueComparison = ({ searchTerm = '' }) => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(WALSWORTH_BLOB_URL);
+            const response = await fetch(`${WALSWORTH_BLOB_URL}&_t=${Date.now()}`);
             const data = await response.json();
             if (data.issues && Array.isArray(data.issues)) {
                 const normalized = data.issues

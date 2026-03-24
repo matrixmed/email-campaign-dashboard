@@ -144,128 +144,68 @@ def zipcode_to_state_full_name(zipcode):
     return None
 
 URBAN_ZIPCODES = {
-    # New York City metro
     '100', '101', '102', '103', '104', '110', '111', '112', '113', '114',
-    # Los Angeles metro
     '900', '901', '902', '903', '904', '905', '906', '907', '908', '910', '911', '912', '913', '914', '915', '916', '917', '918',
-    # Chicago metro
     '606', '607', '608', '609', '610',
-    # Houston metro
     '770', '772', '773', '774', '775',
-    # Phoenix metro
     '850', '851', '852', '853',
-    # Philadelphia metro
     '190', '191', '192', '193', '194',
-    # San Antonio metro
     '782',
-    # San Diego metro
     '919', '920', '921',
-    # Dallas metro
     '750', '751', '752', '753', '754', '755',
-    # San Jose metro
     '950', '951',
-    # Austin metro
     '787',
-    # Jacksonville metro
     '322',
-    # Fort Worth metro
     '760', '761', '762',
-    # Columbus metro
     '432',
-    # San Francisco metro
     '941', '940',
-    # Charlotte metro
     '282',
-    # Indianapolis metro
     '462',
-    # Seattle metro
     '980', '981', '982', '983', '984',
-    # Denver metro
     '802', '803', '804', '805',
-    # Washington DC metro
     '200', '201', '202', '203', '204', '205', '220', '221', '222',
-    # Boston metro
     '021', '022', '024',
-    # Nashville metro
     '372',
-    # Detroit metro
     '481', '482', '483', '484',
-    # Oklahoma City metro
     '730', '731',
-    # Portland metro
     '972', '973',
-    # Las Vegas metro
     '891', '890',
-    # Louisville metro
     '402',
-    # Baltimore metro
     '212',
-    # Milwaukee metro
     '532',
-    # Albuquerque metro
     '871',
-    # Tucson metro
     '857',
-    # Fresno metro
     '937',
-    # Sacramento metro
     '958', '956',
-    # Kansas City metro
     '641', '640',
-    # Atlanta metro
     '303', '300', '301',
-    # Miami metro
     '331', '330', '332', '333',
-    # Minneapolis metro
     '553', '554', '555',
-    # Cleveland metro
     '441', '440',
-    # Tampa metro
     '336', '335',
-    # St. Louis metro
     '631', '630', '633',
-    # Pittsburgh metro
     '152', '150', '151',
 }
 
 SUBURBAN_ZIPCODES = {
-    # Long Island / NYC suburbs
     '115', '116', '117', '118', '119',
-    # LA suburbs
     '919', '926', '927', '928', '930', '931', '932', '935', '936',
-    # Chicago suburbs
     '600', '601', '602', '603', '604', '605', '611', '612', '613', '614', '615', '616', '617',
-    # Houston suburbs
     '773', '774', '776', '777', '778', '779',
-    # Phoenix suburbs
     '855', '856', '859', '860',
-    # Philadelphia suburbs
     '180', '181', '182', '183', '184', '185', '186', '187', '188', '189', '195', '196',
-    # Dallas suburbs
     '756', '757', '758', '759', '763', '764', '765',
-    # San Diego suburbs
     '920', '921', '922', '923',
-    # Seattle suburbs
     '985', '986', '988', '989', '990',
-    # Denver suburbs
     '800', '801', '806', '807', '808', '809', '810', '811',
-    # DC suburbs
     '206', '207', '208', '209', '210', '211', '214', '215', '216', '217', '218', '219', '223', '224', '225', '226',
-    # Boston suburbs
     '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '023', '025', '026', '027',
-    # Detroit suburbs
     '480', '485', '486', '487', '488', '489', '490', '491',
-    # Atlanta suburbs
     '302', '304', '305', '306', '307', '308', '309', '310', '311', '312', '313', '314', '315', '316', '317', '318', '319',
-    # Miami suburbs
     '334', '337', '338', '339', '341', '342', '344', '346', '347',
-    # Minneapolis suburbs
     '550', '551', '556', '557', '558', '559', '560', '561', '562', '563',
-    # Tampa suburbs
     '337', '338', '339', '341', '342',
-    # Phoenix suburbs
     '863', '864', '865',
-    # San Francisco suburbs
     '942', '943', '944', '945', '946', '947', '948', '949', '952', '953', '954',
 }
 

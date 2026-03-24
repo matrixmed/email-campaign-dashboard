@@ -178,7 +178,7 @@ const CampaignPerformancePage = () => {
     async function fetchBlobData() {
       const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D";
       try {
-        const response = await fetch(blobUrl);
+        const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
         const jsonData = await response.json();
         setMetricsData(jsonData);
         setRawFilteredData(jsonData);
@@ -267,31 +267,54 @@ const CampaignPerformancePage = () => {
   const startIndex = (currentPage - 1) * rowsPerPage;
   const currentPageData = sortedData.slice(startIndex, startIndex + rowsPerPage);
 
-  const calculateAggregateMetrics = () => {
-    if (!processedData || processedData.length === 0) {
-      return {
-        uniqueOpenRate: 0,
-        totalOpenRate: 0,
-        uniqueClickRate: 0,
-        totalClickRate: 0
-      };
-    }
+  const rateMetrics = new Set([
+    'Delivery_Rate', 'Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate'
+  ]);
 
-    const totalDelivered = _.sumBy(processedData, 'Delivered');
-    const totalUniqueOpens = _.sumBy(processedData, 'Unique_Opens');
-    const totalTotalOpens = _.sumBy(processedData, 'Total_Opens');
-    const totalUniqueClicks = _.sumBy(processedData, 'Unique_Clicks');
-    const totalTotalClicks = _.sumBy(processedData, 'Total_Clicks');
-
-    return {
-      uniqueOpenRate: totalDelivered > 0 ? (totalUniqueOpens / totalDelivered * 100) : 0,
-      totalOpenRate: totalDelivered > 0 ? (totalTotalOpens / totalDelivered * 100) : 0,
-      uniqueClickRate: totalUniqueOpens > 0 ? (totalUniqueClicks / totalUniqueOpens * 100) : 0,
-      totalClickRate: totalTotalOpens > 0 ? (totalTotalClicks / totalTotalOpens * 100) : 0
-    };
+  const metricLabels = {
+    Sent: 'Sent', Hard_Bounces: 'Hard Bounces', Soft_Bounces: 'Soft Bounces',
+    Total_Bounces: 'Total Bounces', Delivered: 'Delivered', Delivery_Rate: 'Delivery Rate',
+    Unique_Opens: 'Unique Opens', Unique_Open_Rate: 'Unique Open Rate',
+    Total_Opens: 'Total Opens', Total_Open_Rate: 'Total Open Rate',
+    Unique_Clicks: 'Unique Clicks', Unique_Click_Rate: 'Unique Click Rate',
+    Total_Clicks: 'Total Clicks', Total_Click_Rate: 'Total Click Rate',
+    Filtered_Bot_Clicks: 'Filtered Bot Clicks',
   };
 
-  const aggregateMetrics = calculateAggregateMetrics();
+  const calculateAggregateForMetric = (metric) => {
+    if (!processedData || processedData.length === 0) return { value: 0, isRate: false };
+
+    if (rateMetrics.has(metric)) {
+      const totalSent = _.sumBy(processedData, 'Sent');
+      const totalDelivered = _.sumBy(processedData, 'Delivered');
+      const totalUniqueOpens = _.sumBy(processedData, 'Unique_Opens');
+      const totalTotalOpens = _.sumBy(processedData, 'Total_Opens');
+      const totalUniqueClicks = _.sumBy(processedData, 'Unique_Clicks');
+      const totalTotalClicks = _.sumBy(processedData, 'Total_Clicks');
+
+      let value = 0;
+      if (metric === 'Delivery_Rate') value = totalSent > 0 ? (totalDelivered / totalSent * 100) : 0;
+      else if (metric === 'Unique_Open_Rate') value = totalDelivered > 0 ? (totalUniqueOpens / totalDelivered * 100) : 0;
+      else if (metric === 'Total_Open_Rate') value = totalDelivered > 0 ? (totalTotalOpens / totalDelivered * 100) : 0;
+      else if (metric === 'Unique_Click_Rate') value = totalUniqueOpens > 0 ? (totalUniqueClicks / totalUniqueOpens * 100) : 0;
+      else if (metric === 'Total_Click_Rate') value = totalTotalOpens > 0 ? (totalTotalClicks / totalTotalOpens * 100) : 0;
+
+      return { value, isRate: true };
+    }
+
+    return { value: _.sumBy(processedData, metric) || 0, isRate: false };
+  };
+
+  const heroMetrics = [
+    { key: 'column1', metric: selectedColumn.column1 },
+    { key: 'column2', metric: selectedColumn.column2 },
+    { key: 'column3', metric: selectedColumn.column3 },
+    { key: 'column4', metric: selectedColumn.column4 },
+  ].map(({ key, metric }) => ({
+    key,
+    label: metricLabels[metric] || metric,
+    ...calculateAggregateForMetric(metric),
+  }));
 
   return (
     <div className="campaign-performance-page">
@@ -309,22 +332,14 @@ const CampaignPerformancePage = () => {
       </div>
 
       <div className="campaign-metrics-summary">
-        <div className="metric-summary-card">
-          <div className="metric-summary-label">Unique Open Rate</div>
-          <div className="metric-summary-value">{aggregateMetrics.uniqueOpenRate.toFixed(2)}%</div>
-        </div>
-        <div className="metric-summary-card">
-          <div className="metric-summary-label">Total Open Rate</div>
-          <div className="metric-summary-value">{aggregateMetrics.totalOpenRate.toFixed(2)}%</div>
-        </div>
-        <div className="metric-summary-card">
-          <div className="metric-summary-label">Unique Click Rate</div>
-          <div className="metric-summary-value">{aggregateMetrics.uniqueClickRate.toFixed(2)}%</div>
-        </div>
-        <div className="metric-summary-card">
-          <div className="metric-summary-label">Total Click Rate</div>
-          <div className="metric-summary-value">{aggregateMetrics.totalClickRate.toFixed(2)}%</div>
-        </div>
+        {heroMetrics.map(({ key, label, value, isRate }) => (
+          <div className="metric-summary-card" key={key}>
+            <div className="metric-summary-label">{label}</div>
+            <div className="metric-summary-value">
+              {isRate ? `${value.toFixed(2)}%` : value.toLocaleString()}
+            </div>
+          </div>
+        ))}
       </div>
 
       <MetricsTable

@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../../styles/CampaignBenchmarks.css';
 import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
+import { classifyCampaign } from '../../utils/campaignClassifier';
+import { getIndustry } from '../../utils/industryKeywords';
+
+const INITIAL_SHOW = 5;
+const LOAD_MORE = 10;
 
 const CampaignBenchmarks = ({ onClearCache }) => {
   const [loading, setLoading] = useState(false);
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [analyzeBy, setAnalyzeBy] = useState('content');
+  const [analyzeBy, setAnalyzeBy] = useState('market');
   const [filterByDisease, setFilterByDisease] = useState(false);
   const [activeTab, setActiveTab] = useState('performance');
   const [hasRun, setHasRun] = useState(false);
@@ -15,16 +20,22 @@ const CampaignBenchmarks = ({ onClearCache }) => {
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
   const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
 
+  const [overviewMode, setOverviewMode] = useState('market');
+  const [overviewByDisease, setOverviewByDisease] = useState(false);
+  const [brandIndustryMap, setBrandIndustryMap] = useState({});
+  const [overviewVisibleCounts, setOverviewVisibleCounts] = useState({});
+
   const API_BASE = `${API_BASE_URL}/api`;
 
   useEffect(() => {
     fetchCampaigns();
+    fetchBrandData();
   }, []);
 
   const fetchCampaigns = async () => {
     try {
       const dashboardMetricsUrl = 'https://emaildash.blob.core.windows.net/json-data/dashboard_metrics.json?sp=r&st=2025-06-09T18:55:36Z&se=2027-06-17T02:55:36Z&spr=https&sv=2024-11-04&sr=b&sig=9o5%2B%2BHmlqiFuAQmw9bGl0D2485Z8xTy0XXsb10S2aCI%3D';
-      const response = await fetch(dashboardMetricsUrl);
+      const response = await fetch(`${dashboardMetricsUrl}&_t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
         const validCampaigns = Array.isArray(data) ? data : [];
@@ -32,6 +43,124 @@ const CampaignBenchmarks = ({ onClearCache }) => {
       }
     } catch (err) {
     }
+  };
+
+  const fetchBrandData = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/brand-management`);
+      const data = await response.json();
+      if (data.status === 'success' && data.brands) {
+        const mapping = {};
+        data.brands.forEach(b => {
+          if (b.brand && b.industry) {
+            const brandLower = b.brand.toLowerCase();
+            mapping[brandLower] = b.industry;
+            const firstWord = brandLower.split(/\s+/)[0];
+            if (firstWord && firstWord !== brandLower && !mapping[firstWord]) {
+              mapping[firstWord] = b.industry;
+            }
+          }
+        });
+        setBrandIndustryMap(mapping);
+      }
+    } catch (err) {}
+  };
+
+  const overviewData = useMemo(() => {
+    if (!campaigns.length) return [];
+
+    const validCampaigns = campaigns.filter(c =>
+      c.campaign_name && c.core_metrics?.unique_open_rate != null
+    );
+
+    const overallSum = validCampaigns.reduce((s, c) => s + c.core_metrics.unique_open_rate, 0);
+    const overallAvg = validCampaigns.length > 0 ? overallSum / validCampaigns.length : 0;
+
+    const groupMap = {};
+
+    validCampaigns.forEach(c => {
+      const name = c.campaign_name;
+      let groupKey, topicKey;
+
+      if (overviewMode === 'market') {
+        const industry = getIndustry(name, brandIndustryMap);
+        if (!industry) return;
+        const { topic } = classifyCampaign(name);
+        groupKey = industry;
+        topicKey = topic;
+      } else {
+        const { bucket, topic } = classifyCampaign(name);
+        groupKey = bucket;
+        topicKey = topic;
+      }
+
+      if (overviewByDisease) {
+        const compositeKey = `${groupKey}|||${topicKey}`;
+        if (!groupMap[compositeKey]) {
+          groupMap[compositeKey] = { groupName: topicKey, parentGroup: groupKey, rates: [], count: 0 };
+        }
+        groupMap[compositeKey].rates.push(c.core_metrics.unique_open_rate);
+        groupMap[compositeKey].count++;
+      } else {
+        if (!groupMap[groupKey]) {
+          groupMap[groupKey] = { groupName: groupKey, parentGroup: null, rates: [], count: 0 };
+        }
+        groupMap[groupKey].rates.push(c.core_metrics.unique_open_rate);
+        groupMap[groupKey].count++;
+      }
+    });
+
+    const groups = Object.values(groupMap).map(g => {
+      const avg = g.rates.reduce((s, r) => s + r, 0) / g.rates.length;
+      return {
+        groupName: g.groupName,
+        parentGroup: g.parentGroup,
+        avgRate: avg,
+        delta: avg - overallAvg,
+        count: g.count
+      };
+    });
+
+    groups.sort((a, b) => b.avgRate - a.avgRate);
+
+    if (overviewByDisease) {
+      const parentOrder = [];
+      const parentMap = {};
+      groups.forEach(g => {
+        const p = g.parentGroup || g.groupName;
+        if (!parentMap[p]) {
+          parentMap[p] = { parentName: p, children: [], totalRate: 0, totalCount: 0 };
+          parentOrder.push(p);
+        }
+        parentMap[p].children.push(g);
+        parentMap[p].totalRate += g.avgRate * g.count;
+        parentMap[p].totalCount += g.count;
+      });
+
+      return parentOrder.map(p => {
+        const parent = parentMap[p];
+        parent.children.sort((a, b) => b.avgRate - a.avgRate);
+        const parentAvg = parent.totalCount > 0 ? parent.totalRate / parent.totalCount : 0;
+        return {
+          parentName: parent.parentName,
+          parentAvg,
+          parentCount: parent.totalCount,
+          parentDelta: parentAvg - overallAvg,
+          children: parent.children
+        };
+      }).sort((a, b) => b.parentAvg - a.parentAvg);
+    }
+
+    return groups;
+  }, [campaigns, overviewMode, overviewByDisease, brandIndustryMap]);
+
+  const getOverviewVisible = (groupId) => overviewVisibleCounts[groupId] || INITIAL_SHOW;
+
+  const handleOverviewLoadMore = (groupId) => {
+    setOverviewVisibleCounts(prev => ({
+      ...prev,
+      [groupId]: (prev[groupId] || INITIAL_SHOW) + LOAD_MORE
+    }));
   };
 
   const handleCampaignToggle = (campaign) => {
@@ -164,7 +293,7 @@ const CampaignBenchmarks = ({ onClearCache }) => {
     return (
       <div className="similar-campaigns-container">
         <h3>Similar Campaigns</h3>
-        <p className="section-subtitle">Campaigns matching the {analyzeBy === 'industry' ? 'industry' : 'content type'}{filterByDisease ? ' and disease' : ''}</p>
+        <p className="section-subtitle">Campaigns matching the {analyzeBy === 'market' ? 'market' : 'content type'}{filterByDisease ? ' and disease' : ''}</p>
 
         <div className="campaigns-table-wrapper">
           <table className="campaigns-table">
@@ -251,16 +380,125 @@ const CampaignBenchmarks = ({ onClearCache }) => {
     <div className="campaign-benchmarks">
       <div className="section-header-bar">
         <h3>Campaign Benchmarks</h3>
-        {onClearCache && (
-          <button
-            className="clear-cache-button"
-            onClick={onClearCache}
-            title="Clear cached data and reload"
-          >
-            Clear
-          </button>
+        <div className="section-header-stats">
+          <div className="anomaly-controls-inline">
+            <span className="control-label">Group by</span>
+            <div className="anomaly-mode-toggle">
+              <button
+                className={`mode-toggle-btn ${overviewMode === 'content' ? 'active' : ''}`}
+                onClick={() => { setOverviewMode('content'); setOverviewVisibleCounts({}); }}
+              >
+                Content
+              </button>
+              <button
+                className={`mode-toggle-btn ${overviewMode === 'market' ? 'active' : ''}`}
+                onClick={() => { setOverviewMode('market'); setOverviewVisibleCounts({}); }}
+              >
+                Market
+              </button>
+            </div>
+            <span className="control-divider">→</span>
+            <div className="anomaly-mode-toggle">
+              <button
+                className={`mode-toggle-btn ${!overviewByDisease ? 'active' : ''}`}
+                onClick={() => { setOverviewByDisease(false); setOverviewVisibleCounts({}); }}
+              >
+                All
+              </button>
+              <button
+                className={`mode-toggle-btn ${overviewByDisease ? 'active' : ''}`}
+                onClick={() => { setOverviewByDisease(true); setOverviewVisibleCounts({}); }}
+              >
+                By Disease
+              </button>
+            </div>
+          </div>
+          {onClearCache && (
+            <button
+              className="clear-cache-button"
+              onClick={onClearCache}
+              title="Clear cached data and reload"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="cb-overview-section">
+
+        {overviewByDisease && Array.isArray(overviewData) && overviewData.length > 0 && overviewData[0]?.children ? (
+          <div className="cbo-groups">
+            {overviewData.map(parent => {
+              const groupId = parent.parentName;
+              const visible = getOverviewVisible(groupId);
+              const visibleChildren = parent.children.slice(0, visible);
+              const remaining = parent.children.length - visible;
+
+              return (
+                <div className="cbo-group-section" key={groupId}>
+                  <div className="cbo-group-header">
+                    <h4 className="cbo-group-name">{parent.parentName}</h4>
+                    <div className="cbo-group-meta">
+                      <span className="cbo-group-avg">{parent.parentAvg.toFixed(1)}%</span>
+                      <span className="cbo-group-count">{parent.parentCount} campaigns</span>
+                      {overviewVisibleCounts[groupId] > INITIAL_SHOW && (
+                        <button className="cbo-collapse-btn" onClick={() => setOverviewVisibleCounts(prev => { const next = { ...prev }; delete next[groupId]; return next; })}>
+                          Collapse
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="cbo-grid">
+                    {visibleChildren.map((child) => (
+                      <div className={"cbo-card"} key={child.groupName}>
+                        <div className="cbo-card-name" title={child.groupName}>{child.groupName}</div>
+                        <div className="cbo-card-rate">{child.avgRate.toFixed(1)}%</div>
+                        <div className="cbo-card-bottom">
+                          <span className={`cbo-card-delta ${child.delta >= 0 ? 'cbo-pos' : 'cbo-neg'}`}>
+                            {child.delta >= 0 ? '+' : ''}{child.delta.toFixed(1)}pp
+                          </span>
+                          <span className="cbo-card-count">n={child.count}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {remaining > 0 && (
+                    <button className="cbo-load-more" onClick={() => handleOverviewLoadMore(groupId)}>
+                      Show {Math.min(remaining, LOAD_MORE)} more
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            {Array.isArray(overviewData) && overviewData.length > 0 && !overviewData[0]?.children && (
+              <div className="cbo-flat">
+                <div className="cbo-grid">
+                  {overviewData.map((group) => (
+                    <div className={"cbo-card"} key={group.groupName}>
+                      <div className="cbo-card-name" title={group.groupName}>{group.groupName}</div>
+                      <div className="cbo-card-rate">{group.avgRate.toFixed(1)}%</div>
+                      <div className="cbo-card-bottom">
+                        <span className={`cbo-card-delta ${group.delta >= 0 ? 'cbo-pos' : 'cbo-neg'}`}>
+                          {group.delta >= 0 ? '+' : ''}{group.delta.toFixed(1)}pp
+                        </span>
+                        <span className="cbo-card-count">n={group.count}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {Array.isArray(overviewData) && overviewData.length === 0 && campaigns.length > 0 && overviewMode === 'market' && (
+          <div className="cb-overview-empty">No market matches found. Brand data may still be loading.</div>
         )}
       </div>
+
       <div className="benchmark-filters">
         <button
           type="button"
@@ -283,10 +521,10 @@ const CampaignBenchmarks = ({ onClearCache }) => {
               Content
             </button>
             <button
-              className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
-              onClick={() => setAnalyzeBy('industry')}
+              className={`mode-toggle-btn ${analyzeBy === 'market' ? 'active' : ''}`}
+              onClick={() => setAnalyzeBy('market')}
             >
-              Industry
+              Market
             </button>
           </div>
           <span className="toggle-arrow">→</span>

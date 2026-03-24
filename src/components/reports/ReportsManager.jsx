@@ -34,6 +34,10 @@ const ReportsManager = () => {
     const [attachedAGGs, setAttachedAGGs] = useState({});
     const [standaloneAGGs, setStandaloneAGGs] = useState([]);
     const [movedPLDAGGs, setMovedPLDAGGs] = useState([]);
+    const [archiveAGGs, setArchiveAGGs] = useState({});
+    const [archiveStandaloneAGGs, setArchiveStandaloneAGGs] = useState([]);
+    const [expandedArchiveRows, setExpandedArchiveRows] = useState({});
+    const [futureReports, setFutureReports] = useState([]);
     const [moveMode, setMoveMode] = useState('attach'); 
     const [selectedAttachTarget, setSelectedAttachTarget] = useState(null);
 
@@ -288,14 +292,18 @@ const ReportsManager = () => {
                 } catch (contractsError) {
                 }
 
+                let noDataReports = { pldAndAgg: [], aggOnly: [] };
                 try {
                     const noDataResponse = await fetch(`${API_BASE_URL}/api/unified/no-data`);
                     if (noDataResponse.ok) {
                         const noDataResult = await noDataResponse.json();
                         if (noDataResult.status === 'success') {
-                            setCmiExpectedNoData({
+                            noDataReports = {
                                 pldAndAgg: noDataResult.pld_and_agg || [],
                                 aggOnly: noDataResult.agg_only || [],
+                            };
+                            setCmiExpectedNoData({
+                                ...noDataReports,
                                 allExpectedPlacementIds: noDataResult.all_expected_placement_ids || []
                             });
                         }
@@ -338,6 +346,12 @@ const ReportsManager = () => {
                 });
                 setNotNeededReports(notNeededStates);
 
+                [...noDataReports.pldAndAgg, ...noDataReports.aggOnly].forEach(report => {
+                    if (report.id && report.is_submitted && report.submitted_for_week === report.reporting_week_start) {
+                        newCheckedStates[`${report.id}_no_data`] = true;
+                    }
+                });
+
                 try {
                     const savedMonthlyStates = JSON.parse(localStorage.getItem('monthlyReportStates') || '{}');
                     Object.assign(newCheckedStates, savedMonthlyStates);
@@ -345,6 +359,55 @@ const ReportsManager = () => {
                 }
 
                 setCheckedReports(newCheckedStates);
+
+                await refreshAGGData();
+
+                try {
+                    const archiveAggResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/archive-aggregates?days_back=90`);
+                    if (archiveAggResponse.ok) {
+                        const archiveAggResult = await archiveAggResponse.json();
+                        if (archiveAggResult.status === 'success') {
+                            const attachedByReportId = {};
+                            const standaloneArchive = [];
+
+                            archiveAggResult.reports.forEach(agg => {
+                                const isMonthly = (agg.expected_data_frequency || agg.contract_frequency || '').toLowerCase() === 'monthly';
+                                const aggData = {
+                                    ...agg,
+                                    brand: agg.brand_name,
+                                    contract_metric: agg.agg_metric || agg.contract_metric,
+                                    contract_notes: agg.contract_notes || agg.notes || agg.placement_description,
+                                    frequency: agg.expected_data_frequency || agg.contract_frequency,
+                                    is_monthly_agg: isMonthly
+                                };
+
+                                if (agg.attached_to_campaign_id) {
+                                    if (!attachedByReportId[agg.attached_to_campaign_id]) {
+                                        attachedByReportId[agg.attached_to_campaign_id] = [];
+                                    }
+                                    attachedByReportId[agg.attached_to_campaign_id].push(aggData);
+                                } else {
+                                    standaloneArchive.push(aggData);
+                                }
+                            });
+
+                            setArchiveAGGs(attachedByReportId);
+                            setArchiveStandaloneAGGs(standaloneArchive);
+                        }
+                    }
+                } catch (archiveAggError) {
+                }
+
+                try {
+                    const futureResponse = await fetch(`${API_BASE_URL}/api/cmi/expected/future`);
+                    if (futureResponse.ok) {
+                        const futureResult = await futureResponse.json();
+                        if (futureResult.status === 'success') {
+                            setFutureReports(futureResult.reports || []);
+                        }
+                    }
+                } catch (futureError) {
+                }
 
             } catch (error) {
             } finally {
@@ -428,7 +491,8 @@ const ReportsManager = () => {
         setAggModalData({
             agg_value: aggReport.agg_value || '',
             metric: aggReport.agg_metric || aggReport.contract_metric || contract?.metric || '',
-            gcm_placement_ids: contract?.gcm_placement_ids || []
+            gcm_placement_ids: contract?.gcm_placement_ids || [],
+            creative_code: contract?.creative_code || ''
         });
         setShowAggModal(true);
     };
@@ -436,7 +500,7 @@ const ReportsManager = () => {
     const closeAggModal = () => {
         setShowAggModal(false);
         setSelectedAggReport(null);
-        setAggModalData({ agg_value: '', metric: '', gcm_placement_ids: [] });
+        setAggModalData({ agg_value: '', metric: '', gcm_placement_ids: [], creative_code: '' });
     };
 
     const handleAggModalSave = async () => {
@@ -461,7 +525,8 @@ const ReportsManager = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         metric: aggModalData.metric,
-                        gcm_placement_ids: aggModalData.gcm_placement_ids
+                        gcm_placement_ids: aggModalData.gcm_placement_ids,
+                        creative_code: aggModalData.creative_code
                     })
                 });
 
@@ -901,10 +966,6 @@ const ReportsManager = () => {
         }
     };
 
-    useEffect(() => {
-        refreshAGGData();
-    }, []);
-
     const getLastMonday = () => {
         const today = new Date();
         const day = today.getDay();
@@ -1119,13 +1180,20 @@ const ReportsManager = () => {
     const dueThisWeekPlacementIds = useMemo(() => {
         const ids = new Set();
         getCurrentWeekReports.forEach(report => {
-            const placementId = report.cmi_placement_id || report.cmi_metadata?.cmi_placement_id;
+            const matchedMeta = findMatchingMetadata(report);
+            const dbMeta = report.agency_metadata;
+            const manualMeta = manualMetadata[report.id];
+            const placementId = report.cmi_placement_id ||
+                               report.cmi_metadata?.cmi_placement_id ||
+                               matchedMeta?.cmi_placement_id ||
+                               dbMeta?.cmi_placement_id ||
+                               manualMeta?.cmi_placement_id;
             if (placementId) {
                 ids.add(String(placementId));
             }
         });
         return ids;
-    }, [getCurrentWeekReports]);
+    }, [getCurrentWeekReports, manualMetadata]);
 
     const campaignsWithExpectedStatus = useMemo(() => {
         return new Set(cmiExpectedNoData.allExpectedPlacementIds || []);
@@ -1238,8 +1306,50 @@ const ReportsManager = () => {
     }, [getPastReports]);
 
     const getFilteredArchiveReports = useMemo(() => {
-        return getPastReports.filter(r => r.agency === archiveAgencyTab);
-    }, [getPastReports, archiveAgencyTab]);
+        const filtered = getPastReports.filter(r => r.agency === archiveAgencyTab);
+
+        if (archiveAgencyTab === 'CMI' && archiveStandaloneAGGs.length > 0) {
+            const standaloneRows = archiveStandaloneAGGs.map(agg => {
+                const weekStart = agg.reporting_week_start ? new Date(agg.reporting_week_start + 'T00:00:00') : null;
+                const weekEnd = agg.reporting_week_end ? new Date(agg.reporting_week_end + 'T00:00:00') : (weekStart ? new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)) : null);
+                return {
+                    id: `standalone_agg_${agg.id}`,
+                    campaign_name: agg.contract_notes || agg.notes || agg.placement_description || agg.brand || 'Standalone AGG',
+                    brand: agg.brand || 'Unknown',
+                    agency: 'CMI',
+                    send_date: agg.submitted_at || agg.reporting_week_start,
+                    week_number: 1,
+                    week_range: { start: weekStart, end: weekEnd },
+                    unique_key: `standalone_agg_${agg.id}`,
+                    is_submitted: true,
+                    is_standalone_agg: true,
+                    _agg: agg
+                };
+            });
+
+            const combined = [...filtered, ...standaloneRows];
+            combined.sort((a, b) => {
+                const aStart = a.week_range?.start ? new Date(a.week_range.start) : new Date(0);
+                const bStart = b.week_range?.start ? new Date(b.week_range.start) : new Date(0);
+                return bStart - aStart;
+            });
+            return combined;
+        }
+
+        return filtered;
+    }, [getPastReports, archiveAgencyTab, archiveStandaloneAGGs]);
+
+    const getFilteredFutureReports = useMemo(() => {
+        if (!searchTerm) return futureReports;
+        const term = searchTerm.toLowerCase();
+        return futureReports.filter(r =>
+            (r.brand_name || '').toLowerCase().includes(term) ||
+            (r.vehicle_name || '').toLowerCase().includes(term) ||
+            (r.placement_description || '').toLowerCase().includes(term) ||
+            (r.cmi_placement_id || '').toLowerCase().includes(term) ||
+            (r.contract_notes || '').toLowerCase().includes(term)
+        );
+    }, [futureReports, searchTerm]);
 
     const getPaginatedData = (data, currentPageParam, rowsPerPageParam) => {
         const startIndex = (currentPageParam - 1) * rowsPerPageParam;
@@ -1368,31 +1478,29 @@ const ReportsManager = () => {
         const key = `${reportId}_no_data`;
         const newCheckedState = !checkedReports[key];
 
-        const newStates = {
-            ...checkedReports,
+        setCheckedReports(prev => ({
+            ...prev,
             [key]: newCheckedState
-        };
-        setCheckedReports(newStates);
+        }));
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/cmi/reports/${reportId}/submit`, {
+            const response = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/submit`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    is_submitted: newCheckedState,
-                    submitted_by: 'user'
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_submitted: newCheckedState })
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-                setCheckedReports(checkedReports);
-                alert(`Failed to update: ${errorData.message || 'Unknown error'}`);
+                setCheckedReports(prev => ({
+                    ...prev,
+                    [key]: !newCheckedState
+                }));
             }
         } catch (error) {
-            setCheckedReports(checkedReports);
+            setCheckedReports(prev => ({
+                ...prev,
+                [key]: !newCheckedState
+            }));
         }
     };
 
@@ -1752,7 +1860,14 @@ const ReportsManager = () => {
             "source_id_qual": meta.source_id_qual || 'NPI',
             "source_list_name": meta.source_list_name || '',
             "client_type": meta.client_type || 'standard',
-            "generate_aggregate": meta.generate_aggregate !== false
+            "generate_aggregate": meta.generate_aggregate !== false,
+            "package_id": meta.package_id || '',
+            "package_name": meta.package_name || '',
+            "publisher_product_start_datetime": meta.publisher_product_start_datetime || '',
+            "publisher_product_end_datetime": meta.publisher_product_end_datetime || '',
+            "contract_category_identifier": meta.contract_category_identifier || '',
+            "overall_guarantee_count": meta.overall_guarantee_count || '',
+            "product_name_guarantee_counts": meta.product_name_guarantee_counts || ''
         };
     };
 
@@ -1870,7 +1985,7 @@ const ReportsManager = () => {
 
             aggregate[aggName] = {
                 cmi_placement_id: agg.cmi_placement_id || '',
-                creative_code: '',
+                creative_code: contractInfo?.creative_code || '',
                 gcm_placement_id: contractInfo?.gcm_placement_ids || [],
                 brand_name: contractInfo?.brand || agg.brand || '',
                 vehicle_name: contractInfo?.vehicle || agg.vehicle || '',
@@ -1903,7 +2018,7 @@ const ReportsManager = () => {
                 buy_component_type: report.buy_component_type || contractInfo?.buy_component_type || '',
                 gcm_placement_id: [],
                 target_list_id: '',
-                creative_code: ''
+                creative_code: contractInfo?.creative_code || ''
             };
 
             pldNoData[name] = baseEntry;
@@ -1931,7 +2046,7 @@ const ReportsManager = () => {
                 buy_component_type: report.buy_component_type || contractInfo?.buy_component_type || '',
                 gcm_placement_id: [],
                 target_list_id: '',
-                creative_code: '',
+                creative_code: contractInfo?.creative_code || '',
                 metric: report.contract_metric || contractInfo?.metric || ''
             };
         });
@@ -2074,7 +2189,14 @@ const ReportsManager = () => {
                     source_id_qual: meta.source_id_qual || 'NPI',
                     source_list_name: meta.source_list_name || '',
                     client_type: meta.client_type || 'standard',
-                    generate_aggregate: meta.generate_aggregate !== false
+                    generate_aggregate: meta.generate_aggregate !== false,
+                    package_id: meta.package_id || '',
+                    package_name: meta.package_name || '',
+                    publisher_product_start_datetime: meta.publisher_product_start_datetime || '',
+                    publisher_product_end_datetime: meta.publisher_product_end_datetime || '',
+                    contract_category_identifier: meta.contract_category_identifier || '',
+                    overall_guarantee_count: meta.overall_guarantee_count || '',
+                    product_name_guarantee_counts: meta.product_name_guarantee_counts || ''
                 };
             } else if (agencyLower === 'bi' || agencyLower === 'boehringer') {
                 const monthMatch = campaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
@@ -2464,7 +2586,14 @@ const ReportsManager = () => {
                     content_location: editFormData.content_location,
                     content_id: editFormData.content_id,
                     content_name: editFormData.content_name,
-                    source_list_name: editFormData.source_list_name
+                    source_list_name: editFormData.source_list_name,
+                    package_id: editFormData.package_id,
+                    package_name: editFormData.package_name,
+                    publisher_product_start_datetime: editFormData.publisher_product_start_datetime,
+                    publisher_product_end_datetime: editFormData.publisher_product_end_datetime,
+                    contract_category_identifier: editFormData.contract_category_identifier,
+                    overall_guarantee_count: editFormData.overall_guarantee_count,
+                    product_name_guarantee_counts: editFormData.product_name_guarantee_counts
                 };
             } else if (agencyLower === 'omd') {
                 agencyMeta = {
@@ -2921,6 +3050,12 @@ const ReportsManager = () => {
                         <span>Current Week ({getCurrentWeekReports.length})</span>
                     </button>
                     <button
+                        className={`tab-button ${activeTab === 'future' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('future')}
+                    >
+                        <span>Future ({futureReports.length})</span>
+                    </button>
+                    <button
                         className={`tab-button ${activeTab === 'archive' ? 'active' : ''}`}
                         onClick={() => handleTabChange('archive')}
                     >
@@ -3227,6 +3362,90 @@ const ReportsManager = () => {
                 );
             })()}
 
+            {activeTab === 'future' && (() => {
+                const filtered = getFilteredFutureReports;
+                const totalPages = getTotalPages(filtered.length, futureRowsPerPage);
+                const paginated = getPaginatedData(filtered, futureCurrentPage, futureRowsPerPage);
+
+                const groupedByWeek = {};
+                filtered.forEach(r => {
+                    const key = r.reporting_week_start || 'unknown';
+                    if (!groupedByWeek[key]) groupedByWeek[key] = [];
+                    groupedByWeek[key].push(r);
+                });
+                const weekKeys = Object.keys(groupedByWeek).sort();
+
+                return (
+                    <div className="reports-section future-reports">
+                        <div className="reports-section-header">
+                            <h3>Future Reports</h3>
+                            <div className="reports-header-stats">
+                                <span className="reports-header-stat-item">
+                                    <span className="reports-header-stat-label">Total:</span>
+                                    <span className="reports-header-stat-value">{filtered.length}</span>
+                                </span>
+                                <span className="reports-header-stat-item">
+                                    <span className="reports-header-stat-label">Weeks:</span>
+                                    <span className="reports-header-stat-value">{weekKeys.length}</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div className="table-container table-rounded">
+                            <table className="reports-table">
+                                <thead>
+                                    <tr>
+                                        <th className="brand-header">Brand</th>
+                                        <th className="campaign-header">Vehicle</th>
+                                        <th className="agency-header">Placement</th>
+                                        <th className="week-header">Data Type</th>
+                                        <th className="week-header">Frequency</th>
+                                        <th className="timeframe-header">Week</th>
+                                        <th className="status-header">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody key={`future-${futureCurrentPage}-${futureRowsPerPage}`}>
+                                    {paginated.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="empty-state">
+                                                {searchTerm ? 'No matching future reports' : 'No future reports scheduled'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginated.map((report, index) => {
+                                            const weekStart = report.reporting_week_start ? new Date(report.reporting_week_start + 'T00:00:00') : null;
+                                            const weekEnd = report.reporting_week_end ? new Date(report.reporting_week_end + 'T00:00:00') : (weekStart ? new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)) : null);
+                                            const weekLabel = weekStart ? formatDateRange(weekStart, weekEnd) : '-';
+                                            const description = report.contract_notes || report.notes || report.placement_description || '';
+
+                                            return (
+                                                <tr key={report.id} className={`report-row ${index % 2 === 0 ? 'even-row' : 'odd-row'}`}>
+                                                    <td className="brand-column">{report.brand_name || '-'}</td>
+                                                    <td className="campaign-column">
+                                                        <span className="campaign-name" title={report.vehicle_name}>{report.vehicle_name || '-'}</span>
+                                                    </td>
+                                                    <td className="agency-column">
+                                                        <span title={description} style={{fontSize: '11px', color: 'rgba(255,255,255,0.7)'}}>
+                                                            {description.length > 50 ? description.slice(0, 50) + '...' : (description || '-')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="week-column">{report.data_type || '-'}</td>
+                                                    <td className="week-column">{report.expected_data_frequency || report.contract_frequency || '-'}</td>
+                                                    <td className="timeframe-column">{weekLabel}</td>
+                                                    <td className="status-column">
+                                                        <span className="status-pending">Upcoming</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        {renderPaginationButtons(futureCurrentPage, totalPages, 'future')}
+                    </div>
+                );
+            })()}
+
             {activeTab === 'archive' && (() => {
                 const filteredArchiveReports = getFilteredArchiveReports;
                 const totalPages = getTotalPages(filteredArchiveReports.length, archiveRowsPerPage);
@@ -3276,9 +3495,50 @@ const ReportsManager = () => {
                                         </tr>
                                     ) : (
                                         paginatedArchiveReports.map((report, index) => {
+                                            if (report.is_standalone_agg) {
+                                                const agg = report._agg;
+                                                const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                                                return (
+                                                    <tr
+                                                        key={report.unique_key}
+                                                        className={`report-row archive-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} agg-report-row ${agg.is_monthly_agg ? 'monthly-agg-row' : ''}`}
+                                                        onClick={() => openAggModal(agg, false)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        <td className="campaign-column">
+                                                            <div className="agg-notes-cell">
+                                                                {agg.is_monthly_agg && <span className="standalone-agg-badge monthly-agg-badge" style={{marginRight: '6px'}}>Monthly</span>}
+                                                                <span className="standalone-agg-badge">AGG</span>
+                                                                {notes || <span className="no-notes">-</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="brand-column">
+                                                            <span className="agg-brand-text">{agg.brand || 'Unknown'}</span>
+                                                        </td>
+                                                        <td className="agency-column">
+                                                            <span className="agency-badge cmi">CMI</span>
+                                                        </td>
+                                                        <td className="date-column-report">
+                                                            <span className="agg-value-display">{agg.agg_value || '-'}</span>
+                                                        </td>
+                                                        <td className="week-column">
+                                                            <span className="agg-metric-text">{agg.agg_metric || agg.contract_metric || '-'}</span>
+                                                        </td>
+                                                        <td className="timeframe-column">{report.week_range?.start ? formatDateRange(report.week_range.start, report.week_range.end) : (agg.submitted_at ? new Date(agg.submitted_at).toLocaleDateString() : '-')}</td>
+                                                        <td className="status-column">
+                                                            <span className="status-completed">Submitted</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+
                                             const isCMI = report.agency === 'CMI';
+                                            const campaignArchiveAGGs = archiveAGGs[report.id] || [];
+                                            const hasArchiveAGGs = campaignArchiveAGGs.length > 0;
+                                            const isExpanded = expandedArchiveRows[report.unique_key];
                                             return (
-                                                <tr key={report.unique_key} className={`report-row archive-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''}`}>
+                                                <React.Fragment key={report.unique_key}>
+                                                <tr className={`report-row archive-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''} ${hasArchiveAGGs ? 'has-attached-aggs' : ''}`}>
                                                     <td className="campaign-column">
                                                         <div
                                                             className="campaign-text clickable-campaign"
@@ -3293,6 +3553,21 @@ const ReportsManager = () => {
                                                                 <div className="cmi-info">
                                                                     <FileText className="cmi-icon" size={16} />
                                                                 </div>
+                                                            )}
+                                                            {hasArchiveAGGs && (
+                                                                <span
+                                                                    className="attached-agg-badge"
+                                                                    title={`${campaignArchiveAGGs.length} AGG report(s) attached - click to ${isExpanded ? 'collapse' : 'expand'}`}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setExpandedArchiveRows(prev => ({
+                                                                            ...prev,
+                                                                            [report.unique_key]: !prev[report.unique_key]
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    {isExpanded ? '−' : '+'}{campaignArchiveAGGs.length} AGG
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -3313,6 +3588,45 @@ const ReportsManager = () => {
                                                         )}
                                                     </td>
                                                 </tr>
+                                                {isExpanded && campaignArchiveAGGs.map((agg, aggIndex) => {
+                                                    const notes = agg.contract_notes || agg.notes || agg.placement_description || '';
+                                                    const isMonthlyAgg = agg.is_monthly_agg;
+                                                    return (
+                                                        <tr
+                                                            key={`${report.unique_key}_agg_${aggIndex}`}
+                                                            className={`agg-report-row attached-agg-row ${isMonthlyAgg ? 'monthly-agg-row' : ''}`}
+                                                            onClick={() => openAggModal(agg, false)}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            <td className="campaign-column">
+                                                                <div className="agg-notes-cell attached">
+                                                                    <span className="attached-agg-indicator">└─</span>
+                                                                    {isMonthlyAgg && <span className="standalone-agg-badge monthly-agg-badge" style={{marginRight: '6px'}}>Monthly</span>}
+                                                                    {notes || <span className="no-notes">-</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="brand-column">
+                                                                <span className="agg-brand-text">{agg.brand || 'Unknown'}</span>
+                                                            </td>
+                                                            <td className="agency-column">
+                                                                <span className="agency-badge cmi">CMI</span>
+                                                            </td>
+                                                            <td className="date-column-report">
+                                                                <span className="agg-value-display">{agg.agg_value || '-'}</span>
+                                                            </td>
+                                                            <td className="week-column">
+                                                                <span className="agg-metric-text">{agg.agg_metric || agg.contract_metric || '-'}</span>
+                                                            </td>
+                                                            <td className="timeframe-column">
+                                                                <span className="agg-submitted-date">{agg.submitted_at ? new Date(agg.submitted_at).toLocaleDateString() : '-'}</span>
+                                                            </td>
+                                                            <td className="status-column">
+                                                                <span className="status-completed">Submitted</span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                </React.Fragment>
                                             );
                                         })
                                     )}
@@ -3689,11 +4003,11 @@ const ReportsManager = () => {
                                                 <label>Placement ID</label>
                                                 <input type="text" value={editFormData.placement_id || ''} onChange={(e) => updateEditFormField('placement_id', e.target.value)} />
                                             </div>
-                                            <div className="edit-form-field">
+                                            <div className="edit-form-field full-width">
                                                 <label>Placement Name</label>
                                                 <input type="text" value={editFormData.placement_name || ''} onChange={(e) => updateEditFormField('placement_name', e.target.value)} />
                                             </div>
-                                            <div className="edit-form-field full-width">
+                                            <div className="edit-form-field">
                                                 <label>Publisher Product Name</label>
                                                 <input type="text" value={editFormData.publisher_product_name || ''} onChange={(e) => updateEditFormField('publisher_product_name', e.target.value)} />
                                             </div>
@@ -3712,6 +4026,34 @@ const ReportsManager = () => {
                                             <div className="edit-form-field">
                                                 <label>Source List Name</label>
                                                 <input type="text" value={editFormData.source_list_name || ''} onChange={(e) => updateEditFormField('source_list_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Package ID</label>
+                                                <input type="text" value={editFormData.package_id || ''} onChange={(e) => updateEditFormField('package_id', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Package Name</label>
+                                                <input type="text" value={editFormData.package_name || ''} onChange={(e) => updateEditFormField('package_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Product Start Datetime</label>
+                                                <input type="text" value={editFormData.publisher_product_start_datetime || ''} onChange={(e) => updateEditFormField('publisher_product_start_datetime', e.target.value)} placeholder="YYYY-MM-DD HH:MM:SS" />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Product End Datetime</label>
+                                                <input type="text" value={editFormData.publisher_product_end_datetime || ''} onChange={(e) => updateEditFormField('publisher_product_end_datetime', e.target.value)} placeholder="YYYY-MM-DD HH:MM:SS" />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Contract Category</label>
+                                                <input type="text" value={editFormData.contract_category_identifier || ''} onChange={(e) => updateEditFormField('contract_category_identifier', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Overall Guarantee Count</label>
+                                                <input type="text" value={editFormData.overall_guarantee_count || ''} onChange={(e) => updateEditFormField('overall_guarantee_count', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Product Guarantee Counts</label>
+                                                <input type="text" value={editFormData.product_name_guarantee_counts || ''} onChange={(e) => updateEditFormField('product_name_guarantee_counts', e.target.value)} />
                                             </div>
                                         </div>
                                     );
@@ -4208,6 +4550,16 @@ const ReportsManager = () => {
                                         value={aggModalData.metric}
                                         onChange={(e) => setAggModalData(prev => ({ ...prev, metric: e.target.value }))}
                                         placeholder="e.g., Impressions"
+                                    />
+                                </div>
+
+                                <div className="edit-form-field">
+                                    <label>Creative Code</label>
+                                    <input
+                                        type="text"
+                                        value={aggModalData.creative_code}
+                                        onChange={(e) => setAggModalData(prev => ({ ...prev, creative_code: e.target.value }))}
+                                        placeholder="Enter creative code"
                                     />
                                 </div>
 

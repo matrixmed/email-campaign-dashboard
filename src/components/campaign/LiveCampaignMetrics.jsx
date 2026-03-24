@@ -3,8 +3,7 @@ import _ from 'lodash';
 import CampaignModal from './CampaignModal';
 import { metricDisplayNames } from '../utils/metricDisplayNames';
 import { matchesSearchTerm } from '../../utils/searchUtils';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../../config/api';
 
 const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     const [metrics, setMetrics] = useState([]);
@@ -21,7 +20,7 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
         const fetchData = async () => {
             try {
                 const blobUrl = "https://emaildash.blob.core.windows.net/json-data/live_campaign_metrics.json?sp=r&st=2025-02-05T20:36:54Z&se=2026-07-31T03:36:54Z&spr=https&sv=2022-11-02&sr=b&sig=7Ywfk4UlVByj1PeeOo%2BjdliKQSVAWYDU5ZR%2Fcrc7eBE%3D";
-                const response = await fetch(blobUrl);
+                const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
                 const data = await response.json();
 
                 const getBaseName = (name) => {
@@ -152,8 +151,16 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
             if (flagTime) {
                 const hoursSinceDetected = (now - flagTime) / (1000 * 60 * 60);
                 if (hoursSinceDetected > 24) {
-                    return false; 
+                    return false;
                 }
+            }
+
+            if (flag.issue_type === 'missing_from_live' && currentMetrics?.Sent > 0) {
+                return false;
+            }
+
+            if ((flag.issue_type === 'should_be_completed' || flag.issue_type === 'stale_campaign') && currentMetrics?.Sent > 0) {
+                return false;
             }
 
             if (flag.issue_type === 'sent_deviation' && flag.campaign_name) {
@@ -168,11 +175,11 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
             if (flag.api_value && currentMetrics?.Sent) {
                 const deviation = Math.abs(currentMetrics.Sent - flag.api_value) / flag.api_value;
                 if (deviation < 0.01) {
-                    return false; 
+                    return false;
                 }
             }
 
-            return true; 
+            return true;
         });
 
         return flags;

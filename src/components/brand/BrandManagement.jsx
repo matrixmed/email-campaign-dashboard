@@ -12,7 +12,7 @@ const BrandManagement = () => {
   const [aaCounters, setAaCounters] = useState({}); 
   const tableRefs = useRef({});
 
-  const salesMembers = ['Emily', 'Courtney', 'Morgan', 'Dana'];
+  const salesMembers = ['Emily', 'Courtney', 'Quinn', 'Dana'];
   const brandFields = ['brand', 'agency', 'pharma_company', 'industry'];
 
   const fetchBrands = useCallback(async () => {
@@ -407,7 +407,7 @@ const BrandManagement = () => {
               <th style={{ width: '20%', fontSize: '18px' }}>Brand</th>
               <th style={{ width: '20%', fontSize: '18px' }}>Agency</th>
               <th style={{ width: '20%', fontSize: '18px' }}>Pharma Company</th>
-              <th style={{ width: '20%', fontSize: '18px' }}>Industry</th>
+              <th style={{ width: '20%', fontSize: '18px' }}>Market</th>
               <th style={{ width: '20%', textAlign: 'right', paddingRight: '16px', fontSize: '18px' }}>Actions</th>
             </tr>
           </thead>

@@ -559,7 +559,8 @@ const DashboardCanvasContent = () => {
 
       const updatedCards = [...prev];
       const videoTable = { ...updatedCards[videoTableIndex] };
-      const currentData = videoTable.config?.customData || [];
+      const rawData = videoTable.config?.customData;
+      const currentData = Array.isArray(rawData) ? rawData : [];
 
       let newData;
 
@@ -904,10 +905,10 @@ const DashboardCanvasContent = () => {
     let startX, startY, thumbWidth, thumbHeight, gap;
 
     if (isEPSingle) {
-      startX = 656;
-      startY = 337;
-      thumbWidth = 336;
-      thumbHeight = 192;
+      startX = 640;
+      startY = 344;
+      thumbWidth = 352;
+      thumbHeight = 200;
       gap = 8;
     } else if (isEPMulti) {
       startX = 752;

@@ -33,6 +33,16 @@ def get_monthly_report_period():
         return prev_month_start.date(), True
     return None, False
 
+def get_pending_monthly_periods():
+    today = datetime.now()
+    periods = []
+    for months_back in range(1, 4):
+        dt = today.replace(day=1)
+        for _ in range(months_back):
+            dt = (dt - timedelta(days=1)).replace(day=1)
+        periods.append(dt.date())
+    return periods
+
 @expected_reports_bp.route('/expected', methods=['GET'])
 @cross_origin()
 def get_expected_reports():
@@ -54,6 +64,24 @@ def get_expected_reports():
                     CMIExpectedReport.reporting_week_start == monthly_start
                 )
             )
+        pending_monthly_periods = get_pending_monthly_periods()
+        if pending_monthly_periods:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start.in_(pending_monthly_periods),
+                    CMIExpectedReport.is_submitted == False
+                )
+            )
+        week_1_start = week_start - timedelta(days=7)
+        week_2_start = week_start - timedelta(days=14)
+        filters.append(
+            and_(
+                CMIExpectedReport.reporting_week_start.in_([week_1_start, week_2_start]),
+                CMIExpectedReport.expected_data_frequency != 'Monthly',
+                CMIExpectedReport.status.in_(['attached', 'standalone', 'moved_to_due'])
+            )
+        )
         reports = session.query(CMIExpectedReport).filter(or_(*filters)).order_by(
             CMIExpectedReport.is_matched,
             CMIExpectedReport.brand_name
@@ -103,6 +131,7 @@ def get_expected_reports():
                 'agg_value': r.agg_value,
                 'status': r.status,
                 'is_submitted': r.is_submitted,
+                'submitted_for_week': r.submitted_for_week.isoformat() if r.submitted_for_week else None,
                 'source_file': r.source_file,
                 'notes': r.notes,
                 'contract_notes': contract.get('notes'),
@@ -282,6 +311,14 @@ def submit_expected_report(report_id):
         report.is_submitted = is_submitted
         report.updated_at = datetime.utcnow()
 
+        if is_submitted:
+            week_start, _ = get_current_reporting_week()
+            report.submitted_for_week = week_start
+            report.submitted_at = datetime.utcnow()
+        else:
+            report.submitted_for_week = None
+            report.submitted_at = None
+
         session.commit()
         session.close()
 
@@ -361,6 +398,15 @@ def auto_match_expected_reports():
                     CMIExpectedReport.reporting_week_start == monthly_start
                 )
             )
+        pending_monthly_periods = get_pending_monthly_periods()
+        if pending_monthly_periods:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start.in_(pending_monthly_periods),
+                    CMIExpectedReport.is_submitted == False
+                )
+            )
         expected_reports = session.query(CMIExpectedReport).filter(
             or_(*filters),
             CMIExpectedReport.is_matched == False
@@ -427,6 +473,15 @@ def create_from_placement():
                 and_(
                     CMIExpectedReport.expected_data_frequency == 'Monthly',
                     CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
+        pending_monthly_periods = get_pending_monthly_periods()
+        if pending_monthly_periods:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start.in_(pending_monthly_periods),
+                    CMIExpectedReport.is_submitted == False
                 )
             )
         existing = session.query(CMIExpectedReport).filter(
@@ -517,6 +572,15 @@ def get_no_data_reports():
                 and_(
                     CMIExpectedReport.expected_data_frequency == 'Monthly',
                     CMIExpectedReport.reporting_week_start == monthly_start
+                )
+            )
+        pending_monthly_periods = get_pending_monthly_periods()
+        if pending_monthly_periods:
+            filters.append(
+                and_(
+                    CMIExpectedReport.expected_data_frequency == 'Monthly',
+                    CMIExpectedReport.reporting_week_start.in_(pending_monthly_periods),
+                    CMIExpectedReport.is_submitted == False
                 )
             )
         reports = session.query(CMIExpectedReport).filter(
@@ -638,6 +702,146 @@ def get_no_data_reports():
         }), 200
 
     except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@expected_reports_bp.route('/expected/future', methods=['GET'])
+@cross_origin()
+def get_future_reports():
+    try:
+        session = get_session()
+        week_start, _ = get_current_reporting_week()
+
+        reports = session.query(CMIExpectedReport).filter(
+            CMIExpectedReport.reporting_week_start > week_start,
+            CMIExpectedReport.is_submitted == False
+        ).order_by(
+            CMIExpectedReport.reporting_week_start,
+            CMIExpectedReport.brand_name
+        ).all()
+
+        contracts_by_placement = {}
+        contract_values = session.query(CMIContractValue).all()
+        for cv in contract_values:
+            if cv.placement_id:
+                contracts_by_placement[str(cv.placement_id)] = {
+                    'notes': cv.notes,
+                    'placement_description': cv.placement_description,
+                    'metric': cv.metric,
+                    'frequency': cv.frequency
+                }
+
+        result = []
+        for r in reports:
+            contract = contracts_by_placement.get(str(r.cmi_placement_id), {}) if r.cmi_placement_id else {}
+            result.append({
+                'id': r.id,
+                'cmi_placement_id': r.cmi_placement_id,
+                'client_placement_id': r.client_placement_id,
+                'contract_number': r.contract_number,
+                'brand_name': r.brand_name,
+                'vehicle_name': r.vehicle_name,
+                'placement_description': r.placement_description or contract.get('placement_description'),
+                'data_type': r.data_type,
+                'expected_data_frequency': r.expected_data_frequency,
+                'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
+                'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
+                'is_agg_only': r.is_agg_only,
+                'status': r.status,
+                'notes': r.notes,
+                'contract_notes': contract.get('notes'),
+                'contract_metric': contract.get('metric'),
+                'contract_frequency': contract.get('frequency')
+            })
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'reports': result,
+            'count': len(result)
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@expected_reports_bp.route('/expected/archive-aggregates', methods=['GET'])
+@cross_origin()
+def get_archive_aggregates():
+    try:
+        session = get_session()
+        days_back = request.args.get('days_back', 90, type=int)
+        cutoff_date = (datetime.now() - timedelta(days=days_back)).date()
+
+        reports = session.query(CMIExpectedReport).filter(
+            CMIExpectedReport.is_submitted == True,
+            CMIExpectedReport.submitted_at >= cutoff_date,
+            or_(
+                CMIExpectedReport.is_agg_only == True,
+                CMIExpectedReport.data_type == 'AGG',
+                CMIExpectedReport.attached_to_campaign_id.isnot(None)
+            )
+        ).order_by(CMIExpectedReport.submitted_at.desc()).all()
+
+        contracts_by_placement = {}
+        contract_values = session.query(CMIContractValue).all()
+        for cv in contract_values:
+            if cv.placement_id:
+                contracts_by_placement[str(cv.placement_id)] = {
+                    'notes': cv.notes,
+                    'placement_description': cv.placement_description,
+                    'metric': cv.metric,
+                    'frequency': cv.frequency
+                }
+
+        result = []
+        for r in reports:
+            contract = contracts_by_placement.get(str(r.cmi_placement_id), {}) if r.cmi_placement_id else {}
+            result.append({
+                'id': r.id,
+                'cmi_placement_id': r.cmi_placement_id,
+                'client_placement_id': r.client_placement_id,
+                'contract_number': r.contract_number,
+                'brand_name': r.brand_name,
+                'vehicle_name': r.vehicle_name,
+                'placement_description': r.placement_description,
+                'data_type': r.data_type,
+                'expected_data_frequency': r.expected_data_frequency,
+                'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
+                'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
+                'agg_metric': r.agg_metric or contract.get('metric'),
+                'agg_value': r.agg_value,
+                'is_agg_only': r.is_agg_only,
+                'attached_to_campaign_id': r.attached_to_campaign_id,
+                'is_standalone': r.is_standalone,
+                'status': r.status,
+                'is_submitted': r.is_submitted,
+                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                'submitted_for_week': r.submitted_for_week.isoformat() if r.submitted_for_week else None,
+                'notes': r.notes,
+                'contract_notes': contract.get('notes'),
+                'contract_metric': contract.get('metric'),
+                'contract_frequency': contract.get('frequency')
+            })
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'reports': result,
+            'count': len(result)
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'status': 'error',
             'message': str(e)

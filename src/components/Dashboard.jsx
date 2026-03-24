@@ -14,6 +14,8 @@ import ABTestingPage from '../pages/ABTestingPage';
 import ContentPerformancePage from '../pages/ContentPerformancePage';
 import AudienceAnalyticsPage from '../pages/AudienceAnalyticsPage';
 import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
+import ProgramPerformancePage from '../pages/ProgramPerformancePage';
+import DocumentationPage from '../pages/DocumentationPage';
 
 const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
   return (
@@ -25,6 +27,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/" element={<Navigate to="/campaigns" replace />} />
           <Route path="/campaigns" element={<CampaignPerformancePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/programs" element={<ProgramPerformancePage />} />
           <Route path="/dashboard-builder" element={<DashboardCanvas />} />
           <Route path="/ab-testing" element={<ABTestingPage />} />
           <Route path="/reports" element={<ReportsPage />} />
@@ -35,6 +38,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/cmi-contracts" element={<CMIContractsPage />} />
           <Route path="/brands" element={<BrandManagementPage />} />
           <Route path="/tracking" element={<TrackingPage />} />
+          <Route path="/documentation" element={<DocumentationPage />} />
         </Routes>
       )}
     </AppLayout>

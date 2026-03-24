@@ -57,7 +57,7 @@ const TableComponent = ({
         .slice(0, 5);
       
       const specialtyData = [
-        ['Specialty', 'Open Rate', 'Audience', 'vs Industry'],
+        ['Specialty', 'Open Rate', 'Audience', 'vs Market'],
         ...specialties.map(([name, data]) => [
           name.split(' - ')[0], 
           `${data.unique_open_rate?.toFixed(1) || 0}%`,

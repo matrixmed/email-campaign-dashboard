@@ -269,6 +269,309 @@ def analyze_list():
             'error': str(e)
         }), 500
 
+@users_bp.route('/engagement-patterns/status', methods=['GET'])
+def engagement_patterns_status():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT COUNT(*) as total_users,
+                   MAX(computed_at) as last_computed
+            FROM user_engagement_summary
+        """)
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return jsonify({
+            'success': True,
+            'total_users': row['total_users'] or 0,
+            'last_computed': row['last_computed'].isoformat() if row['last_computed'] else None
+        }), 200
+    except Exception as e:
+        return jsonify({'success': True, 'total_users': 0, 'last_computed': None}), 200
+
+@users_bp.route('/engagement-patterns/refresh', methods=['POST'])
+def engagement_patterns_refresh():
+    try:
+        import psycopg2
+        data = request.get_json() or {}
+        batch_size = data.get('batch_size', 500)
+        batch_offset = data.get('batch_offset', 0)
+        fast_open_minutes = data.get('fast_open_minutes', 30)
+
+        db_url = os.environ.get('DATABASE_URL')
+
+        if batch_offset == 0:
+            conn = psycopg2.connect(db_url, connect_timeout=15,
+                keepalives=1, keepalives_idle=10, keepalives_interval=5, keepalives_count=5,
+                options='-c statement_timeout=30000')
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT email) FROM campaign_interactions WHERE event_type = 'sent'")
+            total_emails = cursor.fetchone()[0]
+            cursor.execute("TRUNCATE TABLE user_engagement_summary")
+            conn.commit()
+            cursor.close()
+            conn.close()
+        else:
+            total_emails = data.get('total_emails', 0)
+
+        conn = psycopg2.connect(db_url, connect_timeout=15,
+            keepalives=1, keepalives_idle=10, keepalives_interval=5, keepalives_count=5,
+            options='-c statement_timeout=60000')
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute("""
+            SELECT email FROM (
+                SELECT DISTINCT email FROM campaign_interactions WHERE event_type = 'sent'
+                ORDER BY email
+            ) sub
+            OFFSET %s LIMIT %s
+        """, (batch_offset, batch_size))
+        email_rows = cursor.fetchall()
+        emails = [r['email'] for r in email_rows]
+
+        if not emails:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': True,
+                'done': True,
+                'processed': batch_offset,
+                'total_emails': total_emails
+            }), 200
+
+        cursor.execute("""
+            WITH batch_stats AS (
+                SELECT
+                    ci.email,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' THEN cd.campaign_base_name END) as campaigns_received,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN cd.campaign_base_name END) as campaigns_opened,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN cd.campaign_base_name END) as campaigns_clicked,
+                    MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as first_campaign_date,
+                    MAX(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as last_campaign_date
+                FROM campaign_interactions ci
+                JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                WHERE ci.email = ANY(%s)
+                GROUP BY ci.email
+            )
+            SELECT bs.*,
+                   up.npi, up.first_name, up.last_name, up.specialty
+            FROM batch_stats bs
+            LEFT JOIN user_profiles up ON LOWER(up.email) = bs.email
+        """, (emails,))
+        base_rows = cursor.fetchall()
+
+        if not base_rows:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': True,
+                'done': False,
+                'processed': batch_offset + len(emails),
+                'total_emails': total_emails
+            }), 200
+
+        cursor.execute("""
+            WITH interaction_agg AS (
+                SELECT ci.email, cd.campaign_base_name,
+                    MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
+                    MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened
+                FROM campaign_interactions ci
+                JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                WHERE ci.email = ANY(%s)
+                GROUP BY ci.email, cd.campaign_base_name
+            ),
+            campaign_timeline AS (
+                SELECT email, was_opened,
+                    ROW_NUMBER() OVER (PARTITION BY email ORDER BY sent_time) as seq,
+                    ROW_NUMBER() OVER (PARTITION BY email ORDER BY sent_time DESC) as rev_seq,
+                    COUNT(*) OVER (PARTITION BY email) as total
+                FROM interaction_agg
+                WHERE sent_time IS NOT NULL
+            )
+            SELECT email,
+                AVG(CASE WHEN seq <= total * 0.4 THEN was_opened::float END) as early_rate,
+                AVG(CASE WHEN seq > total * 0.6 THEN was_opened::float END) as late_rate,
+                SUM(CASE WHEN rev_seq <= 5 THEN was_opened ELSE 0 END) as recent_opens,
+                CASE WHEN MAX(total) > 5 THEN
+                    SUM(CASE WHEN rev_seq > 5 THEN was_opened ELSE 0 END)::float /
+                    NULLIF(COUNT(CASE WHEN rev_seq > 5 THEN 1 END), 0)
+                ELSE NULL END as historical_open_rate,
+                SUM(CASE WHEN seq <= 3 THEN was_opened ELSE 0 END) as first_three_opens,
+                SUM(CASE WHEN seq > 3 THEN was_opened ELSE 0 END) as later_opens
+            FROM campaign_timeline
+            GROUP BY email
+        """, (emails,))
+        timeline_rows = {r['email']: dict(r) for r in cursor.fetchall()}
+
+        cursor.execute("""
+            WITH open_timing AS (
+                SELECT ci.email,
+                    MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
+                    MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) as first_open
+                FROM campaign_interactions ci
+                WHERE ci.email = ANY(%s) AND ci.event_type IN ('sent', 'open')
+                GROUP BY ci.email, ci.campaign_id
+                HAVING MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) IS NOT NULL
+                    AND MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) IS NOT NULL
+            )
+            SELECT email,
+                AVG(EXTRACT(EPOCH FROM (first_open - sent_time)) / 60) as avg_open_minutes,
+                SUM(CASE WHEN EXTRACT(EPOCH FROM (first_open - sent_time)) / 60 <= %s THEN 1 ELSE 0 END) as fast_opens
+            FROM open_timing
+            WHERE first_open > sent_time
+            GROUP BY email
+        """, (emails, fast_open_minutes))
+        timing_rows = {r['email']: dict(r) for r in cursor.fetchall()}
+
+        cursor.execute("""
+            WITH open_events AS (
+                SELECT ci.email, ci.timestamp,
+                    LAG(ci.timestamp) OVER (PARTITION BY ci.email ORDER BY ci.timestamp) as prev_open
+                FROM campaign_interactions ci
+                WHERE ci.event_type = 'open' AND ci.email = ANY(%s)
+            )
+            SELECT email,
+                COUNT(*) as total_opens,
+                SUM(CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open)) <= 1800 THEN 1 ELSE 0 END) as rapid_opens,
+                COUNT(DISTINCT CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open)) <= 1800
+                    THEN DATE_TRUNC('hour', timestamp) END) as binge_sessions
+            FROM open_events
+            WHERE prev_open IS NOT NULL
+            GROUP BY email
+        """, (emails,))
+        binge_rows = {r['email']: dict(r) for r in cursor.fetchall()}
+
+        cursor.execute("""
+            WITH sent_times AS (
+                SELECT email, campaign_id, MIN(timestamp) as sent_time
+                FROM campaign_interactions
+                WHERE event_type = 'sent' AND email = ANY(%s)
+                GROUP BY email, campaign_id
+            ),
+            delayed AS (
+                SELECT ci.email,
+                    EXTRACT(DOW FROM ci.timestamp) as dow,
+                    EXTRACT(HOUR FROM ci.timestamp) as hour_of_day
+                FROM campaign_interactions ci
+                JOIN sent_times st ON ci.email = st.email AND ci.campaign_id = st.campaign_id
+                WHERE ci.event_type = 'open'
+                    AND ci.timestamp > st.sent_time + INTERVAL '4 hours'
+            )
+            SELECT email,
+                COUNT(*) as delayed_opens,
+                SUM(CASE WHEN dow IN (0, 6) THEN 1 ELSE 0 END) as weekend_opens,
+                SUM(CASE WHEN dow NOT IN (0, 6) THEN 1 ELSE 0 END) as weekday_opens,
+                AVG(hour_of_day) as avg_hour,
+                SUM(CASE WHEN hour_of_day BETWEEN 5 AND 9 THEN 1 ELSE 0 END) as early_morning_opens,
+                SUM(CASE WHEN hour_of_day BETWEEN 20 AND 23 OR hour_of_day BETWEEN 0 AND 4 THEN 1 ELSE 0 END) as night_opens
+            FROM delayed
+            GROUP BY email
+        """, (emails,))
+        delayed_rows = {r['email']: dict(r) for r in cursor.fetchall()}
+
+        insert_values = []
+        for row in base_rows:
+            email = row['email']
+            t = timeline_rows.get(email, {})
+            tm = timing_rows.get(email, {})
+            b = binge_rows.get(email, {})
+            d = delayed_rows.get(email, {})
+
+            cr = row['campaigns_received'] or 0
+            co = row['campaigns_opened'] or 0
+            cc = row['campaigns_clicked'] or 0
+
+            insert_values.append((
+                email,
+                row.get('npi'), row.get('first_name'), row.get('last_name'), row.get('specialty'),
+                cr, co, cc,
+                round(co / cr * 100, 2) if cr > 0 else 0,
+                round(cc / co * 100, 2) if co > 0 else 0,
+                row.get('first_campaign_date'), row.get('last_campaign_date'),
+                round((t.get('early_rate') or 0) * 100, 2) if t.get('early_rate') is not None else None,
+                round((t.get('late_rate') or 0) * 100, 2) if t.get('late_rate') is not None else None,
+                t.get('recent_opens', 0),
+                round((t.get('historical_open_rate') or 0) * 100, 2) if t.get('historical_open_rate') is not None else None,
+                t.get('first_three_opens', 0),
+                t.get('later_opens', 0),
+                round(float(tm.get('avg_open_minutes') or 0), 1) if tm.get('avg_open_minutes') else None,
+                tm.get('fast_opens', 0),
+                b.get('total_opens', 0),
+                b.get('rapid_opens', 0),
+                b.get('binge_sessions', 0),
+                d.get('delayed_opens', 0),
+                d.get('weekend_opens', 0),
+                d.get('weekday_opens', 0),
+                round(float(d.get('avg_hour') or 0), 1) if d.get('avg_hour') is not None else None,
+                d.get('early_morning_opens', 0),
+                d.get('night_opens', 0)
+            ))
+
+        if insert_values:
+            from psycopg2.extras import execute_values
+            execute_values(cursor, """
+                INSERT INTO user_engagement_summary (
+                    email, npi, first_name, last_name, specialty,
+                    campaigns_received, campaigns_opened, campaigns_clicked,
+                    unique_open_rate, unique_click_rate,
+                    first_campaign_date, last_campaign_date,
+                    early_open_rate, late_open_rate,
+                    recent_opens, historical_open_rate,
+                    first_three_opens, later_opens,
+                    avg_open_minutes, fast_opens,
+                    total_opens, rapid_opens, binge_sessions,
+                    delayed_opens, weekend_opens, weekday_opens,
+                    avg_open_hour, early_morning_opens, night_opens
+                ) VALUES %s
+                ON CONFLICT (email) DO UPDATE SET
+                    npi = EXCLUDED.npi, first_name = EXCLUDED.first_name,
+                    last_name = EXCLUDED.last_name, specialty = EXCLUDED.specialty,
+                    campaigns_received = EXCLUDED.campaigns_received,
+                    campaigns_opened = EXCLUDED.campaigns_opened,
+                    campaigns_clicked = EXCLUDED.campaigns_clicked,
+                    unique_open_rate = EXCLUDED.unique_open_rate,
+                    unique_click_rate = EXCLUDED.unique_click_rate,
+                    first_campaign_date = EXCLUDED.first_campaign_date,
+                    last_campaign_date = EXCLUDED.last_campaign_date,
+                    early_open_rate = EXCLUDED.early_open_rate,
+                    late_open_rate = EXCLUDED.late_open_rate,
+                    recent_opens = EXCLUDED.recent_opens,
+                    historical_open_rate = EXCLUDED.historical_open_rate,
+                    first_three_opens = EXCLUDED.first_three_opens,
+                    later_opens = EXCLUDED.later_opens,
+                    avg_open_minutes = EXCLUDED.avg_open_minutes,
+                    fast_opens = EXCLUDED.fast_opens,
+                    total_opens = EXCLUDED.total_opens,
+                    rapid_opens = EXCLUDED.rapid_opens,
+                    binge_sessions = EXCLUDED.binge_sessions,
+                    delayed_opens = EXCLUDED.delayed_opens,
+                    weekend_opens = EXCLUDED.weekend_opens,
+                    weekday_opens = EXCLUDED.weekday_opens,
+                    avg_open_hour = EXCLUDED.avg_open_hour,
+                    early_morning_opens = EXCLUDED.early_morning_opens,
+                    night_opens = EXCLUDED.night_opens,
+                    computed_at = NOW()
+            """, insert_values)
+            conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        new_offset = batch_offset + len(emails)
+        return jsonify({
+            'success': True,
+            'done': new_offset >= total_emails,
+            'processed': new_offset,
+            'total_emails': total_emails,
+            'batch_size': batch_size
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @users_bp.route('/engagement-patterns', methods=['POST'])
 def engagement_patterns():
     try:
@@ -285,329 +588,146 @@ def engagement_patterns():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        base_filter = "WHERE campaigns_received >= %s"
+
         if pattern_type == 'infrequent_responders':
-            query = """
-                WITH user_stats AS (
-                    SELECT
-                        up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' THEN cd.campaign_base_name END) as campaigns_received,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN cd.campaign_base_name END) as campaigns_opened,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN cd.campaign_base_name END) as campaigns_clicked,
-                        COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
-                        COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, campaigns_received, campaigns_opened, campaigns_clicked, total_opens, total_clicks,
-                    ROUND((campaigns_opened::numeric / NULLIF(campaigns_received, 0) * 100), 2) as unique_open_rate,
-                    ROUND((total_opens::numeric / NULLIF(campaigns_received, 0) * 100), 2) as total_open_rate,
-                    ROUND((campaigns_clicked::numeric / NULLIF(campaigns_opened, 0) * 100), 2) as unique_click_rate,
-                    ROUND((total_clicks::numeric / NULLIF(total_opens, 0) * 100), 2) as total_click_rate
-                FROM user_stats
-                WHERE campaigns_received >= %s AND campaigns_opened > 0
-                    AND (campaigns_opened::numeric / NULLIF(campaigns_received, 0) * 100) <= %s
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received, campaigns_opened, unique_open_rate
+                FROM user_engagement_summary
+                {base_filter} AND campaigns_opened > 0 AND unique_open_rate <= %s
                 ORDER BY unique_open_rate ASC, campaigns_received DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns, infrequent_threshold))
 
         elif pattern_type == 'hyper_engaged':
-            query = """
-                WITH user_stats AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' THEN cd.campaign_base_name END) as campaigns_received,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN cd.campaign_base_name END) as campaigns_opened,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN cd.campaign_base_name END) as campaigns_clicked,
-                        COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
-                        COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, campaigns_received, campaigns_opened, campaigns_clicked, total_opens, total_clicks,
-                    ROUND((campaigns_opened::numeric / NULLIF(campaigns_received, 0) * 100), 2) as unique_open_rate,
-                    ROUND((total_opens::numeric / NULLIF(campaigns_received, 0) * 100), 2) as total_open_rate,
-                    ROUND((campaigns_clicked::numeric / NULLIF(campaigns_opened, 0) * 100), 2) as unique_click_rate,
-                    ROUND((total_clicks::numeric / NULLIF(total_opens, 0) * 100), 2) as total_click_rate
-                FROM user_stats
-                WHERE campaigns_received >= %s AND (campaigns_opened::numeric / NULLIF(campaigns_received, 0) * 100) >= %s
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received, campaigns_opened, unique_open_rate
+                FROM user_engagement_summary
+                {base_filter} AND unique_open_rate >= %s
                 ORDER BY unique_open_rate DESC, campaigns_received DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns, hyper_engaged_threshold))
 
         elif pattern_type == 'heavy_inactive':
-            query = """
-                WITH user_stats AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' THEN cd.campaign_base_name END) as campaigns_received,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN cd.campaign_base_name END) as campaigns_opened,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN cd.campaign_base_name END) as campaigns_clicked,
-                        COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
-                        COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, campaigns_received, campaigns_opened, campaigns_clicked, total_opens, total_clicks,
-                    0 as unique_open_rate, 0 as total_open_rate, 0 as unique_click_rate, 0 as total_click_rate
-                FROM user_stats
-                WHERE campaigns_received >= %s AND campaigns_opened = 0
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received
+                FROM user_engagement_summary
+                {base_filter} AND campaigns_opened = 0
                 ORDER BY campaigns_received DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
 
         elif pattern_type == 'click_champions':
-            query = """
-                WITH user_stats AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' THEN cd.campaign_base_name END) as campaigns_received,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN cd.campaign_base_name END) as campaigns_opened,
-                        COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN cd.campaign_base_name END) as campaigns_clicked,
-                        COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
-                        COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, campaigns_received, campaigns_opened, campaigns_clicked, total_opens, total_clicks,
-                    ROUND((campaigns_opened::numeric / NULLIF(campaigns_received, 0) * 100), 2) as unique_open_rate,
-                    ROUND((total_opens::numeric / NULLIF(campaigns_received, 0) * 100), 2) as total_open_rate,
-                    ROUND((campaigns_clicked::numeric / NULLIF(campaigns_opened, 0) * 100), 2) as unique_click_rate,
-                    ROUND((total_clicks::numeric / NULLIF(total_opens, 0) * 100), 2) as total_click_rate
-                FROM user_stats
-                WHERE campaigns_received >= %s AND campaigns_clicked > 0
-                    AND (campaigns_clicked::numeric / NULLIF(campaigns_opened, 0) * 100) >= 30
-                ORDER BY unique_click_rate DESC, total_clicks DESC LIMIT 1000
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received, campaigns_clicked, unique_click_rate
+                FROM user_engagement_summary
+                {base_filter} AND campaigns_clicked > 0 AND unique_click_rate >= 30
+                ORDER BY unique_click_rate DESC, campaigns_clicked DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
 
         elif pattern_type == 'declining_engagement':
-            query = """
-                WITH campaign_timeline AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
-                        MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
-                        ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence,
-                        COUNT(*) OVER (PARTITION BY up.email) as total_user_campaigns
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
-                ),
-                early_late_comparison AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        MAX(total_user_campaigns) as total_campaigns,
-                        AVG(CASE WHEN campaign_sequence <= total_user_campaigns * 0.4 THEN was_opened ELSE NULL END) as early_open_rate,
-                        AVG(CASE WHEN campaign_sequence > total_user_campaigns * 0.6 THEN was_opened ELSE NULL END) as late_open_rate
-                    FROM campaign_timeline GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_campaigns,
-                    ROUND((early_open_rate * 100)::numeric, 2) as early_open_rate,
-                    ROUND((late_open_rate * 100)::numeric, 2) as late_open_rate,
-                    ROUND(((early_open_rate - late_open_rate) * 100)::numeric, 2) as engagement_decline
-                FROM early_late_comparison
-                WHERE total_campaigns >= %s AND early_open_rate > late_open_rate AND (early_open_rate - late_open_rate) >= 0.2
-                ORDER BY engagement_decline DESC, total_campaigns DESC LIMIT 1000
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received as total_campaigns,
+                    early_open_rate, late_open_rate,
+                    ROUND((early_open_rate - late_open_rate)::numeric, 2) as engagement_decline
+                FROM user_engagement_summary
+                {base_filter}
+                    AND early_open_rate IS NOT NULL AND late_open_rate IS NOT NULL
+                    AND early_open_rate > late_open_rate
+                    AND (early_open_rate - late_open_rate) >= 20
+                ORDER BY engagement_decline DESC, campaigns_received DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
 
         elif pattern_type == 'recently_reengaged':
-            query = """
-                WITH campaign_timeline AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
-                        MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
-                        ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) DESC) as reverse_sequence
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
-                ),
-                recent_vs_historical AS (
-                    SELECT email, npi, first_name, last_name, specialty, COUNT(*) as total_campaigns,
-                        SUM(CASE WHEN reverse_sequence <= 5 THEN was_opened ELSE 0 END) as recent_opens,
-                        SUM(CASE WHEN reverse_sequence > 5 THEN was_opened ELSE 0 END) as historical_opens,
-                        COUNT(CASE WHEN reverse_sequence > 5 THEN 1 END) as historical_campaigns
-                    FROM campaign_timeline GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_campaigns, recent_opens, historical_opens, historical_campaigns,
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received as total_campaigns,
+                    recent_opens,
                     ROUND((recent_opens::numeric / 5 * 100), 2) as recent_open_rate,
-                    ROUND((historical_opens::numeric / NULLIF(historical_campaigns, 0) * 100), 2) as historical_open_rate
-                FROM recent_vs_historical
-                WHERE total_campaigns >= %s AND recent_opens >= 2
-                    AND (historical_opens::numeric / NULLIF(historical_campaigns, 0)) < 0.2
+                    ROUND(historical_open_rate::numeric, 2) as historical_open_rate
+                FROM user_engagement_summary
+                {base_filter}
+                    AND recent_opens >= 2
+                    AND historical_open_rate IS NOT NULL
+                    AND historical_open_rate < 20
                 ORDER BY recent_opens DESC, historical_open_rate ASC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
 
-        elif pattern_type == 'weekend_warriors':
-            query = """
-                WITH open_timing AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        ci.campaign_id, cd.campaign_base_name, ci.timestamp,
-                        EXTRACT(DOW FROM ci.timestamp) as day_of_week,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) OVER (PARTITION BY up.email, ci.campaign_id) as sent_time
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    WHERE ci.event_type = 'open'
-                ),
-                delayed_campaign_opens AS (
-                    SELECT DISTINCT ON (email, campaign_base_name)
-                        email, npi, first_name, last_name, specialty, campaign_base_name,
-                        CASE WHEN day_of_week IN (0, 6) THEN 1 ELSE 0 END as is_weekend
-                    FROM open_timing
-                    WHERE timestamp > sent_time + INTERVAL '4 hours'
-                    ORDER BY email, campaign_base_name, timestamp
-                ),
-                user_patterns AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(*) as total_delayed_opens,
-                        SUM(is_weekend) as weekend_opens,
-                        COUNT(*) - SUM(is_weekend) as weekday_opens
-                    FROM delayed_campaign_opens
-                    GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_delayed_opens, weekend_opens, weekday_opens,
-                    ROUND((weekend_opens::numeric / NULLIF(total_delayed_opens, 0) * 100), 2) as weekend_open_rate,
-                    ROUND((weekday_opens::numeric / NULLIF(total_delayed_opens, 0) * 100), 2) as weekday_open_rate
-                FROM user_patterns
-                WHERE total_delayed_opens >= %s AND weekend_opens > weekday_opens
-                ORDER BY weekend_open_rate DESC LIMIT 1000
-            """
-            cursor.execute(query, (min_campaigns,))
-
-        elif pattern_type == 'binge_readers':
-            query = """
-                WITH open_events AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        ci.timestamp, cd.campaign_base_name,
-                        LAG(ci.timestamp) OVER (PARTITION BY up.email ORDER BY ci.timestamp) as prev_open_time
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    WHERE ci.event_type = 'open'
-                ),
-                binge_stats AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(*) as total_opens,
-                        SUM(CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open_time)) <= 1800 THEN 1 ELSE 0 END) as rapid_opens,
-                        COUNT(DISTINCT CASE WHEN EXTRACT(EPOCH FROM (timestamp - prev_open_time)) <= 1800
-                            THEN DATE_TRUNC('hour', timestamp) END) as binge_sessions
-                    FROM open_events
-                    WHERE prev_open_time IS NOT NULL
-                    GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_opens, rapid_opens, binge_sessions,
-                    ROUND((rapid_opens::numeric / NULLIF(total_opens, 0) * 100), 2) as binge_rate
-                FROM binge_stats
-                WHERE total_opens >= %s AND rapid_opens >= 3
-                ORDER BY binge_rate DESC, rapid_opens DESC LIMIT 1000
-            """
-            cursor.execute(query, (min_campaigns,))
-
         elif pattern_type == 'one_and_done':
-            query = """
-                WITH campaign_timeline AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
-                        MAX(CASE WHEN ci.event_type = 'open' THEN 1 ELSE 0 END) as was_opened,
-                        ROW_NUMBER() OVER (PARTITION BY up.email ORDER BY MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END)) as campaign_sequence
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name
-                ),
-                early_vs_later AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(*) as total_campaigns,
-                        SUM(CASE WHEN campaign_sequence <= 3 THEN was_opened ELSE 0 END) as first_three_opens,
-                        SUM(CASE WHEN campaign_sequence > 3 THEN was_opened ELSE 0 END) as later_opens
-                    FROM campaign_timeline
-                    GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_campaigns, first_three_opens, later_opens,
-                    ROUND((first_three_opens::numeric / 3 * 100), 2) as early_open_rate,
-                    ROUND((later_opens::numeric / NULLIF(total_campaigns - 3, 0) * 100), 2) as later_open_rate
-                FROM early_vs_later
-                WHERE total_campaigns >= %s AND first_three_opens >= 1 AND later_opens = 0
-                ORDER BY first_three_opens DESC, total_campaigns DESC LIMIT 1000
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_received as total_campaigns,
+                    first_three_opens, later_opens
+                FROM user_engagement_summary
+                {base_filter}
+                    AND first_three_opens >= 1 AND later_opens = 0
+                ORDER BY first_three_opens DESC, campaigns_received DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
 
         elif pattern_type == 'fast_openers':
-            query = """
-                WITH open_timing AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        ci.campaign_id, cd.campaign_base_name,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) as sent_time,
-                        MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) as first_open_time
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, ci.campaign_id, cd.campaign_base_name
-                    HAVING MIN(CASE WHEN ci.event_type = 'open' THEN ci.timestamp END) IS NOT NULL
-                        AND MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) IS NOT NULL
-                ),
-                user_speed AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(*) as campaigns_opened,
-                        AVG(EXTRACT(EPOCH FROM (first_open_time - sent_time)) / 60) as avg_open_minutes,
-                        SUM(CASE WHEN EXTRACT(EPOCH FROM (first_open_time - sent_time)) / 60 <= %s THEN 1 ELSE 0 END) as fast_opens
-                    FROM open_timing
-                    WHERE first_open_time > sent_time
-                    GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, campaigns_opened,
-                    ROUND(avg_open_minutes::numeric, 1) as avg_open_minutes,
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    campaigns_opened,
+                    avg_open_minutes,
                     fast_opens,
                     ROUND((fast_opens::numeric / NULLIF(campaigns_opened, 0) * 100), 2) as fast_open_rate
-                FROM user_speed
-                WHERE campaigns_opened >= %s AND fast_opens >= 2
+                FROM user_engagement_summary
+                {base_filter} AND campaigns_opened > 0 AND fast_opens >= 2
                 ORDER BY fast_open_rate DESC, avg_open_minutes ASC LIMIT 1000
             """
-            cursor.execute(query, (fast_open_minutes, min_campaigns))
+            cursor.execute(query, (min_campaigns,))
 
-        elif pattern_type == 'early_birds_night_owls':
-            query = """
-                WITH open_timing AS (
-                    SELECT up.email, up.npi, up.first_name, up.last_name, up.specialty,
-                        ci.timestamp, EXTRACT(HOUR FROM ci.timestamp) as hour_of_day,
-                        MIN(CASE WHEN ci.event_type = 'sent' THEN ci.timestamp END) OVER (PARTITION BY up.email, ci.campaign_id) as sent_time
-                    FROM user_profiles up
-                    JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-                    JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                    WHERE ci.event_type = 'open'
-                ),
-                delayed_opens AS (
-                    SELECT email, npi, first_name, last_name, specialty, hour_of_day
-                    FROM open_timing
-                    WHERE timestamp > sent_time + INTERVAL '4 hours'
-                ),
-                user_patterns AS (
-                    SELECT email, npi, first_name, last_name, specialty,
-                        COUNT(*) as total_delayed_opens,
-                        AVG(hour_of_day) as avg_hour,
-                        SUM(CASE WHEN hour_of_day BETWEEN 5 AND 9 THEN 1 ELSE 0 END) as early_morning_opens,
-                        SUM(CASE WHEN hour_of_day BETWEEN 20 AND 23 OR hour_of_day BETWEEN 0 AND 4 THEN 1 ELSE 0 END) as night_opens
-                    FROM delayed_opens
-                    GROUP BY email, npi, first_name, last_name, specialty
-                )
-                SELECT email, npi, first_name, last_name, specialty, total_delayed_opens,
-                    ROUND(avg_hour::numeric, 1) as avg_hour,
-                    early_morning_opens, night_opens,
-                    CASE WHEN avg_hour >= 5 AND avg_hour <= 9 THEN 'Early Bird'
-                         WHEN avg_hour >= 20 OR avg_hour <= 4 THEN 'Night Owl'
-                         ELSE 'Midday' END as reader_type
-                FROM user_patterns
-                WHERE total_delayed_opens >= %s AND (early_morning_opens > 0 OR night_opens > 0)
-                ORDER BY avg_hour ASC LIMIT 1000
+        elif pattern_type == 'binge_readers':
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    total_opens, rapid_opens, binge_sessions,
+                    ROUND((rapid_opens::numeric / NULLIF(total_opens, 0) * 100), 2) as binge_rate
+                FROM user_engagement_summary
+                {base_filter} AND total_opens > 0 AND rapid_opens >= 3
+                ORDER BY binge_rate DESC, rapid_opens DESC LIMIT 1000
             """
             cursor.execute(query, (min_campaigns,))
+
+        elif pattern_type == 'weekend_warriors':
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    delayed_opens as total_delayed_opens,
+                    weekend_opens, weekday_opens,
+                    ROUND((weekend_opens::numeric / NULLIF(delayed_opens, 0) * 100), 2) as weekend_open_rate
+                FROM user_engagement_summary
+                {base_filter} AND delayed_opens > 0 AND weekend_opens > weekday_opens
+                ORDER BY weekend_open_rate DESC LIMIT 1000
+            """
+            cursor.execute(query, (min_campaigns,))
+
+        elif pattern_type == 'early_birds_night_owls':
+            query = f"""
+                SELECT email, npi, first_name, last_name, specialty,
+                    delayed_opens as total_delayed_opens,
+                    avg_open_hour as avg_hour,
+                    early_morning_opens, night_opens,
+                    CASE WHEN avg_open_hour >= 5 AND avg_open_hour <= 9 THEN 'Early Bird'
+                         WHEN avg_open_hour >= 20 OR avg_open_hour <= 4 THEN 'Night Owl'
+                         ELSE 'Midday' END as reader_type
+                FROM user_engagement_summary
+                {base_filter} AND delayed_opens > 0 AND (early_morning_opens > 0 OR night_opens > 0)
+                ORDER BY avg_open_hour ASC LIMIT 1000
+            """
+            cursor.execute(query, (min_campaigns,))
+
+        else:
+            cursor.close()
+            conn.close()
+            return jsonify({'success': False, 'error': f'Unknown pattern type: {pattern_type}'}), 400
 
         raw_results = cursor.fetchall()
         results = [dict(row) for row in raw_results]
@@ -629,20 +749,13 @@ def engagement_patterns():
             output = io.StringIO()
             writer = csv.writer(output)
 
-            if pattern_type == 'declining_engagement':
-                headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Total Campaigns', 'Early Open Rate (%)', 'Late Open Rate (%)', 'Engagement Decline (%)']
+            if results:
+                headers = list(results[0].keys())
                 writer.writerow(headers)
                 for user in results:
-                    writer.writerow([user.get('email', ''), user.get('npi', ''), user.get('first_name', ''), user.get('last_name', ''), user.get('specialty', ''),
-                                   user.get('total_campaigns', 0), user.get('early_open_rate', 0), user.get('late_open_rate', 0), user.get('engagement_decline', 0)])
+                    writer.writerow([user.get(h, '') for h in headers])
             else:
-                headers = ['Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Campaigns Received', 'Campaigns Opened', 'Campaigns Clicked',
-                          'Total Opens', 'Total Clicks', 'Unique Open Rate (%)', 'Total Open Rate (%)', 'Unique Click Rate (%)', 'Total Click Rate (%)']
-                writer.writerow(headers)
-                for user in results:
-                    writer.writerow([user.get('email', ''), user.get('npi', ''), user.get('first_name', ''), user.get('last_name', ''), user.get('specialty', ''),
-                                   user.get('campaigns_received', 0), user.get('campaigns_opened', 0), user.get('campaigns_clicked', 0), user.get('total_opens', 0),
-                                   user.get('total_clicks', 0), user.get('unique_open_rate', 0), user.get('total_open_rate', 0), user.get('unique_click_rate', 0), user.get('total_click_rate', 0)])
+                writer.writerow(['No results'])
 
             output.seek(0)
             response = make_response(output.getvalue())

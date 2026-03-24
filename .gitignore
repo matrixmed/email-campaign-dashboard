@@ -16,6 +16,8 @@
 /backend/migrations
 backend/example_metadata_files
 rename_campaigns.py
+src/components/listanalysis/Print Lists
+src/components/printManagement/ncoa
 
 # misc
 .DS_Store

@@ -312,7 +312,7 @@ const ListEfficiencyAnalysis = () => {
     return (
         <>
         <div className="section-header-bar">
-            <h3>List Efficiency Analysis</h3>
+            <h3>IQVIA List Efficiency Analysis</h3>
             <button className="section-header-clear-btn" onClick={clearAnalysis}>Clear</button>
         </div>
         <div className="list-analysis-container">

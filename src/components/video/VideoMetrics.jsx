@@ -17,7 +17,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVideo, setSelectedVideo] = useState(null);
-    const [sortColumn, setSortColumn] = useState('views');
+    const [sortColumn, setSortColumn] = useState('publishedAt');
     const [sortDirection, setSortDirection] = useState('desc');
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState('all');
@@ -185,14 +185,22 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
             });
         }
 
-        const sortedVideos = videosArray.sort((a, b) => (b.views || 0) - (a.views || 0));
+        const sortedVideos = videosArray.sort((a, b) => {
+            const aDate = new Date(a.publishedAt || 0);
+            const bDate = new Date(b.publishedAt || 0);
+            return bDate - aDate;
+        });
         setVideosList(sortedVideos);
 
         let filtered = sortedVideos;
 
         if (videoSource === 'youtube' && viewMode !== 'channel') {
             filtered = mergeVideosByTitle(filtered);
-            filtered = filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
+            filtered = filtered.sort((a, b) => {
+                const aDate = new Date(a.publishedAt || 0);
+                const bDate = new Date(b.publishedAt || 0);
+                return bDate - aDate;
+            });
         }
 
         if (viewMode === 'playlist' && selectedPlaylists.length > 0 && videoSource === 'youtube') {
@@ -246,14 +254,14 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
         setSortDirection(newDirection);
 
         const sorted = [...filteredData].sort((a, b) => {
+            if (column === 'publishedAt') {
+                const aDate = new Date(a.publishedAt || 0);
+                const bDate = new Date(b.publishedAt || 0);
+                return newDirection === 'asc' ? aDate - bDate : bDate - aDate;
+            }
             const aVal = a[column] || 0;
             const bVal = b[column] || 0;
-
-            if (newDirection === 'asc') {
-                return aVal - bVal;
-            } else {
-                return bVal - aVal;
-            }
+            return newDirection === 'asc' ? aVal - bVal : bVal - aVal;
         });
 
         setFilteredData(sorted);
@@ -344,6 +352,13 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
         if (newIdx >= 0 && newIdx < filteredData.length) {
             setSelectedVideo(filteredData[newIdx]);
         }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const formatNumber = (num) => {
@@ -521,11 +536,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                                     )}
                                 </div>
                             )}
-                            {(videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated) && (
-                                <div className="last-updated-tag">
-                                    Last Updated: {(() => { const raw = videoSource === 'youtube' ? (youtubeData.lastUpdated || youtubeData.last_updated) : vimeoData.last_updated; const d = new Date(raw + (raw.length === 10 ? 'T00:00:00' : '')); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
-                                </div>
-                            )}
+                            {(() => { const src = videoSource === 'youtube' ? youtubeData : vimeoData; const rawSynced = src.last_synced || src.lastSynced; const rawUpdated = src.last_updated || src.lastUpdated; const hasFresh = rawSynced && rawUpdated && rawSynced >= rawUpdated; const synced = hasFresh ? rawSynced : (rawUpdated || rawSynced); const dataThru = rawUpdated; if (!synced) return null; return (<div className="last-updated-tag"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg><span>Last synced: {(() => { const d = new Date(synced + (synced.length === 10 ? 'T00:00:00' : '')); if (!hasFresh) d.setDate(d.getDate() + 1); const now = new Date(); const diff = Math.floor((now - d) / 86400000); if (diff === 0) return 'Today'; if (diff === 1) return 'Yesterday'; if (diff < 7) return `${diff} days ago`; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}{dataThru ? ` | Data through: ${new Date(dataThru + (dataThru.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</span></div>); })()}
                             
                         </div>
                     </div>
@@ -596,6 +607,9 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                                 {videoSource === 'youtube' && (
                                     <th className="playlist-column">Playlist</th>
                                 )}
+                                <th className="metric-column sortable" onClick={() => handleSort('publishedAt')}>
+                                    Date {sortColumn === 'publishedAt' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
+                                </th>
                                 <th className="metric-column sortable" onClick={() => handleSort('views')}>
                                     Views {sortColumn === 'views' && <span className="sort-indicator">{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
                                 </th>
@@ -654,6 +668,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                                             )}
                                         </td>
                                     )}
+                                    <td className="metric-column">{formatDate(item.publishedAt)}</td>
                                     <td className="metric-column">{formatNumber(item.views)}</td>
                                     {videoSource === 'vimeo' && <td className="metric-column">{formatNumber(item.impressions)}</td>}
                                     {videoSource === 'vimeo' && <td className="metric-column">{formatPercent(item.ctr)}</td>}

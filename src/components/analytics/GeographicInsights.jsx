@@ -86,7 +86,7 @@ const GeographicInsights = () => {
   const fetchCampaigns = async () => {
     try {
       const dashboardMetricsUrl = 'https://emaildash.blob.core.windows.net/json-data/dashboard_metrics.json?sp=r&st=2025-06-09T18:55:36Z&se=2027-06-17T02:55:36Z&spr=https&sv=2024-11-04&sr=b&sig=9o5%2B%2BHmlqiFuAQmw9bGl0D2485Z8xTy0XXsb10S2aCI%3D';
-      const response = await fetch(dashboardMetricsUrl);
+      const response = await fetch(`${dashboardMetricsUrl}&_t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
         const validCampaigns = Array.isArray(data) ? data : [];

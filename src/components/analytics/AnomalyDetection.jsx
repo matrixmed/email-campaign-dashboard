@@ -4,6 +4,8 @@ import '../../styles/AnomalyDetection.css';
 import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { API_BASE_URL } from '../../config/api';
+import { KEYWORD_INDUSTRY_MAP, getIndustryFromMap } from '../../utils/industryKeywords';
+import NormalDistributionModal from './NormalDistributionModal';
 
 const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy = 'content', onAnalyzeByChange, onDetectByDiseaseChange }) => {
   const [anomalies, setAnomalies] = useState([]);
@@ -11,6 +13,8 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
   const [showOverperforming, setShowOverperforming] = useState(false);
   const [brandIndustryMap, setBrandIndustryMap] = useState({});
   const [brands, setBrands] = useState([]);
+  const [selectedAnomaly, setSelectedAnomaly] = useState(null);
+  const [groupCampaignsMap, setGroupCampaignsMap] = useState({});
 
   useEffect(() => {
     const fetchBrandData = async () => {
@@ -167,7 +171,13 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
     }
 
     if (!matchedIndustry) {
-      return { industry: null, disease: 'Other' };
+      const kwMatch = getIndustryFromMap(campaignName, KEYWORD_INDUSTRY_MAP);
+      if (kwMatch) {
+        matchedIndustry = kwMatch;
+        matchedBrand = campaignName.toLowerCase();
+      } else {
+        return { industry: null, disease: 'Other' };
+      }
     }
 
     const { topic } = extractBucketAndTopic(campaignName);
@@ -176,14 +186,15 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
   };
 
   const fetchAndAnalyzeAnomalies = async () => {
+    setSelectedAnomaly(null);
     setIsLoading(true);
     try {
-      const completedResponse = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
+      const completedResponse = await fetch(`https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D&_t=${Date.now()}`);
       const completedData = await completedResponse.json();
 
       let liveData = [];
       try {
-        const liveResponse = await fetch('https://emaildash.blob.core.windows.net/json-data/live_campaign_metrics.json?sp=r&st=2025-02-05T20:36:54Z&se=2026-07-31T03:36:54Z&spr=https&sv=2022-11-02&sr=b&sig=7Ywfk4UlVByj1PeeOo%2BjdliKQSVAWYDU5ZR%2Fcrc7eBE%3D');
+        const liveResponse = await fetch(`https://emaildash.blob.core.windows.net/json-data/live_campaign_metrics.json?sp=r&st=2025-02-05T20:36:54Z&se=2026-07-31T03:36:54Z&spr=https&sv=2022-11-02&sr=b&sig=7Ywfk4UlVByj1PeeOo%2BjdliKQSVAWYDU5ZR%2Fcrc7eBE%3D&_t=${Date.now()}`);
         liveData = await liveResponse.json();
         if (!Array.isArray(liveData)) liveData = [];
       } catch (e) {
@@ -247,20 +258,20 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
 
       let processedCampaigns;
 
-      if (analyzeBy === 'industry') {
+      if (analyzeBy === 'market') {
         processedCampaigns = combinedCampaigns
           .map(c => {
             const { industry, disease } = extractIndustryAndDisease(c.CleanedName);
             const { topic } = extractBucketAndTopic(c.CleanedName);
             return {
               ...c,
-              Industry: industry,
+              Market: industry,
               Disease: disease !== 'Other' ? disease : topic,
               Bucket: industry || 'Unknown',
               Topic: disease !== 'Other' ? disease : topic
             };
           })
-          .filter(c => c.Industry !== null);
+          .filter(c => c.Market !== null);
       } else {
         processedCampaigns = combinedCampaigns
           .map(c => {
@@ -270,11 +281,10 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
           .filter(c => c.Topic !== 'Other');
       }
 
-      const primaryGroupKey = analyzeBy === 'industry' ? 'Industry' : 'Bucket';
+      const primaryGroupKey = analyzeBy === 'market' ? 'Market' : 'Bucket';
       const primaryGroups = _.groupBy(processedCampaigns, primaryGroupKey);
       const allAnomalies = [];
-
-
+      const groupMap = {};
       const zThreshold = showOverperforming ? 1.5 : -1.5;
 
       Object.entries(primaryGroups).forEach(([groupName, groupCampaigns]) => {
@@ -284,6 +294,7 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
           Object.entries(diseaseGroups).forEach(([disease, campaigns]) => {
             const completedCampaignsInGroup = campaigns.filter(c => !c.isLive);
             if (completedCampaignsInGroup.length < 5) return;
+            groupMap[`${groupName}::${disease}`] = campaigns;
 
             const openRates = completedCampaignsInGroup.map(c => c.Unique_Open_Rate).filter(r => r != null);
             const mean = _.mean(openRates);
@@ -298,7 +309,8 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
                   topicMean: mean,
                   topicStdDev: stdDev,
                   zScore: zScore,
-                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100
+                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100,
+                  groupKey: `${groupName}::${disease}`
                 });
               }
             });
@@ -306,6 +318,7 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
         } else {
           const completedCampaignsInGroup = groupCampaigns.filter(c => !c.isLive);
           if (completedCampaignsInGroup.length >= 5) {
+            groupMap[groupName] = groupCampaigns;
             const openRates = completedCampaignsInGroup.map(c => c.Unique_Open_Rate).filter(r => r != null);
             const mean = _.mean(openRates);
             const stdDev = Math.sqrt(_.mean(openRates.map(r => Math.pow(r - mean, 2))));
@@ -319,13 +332,16 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
                   topicMean: mean,
                   topicStdDev: stdDev,
                   zScore: zScore,
-                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100
+                  deviationPercent: ((campaign.Unique_Open_Rate - mean) / mean) * 100,
+                  groupKey: groupName
                 });
               }
             });
           }
         }
       });
+
+      setGroupCampaignsMap(groupMap);
 
       allAnomalies.sort((a, b) => {
         if (a.isLive && !b.isLive) return -1;
@@ -403,10 +419,10 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
                 Content
               </button>
               <button
-                className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
-                onClick={() => onAnalyzeByChange('industry')}
+                className={`mode-toggle-btn ${analyzeBy === 'market' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange('market')}
               >
-                Industry
+                Market
               </button>
             </div>
             <span className="control-divider">→</span>
@@ -442,6 +458,7 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
               <div
                 key={idx}
                 className={`anomaly-card ${showOverperforming ? 'overperforming' : ''} ${anomaly.isLive ? 'live-campaign' : ''}`}
+                onClick={() => setSelectedAnomaly(anomaly)}
                 style={anomaly.isLive ? {
                   borderColor: showOverperforming ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 107, 107, 0.5)',
                   boxShadow: showOverperforming
@@ -471,7 +488,7 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
                   </div>
                   <div className="anomaly-metric">
                     <span className="anomaly-metric-label">
-                      {detectByDisease ? 'Disease' : (analyzeBy === 'industry' ? 'Industry' : 'Content')} Average
+                      {detectByDisease ? 'Disease' : (analyzeBy === 'market' ? 'Market' : 'Content')} Average
                     </span>
                     <span className="anomaly-metric-value">
                       {anomaly.topicMean.toFixed(2)}%
@@ -509,6 +526,17 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
           </div>
         )}
       </div>
+
+      {selectedAnomaly && groupCampaignsMap[selectedAnomaly.groupKey] && (
+        <NormalDistributionModal
+          anomaly={selectedAnomaly}
+          groupCampaigns={groupCampaignsMap[selectedAnomaly.groupKey]}
+          onClose={() => setSelectedAnomaly(null)}
+          showOverperforming={showOverperforming}
+          detectByDisease={detectByDisease}
+          analyzeBy={analyzeBy}
+        />
+      )}
     </div>
   );
 };

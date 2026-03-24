@@ -943,12 +943,12 @@ export const generateTemplate = (config) => {
     const campaign = type === 'single' ? campaigns[0] : null;
     const tpeCard = components.find(c => c.id === 'total-professional-engagements');
     if (tpeCard && campaign) {
-      const isExpertPerspectives = campaign.campaign_name?.toLowerCase().includes('expert perspectives');
+      const campaignNameLower = (campaign.campaign_name || '').toLowerCase();
+      const skipDouble = campaignNameLower.includes('expert perspectives') || campaignNameLower.includes('custom email');
       const totalOpens = campaign.volume_metrics?.total_opens || 0;
-      const bannerValue = isExpertPerspectives ? totalOpens : totalOpens * 2;
+      const bannerValue = skipDouble ? totalOpens : totalOpens * 2;
       tpeCard.title = 'eNEWSLETTER BANNER IMPRESSIONS';
       tpeCard.value = bannerValue.toLocaleString();
-      tpeCard.subtitle = isExpertPerspectives ? 'Based on total opens' : 'Based on 2x total opens';
     }
   }
 

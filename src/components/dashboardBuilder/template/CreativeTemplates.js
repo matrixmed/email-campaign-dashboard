@@ -65,7 +65,9 @@ export const generateHotTopicsSingle = (campaign, theme, mergeSubspecialties = f
   });
 
   const totalOpens = campaign.volume_metrics?.total_opens || 0;
-  const bannerValue = totalOpens * 2;
+  const campaignNameLower = (campaign.campaign_name || '').toLowerCase();
+  const skipDouble = campaignNameLower.includes('expert perspectives') || campaignNameLower.includes('custom email');
+  const bannerValue = skipDouble ? totalOpens : totalOpens * 2;
 
   components.push({
     id: 'ms-enl-kpis',
@@ -134,7 +136,11 @@ export const generateHotTopicsMulti = (campaigns, theme, mergeSubspecialties = f
   const aggUniqueOpenRate = totalDelivered > 0 ? (totalUniqueOpens / totalDelivered) * 100 : 0;
   const totalClicks = campaigns.reduce((s, c) => s + ((c.core_metrics?.total_click_rate || 0) / 100) * (c.volume_metrics?.total_opens || 0), 0);
   const aggCTR = totalTotalOpens > 0 ? (totalClicks / totalTotalOpens) * 100 : 0;
-  const aggBannerImp = totalTotalOpens * 2;
+  const allSkipDouble = campaigns.every(c => {
+    const n = (c.campaign_name || '').toLowerCase();
+    return n.includes('expert perspectives') || n.includes('custom email');
+  });
+  const aggBannerImp = allSkipDouble ? totalTotalOpens : totalTotalOpens * 2;
 
   components.push({
     id: 'ms-enl-kpis',
@@ -160,7 +166,9 @@ export const generateHotTopicsMulti = (campaigns, theme, mergeSubspecialties = f
 
   const comparisonRows = campaigns.map((campaign, index) => {
     const totalOpens = campaign.volume_metrics?.total_opens || 0;
-    const bannerValue = totalOpens * 2;
+    const cNameLower = (campaign.campaign_name || '').toLowerCase();
+    const cSkipDouble = cNameLower.includes('expert perspectives') || cNameLower.includes('custom email');
+    const bannerValue = cSkipDouble ? totalOpens : totalOpens * 2;
     const label = dedup.isMonthOnly ? dedup.months[index] : (campaign.campaign_name || 'Unknown');
     return [
       label,
@@ -214,7 +222,7 @@ export const generateExpertPerspectivesSingle = (campaign, theme, mergeSubspecia
     id: 'campaign-title',
     type: 'title',
     title: campaign.campaign_name || 'Campaign Analysis',
-    position: { x: 17, y: 38, width: 1000, height: 100 },
+    position: { x: 20, y: 48, width: 975, height: 82 },
     style: { background: 'transparent', color: themeColors.darkGray || '#1f2937' }
   });
 
@@ -244,15 +252,15 @@ export const generateExpertPerspectivesSingle = (campaign, theme, mergeSubspecia
   });
 
   const videoTable = generateTableForType(TABLE_TYPES.VIDEO_METRICS, 1, themeColors);
-  videoTable.position = { x: 21, y: 208, width: 298, height: 136 };
+  videoTable.position = { x: 21, y: 208, width: 281, height: 136 };
   components.push(videoTable);
 
   const socialTable = generateTableForType(TABLE_TYPES.SOCIAL_MEDIA, 2, themeColors);
-  socialTable.position = { x: 331, y: 208, width: 298, height: 135 };
+  socialTable.position = { x: 331, y: 208, width: 279, height: 137 };
   components.push(socialTable);
 
   const landingTable = generateTableForType(TABLE_TYPES.LANDING_PAGE, 3, themeColors);
-  landingTable.position = { x: 641, y: 208, width: 298, height: 100 };
+  landingTable.position = { x: 641, y: 208, width: 336, height: 105 };
   components.push(landingTable);
 
   const aud = buildAudienceBreakdown(campaign.specialty_performance, mergeSubspecialties,

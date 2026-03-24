@@ -4,12 +4,15 @@ import NPIQuickLookup from '../components/listanalysis/NPIQuickLookup';
 import ListEfficiencyAnalysis from '../components/listanalysis/ListEfficiencyAnalysis';
 import DMABreakdown from '../components/listanalysis/DMABreakdown';
 import EngagementPatterns from '../components/audience/EngagementPatterns';
+import PrintListManagement from '../components/printManagement/PrintListManagement';
+import NCOAUpload from '../components/printManagement/NCOAUpload';
 import '../styles/AnalyticsHub.css';
 
 const AudienceAnalyticsPage = () => {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('audienceAnalyticsTab') || 'find-users';
   });
+  const [printSearch, setPrintSearch] = useState('');
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
@@ -22,6 +25,17 @@ const AudienceAnalyticsPage = () => {
     <div className="audience-analytics-page analytics-hub">
       <div className="page-header">
         <h1>Audience Analytics</h1>
+        {activeTab === 'print-management' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={printSearch}
+              onChange={(e) => setPrintSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
       </div>
 
       <div className="analytics-tabs">
@@ -47,7 +61,7 @@ const AudienceAnalyticsPage = () => {
           className={`tab-button ${activeTab === 'list-analysis' ? 'active' : ''}`}
           onClick={() => handleTabClick('list-analysis')}
         >
-          <span>List Analytics</span>
+          <span>IQVIA List Efficiency</span>
         </button>
         <button
           className={`tab-button ${activeTab === 'dma-breakdown' ? 'active' : ''}`}
@@ -55,12 +69,26 @@ const AudienceAnalyticsPage = () => {
         >
           <span>DMA Breakdown</span>
         </button>
+        {/* DISABLED - not verified yet
         <button
           className={`tab-button ${activeTab === 'engagement-patterns' ? 'active' : ''}`}
           onClick={() => handleTabClick('engagement-patterns')}
         >
           <span>Engagement Queries</span>
         </button>
+        <button
+          className={`tab-button ${activeTab === 'print-management' ? 'active' : ''}`}
+          onClick={() => handleTabClick('print-management')}
+        >
+          <span>Print Management</span>
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'ncoa-upload' ? 'active' : ''}`}
+          onClick={() => handleTabClick('ncoa-upload')}
+        >
+          <span>NCOA Upload</span>
+        </button>
+        */}
       </div>
 
       {(activeTab === 'find-users' || activeTab === 'analyze') && (
@@ -75,9 +103,17 @@ const AudienceAnalyticsPage = () => {
       {activeTab === 'dma-breakdown' && (
         <DMABreakdown />
       )}
+      {/* DISABLED - not verified yet
       {activeTab === 'engagement-patterns' && (
         <EngagementPatterns />
       )}
+      {activeTab === 'print-management' && (
+        <PrintListManagement externalSearch={printSearch} />
+      )}
+      {activeTab === 'ncoa-upload' && (
+        <NCOAUpload />
+      )}
+      */}
     </div>
   );
 };

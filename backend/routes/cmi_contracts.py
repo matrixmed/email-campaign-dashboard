@@ -43,6 +43,7 @@ def get_all_contracts():
             'notes': c.notes,
             'year': c.year,
             'gcm_placement_ids': c.gcm_placement_ids,
+            'creative_code': c.creative_code,
             'last_attached_campaign_name': c.last_attached_campaign_name,
             'last_attached_campaign_brand': c.last_attached_campaign_brand
         } for c in contracts]
@@ -189,6 +190,8 @@ def update_contract_by_placement(placement_id):
             contract.metric = data['metric']
         if 'gcm_placement_ids' in data:
             contract.gcm_placement_ids = data['gcm_placement_ids']
+        if 'creative_code' in data:
+            contract.creative_code = data['creative_code']
         if 'last_attached_campaign_name' in data:
             contract.last_attached_campaign_name = data['last_attached_campaign_name']
         if 'last_attached_campaign_brand' in data:
@@ -202,6 +205,7 @@ def update_contract_by_placement(placement_id):
             'placement_id': contract.placement_id,
             'metric': contract.metric,
             'gcm_placement_ids': contract.gcm_placement_ids,
+            'creative_code': contract.creative_code,
             'last_attached_campaign_name': contract.last_attached_campaign_name,
             'last_attached_campaign_brand': contract.last_attached_campaign_brand,
             'brand': contract.brand,

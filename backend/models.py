@@ -24,6 +24,11 @@ class UserProfile(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     npi = Column(String(50), index=True)
+    old_address = Column(String(500))
+    old_city = Column(String(100))
+    old_state = Column(String(50))
+    old_zipcode = Column(String(20))
+    address_history = Column(JSON, default=list)
 
     __table_args__ = (
         Index('idx_email_specialty', 'email', 'specialty'),
@@ -108,6 +113,7 @@ class CMIContractValue(Base):
     notes = Column(Text)
     year = Column(Integer, default=2025, index=True)
     gcm_placement_ids = Column(JSON)
+    creative_code = Column(String(100))
     last_attached_campaign_name = Column(String(500))
     last_attached_campaign_brand = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -154,7 +160,8 @@ class CMIExpectedReport(Base):
     status = Column(String(50), default='pending')
     is_submitted = Column(Boolean, default=False)
     submitted_at = Column(DateTime)
-    notes = Column(Text) 
+    submitted_for_week = Column(Date)
+    notes = Column(Text)
 
     source_file = Column(String(255)) 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -574,6 +581,17 @@ class UniversalProfile(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_synced_at = Column(DateTime, index=True)
+    old_mailing_address_1 = Column(String(255))
+    old_mailing_address_2 = Column(String(255))
+    old_mailing_city = Column(String(100))
+    old_mailing_state = Column(String(50))
+    old_mailing_zipcode = Column(String(20))
+    old_practice_address_1 = Column(String(255))
+    old_practice_address_2 = Column(String(255))
+    old_practice_city = Column(String(100))
+    old_practice_state = Column(String(50))
+    old_practice_zipcode = Column(String(20))
+    address_history = Column(JSON, default=list)
 
     __table_args__ = (
         Index('idx_npi_active', 'npi', 'is_active'),
@@ -742,6 +760,45 @@ class UserAction(Base):
         Index('idx_action_env', 'environment', 'timestamp'),
     )
 
+class Program(Base):
+    __tablename__ = 'programs'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(500), nullable=False)
+    description = Column(Text)
+    status = Column(String(50), default='active')
+    has_sub_programs = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SubProgram(Base):
+    __tablename__ = 'sub_programs'
+
+    id = Column(Integer, primary_key=True)
+    program_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(500), nullable=False)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_sub_program_program_order', 'program_id', 'sort_order'),
+    )
+
+class ProgramItem(Base):
+    __tablename__ = 'program_items'
+
+    id = Column(Integer, primary_key=True)
+    program_id = Column(Integer, nullable=False, index=True)
+    sub_program_id = Column(Integer, nullable=True, index=True)
+    item_type = Column(String(50), nullable=False)
+    item_identifier = Column(String(500), nullable=False)
+    item_label = Column(String(500))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_program_item_type', 'program_id', 'item_type'),
+    )
+
 class ABTest(Base):
     __tablename__ = 'ab_tests'
 
@@ -770,6 +827,121 @@ class ABTestGroup(Base):
     __table_args__ = (
         Index('idx_ab_group_test', 'ab_test_id', 'group_label'),
     )
+
+class UserEngagementSummary(Base):
+    __tablename__ = 'user_engagement_summary'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    npi = Column(String(50))
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    specialty = Column(String(100), index=True)
+
+    campaigns_received = Column(Integer, default=0)
+    campaigns_opened = Column(Integer, default=0)
+    campaigns_clicked = Column(Integer, default=0)
+    unique_open_rate = Column(Float)
+    unique_click_rate = Column(Float)
+
+    first_campaign_date = Column(DateTime)
+    last_campaign_date = Column(DateTime)
+
+    early_open_rate = Column(Float)
+    late_open_rate = Column(Float)
+
+    recent_opens = Column(Integer, default=0)
+    historical_open_rate = Column(Float)
+
+    first_three_opens = Column(Integer, default=0)
+    later_opens = Column(Integer, default=0)
+
+    avg_open_minutes = Column(Float)
+    fast_opens = Column(Integer, default=0)
+
+    total_opens = Column(Integer, default=0)
+    rapid_opens = Column(Integer, default=0)
+    binge_sessions = Column(Integer, default=0)
+
+    delayed_opens = Column(Integer, default=0)
+    weekend_opens = Column(Integer, default=0)
+    weekday_opens = Column(Integer, default=0)
+
+    avg_open_hour = Column(Float)
+    early_morning_opens = Column(Integer, default=0)
+    night_opens = Column(Integer, default=0)
+
+    computed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ues_specialty', 'specialty'),
+        Index('idx_ues_open_rate', 'unique_open_rate'),
+        Index('idx_ues_campaigns', 'campaigns_received'),
+    )
+
+class PrintListSubscriber(Base):
+    __tablename__ = 'print_list_subscribers'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(50), unique=True, index=True)
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    degree = Column(String(50))
+    email = Column(String(255))
+    specialty = Column(String(255))
+    type_of_professional = Column(String(100))
+    company = Column(String(255))
+    title = Column(String(255))
+    address_1 = Column(String(255))
+    address_2 = Column(String(255))
+    city = Column(String(100))
+    state = Column(String(50))
+    zipcode = Column(String(20))
+    country = Column(String(100), default='US')
+    old_address_1 = Column(String(255))
+    old_address_2 = Column(String(255))
+    old_city = Column(String(100))
+    old_state = Column(String(50))
+    old_zipcode = Column(String(20))
+    address_history = Column(JSON, default=list)
+    subscribed_lists = Column(Text)
+    unsubscribed_lists = Column(Text)
+    is_comp = Column(Boolean, default=False)
+    is_subscribed = Column(Boolean, default=True, index=True)
+    unsubscribe_reason = Column(Text)
+    unsubscribe_date = Column(DateTime)
+    subscribe_date = Column(DateTime)
+    source = Column(String(100))
+    is_address_blacklisted = Column(Boolean, default=False)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_print_npi', 'npi'),
+        Index('idx_print_subscribed', 'is_subscribed'),
+        Index('idx_print_subscribed_lists', 'subscribed_lists'),
+    )
+
+class BlacklistedAddress(Base):
+    __tablename__ = 'blacklisted_addresses'
+
+    id = Column(Integer, primary_key=True)
+    address_1 = Column(String(255), index=True)
+    city = Column(String(100))
+    state = Column(String(50))
+    zipcode = Column(String(20))
+    reason = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class PrintListActivityLog(Base):
+    __tablename__ = 'print_list_activity_log'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(50), index=True)
+    action = Column(String(50))
+    details = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 def init_db():
     DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'

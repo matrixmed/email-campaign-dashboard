@@ -30,7 +30,9 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
         avgTimeInIssue: 0
     });
     const [walsworthLastUpdated, setWalsworthLastUpdated] = useState(null);
+    const [walsworthLastSynced, setWalsworthLastSynced] = useState(null);
     const [googleAnalyticsLastUpdated, setGoogleAnalyticsLastUpdated] = useState(null);
+    const [googleAnalyticsLastSynced, setGoogleAnalyticsLastSynced] = useState(null);
     const [search, setSearch] = useState(searchTerms.journalMetrics || '');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -225,7 +227,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
         async function fetchUrlData() {
             const blobUrl = GOOGLE_ANALYTICS_BLOB_URL;
             try {
-                const response = await fetch(blobUrl);
+                const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
                 const jsonData = await response.json();
 
                 if (!jsonData.urls || jsonData.urls.length === 0) {
@@ -264,6 +266,10 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                 if (gaLastUpdated) {
                     setGoogleAnalyticsLastUpdated(gaLastUpdated);
                 }
+                const gaLastSynced = jsonData.last_synced || jsonData.lastSynced;
+                if (gaLastSynced) {
+                    setGoogleAnalyticsLastSynced(gaLastSynced);
+                }
             } catch (error) {
             }
         }
@@ -279,7 +285,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
             const reprocessData = async () => {
                 const blobUrl = GOOGLE_ANALYTICS_BLOB_URL;
                 try {
-                    const response = await fetch(blobUrl);
+                    const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
                     const jsonData = await response.json();
 
                     const processedData = (jsonData.urls || [])
@@ -323,7 +329,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
         async function fetchWalsworthData() {
             const blobUrl = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
             try {
-                const response = await fetch(blobUrl);
+                const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
                 const jsonData = await response.json();
 
                 if (jsonData.issues && Array.isArray(jsonData.issues)) {
@@ -341,6 +347,9 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                     calculateWalsworthAggregates(sortedData);
                     if (jsonData.last_updated) {
                         setWalsworthLastUpdated(jsonData.last_updated);
+                    }
+                    if (jsonData.last_synced) {
+                        setWalsworthLastSynced(jsonData.last_synced);
                     }
                 }
             } catch (error) {
@@ -941,7 +950,8 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                             )}
                             {walsworthLastUpdated && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {(() => { const d = new Date(walsworthLastUpdated + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <span>Last synced: {(() => { const hasFresh = walsworthLastSynced && walsworthLastUpdated && walsworthLastSynced >= walsworthLastUpdated; const raw = hasFresh ? walsworthLastSynced : (walsworthLastUpdated || walsworthLastSynced); const d = new Date(raw + 'T00:00:00'); if (!hasFresh) d.setDate(d.getDate() + 1); const now = new Date(); const diff = Math.floor((now - d) / 86400000); if (diff === 0) return 'Today'; if (diff === 1) return 'Yesterday'; if (diff < 7) return `${diff} days ago`; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()} | Data through: {new Date(walsworthLastUpdated + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 </div>
                             )}
                         </div>
@@ -1078,7 +1088,8 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                             )}
                             {googleAnalyticsLastUpdated && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {(() => { const d = new Date(googleAnalyticsLastUpdated + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <span>Last synced: {(() => { const hasFresh = googleAnalyticsLastSynced && googleAnalyticsLastUpdated && googleAnalyticsLastSynced >= googleAnalyticsLastUpdated; const raw = hasFresh ? googleAnalyticsLastSynced : (googleAnalyticsLastUpdated || googleAnalyticsLastSynced); const d = new Date(raw + 'T00:00:00'); if (!hasFresh) d.setDate(d.getDate() + 1); const now = new Date(); const diff = Math.floor((now - d) / 86400000); if (diff === 0) return 'Today'; if (diff === 1) return 'Yesterday'; if (diff < 7) return `${diff} days ago`; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()} | Data through: {new Date(googleAnalyticsLastUpdated + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 </div>
                             )}
                         </div>

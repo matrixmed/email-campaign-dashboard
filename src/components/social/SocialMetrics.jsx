@@ -21,7 +21,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const [search, setSearch] = useState(searchTerms.socialMetrics || '');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [sortColumn, setSortColumn] = useState('impressions');
+    const [sortColumn, setSortColumn] = useState('createdAt');
     const [sortDirection, setSortDirection] = useState('desc');
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,7 +62,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                 ]);
                 const fbProfile = fbProfileRes?.ok ? await fbProfileRes.json() : {};
                 const fbEngagement = fbEngagementRes?.ok ? await fbEngagementRes.json() : {};
-                const merged = { last_updated: fbEngagement.last_updated || fbProfile.last_updated, companies: {} };
+                const merged = { last_updated: fbEngagement.last_updated || fbProfile.last_updated, last_synced: fbEngagement.last_synced || fbProfile.last_synced, companies: {} };
                 const allKeys = new Set([...Object.keys(fbProfile.companies || {}), ...Object.keys(fbEngagement.companies || {})]);
                 allKeys.forEach(key => {
                     merged.companies[key] = { ...(fbProfile.companies || {})[key], ...(fbEngagement.companies || {})[key] };
@@ -77,7 +77,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                 ]);
                 const igProfile = igProfileRes?.ok ? await igProfileRes.json() : {};
                 const igEngagement = igEngagementRes?.ok ? await igEngagementRes.json() : {};
-                const merged = { last_updated: igEngagement.last_updated || igProfile.last_updated, companies: {} };
+                const merged = { last_updated: igEngagement.last_updated || igProfile.last_updated, last_synced: igEngagement.last_synced || igProfile.last_synced, companies: {} };
                 const allKeys = new Set([...Object.keys(igProfile.companies || {}), ...Object.keys(igEngagement.companies || {})]);
                 allKeys.forEach(key => {
                     merged.companies[key] = { ...(igProfile.companies || {})[key], ...(igEngagement.companies || {})[key] };
@@ -132,10 +132,21 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                     mediaType: item.media_type || '',
                     impressions: platform === 'facebook'
                         ? (current.views || current.impressions_unique || 0)
-                        : (current.impressions_unique || current.reach || current.impressions || 0),
+                        : platform === 'instagram'
+                        ? (current.views || current.reach || 0)
+                        : (current.impressions || 0),
                     reach: current.reach || current.impressions_unique || 0,
                     engagements: current.engagements || current.total_interactions || 0,
-                    engagementRate: current.engagement_rate || 0,
+                    engagementRate: (() => {
+                        if (platform === 'linkedin') {
+                            const imp = current.impressions || 0;
+                            return imp > 0 ? ((current.engagements || 0) / imp) * 100 : 0;
+                        }
+                        const reach = current.reach || current.impressions_unique || 0;
+                        if (!reach) return 0;
+                        if (platform === 'instagram') return ((current.total_interactions || 0) / reach) * 100;
+                        return ((current.engagements || 0) / reach) * 100;
+                    })(),
                     clicks: current.clicks || 0,
                     reactions: current.reactions_total || current.reactions || current.likes || 0,
                     comments: current.comments || 0,
@@ -150,7 +161,11 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
             });
         });
 
-        allPosts.sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
+        allPosts.sort((a, b) => {
+            const aDate = new Date(a.createdAt || 0);
+            const bDate = new Date(b.createdAt || 0);
+            return bDate - aDate;
+        });
         setPostsList(allPosts);
 
         let filtered = allPosts;
@@ -302,7 +317,9 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
         const totalPosts = filteredData.length;
         const totalImpressions = filteredData.reduce((sum, p) => sum + (p.impressions || 0), 0);
         const totalEngagements = filteredData.reduce((sum, p) => sum + (p.engagements || 0), 0);
-        const avgEngagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions * 100) : 0;
+        const totalReach = filteredData.reduce((sum, p) => sum + (p.reach || 0), 0);
+        const rateDenominator = platform === 'linkedin' ? totalImpressions : totalReach;
+        const avgEngagementRate = rateDenominator > 0 ? (totalEngagements / rateDenominator * 100) : 0;
         const totalClicks = filteredData.reduce((sum, p) => sum + (p.clicks || 0), 0);
         const totalReactions = filteredData.reduce((sum, p) => sum + (p.reactions || 0), 0);
 
@@ -407,11 +424,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const exportToCSV = () => {
         const isIg = platform === 'instagram';
         const isFbExport = platform === 'facebook';
-        const headers = isIg
-            ? ['Text', 'Channel', 'Date', 'Reach', 'Interactions', 'Eng. Rate', 'Likes']
-            : isFbExport
-            ? ['Text', 'Channel', 'Date', 'Views', 'Engagements', 'Eng. Rate', 'Clicks']
-            : ['Text', 'Channel', 'Date', 'Impressions', 'Engagements', 'Eng. Rate', 'Clicks'];
+        const headers = ['Text', 'Channel', 'Date', 'Impressions', 'Engagements', 'Eng. Rate', isIg ? 'Likes' : 'Clicks'];
 
         const rows = filteredData.map(item => [
             item.text,
@@ -452,7 +465,9 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
     const aggregateMetrics = calculateAggregateMetrics();
     const channels = getChannels();
     const platformData = getPlatformData();
-    const lastUpdated = platformData.last_updated;
+    const hasFreshSyncDate = platformData.last_synced && platformData.last_updated && platformData.last_synced >= platformData.last_updated;
+    const lastSynced = hasFreshSyncDate ? platformData.last_synced : platformData.last_updated;
+    const dataThrough = platformData.last_updated;
 
     const isIg = platform === 'instagram';
     const isFb = platform === 'facebook';
@@ -537,11 +552,11 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalPosts)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</div>
+                        <div className="metric-summary-label">Impressions</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalImpressions)}</div>
                     </div>
                     <div className="metric-summary-card">
-                        <div className="metric-summary-label">{isIg ? 'Interactions' : 'Engagements'}</div>
+                        <div className="metric-summary-label">Engagements</div>
                         <div className="metric-summary-value">{formatNumber(aggregateMetrics.totalEngagements)}</div>
                     </div>
                     <div className="metric-summary-card">
@@ -657,9 +672,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                     </select>
                                 </div>
                             )}
-                            {lastUpdated && (
+                            {lastSynced && (
                                 <div className="last-updated-tag">
-                                    Last Updated: {(() => { const d = new Date(lastUpdated + (lastUpdated.length === 10 ? 'T00:00:00' : '')); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/><path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <span>Last synced: {(() => { const d = new Date(lastSynced + (lastSynced.length === 10 ? 'T00:00:00' : '')); if (!hasFreshSyncDate) d.setDate(d.getDate() + 1); const now = new Date(); const diff = Math.floor((now - d) / 86400000); if (diff === 0) return 'Today'; if (diff === 1) return 'Yesterday'; if (diff < 7) return `${diff} days ago`; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })()}{dataThrough ? ` | Data through: ${new Date(dataThrough + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</span>
                                 </div>
                             )}
                         </div>
@@ -706,10 +722,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                             Date {renderSortIndicator('createdAt')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('impressions')}>
-                                            {isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'} {renderSortIndicator('impressions')}
+                                            Impressions {renderSortIndicator('impressions')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('engagements')}>
-                                            {isIg ? 'Interactions' : 'Engagements'} {renderSortIndicator('engagements')}
+                                            Engagements {renderSortIndicator('engagements')}
                                         </th>
                                         <th className="metric-column sortable" onClick={() => handleSort('engagementRate')}>
                                             Eng. Rate {renderSortIndicator('engagementRate')}
@@ -883,6 +899,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                     <div className="social-preview-details">
                                         <div className="social-preview-pills">
                                             <div className="info-pill">
+                                                <span className="info-label">Platform</span>
+                                                <span className="info-value">{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+                                            </div>
+                                            <div className="info-pill">
                                                 <span className="info-label">Channel</span>
                                                 <span className="info-value">
                                                     <span className="channel-badge" style={{ '--channel-color': CHANNEL_COLORS[selectedPost.channel] || '#575757' }}>
@@ -916,6 +936,10 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                 <>
                                     <div className="social-modal-info">
                                         <div className="social-modal-info-left">
+                                            <div className="info-pill">
+                                                <span className="info-label">Platform</span>
+                                                <span className="info-value">{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+                                            </div>
                                             <div className="info-pill">
                                                 <span className="info-label">Channel</span>
                                                 <span className="info-value">
@@ -955,33 +979,23 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
 
                             <div className="social-modal-metrics-top">
                                 <div className="social-metric-card large-card">
-                                    <div className="metric-label">{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</div>
+                                    <div className="metric-label">Impressions</div>
                                     <div className="metric-value">{formatNumber(selectedPost.impressions)}</div>
                                 </div>
-                                {isFb && (
+                                {(isFb || isIg) && (
                                     <div className="social-metric-card large-card">
                                         <div className="metric-label">Reach</div>
                                         <div className="metric-value">{formatNumber(selectedPost.reach)}</div>
                                     </div>
                                 )}
                                 <div className="social-metric-card large-card">
-                                    <div className="metric-label">{isIg ? 'Interactions' : 'Engagements'}</div>
+                                    <div className="metric-label">Engagements</div>
                                     <div className="metric-value">{formatNumber(selectedPost.engagements)}</div>
-                                </div>
-                                <div className="social-metric-card large-card">
-                                    <div className="metric-label">Eng. Rate</div>
-                                    <div className="metric-value">{formatPercent(selectedPost.engagementRate)}</div>
                                 </div>
                                 {!isIg && (
                                     <div className="social-metric-card large-card">
                                         <div className="metric-label">Clicks</div>
                                         <div className="metric-value">{formatNumber(selectedPost.clicks)}</div>
-                                    </div>
-                                )}
-                                {isIg && (
-                                    <div className="social-metric-card large-card">
-                                        <div className="metric-label">Views</div>
-                                        <div className="metric-value">{formatNumber(selectedPost.views)}</div>
                                     </div>
                                 )}
                             </div>
@@ -1009,42 +1023,27 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                                     <td>{formatNumber(selectedPost.saved)}</td>
                                                 </tr>
                                             )}
-                                            {isIg && (
-                                                <tr>
-                                                    <td>Views</td>
-                                                    <td>{formatNumber(selectedPost.views)}</td>
-                                                </tr>
-                                            )}
                                         </tbody>
                                     </table>
                                 </div>
 
                                 <div className="social-detail-card">
-                                    <h4>Post Details</h4>
+                                    <h4>Computed Rates</h4>
                                     <table className="detail-table">
                                         <tbody>
                                             <tr>
-                                                <td>Post ID</td>
-                                                <td style={{ fontSize: '12px', wordBreak: 'break-all' }}>{selectedPost.id}</td>
+                                                <td>Engagement Rate</td>
+                                                <td>{formatPercent((() => {
+                                                    if (platform === 'linkedin') return selectedPost.impressions > 0 ? (selectedPost.engagements / selectedPost.impressions) * 100 : 0;
+                                                    return selectedPost.reach > 0 ? (selectedPost.engagements / selectedPost.reach) * 100 : 0;
+                                                })())}</td>
                                             </tr>
-                                            <tr>
-                                                <td>Created</td>
-                                                <td>{formatDate(selectedPost.createdAt)}</td>
-                                            </tr>
-                                            {selectedPost.mediaType && (
+                                            {!isIg && (
                                                 <tr>
-                                                    <td>Media Type</td>
-                                                    <td>{selectedPost.mediaType}</td>
+                                                    <td>Click Rate</td>
+                                                    <td>{formatPercent(selectedPost.impressions > 0 ? (selectedPost.clicks / selectedPost.impressions) * 100 : 0)}</td>
                                                 </tr>
                                             )}
-                                            <tr>
-                                                <td>Channel</td>
-                                                <td>{selectedPost.channel}</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Platform</td>
-                                                <td>{platform.charAt(0).toUpperCase() + platform.slice(1)}</td>
-                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1058,8 +1057,8 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
-                                                    <th>{isFb ? 'Views' : isIg ? 'Reach' : 'Impressions'}</th>
-                                                    <th>{isIg ? 'Interactions' : 'Engagements'}</th>
+                                                    <th>Impressions</th>
+                                                    <th>Engagements</th>
                                                     <th>{isIg ? 'Likes' : 'Reactions'}</th>
                                                     <th>Comments</th>
                                                     <th>Shares</th>
@@ -1069,7 +1068,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                                 {selectedPost.dailyDeltas.slice().reverse().slice(0, 30).map((delta, idx) => (
                                                     <tr key={idx}>
                                                         <td>{formatDate(delta.date)}</td>
-                                                        <td>{formatNumber(isFb ? (delta.views || delta.impressions_unique || 0) : (delta.impressions_unique || delta.reach || 0))}</td>
+                                                        <td>{formatNumber(isFb ? (delta.views || delta.impressions_unique || 0) : isIg ? (delta.views || delta.reach || 0) : (delta.impressions || 0))}</td>
                                                         <td>{formatNumber(delta.engagements || delta.total_interactions || 0)}</td>
                                                         <td>{formatNumber(isIg ? (delta.likes || 0) : (delta.reactions_total || delta.reactions || 0))}</td>
                                                         <td>{formatNumber(delta.comments || 0)}</td>

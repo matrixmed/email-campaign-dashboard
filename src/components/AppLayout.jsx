@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import '../styles/AppLayout.css';
 
@@ -32,6 +32,7 @@ const AppLayout = ({ children }) => {
   const navItems = [
     { path: '/campaigns', label: 'Campaign Performance' },
     { path: '/analytics', label: 'Campaign Analytics' },
+    { path: '/programs', label: 'Program Performance' },
     { path: '/dashboard-builder', label: 'Dashboard Builder' },
     { path: '/ab-testing', label: 'A/B Testing' },
     { path: '/reports', label: 'Reports Management' },
@@ -44,6 +45,23 @@ const AppLayout = ({ children }) => {
   ];
 
   const isDashboardBuilder = location.pathname === '/dashboard-builder';
+
+  const pathToSectionMap = useMemo(() => ({
+    '/campaigns': 'campaign-performance',
+    '/analytics': 'campaign-analytics',
+    '/programs': 'program-performance',
+    '/dashboard-builder': 'dashboard-builder',
+    '/ab-testing': 'ab-testing',
+    '/reports': 'reports-management',
+    '/audience': 'audience-analytics',
+    '/basis': 'basis-performance',
+    '/content': 'content-performance',
+    '/content-analysis': 'content-analytics',
+    '/cmi-contracts': 'cmi-contracts',
+    '/brands': 'brand-management',
+  }), []);
+
+  const docsScrollTarget = pathToSectionMap[location.pathname] || null;
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -76,17 +94,26 @@ const AppLayout = ({ children }) => {
           <img src={`${process.env.PUBLIC_URL}/white-matrix.png`} alt="Logo" className="sidebar-logo" />
         </div>
         {(!sidebarCollapsed || mobileMenuOpen) && (
-          <nav className="sidebar-nav">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-              >
-                <span className="nav-label">{item.label}</span>
-              </Link>
-            ))}
-          </nav>
+          <>
+            <nav className="sidebar-nav">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                >
+                  <span className="nav-label">{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+            <Link
+              to="/documentation"
+              state={{ scrollToSection: docsScrollTarget }}
+              className="sidebar-docs-link"
+            >
+              Documentation
+            </Link>
+          </>
         )}
       </aside>
       <main className={`main-content ${isDashboardBuilder ? 'dashboard-builder-page' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

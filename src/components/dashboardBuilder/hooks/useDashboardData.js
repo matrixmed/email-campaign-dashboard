@@ -13,7 +13,7 @@ const useDashboardData = () => {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(DASHBOARD_METRICS_URL);
+        const response = await fetch(`${DASHBOARD_METRICS_URL}&_t=${Date.now()}`);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }

@@ -14,7 +14,6 @@ const ABTestingPage = () => {
 
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMarket, setFilterMarket] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
   const [activeTab, setActiveTab] = useState('active');
 
   const defaultCategories = [];
@@ -248,21 +247,22 @@ const ABTestingPage = () => {
   }, [storedTests, detectedTests]);
 
   const allTests = useMemo(() => {
-    return [...detectedTests, ...dbActiveTests].sort((a, b) => {
-      const dateA = a.sendDate ? new Date(a.sendDate) : new Date(0);
-      const dateB = b.sendDate ? new Date(b.sendDate) : new Date(0);
-      return dateB - dateA;
-    });
+    return [...detectedTests, ...dbActiveTests]
+      .filter(test => test.metadata?.status !== 'completed')
+      .sort((a, b) => {
+        const dateA = a.sendDate ? new Date(a.sendDate) : new Date(0);
+        const dateB = b.sendDate ? new Date(b.sendDate) : new Date(0);
+        return dateB - dateA;
+      });
   }, [detectedTests, dbActiveTests]);
 
   const filteredTests = useMemo(() => {
     return allTests.filter(test => {
       if (filterCategory && test.metadata?.category !== filterCategory) return false;
       if (filterMarket && test.metadata?.market !== filterMarket) return false;
-      if (filterStatus && test.metadata?.status !== filterStatus) return false;
       return true;
     });
-  }, [allTests, filterCategory, filterMarket, filterStatus]);
+  }, [allTests, filterCategory, filterMarket]);
 
   const categoryOptions = useMemo(() => {
     return [...new Set([
@@ -336,17 +336,6 @@ const ABTestingPage = () => {
             <option value="">All Markets</option>
             {marketOptions.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
-          {activeTab === 'active' && (
-            <select
-              className="ab-filter-select"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-            </select>
-          )}
         </div>
       </div>
 

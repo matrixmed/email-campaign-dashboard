@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import '../../styles/EngagementPatterns.css';
 import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
@@ -60,6 +60,62 @@ const EngagementPatterns = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [summaryStatus, setSummaryStatus] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(null);
+
+  const checkSummaryStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/engagement-patterns/status`);
+      const json = await res.json();
+      setSummaryStatus(json);
+    } catch {
+      setSummaryStatus({ total_users: 0, last_computed: null });
+    }
+  }, []);
+
+  useEffect(() => {
+    checkSummaryStatus();
+  }, [checkSummaryStatus]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshProgress({ processed: 0, total_emails: 0 });
+    setError(null);
+    let offset = 0;
+    let totalEmails = 0;
+    const batchSize = 500;
+    try {
+      let done = false;
+      while (!done) {
+        const res = await fetch(`${API_BASE_URL}/api/users/engagement-patterns/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batch_offset: offset, batch_size: batchSize, total_emails: totalEmails, fast_open_minutes: fastOpenMinutes })
+        });
+        const json = await res.json();
+        if (!json.success) { setError(json.error || 'Refresh failed'); break; }
+        totalEmails = json.total_emails;
+        offset = json.processed;
+        setRefreshProgress({ processed: json.processed, total_emails: json.total_emails });
+        done = json.done;
+      }
+      await checkSummaryStatus();
+    } catch (err) {
+      setError('Failed to refresh engagement data: ' + err.message);
+    } finally {
+      setRefreshing(false);
+      setRefreshProgress(null);
+    }
+  };
+
+  const summaryStale = useMemo(() => {
+    if (!summaryStatus?.last_computed) return true;
+    const lastComputed = new Date(summaryStatus.last_computed);
+    const hoursSince = (Date.now() - lastComputed.getTime()) / (1000 * 60 * 60);
+    return hoursSince > 24;
+  }, [summaryStatus]);
+
   const handleRun = async () => {
     if (!selectedPattern) return;
     setLoading(true);
@@ -81,7 +137,6 @@ const EngagementPatterns = () => {
       const json = await response.json();
       setResults(json);
     } catch (err) {
-      setError('Failed to run engagement pattern query.');
     } finally {
       setLoading(false);
     }
@@ -141,8 +196,33 @@ const EngagementPatterns = () => {
     <div className="ep-container">
       <div className="section-header-bar">
         <h3>Engagement Queries</h3>
-        <button className="section-header-clear-btn" onClick={clearAll}>Clear</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {summaryStatus && (
+            <span style={{ fontSize: '11px', color: '#8b8fa3' }}>
+              {summaryStatus.total_users > 0
+                ? `${summaryStatus.total_users.toLocaleString()} users indexed${summaryStatus.last_computed ? ` · ${new Date(summaryStatus.last_computed).toLocaleDateString()}` : ''}`
+                : 'No data indexed yet'}
+            </span>
+          )}
+          <button
+            className={`ep-run-btn${summaryStale ? ' ep-refresh-needed' : ''}`}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={{ fontSize: '11px', padding: '4px 10px' }}
+          >
+            {refreshing
+              ? `Building... ${refreshProgress ? `${refreshProgress.processed}/${refreshProgress.total_emails}` : ''}`
+              : summaryStale ? 'Build Data Index' : 'Refresh Data'}
+          </button>
+          <button className="section-header-clear-btn" onClick={clearAll}>Clear</button>
+        </div>
       </div>
+
+      {refreshing && refreshProgress && (
+        <div className="ep-refresh-bar">
+          <div className="ep-refresh-progress" style={{ width: `${refreshProgress.total_emails > 0 ? (refreshProgress.processed / refreshProgress.total_emails * 100) : 0}%` }} />
+        </div>
+      )}
 
       <div className="ep-split">
         <div className="ep-sidebar">

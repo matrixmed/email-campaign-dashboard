@@ -10,7 +10,7 @@ from psycopg2.extras import RealDictCursor
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from state_mapper import zipcode_to_state_abbrev, state_abbrev_to_full_name, classify_zipcode_urbanization, STATE_NAME_TO_ABBREV
-from db_pool import get_db_connection
+from db_pool import get_db_connection, execute_query
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -224,7 +224,7 @@ def brand_comparison():
     for brand, stats in brand_stats.items():
         if stats['total_sends'] > 0:
             open_rate = (stats['total_opens'] / stats['total_sends']) * 100
-            click_rate = (stats['total_clicks'] / stats['total_sends']) * 100
+            click_rate = (stats['total_clicks'] / stats['total_opens']) * 100 if stats['total_opens'] > 0 else 0
             engaged = stats['total_opens']
             cost_per_engagement = stats['total_cost'] / engaged if engaged > 0 else 0
 
@@ -586,7 +586,7 @@ def campaign_benchmarks():
         filter_by_disease = filters.get('filter_by_disease', False)
         filter_month = filters.get('month', 'all')
 
-        brand_map = get_brand_industry_map() if analyze_by == 'industry' else {}
+        brand_map = get_brand_industry_map() if analyze_by in ('industry', 'market') else {}
 
         selected_classification = classify_campaign(selected_campaign['campaign_name'])
         selected_topic = selected_classification['topic']
@@ -594,7 +594,7 @@ def campaign_benchmarks():
         selected_industry = None
         selected_bucket = None
 
-        if analyze_by == 'industry':
+        if analyze_by in ('industry', 'market'):
             selected_industry, matched_brand = extract_industry_from_campaign(selected_campaign['campaign_name'], brand_map)
             if selected_industry:
                 selected_bucket = selected_industry
@@ -617,7 +617,7 @@ def campaign_benchmarks():
             camp_bucket = camp_classification['bucket']
             camp_topic = camp_classification['topic']
 
-            if analyze_by == 'industry':
+            if analyze_by in ('industry', 'market'):
                 camp_industry, _ = extract_industry_from_campaign(camp.get('campaign_name', ''), brand_map)
                 if not camp_industry or camp_industry != selected_industry:
                     return 0
@@ -805,9 +805,9 @@ def campaign_benchmarks():
 
         success_factors = []
 
-        if analyze_by == 'industry':
+        if analyze_by in ('industry', 'market'):
             bucket_campaigns = [c for c in campaigns_data if extract_industry_from_campaign(c.get('campaign_name', ''), brand_map)[0] == selected_industry]
-            factor_label = f'Industry: {selected_industry}'
+            factor_label = f'Market: {selected_industry}'
         else:
             bucket_campaigns = [c for c in campaigns_data if classify_campaign(c.get('campaign_name', ''))['bucket'] == selected_bucket]
             factor_label = f'Content Type: {selected_bucket}'
@@ -989,8 +989,6 @@ def timing_intelligence():
 
         heatmap_sends = {day: {hour: None for hour in range(24)} for day in day_names}
 
-        heatmap_normalized = {day: {hour: None for hour in range(24)} for day in day_names}
-
         day_totals = {day: {'opens': 0, 'total_opens': 0} for day in day_names}
 
         total_opens_overall = heatmap_results[0]['total_opens'] if heatmap_results else 0
@@ -1012,13 +1010,6 @@ def timing_intelligence():
             if total_delivered > 0 and unique_sends > 0:
                 pct_of_sends = (unique_sends / total_delivered) * 100
                 heatmap_sends[day_name][hour] = round(pct_of_sends, 2)
-
-            if total_opens > 0 and total_delivered > 0 and unique_opens > 0 and unique_sends > 0:
-                pct_of_opens = (unique_opens / total_opens) * 100
-                pct_of_sends = (unique_sends / total_delivered) * 100
-                if pct_of_sends > 0:
-                    lift = (pct_of_opens / pct_of_sends)
-                    heatmap_normalized[day_name][hour] = round(lift, 2)
 
             day_totals[day_name]['opens'] += int(unique_opens)
             day_totals[day_name]['total_opens'] = int(total_opens)
@@ -1113,126 +1104,6 @@ def timing_intelligence():
             'percent_24h': round((within_24h / total_opens * 100), 1) if total_opens > 0 else 0
         }
 
-        specialty_recommendations = []
-
-        if specialties:
-            for specialty in specialties:
-                specialty_query = f"""
-                    WITH total_opens AS (
-                        SELECT COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as total
-                        FROM campaign_interactions ci
-                        INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                        LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                        WHERE ci.event_type = 'open'
-                        AND up.specialty = %s
-                        {date_filter}
-                        {campaign_filter}
-                    ),
-                    open_data AS (
-                        SELECT
-                            ci.email,
-                            ci.campaign_id,
-                            EXTRACT(HOUR FROM ci.timestamp) as hour,
-                            EXTRACT(DOW FROM ci.timestamp) as day_of_week
-                        FROM campaign_interactions ci
-                        INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                        LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                        WHERE ci.event_type = 'open'
-                        AND up.specialty = %s
-                        {date_filter}
-                        {campaign_filter}
-                    )
-                    SELECT
-                        od.hour,
-                        od.day_of_week,
-                        COUNT(DISTINCT od.email || '-' || od.campaign_id) as unique_opens,
-                        to2.total as total_opens
-                    FROM open_data od
-                    CROSS JOIN total_opens to2
-                    GROUP BY od.hour, od.day_of_week, to2.total
-                    HAVING COUNT(DISTINCT od.email || '-' || od.campaign_id) >= 10
-                """
-
-                specialty_params = [specialty]
-                if campaigns:
-                    specialty_params.extend([f"{c}%" for c in campaigns]) 
-                specialty_params.append(specialty) 
-                if campaigns:
-                    specialty_params.extend([f"{c}%" for c in campaigns])
-
-                cursor.execute(specialty_query, specialty_params)
-                specialty_results = cursor.fetchall()
-
-                if specialty_results:
-                    time_slots = []
-                    for row in specialty_results:
-                        hour = int(row['hour'])
-                        dow = int(row['day_of_week'])
-                        opens = row['unique_opens']
-                        total_opens = row['total_opens']
-
-                        if total_opens > 0:
-                            pct_of_opens = (opens / total_opens) * 100
-                            time_slots.append({
-                                'hour': hour,
-                                'day_of_week': dow,
-                                'open_rate': pct_of_opens,
-                                'sample_size': opens
-                            })
-
-                    if time_slots:
-                        time_slots.sort(key=lambda x: x['open_rate'], reverse=True)
-                        best = time_slots[0]
-                        worst = time_slots[-1]
-
-                        total_campaigns = sum(t['sample_size'] for t in time_slots)
-                        improvement = ((best['open_rate'] - worst['open_rate']) / worst['open_rate'] * 100) if worst['open_rate'] > 0 else 0
-
-                        def format_hour(h):
-                            if h == 0:
-                                return "12 AM"
-                            elif h < 12:
-                                return f"{h} AM"
-                            elif h == 12:
-                                return "12 PM"
-                            else:
-                                return f"{h-12} PM"
-
-                        specialty_recommendations.append({
-                            'specialty': specialty,
-                            'sample_size': total_campaigns,
-                            'best_time': {
-                                'day': day_names[best['day_of_week']],
-                                'hour': format_hour(best['hour']),
-                                'open_rate': round(best['open_rate'], 2)
-                            },
-                            'worst_time': {
-                                'day': day_names[worst['day_of_week']],
-                                'hour': format_hour(worst['hour']),
-                                'open_rate': round(worst['open_rate'], 2)
-                            },
-                            'improvement': round(improvement, 1),
-                            'top_windows': [
-                                {
-                                    'day': day_names[t['day_of_week']],
-                                    'hour': format_hour(t['hour']),
-                                    'open_rate': round(t['open_rate'], 2)
-                                }
-                                for t in time_slots[1:4]
-                            ]
-                        })
-
-        specialty_query = """
-            SELECT DISTINCT up.specialty
-            FROM user_profiles up
-            INNER JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
-            WHERE up.specialty IS NOT NULL AND up.specialty != ''
-            ORDER BY up.specialty
-            LIMIT 50
-        """
-        cursor.execute(specialty_query)
-        available_specialties = [row['specialty'] for row in cursor.fetchall()]
-
         cursor.close()
         conn.close()
 
@@ -1241,11 +1112,8 @@ def timing_intelligence():
         return jsonify({
             'heatmap_opens': heatmap_opens,
             'heatmap_sends': heatmap_sends,
-            'heatmap_normalized': heatmap_normalized,
             'day_of_week': day_of_week_performance,
-            'time_to_open': time_to_open_data,
-            'specialty_recommendations': specialty_recommendations,
-            'available_specialties': available_specialties
+            'time_to_open': time_to_open_data
         }), 200
 
     except Exception as e:
@@ -1257,11 +1125,8 @@ def timing_intelligence():
             'error': str(e),
             'heatmap_opens': {},
             'heatmap_sends': {},
-            'heatmap_normalized': {},
             'day_of_week': {},
-            'time_to_open': {'buckets': [], 'median': 'N/A', 'peak_window': 'N/A', 'percent_24h': 0},
-            'specialty_recommendations': [],
-            'available_specialties': []
+            'time_to_open': {'buckets': [], 'median': 'N/A', 'peak_window': 'N/A', 'percent_24h': 0}
         }), 500
 
 @analytics_bp.route('/geographic-main', methods=['GET'])
@@ -2606,14 +2471,57 @@ def subject_line_analysis():
 @analytics_bp.route('/geographic-rates', methods=['POST'])
 def geographic_rates():
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        data = request.get_json(silent=True) or {}
+        level = data.get('level', 'state')
+        filter_state = data.get('state')
+
+        if level == 'zipcode' and filter_state:
+            query = """
+                SELECT REGEXP_REPLACE(up.zipcode, '[^0-9]', '', 'g') as zip_clean,
+                    up.city,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' AND COALESCE(cd.deployment_number, 1) = 1 THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as total_sent,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_opens,
+                    COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
+                    COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_clicks,
+                    COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
+                FROM campaign_interactions ci
+                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
+                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                WHERE up.state = %s AND up.zipcode IS NOT NULL AND up.zipcode != ''
+                GROUP BY zip_clean, up.city
+                HAVING COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' AND COALESCE(cd.deployment_number, 1) = 1 THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) >= 5
+                ORDER BY total_sent DESC
+                LIMIT 200
+            """
+            rows = execute_query(query, (filter_state,), cursor_factory=RealDictCursor)
+
+            total_sent_all = sum((r['total_sent'] or 0) for r in rows)
+            zip_rates = []
+            for row in rows:
+                sent = row['total_sent'] or 0
+                u_opens = row['unique_opens'] or 0
+                t_opens = row['total_opens'] or 0
+                u_clicks = row['unique_clicks'] or 0
+                t_clicks = row['total_clicks'] or 0
+                zip_rates.append({
+                    'zipcode': (row['zip_clean'] or '')[:5],
+                    'city': row['city'] or '',
+                    'total_sent': sent,
+                    'unique_open_rate': min(round((u_opens / sent * 100), 2), 100) if sent > 0 else 0,
+                    'total_open_rate': min(round((t_opens / sent * 100), 2), 100) if sent > 0 else 0,
+                    'unique_click_rate': min(round((u_clicks / u_opens * 100), 2), 100) if u_opens > 0 else 0,
+                    'total_click_rate': min(round((t_clicks / t_opens * 100), 2), 100) if t_opens > 0 else 0
+                })
+
+            return jsonify({'zip_rates': zip_rates, 'state': filter_state, 'total_sent': total_sent_all}), 200
 
         query = """
             SELECT up.state as state_abbrev,
                 COUNT(DISTINCT CASE WHEN ci.event_type = 'sent' AND COALESCE(cd.deployment_number, 1) = 1 THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as total_sent,
                 COUNT(DISTINCT CASE WHEN ci.event_type = 'open' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_opens,
-                COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_clicks
+                COUNT(CASE WHEN ci.event_type = 'open' THEN 1 END) as total_opens,
+                COUNT(DISTINCT CASE WHEN ci.event_type = 'click' THEN ci.email || '-' || COALESCE(cd.campaign_base_name, ci.campaign_id) END) as unique_clicks,
+                COUNT(CASE WHEN ci.event_type = 'click' THEN 1 END) as total_clicks
             FROM campaign_interactions ci
             INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
             LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
@@ -2621,15 +2529,14 @@ def geographic_rates():
             GROUP BY up.state ORDER BY total_sent DESC
         """
 
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        rows = execute_query(query, cursor_factory=RealDictCursor)
 
         state_rates = []
         total_sent_all = 0
-        total_opens_all = 0
-        total_clicks_all = 0
+        total_u_opens_all = 0
+        total_t_opens_all = 0
+        total_u_clicks_all = 0
+        total_t_clicks_all = 0
 
         for row in rows:
             abbrev = row['state_abbrev']
@@ -2638,46 +2545,49 @@ def geographic_rates():
                 continue
 
             sent = row['total_sent'] or 0
-            opens = row['unique_opens'] or 0
-            clicks = row['unique_clicks'] or 0
-            open_rate = min(round((opens / sent * 100), 2), 100) if sent > 0 else 0
-            click_rate = min(round((clicks / sent * 100), 2), 100) if sent > 0 else 0
-            click_to_open = min(round((clicks / opens * 100), 2), 100) if opens > 0 else 0
+            u_opens = row['unique_opens'] or 0
+            t_opens = row['total_opens'] or 0
+            u_clicks = row['unique_clicks'] or 0
+            t_clicks = row['total_clicks'] or 0
 
             total_sent_all += sent
-            total_opens_all += opens
-            total_clicks_all += clicks
+            total_u_opens_all += u_opens
+            total_t_opens_all += t_opens
+            total_u_clicks_all += u_clicks
+            total_t_clicks_all += t_clicks
 
             state_rates.append({
                 'state_abbrev': abbrev,
                 'state_name': full_name,
                 'total_sent': sent,
-                'unique_opens': opens,
-                'unique_clicks': clicks,
-                'open_rate': open_rate,
-                'click_rate': click_rate,
-                'click_to_open_rate': click_to_open
+                'unique_opens': u_opens,
+                'total_opens': t_opens,
+                'unique_clicks': u_clicks,
+                'total_clicks': t_clicks
             })
 
-        national_open_rate = min(round((total_opens_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
-        national_click_rate = min(round((total_clicks_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
-        national_cto = min(round((total_clicks_all / total_opens_all * 100), 2), 100) if total_opens_all > 0 else 0
+        for s in state_rates:
+            s['audience_pct'] = round((s['total_sent'] / total_sent_all * 100), 2) if total_sent_all > 0 else 0
+            s['unique_open_rate'] = min(round((s['unique_opens'] / s['total_sent'] * 100), 2), 100) if s['total_sent'] > 0 else 0
+            s['total_open_rate'] = min(round((s['total_opens'] / s['total_sent'] * 100), 2), 100) if s['total_sent'] > 0 else 0
+            s['unique_click_rate'] = min(round((s['unique_clicks'] / s['unique_opens'] * 100), 2), 100) if s['unique_opens'] > 0 else 0
+            s['total_click_rate'] = min(round((s['total_clicks'] / s['total_opens'] * 100), 2), 100) if s['total_opens'] > 0 else 0
 
-        sorted_by_open = sorted(state_rates, key=lambda x: x['open_rate'], reverse=True)
-        top_states = sorted_by_open[:5]
-        bottom_states = sorted_by_open[-5:][::-1] if len(sorted_by_open) >= 5 else []
+        national_unique_open_rate = min(round((total_u_opens_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
+        national_total_open_rate = min(round((total_t_opens_all / total_sent_all * 100), 2), 100) if total_sent_all > 0 else 0
+        national_unique_click_rate = min(round((total_u_clicks_all / total_u_opens_all * 100), 2), 100) if total_u_opens_all > 0 else 0
+        national_total_click_rate = min(round((total_t_clicks_all / total_t_opens_all * 100), 2), 100) if total_t_opens_all > 0 else 0
 
         return jsonify({
             'state_rates': state_rates,
             'summary': {
                 'total_states': len(state_rates),
                 'total_sent': total_sent_all,
-                'national_open_rate': national_open_rate,
-                'national_click_rate': national_click_rate,
-                'national_click_to_open_rate': national_cto
-            },
-            'top_states': top_states,
-            'bottom_states': bottom_states
+                'national_unique_open_rate': national_unique_open_rate,
+                'national_total_open_rate': national_total_open_rate,
+                'national_unique_click_rate': national_unique_click_rate,
+                'national_total_click_rate': national_total_click_rate
+            }
         }), 200
 
     except Exception as e:

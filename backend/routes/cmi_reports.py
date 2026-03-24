@@ -102,11 +102,14 @@ def update_submission_status(report_id):
         elif week == 3:
             report.week_3_submitted = is_submitted
 
-        report.is_submitted = (
-            report.week_1_submitted or
-            report.week_2_submitted or
-            report.week_3_submitted
-        )
+        if week in (1, 2, 3):
+            report.is_submitted = (
+                report.week_1_submitted or
+                report.week_2_submitted or
+                report.week_3_submitted
+            )
+        else:
+            report.is_submitted = is_submitted
 
         if report.is_submitted:
             report.submitted_at = datetime.utcnow()

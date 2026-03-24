@@ -68,7 +68,7 @@ const MonthlyEngagementChart = ({ searchTerm, selectedMetric = 'Unique_Open_Rate
   const fetchCampaignData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D');
+      const response = await fetch(`https://emaildash.blob.core.windows.net/json-data/completed_campaign_metrics.json?sp=r&st=2025-05-08T18:43:13Z&se=2027-06-26T02:43:13Z&spr=https&sv=2024-11-04&sr=b&sig=%2FuZDifPilE4VzfTl%2BWjUcSmzP9M283h%2B8gH9Q1V3TUg%3D&_t=${Date.now()}`);
       const campaignsData = await response.json();
 
       if (onAvailableYears) {

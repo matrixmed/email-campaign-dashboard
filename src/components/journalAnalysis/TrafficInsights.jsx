@@ -89,7 +89,7 @@ const TrafficInsights = ({ searchTerm = '', viewMode = 'overview' }) => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(GA_BLOB_URL);
+      const response = await fetch(`${GA_BLOB_URL}&_t=${Date.now()}`);
       const data = await response.json();
 
       if (data.urls && Array.isArray(data.urls)) {

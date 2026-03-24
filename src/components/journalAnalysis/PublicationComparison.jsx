@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 import { matchesSearchTerm } from '../../utils/searchUtils';
+
+const TREND_COLORS = ['#0ff', '#00cc99', '#38bdf8', '#ffd93d', '#8b5cf6', '#ff6b6b', '#f97316', '#ec4899', '#84cc16', '#06b6d4'];
 
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 
@@ -28,6 +30,8 @@ const PublicationComparison = ({
   const [isLoading, setIsLoading] = useState(true);
   const [publicationData, setPublicationData] = useState([]);
   const [showPerIssue, setShowPerIssue] = useState(true);
+  const [chartMode, setChartMode] = useState('comparison');
+  const [trendMetric, setTrendMetric] = useState('visitsPerIssue');
 
   useEffect(() => {
     fetchData();
@@ -36,7 +40,7 @@ const PublicationComparison = ({
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(WALSWORTH_BLOB_URL);
+      const response = await fetch(`${WALSWORTH_BLOB_URL}&_t=${Date.now()}`);
       const data = await response.json();
 
       if (data.issues && Array.isArray(data.issues)) {
@@ -198,6 +202,97 @@ const PublicationComparison = ({
     return formatNumber(value);
   };
 
+  const trendMetricLabel = metricOptions.find(m => m.key === trendMetric)?.label || 'Visits';
+
+  const trendLineData = useMemo(() => {
+    const filtered = publicationData
+      .filter(p => selectedPublications.includes(p.publication))
+      .filter(p => matchesSearchTerm(p.publication, searchTerm));
+
+    const issuePoints = [];
+    filtered.forEach(pub => {
+      (pub.issues || []).forEach((issue, idx) => {
+        const metricMap = {
+          visitsPerIssue: issue.current?.total_issue_visits || 0,
+          pageViewsPerIssue: issue.current?.total_page_views || 0,
+          uniqueViewsPerIssue: issue.current?.unique_page_views || 0,
+          avgTimeInIssue: issue.current?.seconds_per_visit || 0,
+        };
+        issuePoints.push({
+          publication: pub.publication,
+          issueName: issue.issue_name || issue.name || `Issue ${idx + 1}`,
+          order: idx,
+          value: metricMap[trendMetric] || 0,
+        });
+      });
+    });
+
+    const grouped = _.groupBy(issuePoints, 'publication');
+    const maxIssues = Math.max(...Object.values(grouped).map(arr => arr.length), 0);
+
+    const chartPoints = [];
+    for (let i = 0; i < maxIssues; i++) {
+      const point = { index: i + 1 };
+      Object.entries(grouped).forEach(([pub, issues]) => {
+        const sorted = _.sortBy(issues, 'order');
+        if (sorted[i]) {
+          point[pub] = sorted[i].value;
+          if (!point.label) point.label = sorted[i].issueName;
+        }
+      });
+      chartPoints.push(point);
+    }
+    return chartPoints;
+  }, [publicationData, selectedPublications, searchTerm, trendMetric]);
+
+  const trendDeltas = useMemo(() => {
+    const filtered = publicationData
+      .filter(p => selectedPublications.includes(p.publication))
+      .filter(p => matchesSearchTerm(p.publication, searchTerm));
+
+    return filtered.map(pub => {
+      const issues = pub.issues || [];
+      if (issues.length === 0) return null;
+
+      const metricMap = {
+        visitsPerIssue: (i) => i.current?.total_issue_visits || 0,
+        pageViewsPerIssue: (i) => i.current?.total_page_views || 0,
+        uniqueViewsPerIssue: (i) => i.current?.unique_page_views || 0,
+        avgTimeInIssue: (i) => i.current?.seconds_per_visit || 0,
+      };
+
+      const getValue = metricMap[trendMetric] || metricMap.visitsPerIssue;
+      const values = issues.map(getValue);
+      const avg = values.length > 0 ? _.mean(values) : 0;
+      const latest = values[values.length - 1] || 0;
+      const diff = avg > 0 ? ((latest - avg) / avg * 100).toFixed(1) : 0;
+      const trending = latest > avg ? 'up' : latest < avg ? 'down' : 'flat';
+
+      return {
+        publication: pub.publication,
+        latest: trendMetric === 'avgTimeInIssue' ? formatTimeInIssue(latest) : formatNumber(latest),
+        avg: trendMetric === 'avgTimeInIssue' ? formatTimeInIssue(Math.round(avg)) : formatNumber(Math.round(avg)),
+        diff: `${diff > 0 ? '+' : ''}${diff}%`,
+        trending,
+      };
+    }).filter(Boolean);
+  }, [publicationData, selectedPublications, searchTerm, trendMetric]);
+
+  const TrendTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="ja-custom-tooltip">
+        <p className="ja-tooltip-title">Issue #{label}</p>
+        {payload.map((entry, idx) => (
+          <div key={idx} className="ja-tooltip-row">
+            <span style={{ color: entry.color }}>{entry.name}:</span>
+            <span>{trendMetric === 'avgTimeInIssue' ? formatTimeInIssue(entry.value) : formatNumber(entry.value)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="publication-comparison-wrapper">
       {isLoading ? (
@@ -212,45 +307,114 @@ const PublicationComparison = ({
       ) : (
         <>
           <div className="ja-chart-container">
-            {sortedChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={sortedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#888"
-                    tick={{ fontSize: 11, fill: '#ccc' }}
-                    interval={0}
-                    height={60}
-                  />
-                  <YAxis
-                    stroke="#888"
-                    tickFormatter={formatYAxis}
-                    tick={{ fontSize: 12, fill: '#888' }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value) => {
-                      const metric = metricOptions.find(m => m.key === value);
-                      return <span style={{ color: '#ccc' }}>{metric?.label || value}</span>;
-                    }}
-                  />
-                  {metricOptions
-                    .filter(m => selectedMetrics.includes(m.key))
-                    .map(metric => (
-                      <Bar
-                        key={metric.key}
-                        dataKey={metric.key}
-                        fill={metric.color}
-                        name={metric.key}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    ))}
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="pc-chart-header">
+              <div className="ja-toggle-group">
+                <button className={`ja-toggle-btn ${chartMode === 'comparison' ? 'active' : ''}`} onClick={() => setChartMode('comparison')}>Comparison</button>
+                <button className={`ja-toggle-btn ${chartMode === 'trends' ? 'active' : ''}`} onClick={() => setChartMode('trends')}>Trends</button>
+              </div>
+              {chartMode === 'trends' && (
+                <select className="ja-select" style={{ minWidth: '140px' }} value={trendMetric} onChange={e => setTrendMetric(e.target.value)}>
+                  {metricOptions.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {chartMode === 'trends' && trendDeltas.length > 0 && (
+              <div className="pc-delta-cards">
+                {trendDeltas.map((d, idx) => (
+                  <div className={`pc-delta-card ${d.trending === 'up' ? 'trending-up' : d.trending === 'down' ? 'trending-down' : ''}`} key={idx}>
+                    <div className="pc-delta-pub">{d.publication.length > 25 ? d.publication.substring(0, 25) + '...' : d.publication}</div>
+                    <div className="pc-delta-values">
+                      <span className="pc-delta-latest">Latest: {d.latest}</span>
+                      <span className="pc-delta-avg">Avg: {d.avg}</span>
+                    </div>
+                    <div className={`pc-delta-diff ${d.trending === 'up' ? 'positive' : d.trending === 'down' ? 'negative' : ''}`}>
+                      {d.trending === 'up' ? '\u25B2' : d.trending === 'down' ? '\u25BC' : '\u2014'} {d.diff}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {chartMode === 'comparison' ? (
+              sortedChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={sortedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                    <XAxis
+                      dataKey="name"
+                      stroke="#888"
+                      tick={{ fontSize: 11, fill: '#ccc' }}
+                      interval={0}
+                      height={60}
+                    />
+                    <YAxis
+                      stroke="#888"
+                      tickFormatter={formatYAxis}
+                      tick={{ fontSize: 12, fill: '#888' }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      formatter={(value) => {
+                        const metric = metricOptions.find(m => m.key === value);
+                        return <span style={{ color: '#ccc' }}>{metric?.label || value}</span>;
+                      }}
+                    />
+                    {metricOptions
+                      .filter(m => selectedMetrics.includes(m.key))
+                      .map(metric => (
+                        <Bar
+                          key={metric.key}
+                          dataKey={metric.key}
+                          fill={metric.color}
+                          name={metric.key}
+                          radius={[4, 4, 0, 0]}
+                        />
+                      ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="no-data">Select publications to display in the chart</div>
+              )
             ) : (
-              <div className="no-data">Select publications to display in the chart</div>
+              trendLineData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={trendLineData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                    <XAxis
+                      dataKey="index"
+                      stroke="#888"
+                      tick={{ fontSize: 11, fill: '#ccc' }}
+                      label={{ value: 'Issue Sequence', position: 'insideBottom', offset: -10, fill: '#888', fontSize: 12 }}
+                    />
+                    <YAxis
+                      stroke="#888"
+                      tickFormatter={trendMetric === 'avgTimeInIssue' ? formatTimeInIssue : formatNumber}
+                      tick={{ fontSize: 12, fill: '#888' }}
+                    />
+                    <Tooltip content={<TrendTooltip />} />
+                    <Legend />
+                    {selectedPublications
+                      .filter(pub => matchesSearchTerm(pub, searchTerm))
+                      .map((pub, idx) => (
+                        <Line
+                          key={pub}
+                          type="monotone"
+                          dataKey={pub}
+                          stroke={TREND_COLORS[idx % TREND_COLORS.length]}
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          connectNulls
+                        />
+                      ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="no-data">Select publications to display trends</div>
+              )
             )}
           </div>
 

@@ -4,6 +4,7 @@ import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { classifyCampaign, stripAbGroup } from '../../utils/campaignClassifier';
 import { API_BASE_URL } from '../../config/api';
+import { getIndustry } from '../../utils/industryKeywords';
 
 const METADATA_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metadata.json?sp=r&st=2025-09-03T19:53:53Z&se=2027-09-29T04:08:53Z&spr=https&sv=2024-11-04&sr=b&sig=JWxxARzWg4FN%2FhGa17O3RGffl%2BVyJ%2FkE3npL9Iws%2FIs%3D";
 
@@ -15,8 +16,6 @@ const combineDeploymentAudience = (deployments) => {
   const deployment1 = deployments.find(d =>
     d.campaign_name && /deployment\s*#?\s*1\s*$/i.test(d.campaign_name)
   ) || deployments[0];
-
-  const totalDelivered1 = Object.values(deployment1.audience_breakdown || {}).reduce((sum, a) => sum + (a.delivered || 0), 0);
 
   allSpecialties.forEach(spec => {
     const d1Delivered = deployment1.audience_breakdown?.[spec]?.delivered || 0;
@@ -32,29 +31,17 @@ const combineDeploymentAudience = (deployments) => {
   return combined;
 };
 
-const getIndustryFromMap = (campaignName, industryMap) => {
-  const name = campaignName.toLowerCase();
-  let matched = null;
-  let matchedLen = 0;
-  for (const [brand, industry] of Object.entries(industryMap)) {
-    if (name.includes(brand) && brand.length > matchedLen) {
-      matched = industry;
-      matchedLen = brand.length;
-    }
-  }
-  return matched;
-};
-
 const INITIAL_SHOW = 5;
+const LOAD_MORE = 10;
 
 const SpecialtyBreakdown = ({ searchTerm = '' }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [rawCampaigns, setRawCampaigns] = useState([]);
-  const [analyzeBy, setAnalyzeBy] = useState('content');
+  const [analyzeBy, setAnalyzeBy] = useState('market');
   const [groupByTopic, setGroupByTopic] = useState(false);
   const [combineSubSpecialties, setCombineSubSpecialties] = useState(false);
-  const [showMoreGroups, setShowMoreGroups] = useState(new Set());
+  const [visibleCounts, setVisibleCounts] = useState({});
   const [brandIndustryMap, setBrandIndustryMap] = useState({});
 
   useEffect(() => {
@@ -66,7 +53,7 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(METADATA_BLOB_URL);
+      const response = await fetch(`${METADATA_BLOB_URL}&_t=${Date.now()}`);
       if (!response.ok) throw new Error(`Error: ${response.status}`);
       const rawData = await response.json();
 
@@ -123,8 +110,8 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
     rawCampaigns.forEach(({ baseName, audience }) => {
       let groupKey, topicKey;
 
-      if (analyzeBy === 'industry') {
-        const industry = getIndustryFromMap(baseName, brandIndustryMap);
+      if (analyzeBy === 'market') {
+        const industry = getIndustry(baseName, brandIndustryMap);
         if (!industry) return;
         const { topic } = classifyCampaign(baseName);
         groupKey = industry;
@@ -187,13 +174,10 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
         ? specArray.reduce((sum, s) => sum + (s.openRate * s.delivered), 0) / totalDelivered
         : 0;
 
-      const maxRate = specArray.length > 0 ? specArray[0].openRate : 1;
-
       return {
         ...group,
         specialties: specArray.map(s => ({
           ...s,
-          barWidth: maxRate > 0 ? (s.openRate / maxRate) * 100 : 0,
           vsAvg: s.openRate - avgRate
         })),
         avgRate,
@@ -205,13 +189,13 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
     .sort((a, b) => b.totalDelivered - a.totalDelivered);
   }, [rawCampaigns, analyzeBy, groupByTopic, combineSubSpecialties, searchTerm, brandIndustryMap]);
 
-  const toggleShowMore = (groupId) => {
-    setShowMoreGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
+  const getVisibleCount = (groupId) => visibleCounts[groupId] || INITIAL_SHOW;
+
+  const handleLoadMore = (groupId) => {
+    setVisibleCounts(prev => ({
+      ...prev,
+      [groupId]: (prev[groupId] || INITIAL_SHOW) + LOAD_MORE
+    }));
   };
 
   if (loading) {
@@ -219,7 +203,7 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
       <div className="sb-container">
         <div className="sb-loader">
           <div className="sb-spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-          <p>Loading specialty breakdown...</p>
+          <p>Loading specialty data...</p>
         </div>
       </div>
     );
@@ -236,7 +220,7 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
   return (
     <div className="sb-container">
       <div className="section-header-bar">
-        <h3>Specialty Breakdown</h3>
+        <h3>Specialty Insights</h3>
         <div className="section-header-stats">
           <div className="anomaly-controls-inline">
             <span className="control-label">Group by</span>
@@ -248,10 +232,10 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
                 Content
               </button>
               <button
-                className={`mode-toggle-btn ${analyzeBy === 'industry' ? 'active' : ''}`}
-                onClick={() => setAnalyzeBy('industry')}
+                className={`mode-toggle-btn ${analyzeBy === 'market' ? 'active' : ''}`}
+                onClick={() => setAnalyzeBy('market')}
               >
-                Industry
+                Market
               </button>
             </div>
             <span className="control-divider">→</span>
@@ -285,12 +269,12 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
       <div className="sb-groups">
         {groupedData.map(group => {
           const groupId = group.groupName + (group.parentGroup || '');
-          const showAll = showMoreGroups.has(groupId);
-          const visibleSpecs = showAll ? group.specialties : group.specialties.slice(0, INITIAL_SHOW);
-          const remaining = group.specialties.length - INITIAL_SHOW;
+          const visible = getVisibleCount(groupId);
+          const visibleSpecs = group.specialties.slice(0, visible);
+          const remaining = group.specialties.length - visible;
 
           return (
-            <div className="sb-group-card" key={groupId}>
+            <div className="sb-group-section" key={groupId}>
               <div className="sb-group-header">
                 <div className="sb-group-header-left">
                   <h4 className="sb-group-name">{group.groupName}</h4>
@@ -299,33 +283,35 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
                   )}
                 </div>
                 <div className="sb-group-meta">
-                  <span className="sb-group-avg">{group.avgRate.toFixed(1)}%</span>
+                  <span className="sb-group-avg">{group.avgRate.toFixed(1)}% avg</span>
                   <span className="sb-group-count">{group.specCount} specialties</span>
+                  {visibleCounts[groupId] > INITIAL_SHOW && (
+                    <button className="sb-collapse-btn" onClick={() => setVisibleCounts(prev => { const next = { ...prev }; delete next[groupId]; return next; })}>
+                      Collapse
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="sb-group-specs">
-                {visibleSpecs.map(spec => (
-                  <div className="sb-spec-row" key={spec.name}>
-                    <span className="sb-spec-name" title={spec.name}>{spec.name}</span>
-                    <div className="sb-spec-bar-track">
-                      <div
-                        className={`sb-spec-fill ${spec.vsAvg >= 0 ? 'sb-fill-green' : 'sb-fill-amber'}`}
-                        style={{ width: `${spec.barWidth}%` }}
-                      />
-                    </div>
-                    <span className="sb-spec-rate">{spec.openRate.toFixed(1)}%</span>
-                    <span className="sb-spec-volume">{spec.delivered.toLocaleString()}</span>
-                    <span className={`sb-spec-dev ${spec.vsAvg >= 0 ? 'sb-dev-pos' : 'sb-dev-neg'}`}>
+
+              <div className="sb-cards-grid">
+                {visibleSpecs.map((spec, idx) => (
+                  <div className="sb-spec-card" key={spec.name}>
+                    <div className="sb-card-rank">#{idx + 1 + (visible - visibleSpecs.length > 0 ? 0 : 0)}</div>
+                    <div className="sb-card-name" title={spec.name}>{spec.name}</div>
+                    <div className="sb-card-rate">{spec.openRate.toFixed(1)}%</div>
+                    <div className={`sb-card-delta ${spec.vsAvg >= 0 ? 'sb-delta-pos' : 'sb-delta-neg'}`}>
                       {spec.vsAvg >= 0 ? '+' : ''}{spec.vsAvg.toFixed(1)}pp
-                    </span>
+                    </div>
+                    <div className="sb-card-volume">{spec.delivered.toLocaleString()} delivered</div>
                   </div>
                 ))}
-                {remaining > 0 && (
-                  <button className="sb-show-more" onClick={() => toggleShowMore(groupId)}>
-                    {showAll ? 'Show less' : `Show ${remaining} more`}
-                  </button>
-                )}
               </div>
+
+              {remaining > 0 && (
+                <button className="sb-load-more" onClick={() => handleLoadMore(groupId)}>
+                  Show {Math.min(remaining, LOAD_MORE)} more
+                </button>
+              )}
             </div>
           );
         })}

@@ -87,7 +87,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             setIsLoadingMetadata(true);
             try {
                 const blobUrl = "https://emaildash.blob.core.windows.net/json-data/completed_campaign_metadata.json?sp=r&st=2025-09-03T19:53:53Z&se=2027-09-29T04:08:53Z&spr=https&sv=2024-11-04&sr=b&sig=JWxxARzWg4FN%2FhGa17O3RGffl%2BVyJ%2FkE3npL9Iws%2FIs%3D";
-                const response = await fetch(blobUrl);
+                const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
                 const jsonData = await response.json();
 
                 const baseCampaignName = formatCampaignName(campaign.Campaign).toLowerCase();

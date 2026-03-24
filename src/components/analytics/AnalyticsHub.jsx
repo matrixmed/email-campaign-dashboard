@@ -16,7 +16,7 @@ const AnalyticsHub = () => {
   const [activeView, setActiveView] = useState('monthly');
   const [searchTerm, setSearchTerm] = useState(searchTerms.campaignAnalytics || '');
   const [selectedMetric, setSelectedMetric] = useState('Unique_Open_Rate');
-  const [analyzeBy, setAnalyzeBy] = useState('content');
+  const [analyzeBy, setAnalyzeBy] = useState('market');
   const [detectByDisease, setDetectByDisease] = useState(false);
   const [selectedYearlyMetrics, setSelectedYearlyMetrics] = useState(['Unique_Open_Rate', 'Total_Open_Rate', 'Unique_Click_Rate', 'Total_Click_Rate']);
   const [availableYears, setAvailableYears] = useState([]);
@@ -31,7 +31,6 @@ const AnalyticsHub = () => {
     { key: 'Unique_Click_Rate', label: 'Unique Click Rate', color: '#38bdf8' },
     { key: 'Total_Click_Rate', label: 'Total Click Rate', color: '#ffd93d' },
   ];
-
 
   const handleYearlyMetricToggle = (metricKey) => {
     setSelectedYearlyMetrics(prev => {

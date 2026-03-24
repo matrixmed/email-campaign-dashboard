@@ -169,31 +169,34 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
       {categorySummary && (
         <div className="ab-category-summary">
           <div className="ab-category-summary-header">
-            <h3>
-              {filterCategory
-                ? `${filterCategory} Tests`
-                : 'All Tests'}
-              {filterMarket ? ` \u2014 ${filterMarket}` : ''}
-            </h3>
-            <span className="ab-category-summary-count">{categorySummary.totalTests} tests</span>
-          </div>
-
-          <div className="ab-category-summary-stats">
-            <div className="ab-summary-stat">
-              <span className="ab-summary-stat-value">{categorySummary.totalTests}</span>
-              <span className="ab-summary-stat-label">Total Tests</span>
-            </div>
-            <div className="ab-summary-stat">
-              <span className="ab-summary-stat-value">{categorySummary.significantTests}</span>
-              <span className="ab-summary-stat-label">Significant</span>
-            </div>
-            <div className="ab-summary-stat">
-              <span className="ab-summary-stat-value">{categorySummary.noWinner}</span>
-              <span className="ab-summary-stat-label">No Winner</span>
-            </div>
-            <div className="ab-summary-stat">
-              <span className="ab-summary-stat-value ab-summary-lift">+{categorySummary.avgLift}%</span>
-              <span className="ab-summary-stat-label">Avg Lift</span>
+            <div className="ab-summary-title-row">
+              <h3>
+                {filterCategory
+                  ? `${filterCategory} Tests`
+                  : 'All Tests'}
+                {filterMarket ? ` \u2014 ${filterMarket}` : ''}
+              </h3>
+              <div className="ab-summary-inline-stats">
+                <div className="ab-summary-inline-stat">
+                  <span className="ab-summary-inline-value">{categorySummary.totalTests}</span>
+                  <span className="ab-summary-inline-label">Tests</span>
+                </div>
+                <span className="ab-summary-inline-divider" />
+                <div className="ab-summary-inline-stat">
+                  <span className="ab-summary-inline-value ab-color-green">{categorySummary.significantTests}</span>
+                  <span className="ab-summary-inline-label">Significant</span>
+                </div>
+                <span className="ab-summary-inline-divider" />
+                <div className="ab-summary-inline-stat">
+                  <span className="ab-summary-inline-value ab-color-muted">{categorySummary.noWinner}</span>
+                  <span className="ab-summary-inline-label">No Winner</span>
+                </div>
+                <span className="ab-summary-inline-divider" />
+                <div className="ab-summary-inline-stat">
+                  <span className="ab-summary-inline-value ab-color-accent">+{categorySummary.avgLift}%</span>
+                  <span className="ab-summary-inline-label">Avg Lift</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -236,75 +239,46 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
         </div>
       )}
 
-      <div className="x-table-container">
-        <table className="results-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Test Name</th>
-              <th>Category</th>
-              <th>Market</th>
-              <th>Winner</th>
-              <th>Winning Approach</th>
-              <th>P-Value</th>
-              <th>Lift</th>
-              <th>Significant</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(test => {
-              const primary = getPrimaryResult(test);
-              const winnerGroup = getWinnerGroupInfo(test);
-              const isExpanded = expandedId === test.id;
+      <div className="ab-historical-list">
+        {filtered.map(test => {
+          const primary = getPrimaryResult(test);
+          const winnerGroup = getWinnerGroupInfo(test);
+          const isExpanded = expandedId === test.id;
 
-              return (
-                <React.Fragment key={test.id}>
-                  <tr
-                    onClick={() => toggleExpand(test.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td style={{ width: 30, textAlign: 'center' }}>
-                      <span className={`ab-expand-arrow ${isExpanded ? 'expanded' : ''}`}>&#9662;</span>
-                    </td>
-                    <td className="ab-historical-name">{test.base_campaign_name}</td>
-                    <td>{test.category || '-'}</td>
-                    <td>{test.market || '-'}</td>
-                    <td>
-                      {primary?.winner && primary.winner !== 'none' ? (
-                        <span className="ab-historical-winner">Group {primary.winner}</span>
-                      ) : (
-                        <span className="ab-historical-no-winner">None</span>
-                      )}
-                    </td>
-                    <td>{winnerGroup?.subcategory || '-'}</td>
-                    <td>{primary?.p_value != null ? (primary.p_value < 0.0001 ? '< 0.0001' : primary.p_value.toFixed(4)) : '-'}</td>
-                    <td>
-                      {primary?.relative_lift != null ? (
-                        <span className={primary.relative_lift > 0 ? 'ab-lift-positive' : 'ab-lift-negative'}>
-                          {primary.relative_lift > 0 ? '+' : ''}{primary.relative_lift.toFixed(1)}%
-                        </span>
-                      ) : '-'}
-                    </td>
-                    <td>
-                      <span className={`ab-sig-badge ${primary?.is_significant ? 'sig-yes' : 'sig-no'}`}>
-                        {primary?.is_significant ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                    <td>{test.updated_at ? new Date(test.updated_at).toLocaleDateString() : '-'}</td>
-                  </tr>
-                  {isExpanded && (
-                    <tr className="ab-expanded-row">
-                      <td colSpan={10} style={{ padding: 0 }}>
-                        <ExpandedTestDetail test={test} />
-                      </td>
-                    </tr>
+          return (
+            <div key={test.id} className="ab-historical-item">
+              <div className="ab-historical-row" onClick={() => toggleExpand(test.id)}>
+                <span className={`ab-expand-arrow ${isExpanded ? 'expanded' : ''}`}>&#9662;</span>
+                <div className="ab-historical-row-main">
+                  <span className="ab-historical-name">{test.base_campaign_name}</span>
+                  <div className="ab-historical-row-tags">
+                    {test.category && <span className="ab-historical-tag">{test.category}</span>}
+                    {test.market && <span className="ab-historical-tag">{test.market}</span>}
+                  </div>
+                </div>
+                <div className="ab-historical-row-stats">
+                  {primary?.winner && primary.winner !== 'none' ? (
+                    <span className="ab-historical-winner">Group {primary.winner}</span>
+                  ) : (
+                    <span className="ab-historical-no-winner">No Winner</span>
                   )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                  {primary?.relative_lift != null ? (
+                    <span className={`ab-historical-lift ${primary.relative_lift > 0 ? 'ab-lift-positive' : 'ab-lift-negative'}`}>
+                      {primary.relative_lift > 0 ? '+' : ''}{primary.relative_lift.toFixed(1)}%
+                    </span>
+                  ) : null}
+                  <span className={`ab-sig-badge ${primary?.is_significant ? 'sig-yes' : 'sig-no'}`}>
+                    {primary?.is_significant ? 'Significant' : 'Not Sig.'}
+                  </span>
+                  <span className="ab-historical-date">
+                    {test.updated_at ? new Date(test.updated_at).toLocaleDateString() : '-'}
+                  </span>
+                </div>
+              </div>
+              {isExpanded && <ExpandedTestDetail test={test} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

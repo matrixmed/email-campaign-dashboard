@@ -29,13 +29,19 @@ def get_current_reporting_week():
 def get_monthly_report_period():
     today = datetime.now()
     days_since_monday = today.weekday()
-    current_monday = today - timedelta(days=days_since_monday)
-    is_first_week = current_monday.day <= 7
+    current_monday = (today - timedelta(days=days_since_monday)).date()
+
+    reporting_monday = current_monday - timedelta(days=7)
+    reporting_sunday = reporting_monday + timedelta(days=6)
+
+    prev_reporting_sunday = reporting_sunday - timedelta(days=7)
+
+    is_first_week = reporting_sunday.month != prev_reporting_sunday.month
 
     if is_first_week:
-        prev_month_end = current_monday.replace(day=1) - timedelta(days=1)
+        prev_month_end = reporting_sunday.replace(day=1) - timedelta(days=1)
         prev_month_start = prev_month_end.replace(day=1)
-        return prev_month_start.date(), True
+        return prev_month_start, True
     return None, False
 
 CLIENT_ID_MAPPINGS = {
@@ -140,7 +146,7 @@ def get_due_this_week():
                 'placement_description': metadata.placement_description if metadata else campaign.placement_description,
 
                 'has_client_id': bool(metadata.client_id if metadata else campaign.client_id),
-                'client_id_field': None, 
+                'client_id_field': None,
 
                 'buy_component_type': contract.buy_component_type if contract else campaign.buy_component_type,
                 'contract_number': contract.contract_number if contract else campaign.contract_number,
@@ -194,6 +200,7 @@ def get_no_data_reports():
 
         monthly_start, is_first_week = get_monthly_report_period()
         filters = [CMIExpectedReport.reporting_week_start == week_start]
+
         if is_first_week and monthly_start:
             filters.append(
                 and_(
@@ -201,6 +208,7 @@ def get_no_data_reports():
                     CMIExpectedReport.reporting_week_start == monthly_start
                 )
             )
+
         expected_reports = session.query(CMIExpectedReport).filter(or_(*filters)).all()
 
         contracts = session.query(CMIContractValue).all()
@@ -214,15 +222,35 @@ def get_no_data_reports():
             CampaignReportManager.batch != 'no_data'
         ).all()
 
-        metadata_records = session.query(CampaignReportingMetadata).all()
-
-        placement_ids_with_data = set()
+        pld_placement_ids_with_data = set()
         for c in campaigns_with_data:
             if c.cmi_placement_id:
-                placement_ids_with_data.add(str(c.cmi_placement_id))
-        for m in metadata_records:
-            if m.cmi_placement_id:
-                placement_ids_with_data.add(str(m.cmi_placement_id))
+                pld_placement_ids_with_data.add(str(c.cmi_placement_id))
+            if c.agency_metadata and isinstance(c.agency_metadata, dict):
+                agency_pid = c.agency_metadata.get('cmi_placement_id')
+                if agency_pid:
+                    pld_placement_ids_with_data.add(str(agency_pid))
+
+        campaigns_without_pid = [c for c in campaigns_with_data if not c.cmi_placement_id and not (c.agency_metadata and isinstance(c.agency_metadata, dict) and c.agency_metadata.get('cmi_placement_id'))]
+        if campaigns_without_pid:
+            metadata_records = session.query(CampaignReportingMetadata).filter(
+                CampaignReportingMetadata.cmi_placement_id.isnot(None)
+            ).all()
+            for c in campaigns_without_pid:
+                c_name = (c.campaign_name or '').lower().strip()
+                c_send = c.send_date.date() if c.send_date else None
+                for m in metadata_records:
+                    m_name = (m.campaign_name or '').lower().strip()
+                    if m.campaign_id and c.campaign_id and str(m.campaign_id) == str(c.campaign_id):
+                        pld_placement_ids_with_data.add(str(m.cmi_placement_id))
+                        break
+                    if m_name == c_name and m.send_date and c_send and str(m.send_date) == str(c_send):
+                        pld_placement_ids_with_data.add(str(m.cmi_placement_id))
+                        break
+                    if c_send and m.send_date and str(m.send_date) == str(c_send):
+                        if m_name and c_name and (m_name in c_name or c_name in m_name):
+                            pld_placement_ids_with_data.add(str(m.cmi_placement_id))
+                            break
 
         grouped = {}
         for report in expected_reports:
@@ -238,12 +266,20 @@ def get_no_data_reports():
 
         pld_and_agg = []
         agg_only = []
-        matched_reports = []  
+        matched_reports = []
 
         for placement_id, group in grouped.items():
-            has_data = placement_id in placement_ids_with_data
-
             contract = contracts_by_placement.get(placement_id)
+            contract_data_type = (contract.data_type or '').upper() if contract else ''
+            is_monthly = any(r.expected_data_frequency == 'Monthly' for r in group['reports'])
+
+            if is_monthly and contract_data_type == 'AGG':
+                has_data = any(
+                    r.is_matched or r.is_submitted or r.status in ('matched', 'attached', 'standalone', 'moved_to_due')
+                    for r in group['reports']
+                )
+            else:
+                has_data = placement_id in pld_placement_ids_with_data
 
             rep_report = group['reports'][0]
 
@@ -267,16 +303,17 @@ def get_no_data_reports():
                 'has_contract_match': contract is not None,
 
                 'is_agg_only': rep_report.is_agg_only,
+                'is_monthly': is_monthly,
                 'agg_metric': rep_report.agg_metric,
                 'agg_value': rep_report.agg_value,
-                'status': rep_report.status
+                'status': rep_report.status,
+                'is_submitted': rep_report.is_submitted,
+                'submitted_for_week': rep_report.submitted_for_week.isoformat() if rep_report.submitted_for_week else None
             }
 
             if has_data:
                 matched_reports.append(report_data)
             else:
-                contract_data_type = (contract.data_type or '').upper() if contract else ''
-
                 if contract_data_type:
                     if contract_data_type == 'AGG':
                         report_data['is_agg_only'] = True
@@ -310,7 +347,7 @@ def get_no_data_reports():
             'week_end': week_end.isoformat(),
             'pld_and_agg': pld_and_agg,
             'agg_only': agg_only,
-            'matched_placement_ids': list(placement_ids_with_data),
+            'matched_placement_ids': list(pld_placement_ids_with_data),
             'all_expected_placement_ids': all_expected_placement_ids,
             'total_expected': len(expected_reports),
             'total_no_data': len(pld_and_agg) + len(agg_only)
@@ -391,7 +428,7 @@ def generate_batch_json():
                 "Placement_Description": metadata.placement_description if metadata else campaign.placement_description or "",
 
                 "Buy_Component_Type": contract.buy_component_type if contract else campaign.buy_component_type or "",
-                "Campaign_Type": "email",  
+                "Campaign_Type": "email",
 
                 "_metadata_source": "unified_api",
                 "_match_confidence": campaign.match_confidence

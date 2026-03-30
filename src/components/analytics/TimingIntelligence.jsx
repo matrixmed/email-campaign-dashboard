@@ -550,7 +550,6 @@ const TimingIntelligence = ({ onClearCache }) => {
         </>
       )}
 
-      {/* DISABLED - queries not verified yet
       {!heatmapData && !heatmapLoading && (
         <div className="timing-filters">
           <div className="filter-row">
@@ -685,7 +684,6 @@ const TimingIntelligence = ({ onClearCache }) => {
           </div>
         </div>
       )}
-      */}
     </div>
   );
 };

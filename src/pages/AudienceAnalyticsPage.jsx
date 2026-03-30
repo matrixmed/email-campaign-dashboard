@@ -6,6 +6,7 @@ import DMABreakdown from '../components/listanalysis/DMABreakdown';
 import EngagementPatterns from '../components/audience/EngagementPatterns';
 import PrintListManagement from '../components/printManagement/PrintListManagement';
 import NCOAUpload from '../components/printManagement/NCOAUpload';
+import ShadowEngagers from '../components/audience/ShadowEngagers';
 import '../styles/AnalyticsHub.css';
 
 const AudienceAnalyticsPage = () => {
@@ -13,6 +14,7 @@ const AudienceAnalyticsPage = () => {
     return localStorage.getItem('audienceAnalyticsTab') || 'find-users';
   });
   const [printSearch, setPrintSearch] = useState('');
+  const [shadowSearch, setShadowSearch] = useState('');
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
@@ -32,6 +34,17 @@ const AudienceAnalyticsPage = () => {
               placeholder="Search"
               value={printSearch}
               onChange={(e) => setPrintSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
+        {activeTab === 'shadow-engagers' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={shadowSearch}
+              onChange={(e) => setShadowSearch(e.target.value)}
               className="search-input"
             />
           </div>
@@ -69,6 +82,12 @@ const AudienceAnalyticsPage = () => {
         >
           <span>DMA Breakdown</span>
         </button>
+        <button
+          className={`tab-button ${activeTab === 'shadow-engagers' ? 'active' : ''}`}
+          onClick={() => handleTabClick('shadow-engagers')}
+        >
+          <span>Shadow Engagers</span>
+        </button>
         {/* DISABLED - not verified yet
         <button
           className={`tab-button ${activeTab === 'engagement-patterns' ? 'active' : ''}`}
@@ -102,6 +121,9 @@ const AudienceAnalyticsPage = () => {
       )}
       {activeTab === 'dma-breakdown' && (
         <DMABreakdown />
+      )}
+      {activeTab === 'shadow-engagers' && (
+        <ShadowEngagers externalSearch={shadowSearch} />
       )}
       {/* DISABLED - not verified yet
       {activeTab === 'engagement-patterns' && (

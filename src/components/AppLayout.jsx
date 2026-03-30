@@ -36,6 +36,7 @@ const AppLayout = ({ children }) => {
     { path: '/dashboard-builder', label: 'Dashboard Builder' },
     { path: '/ab-testing', label: 'A/B Testing' },
     { path: '/reports', label: 'Reports Management' },
+    { path: '/market-intelligence', label: 'Market Intelligence' },
     { path: '/audience', label: 'Audience Analytics' },
     { path: '/basis', label: 'Basis Performance' },
     { path: '/content', label: 'Content Performance' },
@@ -59,6 +60,7 @@ const AppLayout = ({ children }) => {
     '/content-analysis': 'content-analytics',
     '/cmi-contracts': 'cmi-contracts',
     '/brands': 'brand-management',
+    '/market-intelligence': 'market-intelligence',
   }), []);
 
   const docsScrollTarget = pathToSectionMap[location.pathname] || null;

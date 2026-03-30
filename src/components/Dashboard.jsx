@@ -16,6 +16,7 @@ import AudienceAnalyticsPage from '../pages/AudienceAnalyticsPage';
 import DashboardCanvas from './dashboardBuilder/DashboardCanvas';
 import ProgramPerformancePage from '../pages/ProgramPerformancePage';
 import DocumentationPage from '../pages/DocumentationPage';
+import MarketIntelligencePage from '../pages/MarketIntelligencePage';
 
 const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
   return (
@@ -32,6 +33,7 @@ const Dashboard = ({ isAuthenticated, onAuthenticated }) => {
           <Route path="/ab-testing" element={<ABTestingPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/audience" element={<AudienceAnalyticsPage />} />
+          <Route path="/market-intelligence" element={<MarketIntelligencePage />} />
           <Route path="/basis" element={<BasisOptimizationPage />} />
           <Route path="/content" element={<ContentPerformancePage />} />
           <Route path="/content-analysis" element={<JournalAnalysisPage />} />

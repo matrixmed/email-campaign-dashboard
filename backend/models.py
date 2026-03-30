@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float, Date, JSON, Index
+from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, DateTime, Text, Float, Numeric, Date, JSON, Index, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -942,6 +942,319 @@ class PrintListActivityLog(Base):
     action = Column(String(50))
     details = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class ShadowEngager(Base):
+    __tablename__ = 'shadow_engagers'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    specialty = Column(String(100))
+    confidence_pct = Column(Float, nullable=False)
+    classification = Column(String(20), nullable=False)
+    campaigns_clicked_no_open = Column(Integer, default=0)
+    campaigns_with_opens = Column(Integer, default=0)
+    total_campaigns_sent = Column(Integer, default=0)
+    total_clean_clicks_no_open = Column(Integer, default=0)
+    distinct_campaigns_clicked = Column(Integer, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_shadow_confidence', 'confidence_pct'),
+        Index('idx_shadow_classification', 'classification'),
+    )
+
+class ClinicalTrial(Base):
+    __tablename__ = 'clinical_trials'
+
+    nct_id = Column(String(20), primary_key=True)
+    title = Column(Text)
+    sponsor_name = Column(String(500), index=True)
+    sponsor_class = Column(String(50))
+    phase = Column(String(50))
+    status = Column(String(100), index=True)
+    conditions = Column(Text)
+    interventions = Column(Text)
+    enrollment_count = Column(Integer)
+    start_date = Column(Date)
+    primary_completion_date = Column(Date, index=True)
+    completion_date = Column(Date)
+    last_api_update = Column(Date)
+    therapeutic_area = Column(String(100), index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ct_sponsor', 'sponsor_name'),
+        Index('idx_ct_completion', 'primary_completion_date'),
+    )
+
+class PDUFADate(Base):
+    __tablename__ = 'pdufa_dates'
+
+    id = Column(Integer, primary_key=True)
+    drug_name = Column(String(500))
+    company_name = Column(String(500), index=True)
+    application_type = Column(String(50))
+    therapeutic_area = Column(String(200), index=True)
+    target_date = Column(Date, index=True)
+    status = Column(String(100))
+    source_url = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_pdufa_unique', 'drug_name', 'company_name', 'target_date', unique=True),
+    )
+
+class OpenPayment(Base):
+    __tablename__ = 'open_payments'
+
+    record_id = Column(BigInteger, primary_key=True)
+    npi = Column(String(20), index=True)
+    physician_name = Column(String(500))
+    physician_first_name = Column(String(200))
+    physician_last_name = Column(String(200))
+    specialty = Column(String(300), index=True)
+    recipient_city = Column(String(200))
+    recipient_state = Column(String(10))
+    manufacturer_name = Column(String(500), index=True)
+    drug_name = Column(String(500))
+    therapeutic_area = Column(String(300), index=True)
+    payment_amount = Column(Numeric(12, 2))
+    payment_nature = Column(String(300))
+    payment_date = Column(Date)
+    program_year = Column(Integer, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_op_npi_manufacturer', 'npi', 'manufacturer_name'),
+    )
+
+class OpenPaymentSummary(Base):
+    __tablename__ = 'open_payments_summary'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(20), index=True)
+    physician_name = Column(String(500))
+    specialty = Column(String(300))
+    manufacturer_name = Column(String(500), index=True)
+    therapeutic_area = Column(String(300), index=True)
+    total_payments = Column(Numeric(14, 2))
+    payment_count = Column(Integer)
+    avg_payment = Column(Numeric(12, 2))
+    max_payment = Column(Numeric(12, 2))
+    latest_payment_date = Column(Date)
+    program_year = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ops_unique', 'npi', 'manufacturer_name', 'therapeutic_area', 'program_year', unique=True),
+    )
+
+class PubmedTrend(Base):
+    __tablename__ = 'pubmed_trends'
+
+    id = Column(Integer, primary_key=True)
+    search_term = Column(String(500), index=True)
+    therapeutic_area = Column(String(100), index=True)
+    year = Column(Integer)
+    month = Column(Integer)
+    publication_count = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_pm_unique', 'search_term', 'year', 'month', unique=True),
+        Index('idx_pm_year_month', 'year', 'month'),
+    )
+
+class PatentExpiration(Base):
+    __tablename__ = 'patent_expirations'
+
+    id = Column(Integer, primary_key=True)
+    drug_name = Column(String(500))
+    active_ingredient = Column(String(500), index=True)
+    applicant = Column(String(500), index=True)
+    application_number = Column(String(50))
+    product_number = Column(String(50))
+    patent_number = Column(String(50))
+    patent_expiration_date = Column(Date, index=True)
+    exclusivity_code = Column(String(20))
+    exclusivity_date = Column(Date)
+    dosage_form = Column(String(200))
+    route = Column(String(200))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_pe_unique', 'application_number', 'product_number', 'patent_number', unique=True),
+    )
+
+class RedditHCPPost(Base):
+    __tablename__ = 'reddit_hcp_posts'
+
+    post_id = Column(String(20), primary_key=True)
+    subreddit = Column(String(100), index=True)
+    title = Column(Text)
+    body = Column(Text)
+    score = Column(Integer, index=True)
+    upvote_ratio = Column(Numeric(4, 2))
+    num_comments = Column(Integer)
+    author = Column(String(200))
+    author_flair = Column(String(200))
+    link_url = Column(Text)
+    created_utc = Column(DateTime, index=True)
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+
+class RedditHCPComment(Base):
+    __tablename__ = 'reddit_hcp_comments'
+
+    comment_id = Column(String(20), primary_key=True)
+    post_id = Column(String(20), ForeignKey('reddit_hcp_posts.post_id'), index=True)
+    parent_comment_id = Column(String(20))
+    body = Column(Text)
+    score = Column(Integer, index=True)
+    author = Column(String(200))
+    author_flair = Column(String(200))
+    created_utc = Column(DateTime, index=True)
+    depth = Column(Integer)
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+
+class MarketBenchmark(Base):
+    __tablename__ = 'market_benchmarks'
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String(300))
+    metric_name = Column(String(300))
+    metric_value = Column(Numeric(14, 2))
+    metric_unit = Column(String(50))
+    channel = Column(String(100), index=True)
+    therapeutic_area = Column(String(100))
+    platform = Column(String(100))
+    year = Column(Integer, index=True)
+    quarter = Column(Integer)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class HCPTopicProfile(Base):
+    __tablename__ = 'hcp_topic_profiles'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False)
+    npi = Column(String(20))
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    specialty = Column(String(200))
+    therapeutic_area = Column(String(200), nullable=False)
+    topic = Column(String(200))
+    campaigns_sent = Column(Integer, default=0)
+    campaigns_opened = Column(Integer, default=0)
+    campaigns_clicked = Column(Integer, default=0)
+    total_opens = Column(Integer, default=0)
+    total_clicks = Column(Integer, default=0)
+    open_rate = Column(Float, default=0.0)
+    click_rate = Column(Float, default=0.0)
+    affinity_score = Column(Float, default=0.0)
+    recency_days = Column(Integer)
+    last_engagement = Column(DateTime)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_htp_email', 'email'),
+        Index('idx_htp_npi', 'npi'),
+        Index('idx_htp_ta', 'therapeutic_area'),
+        Index('idx_htp_affinity', 'therapeutic_area', 'affinity_score'),
+        Index('idx_htp_email_ta', 'email', 'therapeutic_area', unique=True),
+    )
+
+class HCPCluster(Base):
+    __tablename__ = 'hcp_clusters'
+
+    id = Column(Integer, primary_key=True)
+    cluster_id = Column(Integer, nullable=False, index=True)
+    cluster_name = Column(String(200))
+    cluster_description = Column(Text)
+    top_therapeutic_areas = Column(JSON)
+    top_topics = Column(JSON)
+    hcp_count = Column(Integer, default=0)
+    avg_affinity_score = Column(Float)
+    top_specialties = Column(JSON)
+    run_id = Column(String(50), index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_hc_run_cluster', 'run_id', 'cluster_id', unique=True),
+    )
+
+class HCPClusterMembership(Base):
+    __tablename__ = 'hcp_cluster_memberships'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False)
+    npi = Column(String(20))
+    cluster_id = Column(Integer, nullable=False)
+    run_id = Column(String(50), nullable=False)
+    membership_score = Column(Float)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_hcm_email', 'email'),
+        Index('idx_hcm_npi', 'npi'),
+        Index('idx_hcm_cluster', 'cluster_id'),
+        Index('idx_hcm_run', 'run_id'),
+        Index('idx_hcm_run_email', 'run_id', 'email', unique=True),
+    )
+
+class GASessionMatch(Base):
+    __tablename__ = 'ga_session_matches'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False)
+    npi = Column(String(20))
+    ga_client_id = Column(String(100), nullable=False)
+    match_timestamp = Column(DateTime)
+    match_url = Column(Text)
+    match_city = Column(String(200))
+    match_device = Column(String(50))
+    confidence_score = Column(Float, default=0.0)
+    match_count = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_gsm_email', 'email'),
+        Index('idx_gsm_client', 'ga_client_id'),
+        Index('idx_gsm_confidence', 'confidence_score'),
+        Index('idx_gsm_email_client', 'email', 'ga_client_id', unique=True),
+    )
+
+class GAAnonymousProfile(Base):
+    __tablename__ = 'ga_anonymous_profiles'
+
+    id = Column(Integer, primary_key=True)
+    ga_client_id = Column(String(100), nullable=False, unique=True)
+    total_sessions = Column(Integer, default=0)
+    total_pageviews = Column(Integer, default=0)
+    pages_visited = Column(JSON)
+    topic_interests = Column(JSON)
+    therapeutic_areas = Column(JSON)
+    top_content = Column(JSON)
+    first_seen = Column(DateTime)
+    last_seen = Column(DateTime)
+    primary_city = Column(String(200))
+    primary_device = Column(String(50))
+    video_views = Column(Integer, default=0)
+    video_topics = Column(JSON)
+    matched_email = Column(String(255))
+    matched_npi = Column(String(20))
+    match_confidence = Column(Float, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_gap_client', 'ga_client_id'),
+        Index('idx_gap_matched', 'matched_email'),
+        Index('idx_gap_confidence', 'match_confidence'),
+    )
 
 def init_db():
     DATABASE_URL = os.getenv('DATABASE_URL') or 'postgresql://krill_user:mFjksQrNfkvghjzJEDVE0qQw8zBwz5dV@dpg-d3f8kmbipnbc73a2lnng-a.virginia-postgres.render.com/krill'

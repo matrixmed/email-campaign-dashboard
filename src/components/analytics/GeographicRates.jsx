@@ -440,7 +440,6 @@ const GeographicRates = ({ searchTerm = '' }) => {
         <div className="gr-empty">No regional data available in campaign metadata.</div>
       )}
 
-      {/*
       {!isGenerated && !stateLoading && !directZipLoading && (
         <div className="gr-generate-controls">
           <div className="gr-controls-row">
@@ -658,7 +657,6 @@ const GeographicRates = ({ searchTerm = '' }) => {
           )}
         </>
       )}
-        */}
     </div>
   );
 };

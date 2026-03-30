@@ -120,7 +120,7 @@ const DocumentationPage = () => {
               <li><strong>Dashboard Builder</strong> &mdash; Drag-and-drop dashboard creation tool with templates, themes, and export capabilities.</li>
               <li><strong>A/B Testing</strong> &mdash; Automated detection and statistical analysis of A/B test campaigns.</li>
               <li><strong>Reports Management</strong> &mdash; Multi-agency report tracking, metadata management, and JSON generation.</li>
-              <li><strong>Audience Analytics</strong> &mdash; User-level querying, NPI lookup, list analysis, and engagement pattern detection.</li>
+              <li><strong>Audience Analytics</strong> &mdash; User-level querying, NPI lookup, list analysis, shadow engager detection, and engagement pattern detection.</li>
               <li><strong>Basis Performance</strong> &mdash; Programmatic display (DSP) optimization metrics from the Basis platform.</li>
               <li><strong>Content Performance</strong> &mdash; Digital journal, video, and social media content metrics.</li>
               <li><strong>Content Analytics</strong> &mdash; Analytical tools for publication comparison, anomaly detection, device/traffic/geographic/demographic breakdowns, YouTube analytics, and social profile metrics.</li>
@@ -2334,8 +2334,8 @@ const DocumentationPage = () => {
             <h3>Overview</h3>
             <p>
               Audience Analytics provides tools for querying individual users, analyzing audience segments, looking up NPIs,
-              analyzing list crossover, breaking down DMAs, detecting engagement patterns, managing print subscriptions, and processing NCOA address updates. It is organized into 8 sub-tabs:
-              Find Users, Analyze Users, NPI Lookup, List Analytics, DMA Breakdown, Engagement Queries, Print Management, and NCOA Upload.
+              analyzing list crossover, breaking down DMAs, identifying shadow engagers, detecting engagement patterns, managing print subscriptions, and processing NCOA address updates. It is organized into 9 sub-tabs:
+              Find Users, Analyze Users, NPI Lookup, List Analytics, DMA Breakdown, Shadow Engagers, Engagement Queries, Print Management, and NCOA Upload.
             </p>
           </div>
 
@@ -2529,6 +2529,22 @@ const DocumentationPage = () => {
               <li>Return codes 20-29 or unchanged address = unsubscribe candidate; different new address = address update.</li>
               <li>Select/deselect individual entries with checkboxes before confirming.</li>
               <li>Address updates cascade to print_list_subscribers, user_profiles, and universal_profiles tables.</li>
+            </ul>
+          </div>
+
+          <div className="docs-card">
+            <h3>Shadow Engagers</h3>
+            <p>
+              Identifies users who likely have email image loading disabled. These users never trigger open-tracking pixels
+              but prove they read emails by clicking links across multiple campaigns. Data is populated by running a local
+              detection script that analyzes all campaign CSVs and writes results to the database.
+            </p>
+            <h4>How It Works</h4>
+            <ul>
+              <li>The detection script scans all campaign event CSVs from Azure Blob Storage (deployments merged by base campaign name).</li>
+              <li>For each user, it tracks campaigns where they clicked but had zero opens, after filtering out bot clicks (IP-based, behavioral, and timing filters).</li>
+              <li>A confidence score (0&ndash;100%) is calculated based on: ratio of no-open-click campaigns to total clicked campaigns, number of campaigns with clicks but no opens, total clean clicks, and penalty for campaigns where opens did fire.</li>
+              <li>Classifications: <strong>Confirmed</strong> (&ge;75%), <strong>Likely</strong> (50&ndash;74%), <strong>Potential</strong> (30&ndash;49%), <strong>Unlikely</strong> (&lt;30%).</li>
             </ul>
           </div>
         </section>

@@ -1,0 +1,130 @@
+.shadow-loading,
+.shadow-empty,
+.shadow-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-secondary, #8b8fa3);
+  font-size: 14px;
+}
+
+.shadow-error {
+  color: #ef4444;
+}
+
+.shadow-error-hint {
+  color: var(--color-text-secondary, #8b8fa3);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.shadow-engagers .x-table-container {
+  border-radius: 0;
+  border: none;
+}
+
+.shadow-engagers .results-table thead th:first-child {
+  border-top-left-radius: 0;
+}
+
+.shadow-engagers .results-table thead th:last-child {
+  border-top-right-radius: 0;
+}
+
+.shadow-val-confirmed { color: #22c55e !important; }
+.shadow-val-likely { color: #3b82f6 !important; }
+.shadow-val-potential { color: #f59e0b !important; }
+.shadow-val-unlikely { color: #6b7280 !important; }
+
+.shadow-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.shadow-result-count {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #b8b8b8);
+  margin-left: auto;
+}
+
+.shadow-confidence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shadow-confidence span {
+  font-size: 0.875rem;
+  font-weight: 500;
+  min-width: 42px;
+  text-align: right;
+}
+
+.shadow-confidence-bar {
+  width: 60px;
+  height: 6px;
+  background: var(--color-border, #333336);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.shadow-confidence-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.shadow-confidence-fill[data-classification="confirmed"] { background: #22c55e; }
+.shadow-confidence-fill[data-classification="likely"] { background: #3b82f6; }
+.shadow-confidence-fill[data-classification="potential"] { background: #f59e0b; }
+.shadow-confidence-fill[data-classification="unlikely"] { background: #6b7280; }
+
+.shadow-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.shadow-badge-confirmed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.shadow-badge-likely {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.shadow-badge-potential {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.shadow-badge-unlikely {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+}
+
+body.light .shadow-loading,
+body.light .shadow-empty {
+  color: #666;
+}
+
+body.light .shadow-error {
+  color: #dc3545;
+}
+
+body.light .shadow-error-hint {
+  color: #666;
+}
+
+body.light .shadow-result-count {
+  color: #666;
+}
+
+body.light .shadow-confidence-bar {
+  background: #dee2e6;
+}

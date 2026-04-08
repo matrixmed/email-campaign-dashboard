@@ -172,10 +172,18 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
                 }
             }
 
-            if (flag.api_value && currentMetrics?.Sent) {
-                const deviation = Math.abs(currentMetrics.Sent - flag.api_value) / flag.api_value;
-                if (deviation < 0.01) {
-                    return false;
+            if (flag.api_value) {
+                let localValue = null;
+                if (flag.issue_type === 'opens_deviation' && currentMetrics?.Unique_Opens != null) {
+                    localValue = currentMetrics.Unique_Opens;
+                } else if (flag.issue_type === 'sent_deviation' && currentMetrics?.Sent != null) {
+                    localValue = currentMetrics.Sent;
+                }
+                if (localValue != null) {
+                    const deviation = Math.abs(localValue - flag.api_value) / flag.api_value;
+                    if (deviation < 0.01) {
+                        return false;
+                    }
                 }
             }
 

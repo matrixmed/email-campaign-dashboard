@@ -597,6 +597,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                         </div>
                     )}
 
+                    <div className="video-table-scroll">
                     <table className="video-metrics-table">
                         <thead>
                             <tr>
@@ -678,6 +679,7 @@ const VideoMetrics = ({ embedded, externalSearch, forceSource }) => {
                             ))}
                         </tbody>
                     </table>
+                    </div>
 
                     <div className="table-footer">
                         <div className="pagination">

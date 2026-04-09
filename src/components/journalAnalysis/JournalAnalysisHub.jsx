@@ -19,15 +19,19 @@ const JournalAnalysisHub = () => {
   const [searchTerm, setSearchTerm] = useState(searchTerms.contentAnalysis || '');
   const [visitedTabs, setVisitedTabs] = useState({ walsworth: true });
 
+  const [walsworthSubTab, setWalsworthSubTab] = useState('publications');
+  const [googleSubTab, setGoogleSubTab] = useState('devices');
+  const [youtubeSubTab, setYoutubeSubTab] = useState('overview');
+  const [socialSubTab, setSocialSubTab] = useState('followers');
+
   const [selectedMetrics, setSelectedMetrics] = useState(['visitsPerIssue', 'pageViewsPerIssue', 'uniqueViewsPerIssue', 'avgTimeInIssue']);
   const [selectedPublications, setSelectedPublications] = useState([]);
   const [allPublications, setAllPublications] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [metricsDropdownOpen, setMetricsDropdownOpen] = useState(false);
-  const [analyzeBy, setAnalyzeBy] = useState('time');
   const dropdownRef = useRef(null);
   const metricsDropdownRef = useRef(null);
-
+  const [analyzeBy, setAnalyzeBy] = useState('time');
   const [deviceViewMode, setDeviceViewMode] = useState('overview');
   const [trafficViewMode, setTrafficViewMode] = useState('overview');
   const [geoViewMode, setGeoViewMode] = useState('overview');
@@ -98,6 +102,16 @@ const JournalAnalysisHub = () => {
     return `${selectedMetrics.length} metrics`;
   };
 
+  const getSubHeaderTitle = () => {
+    switch (activeTab) {
+      case 'walsworth': return 'Walsworth';
+      case 'google': return 'Google Analytics';
+      case 'youtube': return 'YouTube';
+      case 'social': return 'Social Profiles';
+      default: return '';
+    }
+  };
+
   return (
     <div className="content-analysis-hub">
       <div className="page-header">
@@ -125,247 +139,223 @@ const JournalAnalysisHub = () => {
         </div>
       </div>
 
+      <div className="section-header-bar">
+        <h3>{getSubHeaderTitle()}</h3>
+      </div>
+
       <div style={{ display: activeTab === 'walsworth' ? 'block' : 'none' }}>
-        <div className="section-header-bar">
-          <h3>Publication Comparison</h3>
-          <div className="section-header-stats">
-            <div className="metric-selector" ref={metricsDropdownRef}>
-              <label>Metrics:</label>
-              <div className="custom-dropdown">
-                <button
-                  className="custom-dropdown-trigger"
-                  onClick={() => setMetricsDropdownOpen(!metricsDropdownOpen)}
-                >
-                  <span className="dropdown-value">{getMetricsLabel()}</span>
-                  <svg className={`dropdown-arrow ${metricsDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {metricsDropdownOpen && (
-                  <div className="custom-dropdown-menu">
-                    <div className="ja-dropdown-list">
-                      {metricOptions.map(metric => (
-                        <label key={metric.key} className="custom-dropdown-option">
-                          <input
-                            type="checkbox"
-                            checked={selectedMetrics.includes(metric.key)}
-                            onChange={() => toggleMetric(metric.key)}
-                          />
-                          <span className="metric-color-dot" style={{ background: metric.color }}></span>
-                          <span>{metric.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="metric-selector" ref={dropdownRef}>
-              <label>Publications:</label>
-              <div className="custom-dropdown">
-                <button
-                  className="custom-dropdown-trigger"
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
-                >
-                  <span className="dropdown-value">{getSelectedLabel()}</span>
-                  <svg className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {dropdownOpen && (
-                  <div className="custom-dropdown-menu">
-                    <div className="ja-dropdown-actions">
-                      <button onClick={() => setSelectedPublications(allPublications)}>All</button>
-                      <button onClick={() => setSelectedPublications(allPublications.slice(0, 10))}>Top 10</button>
-                      <button onClick={() => setSelectedPublications(allPublications.slice(0, 5))}>Top 5</button>
-                    </div>
-                    <div className="ja-dropdown-list">
-                      {allPublications.map(pub => (
-                        <label key={pub} className="custom-dropdown-option">
-                          <input
-                            type="checkbox"
-                            checked={selectedPublications.includes(pub)}
-                            onChange={() => togglePublication(pub)}
-                          />
-                          <span>{pub}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="ca-sub-tabs">
+          <button className={`ca-sub-tab ${walsworthSubTab === 'publications' ? 'active' : ''}`} onClick={() => setWalsworthSubTab('publications')}>Publications</button>
+          <button className={`ca-sub-tab ${walsworthSubTab === 'journal' ? 'active' : ''}`} onClick={() => setWalsworthSubTab('journal')}>Journal</button>
+          <button className={`ca-sub-tab ${walsworthSubTab === 'anomaly' ? 'active' : ''}`} onClick={() => setWalsworthSubTab('anomaly')}>Anomaly Detection</button>
         </div>
 
-        <PublicationComparison
-          searchTerm={searchTerm}
-          selectedMetrics={selectedMetrics}
-          metricOptions={metricOptions}
-          selectedPublications={selectedPublications}
-          setSelectedPublications={setSelectedPublications}
-          allPublications={allPublications}
-          setAllPublications={setAllPublications}
-        />
+        {walsworthSubTab === 'publications' && (
+          <>
+            <div className="section-header-bar" style={{ marginBottom: '16px' }}>
+              <h3>Publication Comparison</h3>
+              <div className="section-header-stats">
+                <div className="metric-selector" ref={metricsDropdownRef}>
+                  <label>Metrics:</label>
+                  <div className="custom-dropdown">
+                    <button
+                      className="custom-dropdown-trigger"
+                      onClick={() => setMetricsDropdownOpen(!metricsDropdownOpen)}
+                    >
+                      <span className="dropdown-value">{getMetricsLabel()}</span>
+                      <svg className={`dropdown-arrow ${metricsDropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {metricsDropdownOpen && (
+                      <div className="custom-dropdown-menu">
+                        <div className="ja-dropdown-list">
+                          {metricOptions.map(metric => (
+                            <label key={metric.key} className="custom-dropdown-option">
+                              <input
+                                type="checkbox"
+                                checked={selectedMetrics.includes(metric.key)}
+                                onChange={() => toggleMetric(metric.key)}
+                              />
+                              <span className="metric-color-dot" style={{ background: metric.color }}></span>
+                              <span>{metric.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-        <div className="section-header-bar" style={{ marginTop: '24px' }}>
-          <h3>Anomaly Detection</h3>
-          <div className="section-header-stats">
-            <div className="ja-control-group">
-              <span className="ja-control-label">Analyze by:</span>
-              <div className="ja-toggle-group">
-                <button
-                  className={`ja-toggle-btn ${analyzeBy === 'time' ? 'active' : ''}`}
-                  onClick={() => setAnalyzeBy('time')}
-                >
-                  Time
-                </button>
-                <button
-                  className={`ja-toggle-btn ${analyzeBy === 'visits' ? 'active' : ''}`}
-                  onClick={() => setAnalyzeBy('visits')}
-                >
-                  Visits
-                </button>
-                <button
-                  className={`ja-toggle-btn ${analyzeBy === 'views' ? 'active' : ''}`}
-                  onClick={() => setAnalyzeBy('views')}
-                >
-                  Page Views
-                </button>
+                <div className="metric-selector" ref={dropdownRef}>
+                  <label>Publications:</label>
+                  <div className="custom-dropdown">
+                    <button
+                      className="custom-dropdown-trigger"
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                    >
+                      <span className="dropdown-value">{getSelectedLabel()}</span>
+                      <svg className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {dropdownOpen && (
+                      <div className="custom-dropdown-menu">
+                        <div className="ja-dropdown-actions">
+                          <button onClick={() => setSelectedPublications(allPublications)}>All</button>
+                          <button onClick={() => setSelectedPublications(allPublications.slice(0, 10))}>Top 10</button>
+                          <button onClick={() => setSelectedPublications(allPublications.slice(0, 5))}>Top 5</button>
+                        </div>
+                        <div className="ja-dropdown-list">
+                          {allPublications.map(pub => (
+                            <label key={pub} className="custom-dropdown-option">
+                              <input
+                                type="checkbox"
+                                checked={selectedPublications.includes(pub)}
+                                onChange={() => togglePublication(pub)}
+                              />
+                              <span>{pub}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <JournalAnomalies searchTerm={searchTerm} analyzeBy={analyzeBy} />
+            <PublicationComparison
+              searchTerm={searchTerm}
+              selectedMetrics={selectedMetrics}
+              metricOptions={metricOptions}
+              selectedPublications={selectedPublications}
+              setSelectedPublications={setSelectedPublications}
+              allPublications={allPublications}
+              setAllPublications={setAllPublications}
+            />
+          </>
+        )}
+
+        {walsworthSubTab === 'journal' && (
+          <div className="ja-chart-container" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ color: '#666', fontSize: '15px' }}>Journal content coming soon.</p>
+          </div>
+        )}
+
+        {walsworthSubTab === 'anomaly' && (
+          <JournalAnomalies
+            searchTerm={searchTerm}
+            analyzeBy={analyzeBy}
+            onAnalyzeByChange={setAnalyzeBy}
+          />
+        )}
       </div>
 
       {visitedTabs.google && (
         <div style={{ display: activeTab === 'google' ? 'block' : 'none' }}>
-          <div className="section-header-bar">
-            <h3>Device Insights</h3>
-            <div className="section-header-stats">
-              <div className="ja-toggle-group">
-                <button
-                  className={`ja-toggle-btn ${deviceViewMode === 'overview' ? 'active' : ''}`}
-                  onClick={() => setDeviceViewMode('overview')}
-                >
-                  Overview
-                </button>
-                <button
-                  className={`ja-toggle-btn ${deviceViewMode === 'comparison' ? 'active' : ''}`}
-                  onClick={() => setDeviceViewMode('comparison')}
-                >
-                  By Journal
-                </button>
-              </div>
-            </div>
+          <div className="ca-sub-tabs">
+            <button className={`ca-sub-tab ${googleSubTab === 'devices' ? 'active' : ''}`} onClick={() => setGoogleSubTab('devices')}>Device Insights</button>
+            <button className={`ca-sub-tab ${googleSubTab === 'traffic' ? 'active' : ''}`} onClick={() => setGoogleSubTab('traffic')}>Traffic Sources</button>
+            <button className={`ca-sub-tab ${googleSubTab === 'geographic' ? 'active' : ''}`} onClick={() => setGoogleSubTab('geographic')}>Geographic</button>
+            <button className={`ca-sub-tab ${googleSubTab === 'demographics' ? 'active' : ''}`} onClick={() => setGoogleSubTab('demographics')}>Demographics</button>
           </div>
-          <DeviceInsights searchTerm={searchTerm} viewMode={deviceViewMode} />
 
-          <div className="section-header-bar" style={{ marginTop: '24px' }}>
-            <h3>Traffic Sources</h3>
-            <div className="section-header-stats">
-              <div className="ja-toggle-group">
-                <button
-                  className={`ja-toggle-btn ${trafficViewMode === 'overview' ? 'active' : ''}`}
-                  onClick={() => setTrafficViewMode('overview')}
-                >
-                  Overview
-                </button>
-                <button
-                  className={`ja-toggle-btn ${trafficViewMode === 'drilldown' ? 'active' : ''}`}
-                  onClick={() => setTrafficViewMode('drilldown')}
-                >
-                  Source
-                </button>
+          {googleSubTab === 'devices' && (
+            <>
+              <div className="section-header-bar">
+                <h3>Device Insights</h3>
+                <div className="section-header-stats">
+                  <div className="ja-toggle-group">
+                    <button className={`ja-toggle-btn ${deviceViewMode === 'overview' ? 'active' : ''}`} onClick={() => setDeviceViewMode('overview')}>Overview</button>
+                    <button className={`ja-toggle-btn ${deviceViewMode === 'comparison' ? 'active' : ''}`} onClick={() => setDeviceViewMode('comparison')}>By Journal</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <TrafficInsights searchTerm={searchTerm} viewMode={trafficViewMode} />
+              <DeviceInsights searchTerm={searchTerm} viewMode={deviceViewMode} />
+            </>
+          )}
 
-          <div className="section-header-bar" style={{ marginTop: '24px' }}>
-            <h3>Geographic</h3>
-            <div className="section-header-stats">
-              <div className="ja-toggle-group">
-                <button
-                  className={`ja-toggle-btn ${geoViewMode === 'overview' ? 'active' : ''}`}
-                  onClick={() => setGeoViewMode('overview')}
-                >
-                  Overview
-                </button>
-                <button
-                  className={`ja-toggle-btn ${geoViewMode === 'country' ? 'active' : ''}`}
-                  onClick={() => setGeoViewMode('country')}
-                >
-                  Country
-                </button>
-                <button
-                  className={`ja-toggle-btn ${geoViewMode === 'city' ? 'active' : ''}`}
-                  onClick={() => setGeoViewMode('city')}
-                >
-                  City
-                </button>
+          {googleSubTab === 'traffic' && (
+            <>
+              <div className="section-header-bar">
+                <h3>Traffic Sources</h3>
+                <div className="section-header-stats">
+                  <div className="ja-toggle-group">
+                    <button className={`ja-toggle-btn ${trafficViewMode === 'overview' ? 'active' : ''}`} onClick={() => setTrafficViewMode('overview')}>Overview</button>
+                    <button className={`ja-toggle-btn ${trafficViewMode === 'drilldown' ? 'active' : ''}`} onClick={() => setTrafficViewMode('drilldown')}>Source</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <GeographicInsights searchTerm={searchTerm} viewMode={geoViewMode} />
+              <TrafficInsights searchTerm={searchTerm} viewMode={trafficViewMode} />
+            </>
+          )}
 
-          <div className="section-header-bar" style={{ marginTop: '24px' }}>
-            <h3>Demographics</h3>
-            <div className="section-header-stats">
-              <div className="ja-toggle-group">
-                <button
-                  className={`ja-toggle-btn ${demoViewMode === 'overview' ? 'active' : ''}`}
-                  onClick={() => setDemoViewMode('overview')}
-                >
-                  Overview
-                </button>
-                <button
-                  className={`ja-toggle-btn ${demoViewMode === 'age' ? 'active' : ''}`}
-                  onClick={() => setDemoViewMode('age')}
-                >
-                  Age
-                </button>
-                <button
-                  className={`ja-toggle-btn ${demoViewMode === 'gender' ? 'active' : ''}`}
-                  onClick={() => setDemoViewMode('gender')}
-                >
-                  Gender
-                </button>
+          {googleSubTab === 'geographic' && (
+            <>
+              <div className="section-header-bar">
+                <h3>Geographic</h3>
+                <div className="section-header-stats">
+                  <div className="ja-toggle-group">
+                    <button className={`ja-toggle-btn ${geoViewMode === 'overview' ? 'active' : ''}`} onClick={() => setGeoViewMode('overview')}>Overview</button>
+                    <button className={`ja-toggle-btn ${geoViewMode === 'country' ? 'active' : ''}`} onClick={() => setGeoViewMode('country')}>Country</button>
+                    <button className={`ja-toggle-btn ${geoViewMode === 'city' ? 'active' : ''}`} onClick={() => setGeoViewMode('city')}>City</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <DemographicsInsights searchTerm={searchTerm} viewMode={demoViewMode} />
+              <GeographicInsights searchTerm={searchTerm} viewMode={geoViewMode} />
+            </>
+          )}
+
+          {googleSubTab === 'demographics' && (
+            <>
+              <div className="section-header-bar">
+                <h3>Demographics</h3>
+                <div className="section-header-stats">
+                  <div className="ja-toggle-group">
+                    <button className={`ja-toggle-btn ${demoViewMode === 'overview' ? 'active' : ''}`} onClick={() => setDemoViewMode('overview')}>Overview</button>
+                    <button className={`ja-toggle-btn ${demoViewMode === 'age' ? 'active' : ''}`} onClick={() => setDemoViewMode('age')}>Age</button>
+                    <button className={`ja-toggle-btn ${demoViewMode === 'gender' ? 'active' : ''}`} onClick={() => setDemoViewMode('gender')}>Gender</button>
+                  </div>
+                </div>
+              </div>
+              <DemographicsInsights searchTerm={searchTerm} viewMode={demoViewMode} />
+            </>
+          )}
         </div>
       )}
 
       {visitedTabs.youtube && (
         <div style={{ display: activeTab === 'youtube' ? 'block' : 'none' }}>
-          <div className="section-header-bar">
-            <h3>Overview</h3>
+          <div className="ca-sub-tabs">
+            <button className={`ca-sub-tab ${youtubeSubTab === 'overview' ? 'active' : ''}`} onClick={() => setYoutubeSubTab('overview')}>Overview</button>
+            <button className={`ca-sub-tab ${youtubeSubTab === 'traffic' ? 'active' : ''}`} onClick={() => setYoutubeSubTab('traffic')}>Traffic Sources</button>
+            <button className={`ca-sub-tab ${youtubeSubTab === 'audience' ? 'active' : ''}`} onClick={() => setYoutubeSubTab('audience')}>Audience</button>
           </div>
-          <YouTubeInsights searchTerm={searchTerm} viewMode="overview" />
 
-          <div className="section-header-bar" style={{ marginTop: '24px' }}>
-            <h3>Traffic Sources</h3>
+          <div style={{ display: youtubeSubTab === 'overview' ? 'block' : 'none' }}>
+            <YouTubeInsights searchTerm={searchTerm} viewMode="overview" />
           </div>
-          <YouTubeInsights searchTerm={searchTerm} viewMode="traffic" />
-
-          <div className="section-header-bar" style={{ marginTop: '24px' }}>
-            <h3>Audience</h3>
+          <div style={{ display: youtubeSubTab === 'traffic' ? 'block' : 'none' }}>
+            <YouTubeInsights searchTerm={searchTerm} viewMode="traffic" />
           </div>
-          <YouTubeInsights searchTerm={searchTerm} viewMode="audience" />
+          <div style={{ display: youtubeSubTab === 'audience' ? 'block' : 'none' }}>
+            <YouTubeInsights searchTerm={searchTerm} viewMode="audience" />
+          </div>
         </div>
       )}
 
       {visitedTabs.social && (
         <div style={{ display: activeTab === 'social' ? 'block' : 'none' }}>
-          <div className="section-header-bar">
-            <h3>Social Profiles</h3>
+          <div className="ca-sub-tabs">
+            <button className={`ca-sub-tab ${socialSubTab === 'followers' ? 'active' : ''}`} onClick={() => setSocialSubTab('followers')}>Followers</button>
+            <button className={`ca-sub-tab ${socialSubTab === 'growth' ? 'active' : ''}`} onClick={() => setSocialSubTab('growth')}>Growth</button>
+            <button className={`ca-sub-tab ${socialSubTab === 'pageviews' ? 'active' : ''}`} onClick={() => setSocialSubTab('pageviews')}>Page Views</button>
+            <button className={`ca-sub-tab ${socialSubTab === 'linkedin-demo' ? 'active' : ''}`} onClick={() => setSocialSubTab('linkedin-demo')}>LinkedIn Demographics</button>
+            <button className={`ca-sub-tab ${socialSubTab === 'instagram-demo' ? 'active' : ''}`} onClick={() => setSocialSubTab('instagram-demo')}>Instagram Audience</button>
           </div>
-          <SocialProfileInsights searchTerm={searchTerm} />
+
+          <SocialProfileInsights searchTerm={searchTerm} activeSection={socialSubTab} />
         </div>
       )}
     </div>

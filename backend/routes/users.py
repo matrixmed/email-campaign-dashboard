@@ -792,17 +792,17 @@ def engagement_query():
         if search_mode == 'specialty':
             query = """
                 SELECT
-                    up.email,
+                    ci.email as email,
                     up.npi,
-                    up.first_name,
-                    up.last_name,
-                    up.specialty,
+                    COALESCE(up.first_name, '') as first_name,
+                    COALESCE(up.last_name, '') as last_name,
+                    COALESCE(up.specialty, 'Unknown') as specialty,
                     cd.campaign_base_name,
                     ci.event_type,
                     COUNT(*) as event_count
-                FROM user_profiles up
-                JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
+                FROM campaign_interactions ci
                 JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                LEFT JOIN user_profiles up ON ci.email = LOWER(up.email)
                 WHERE 1=1
             """
 
@@ -826,24 +826,24 @@ def engagement_query():
                 query += f" AND ({' OR '.join(campaign_conditions)})"
 
             query += """
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
-                ORDER BY up.email, cd.campaign_base_name
+                GROUP BY ci.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                ORDER BY ci.email, cd.campaign_base_name
             """
 
         else:
             query = """
                 SELECT
-                    up.email,
+                    ci.email as email,
                     up.npi,
-                    up.first_name,
-                    up.last_name,
-                    up.specialty,
+                    COALESCE(up.first_name, '') as first_name,
+                    COALESCE(up.last_name, '') as last_name,
+                    COALESCE(up.specialty, 'Unknown') as specialty,
                     cd.campaign_base_name,
                     ci.event_type,
                     COUNT(*) as event_count
                 FROM campaign_deployments cd
                 JOIN campaign_interactions ci ON cd.campaign_id = ci.campaign_id
-                JOIN user_profiles up ON ci.email = LOWER(up.email)
+                LEFT JOIN user_profiles up ON ci.email = LOWER(up.email)
                 WHERE 1=1
             """
 
@@ -855,8 +855,8 @@ def engagement_query():
                 query += f" AND ({' OR '.join(campaign_conditions)})"
 
             query += """
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
-                ORDER BY up.email, cd.campaign_base_name
+                GROUP BY ci.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                ORDER BY ci.email, cd.campaign_base_name
             """
 
         cursor.execute(query, params)
@@ -894,6 +894,7 @@ def engagement_query():
                     'first_name': row['first_name'],
                     'last_name': row['last_name'],
                     'specialty': user_specialty,
+                    'has_profile': row['npi'] is not None or (row['first_name'] != '' and row['last_name'] != ''),
                     'campaigns': {},
                     'total_sends': 0,
                     'unique_opens': 0,
@@ -932,6 +933,7 @@ def engagement_query():
             'total_opens': 0,
             'total_unique_clicks': 0,
             'total_clicks': 0,
+            'users_without_profile': 0,
             'specialties': set(),
             'campaigns': set()
         }
@@ -977,6 +979,7 @@ def engagement_query():
                 'first_name': user_data['first_name'],
                 'last_name': user_data['last_name'],
                 'specialty': user_data['specialty'],
+                'has_profile': user_data['has_profile'],
                 'campaigns_sent': user_campaigns,
                 'campaign_count': total_delivered,
                 'unique_opens': user_data['unique_opens'],
@@ -997,6 +1000,8 @@ def engagement_query():
             aggregate_stats['total_clicks'] += user_data['total_clicks']
             aggregate_stats['specialties'].add(user_data['specialty'])
             aggregate_stats['campaigns'].update(user_campaigns)
+            if not user_data['has_profile']:
+                aggregate_stats['users_without_profile'] += 1
 
         cursor.close()
         conn.close()

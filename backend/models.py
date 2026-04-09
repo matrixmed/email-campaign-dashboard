@@ -29,6 +29,11 @@ class UserProfile(Base):
     old_state = Column(String(50))
     old_zipcode = Column(String(20))
     address_history = Column(JSON, default=list)
+    print_lists_subscribed = Column(JSON, default=list)
+    print_lists_unsubscribed = Column(JSON, default=list)
+    digital_lists_subscribed = Column(JSON, default=list)
+    digital_lists_unsubscribed = Column(JSON, default=list)
+    unsubscribe_reason = Column(Text)
 
     __table_args__ = (
         Index('idx_email_specialty', 'email', 'specialty'),
@@ -592,6 +597,11 @@ class UniversalProfile(Base):
     old_practice_state = Column(String(50))
     old_practice_zipcode = Column(String(20))
     address_history = Column(JSON, default=list)
+    print_lists_subscribed = Column(JSON, default=list)
+    print_lists_unsubscribed = Column(JSON, default=list)
+    digital_lists_subscribed = Column(JSON, default=list)
+    digital_lists_unsubscribed = Column(JSON, default=list)
+    unsubscribe_reason = Column(Text)
 
     __table_args__ = (
         Index('idx_npi_active', 'npi', 'is_active'),
@@ -1134,8 +1144,53 @@ class MarketBenchmark(Base):
     year = Column(Integer, index=True)
     quarter = Column(Integer)
     notes = Column(Text)
+    source_url = Column(Text)
+    category = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class FDAApproval(Base):
+    __tablename__ = 'fda_approvals'
+
+    id = Column(Integer, primary_key=True)
+    application_number = Column(String(50))
+    brand_name = Column(String(500))
+    generic_name = Column(String(500))
+    sponsor_name = Column(String(500), index=True)
+    submission_type = Column(String(50), index=True)
+    submission_status = Column(String(50))
+    approval_date = Column(Date, index=True)
+    therapeutic_area = Column(String(100), index=True)
+    dosage_form = Column(String(200))
+    route = Column(String(200))
+    product_type = Column(String(100))
+    is_new_indication = Column(Boolean, default=False)
+    submission_description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_fda_unique', 'application_number', 'submission_type', 'approval_date', unique=True),
+    )
+
+class DrugSpending(Base):
+    __tablename__ = 'drug_spending'
+
+    id = Column(Integer, primary_key=True)
+    brand_name = Column(String(500), index=True)
+    generic_name = Column(String(500))
+    manufacturer = Column(String(500), index=True)
+    total_spending = Column(Numeric(16, 2))
+    total_claims = Column(Integer)
+    total_beneficiaries = Column(Integer)
+    avg_spending_per_claim = Column(Numeric(12, 2))
+    year = Column(Integer, index=True)
+    program = Column(String(50))
+    spending_change_pct = Column(Numeric(8, 2))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ds_unique', 'brand_name', 'generic_name', 'year', 'program', unique=True),
+    )
 
 class HCPTopicProfile(Base):
     __tablename__ = 'hcp_topic_profiles'

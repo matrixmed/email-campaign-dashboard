@@ -540,14 +540,18 @@ body.light .engagement-value {
 }
 
 
+.video-table-scroll {
+  overflow-x: auto;
+}
+
 .video-metrics-table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .video-metrics-table .title-column {
-  width: 600px;
+  min-width: 400px;
   text-align: left;
   position: relative;
   vertical-align: middle;
@@ -558,7 +562,7 @@ body.light .engagement-value {
 
 @media (min-width: 1800px) {
   .video-metrics-table .title-column {
-    width: 800px;
+    min-width: 600px;
   }
 }
 
@@ -577,14 +581,17 @@ body.light .engagement-value {
 }
 
 .video-metrics-table .playlist-column {
-  width: 180px;
+  min-width: 180px;
   text-align: left;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .video-metrics-table .metric-column {
   text-align: right;
   padding-right: 15px;
+  white-space: nowrap;
+  min-width: 110px;
 }
 
 .video-metrics-table th {
@@ -596,6 +603,7 @@ body.light .engagement-value {
   font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444 !important;
   text-align: left;
+  white-space: nowrap;
 }
 
 .video-metrics-table th.sortable {
@@ -695,12 +703,7 @@ body.light .table-title {
 
 @media (max-width: 768px) {
   .video-metrics-table .title-column {
-    width: 40%;
-  }
-  
-  .video-metrics-table .source-column,
-  .video-metrics-table .metric-column {
-    width: 15%;
+    min-width: 250px;
   }
 }
 

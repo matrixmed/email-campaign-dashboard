@@ -713,6 +713,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
 
                     {contentMode === 'posts' && (
                         <>
+                            <div className="social-table-scroll">
                             <table className="social-metrics-table">
                                 <thead>
                                     <tr>
@@ -768,6 +769,7 @@ const SocialMetrics = ({ embedded, externalSearch, forcePlatform }) => {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
 
                             {totalPages > 1 && (
                                 <div className="table-footer">

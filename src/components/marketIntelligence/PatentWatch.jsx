@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import LastUpdatedTag from './LastUpdatedTag';
 
-const PatentWatch = ({ searchTerm }) => {
+const PatentWatch = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('companies');
-  const [displayCount, setDisplayCount] = useState(25);
+  const [displayCount, setDisplayCount] = useState(100);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -20,7 +21,7 @@ const PatentWatch = ({ searchTerm }) => {
     fetchData();
   }, []);
 
-  useEffect(() => { setDisplayCount(25); }, [subTab, searchTerm]);
+  useEffect(() => { setDisplayCount(100); }, [subTab, searchTerm]);
 
   if (loading) {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Loading patent data...</p></div>;
@@ -37,14 +38,14 @@ const PatentWatch = ({ searchTerm }) => {
     return a.applicant?.toLowerCase().includes(searchTerm.toLowerCase());
   }) || [];
 
-  const currentData = subTab === 'companies' ? filteredApplicants : filtered;
-  const visibleData = currentData.slice(0, displayCount);
-  const hasMore = displayCount < currentData.length;
+  const expVisible = filtered.slice(0, displayCount);
+  const expHasMore = displayCount < filtered.length;
 
   return (
     <div className="mi-tab-content">
       <div className="mi-section-header">
         <h3>Patent Watch</h3>
+        <LastUpdatedTag date={lastUpdated} />
       </div>
 
       <div className="mi-subtabs">
@@ -67,9 +68,9 @@ const PatentWatch = ({ searchTerm }) => {
               </tr>
             </thead>
             <tbody>
-              {visibleData.map((a, i) => (
+              {filteredApplicants.map((a, i) => (
                 <tr key={i}>
-                  <td className="mi-bold">{a.applicant}</td>
+                  <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(a.applicant)}>{a.applicant}</td>
                   <td>{a.drug_count}</td>
                   <td>{a.earliest_expiry}</td>
                 </tr>
@@ -80,36 +81,37 @@ const PatentWatch = ({ searchTerm }) => {
       )}
 
       {subTab === 'expirations' && (
-        <div className="table-section">
-          <table>
-            <thead>
-              <tr>
-                <th>Expiry Date</th>
-                <th>Drug</th>
-                <th>Ingredient</th>
-                <th>Company</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleData.map((e, i) => (
-                <tr key={i}>
-                  <td style={{whiteSpace: 'nowrap'}}>{e.patent_expiration_date}</td>
-                  <td className="mi-bold">{e.drug_name}</td>
-                  <td>{e.active_ingredient}</td>
-                  <td>{e.applicant}</td>
+        <>
+          <div className="table-section">
+            <table>
+              <thead>
+                <tr>
+                  <th>Expiry Date</th>
+                  <th>Drug</th>
+                  <th>Ingredient</th>
+                  <th>Company</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {hasMore && (
-        <div className="load-more-container">
-          <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 25)}>
-            Load More ({visibleData.length} of {currentData.length})
-          </button>
-        </div>
+              </thead>
+              <tbody>
+                {expVisible.map((e, i) => (
+                  <tr key={i}>
+                    <td style={{whiteSpace: 'nowrap'}}>{e.patent_expiration_date}</td>
+                    <td className="mi-bold">{e.drug_name}</td>
+                    <td>{e.active_ingredient}</td>
+                    <td className="mi-company-link" onClick={() => onSelectCompany(e.applicant)}>{e.applicant}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {expHasMore && (
+            <div className="load-more-container">
+              <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 100)}>
+                Load More ({expVisible.length} of {filtered.length})
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

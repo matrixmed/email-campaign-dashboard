@@ -31,9 +31,21 @@ const PLATFORM_COLORS = {
   instagram: '#e4405f',
 };
 
+const PLATFORM_GRADIENTS = {
+  linkedin: 'linear-gradient(135deg, rgba(10, 102, 194, 0.15), rgba(10, 102, 194, 0.05))',
+  facebook: 'linear-gradient(135deg, rgba(24, 119, 242, 0.15), rgba(24, 119, 242, 0.05))',
+  instagram: 'linear-gradient(135deg, rgba(228, 64, 95, 0.15), rgba(228, 64, 95, 0.05))',
+};
+
+const PLATFORM_ICONS = {
+  linkedin: 'in',
+  facebook: 'f',
+  instagram: 'IG',
+};
+
 const getChannelName = (key) => CHANNEL_DISPLAY[key] || key.charAt(0).toUpperCase() + key.slice(1);
 
-const SocialProfileInsights = ({ searchTerm = '' }) => {
+const SocialProfileInsights = ({ searchTerm = '', activeSection = 'followers' }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [linkedinData, setLinkedinData] = useState({});
   const [facebookData, setFacebookData] = useState({});
@@ -97,30 +109,29 @@ const SocialProfileInsights = ({ searchTerm = '' }) => {
     setIsLoading(false);
   };
 
-  const followerCards = useMemo(() => {
-    const cards = [];
-    const totals = { linkedin: 0, facebook: 0, instagram: 0 };
+  const followersByPlatform = useMemo(() => {
+    const platforms = [
+      { key: 'linkedin', label: 'LinkedIn', data: linkedinData, getFollowers: (ch) => ch.total_followers || 0 },
+      { key: 'facebook', label: 'Facebook', data: facebookData, getFollowers: (ch) => ch.followers_count || ch.fan_count || 0 },
+      { key: 'instagram', label: 'Instagram', data: instagramData, getFollowers: (ch) => ch.followers_count || 0 },
+    ];
 
-    Object.entries(linkedinData.companies || {}).forEach(([key, ch]) => {
-      const followers = ch.total_followers || 0;
-      totals.linkedin += followers;
-      cards.push({ platform: 'linkedin', channel: getChannelName(key), followers });
-    });
-
-    Object.entries(facebookData.companies || {}).forEach(([key, ch]) => {
-      const followers = ch.followers_count || ch.fan_count || 0;
-      totals.facebook += followers;
-      cards.push({ platform: 'facebook', channel: getChannelName(key), followers });
-    });
-
-    Object.entries(instagramData.companies || {}).forEach(([key, ch]) => {
-      const followers = ch.followers_count || 0;
-      totals.instagram += followers;
-      cards.push({ platform: 'instagram', channel: getChannelName(key), followers });
-    });
-
-    return { cards, totals };
+    return platforms.map(p => {
+      const channels = [];
+      let total = 0;
+      Object.entries(p.data.companies || {}).forEach(([key, ch]) => {
+        const followers = p.getFollowers(ch);
+        total += followers;
+        channels.push({ name: getChannelName(key), followers });
+      });
+      channels.sort((a, b) => b.followers - a.followers);
+      return { ...p, channels, total };
+    }).filter(p => p.total > 0);
   }, [linkedinData, facebookData, instagramData]);
+
+  const grandTotal = useMemo(() => {
+    return followersByPlatform.reduce((sum, p) => sum + p.total, 0);
+  }, [followersByPlatform]);
 
   const growthChartData = useMemo(() => {
     const dataSource = growthPlatform === 'linkedin' ? linkedinData : facebookData;
@@ -310,166 +321,203 @@ const SocialProfileInsights = ({ searchTerm = '' }) => {
 
   return (
     <div className="social-profile-insights">
-      <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
-        <div className="sp-totals-row">
-          {followerCards.totals.linkedin > 0 && (
-            <div className="sp-total-badge" style={{ borderColor: PLATFORM_COLORS.linkedin }}>
-              <span className="sp-total-platform" style={{ color: PLATFORM_COLORS.linkedin }}>LinkedIn</span>
-              <span className="sp-total-count">{formatNumber(followerCards.totals.linkedin)}</span>
-            </div>
-          )}
-          {followerCards.totals.facebook > 0 && (
-            <div className="sp-total-badge" style={{ borderColor: PLATFORM_COLORS.facebook }}>
-              <span className="sp-total-platform" style={{ color: PLATFORM_COLORS.facebook }}>Facebook</span>
-              <span className="sp-total-count">{formatNumber(followerCards.totals.facebook)}</span>
-            </div>
-          )}
-          {followerCards.totals.instagram > 0 && (
-            <div className="sp-total-badge" style={{ borderColor: PLATFORM_COLORS.instagram }}>
-              <span className="sp-total-platform" style={{ color: PLATFORM_COLORS.instagram }}>Instagram</span>
-              <span className="sp-total-count">{formatNumber(followerCards.totals.instagram)}</span>
-            </div>
-          )}
-        </div>
+      <div style={{ display: activeSection === 'followers' ? 'block' : 'none' }}>
+        <div className="sp-followers-overview">
+          <div className="sp-grand-total">
+            <div className="sp-grand-total-value">{formatNumber(grandTotal)}</div>
+            <div className="sp-grand-total-label">Total Followers Across All Platforms</div>
+          </div>
 
-        <div className="sp-follower-grid">
-          {followerCards.cards.map((card, idx) => (
-            <div className="sp-follower-card" key={idx}>
-              <div className="sp-follower-card-platform" style={{ background: PLATFORM_COLORS[card.platform] }}>
-                {card.platform === 'linkedin' ? 'in' : card.platform === 'facebook' ? 'f' : 'IG'}
+          <div className="sp-platform-cards">
+            {followersByPlatform.map(platform => (
+              <div
+                key={platform.key}
+                className="sp-platform-card"
+                style={{
+                  background: PLATFORM_GRADIENTS[platform.key],
+                  borderColor: `${PLATFORM_COLORS[platform.key]}33`,
+                }}
+              >
+                <div className="sp-platform-card-header">
+                  <div className="sp-platform-icon" style={{ background: PLATFORM_COLORS[platform.key] }}>
+                    {PLATFORM_ICONS[platform.key]}
+                  </div>
+                  <div className="sp-platform-card-title">
+                    <div className="sp-platform-name">{platform.label}</div>
+                    <div className="sp-platform-total" style={{ color: PLATFORM_COLORS[platform.key] }}>
+                      {formatNumber(platform.total)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sp-platform-channels">
+                  {platform.channels.map((ch, idx) => {
+                    const pct = platform.total > 0 ? (ch.followers / platform.total) * 100 : 0;
+                    return (
+                      <div key={idx} className="sp-channel-row">
+                        <div className="sp-channel-info">
+                          <span className="sp-channel-dot" style={{ background: CHANNEL_COLORS[ch.name] || '#666' }}></span>
+                          <span className="sp-channel-name">{ch.name}</span>
+                        </div>
+                        <div className="sp-channel-bar-wrapper">
+                          <div
+                            className="sp-channel-bar"
+                            style={{
+                              width: `${pct}%`,
+                              background: PLATFORM_COLORS[platform.key],
+                              opacity: 0.6,
+                            }}
+                          />
+                        </div>
+                        <span className="sp-channel-count">{formatNumber(ch.followers)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="sp-follower-card-info">
-                <div className="sp-follower-card-channel">{card.channel}</div>
-                <div className="sp-follower-card-count">{formatNumber(card.followers)}</div>
-                <div className="sp-follower-card-label">followers</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
-        <div className="sp-section-header">
-          <h4>Follower Growth <span className="sp-section-sub">(last 90 days)</span></h4>
-          <div className="ja-toggle-group">
-            <button className={`ja-toggle-btn ${growthPlatform === 'linkedin' ? 'active' : ''}`} onClick={() => setGrowthPlatform('linkedin')}>LinkedIn</button>
-            <button className={`ja-toggle-btn ${growthPlatform === 'facebook' ? 'active' : ''}`} onClick={() => setGrowthPlatform('facebook')}>Facebook</button>
-          </div>
-        </div>
-
-        {growthChartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={growthChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11, fill: '#888' }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
-              <YAxis stroke="#888" tick={{ fontSize: 12, fill: '#888' }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              {growthChannelKeys.map(key => (
-                <Line key={key} type="monotone" dataKey={getChannelName(key)} stroke={CHANNEL_COLORS[getChannelName(key)] || '#0ff'} strokeWidth={2} dot={false} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="no-data" style={{ minHeight: '200px' }}>No daily follower data available</div>
-        )}
-
-        <div className="sp-insight-cards">
-          <div className="sp-insight-card">
-            <div className="sp-insight-value">{formatNumber(growthInsights.totalOrganic)}</div>
-            <div className="sp-insight-label">{growthPlatform === 'linkedin' ? 'Organic Gain' : 'Total Follows'}</div>
-          </div>
-          {growthPlatform === 'linkedin' && (
-            <div className="sp-insight-card">
-              <div className="sp-insight-value">{formatNumber(growthInsights.totalPaid)}</div>
-              <div className="sp-insight-label">Paid Gain</div>
-            </div>
-          )}
-          <div className="sp-insight-card">
-            <div className="sp-insight-value">{growthInsights.avgDaily}/day</div>
-            <div className="sp-insight-label">Avg Daily Growth</div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
-        <div className="sp-section-header">
-          <h4>Page Views <span className="sp-section-sub">(last 90 days)</span></h4>
-          <div className="ja-toggle-group">
-            <button className={`ja-toggle-btn ${pageViewPlatform === 'linkedin' ? 'active' : ''}`} onClick={() => setPageViewPlatform('linkedin')}>LinkedIn</button>
-            <button className={`ja-toggle-btn ${pageViewPlatform === 'facebook' ? 'active' : ''}`} onClick={() => setPageViewPlatform('facebook')}>Facebook</button>
-          </div>
-        </div>
-
-        {pageViewChartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={pageViewChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11, fill: '#888' }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
-              <YAxis stroke="#888" tick={{ fontSize: 12, fill: '#888' }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              {pvChannelKeys.map(key => (
-                <Line key={key} type="monotone" dataKey={getChannelName(key)} stroke={CHANNEL_COLORS[getChannelName(key)] || '#0ff'} strokeWidth={2} dot={false} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="no-data" style={{ minHeight: '200px' }}>No page view data available</div>
-        )}
-      </div>
-
-      {liChannelKeys.length > 0 && (
+      <div style={{ display: activeSection === 'growth' ? 'block' : 'none' }}>
         <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
           <div className="sp-section-header">
-            <h4>LinkedIn Demographics</h4>
-            {liChannelKeys.length > 1 && (
-              <select className="ja-select" value={demoChannel} onChange={e => setDemoChannel(e.target.value)}>
-                {liChannelKeys.map(key => (
-                  <option key={key} value={key}>{getChannelName(key)}</option>
-                ))}
-              </select>
-            )}
+            <h4>Follower Growth <span className="sp-section-sub">(last 90 days)</span></h4>
+            <div className="ja-toggle-group">
+              <button className={`ja-toggle-btn ${growthPlatform === 'linkedin' ? 'active' : ''}`} onClick={() => setGrowthPlatform('linkedin')}>LinkedIn</button>
+              <button className={`ja-toggle-btn ${growthPlatform === 'facebook' ? 'active' : ''}`} onClick={() => setGrowthPlatform('facebook')}>Facebook</button>
+            </div>
           </div>
 
-          {linkedinDemoData ? (
-            <div className="sp-demo-grid">
-              {renderMiniBarSection('By Function', linkedinDemoData.byFunction)}
-              {renderMiniBarSection('By Seniority', linkedinDemoData.bySeniority)}
-              {renderMiniBarSection('By Industry', linkedinDemoData.byIndustry)}
-              {renderMiniBarSection('By Country', linkedinDemoData.byCountry)}
-            </div>
+          {growthChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={growthChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11, fill: '#888' }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+                <YAxis stroke="#888" tick={{ fontSize: 12, fill: '#888' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                {growthChannelKeys.map(key => (
+                  <Line key={key} type="monotone" dataKey={getChannelName(key)} stroke={CHANNEL_COLORS[getChannelName(key)] || '#0ff'} strokeWidth={2} dot={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="no-data" style={{ minHeight: '150px' }}>No demographic data available for this channel</div>
+            <div className="no-data" style={{ minHeight: '200px' }}>No daily follower data available</div>
           )}
-        </div>
-      )}
 
-      {igChannelKeys.length > 0 && (
-        <div className="ja-chart-container">
+          <div className="sp-insight-cards">
+            <div className="sp-insight-card">
+              <div className="sp-insight-value">{formatNumber(growthInsights.totalOrganic)}</div>
+              <div className="sp-insight-label">{growthPlatform === 'linkedin' ? 'Organic Gain' : 'Total Follows'}</div>
+            </div>
+            {growthPlatform === 'linkedin' && (
+              <div className="sp-insight-card">
+                <div className="sp-insight-value">{formatNumber(growthInsights.totalPaid)}</div>
+                <div className="sp-insight-label">Paid Gain</div>
+              </div>
+            )}
+            <div className="sp-insight-card">
+              <div className="sp-insight-value">{growthInsights.avgDaily}/day</div>
+              <div className="sp-insight-label">Avg Daily Growth</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: activeSection === 'pageviews' ? 'block' : 'none' }}>
+        <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
           <div className="sp-section-header">
-            <h4>Instagram Audience</h4>
-            {igChannelKeys.length > 1 && (
-              <select className="ja-select" value={igDemoChannel} onChange={e => setIgDemoChannel(e.target.value)}>
-                {igChannelKeys.map(key => (
-                  <option key={key} value={key}>{getChannelName(key)}</option>
-                ))}
-              </select>
-            )}
+            <h4>Page Views <span className="sp-section-sub">(last 90 days)</span></h4>
+            <div className="ja-toggle-group">
+              <button className={`ja-toggle-btn ${pageViewPlatform === 'linkedin' ? 'active' : ''}`} onClick={() => setPageViewPlatform('linkedin')}>LinkedIn</button>
+              <button className={`ja-toggle-btn ${pageViewPlatform === 'facebook' ? 'active' : ''}`} onClick={() => setPageViewPlatform('facebook')}>Facebook</button>
+            </div>
           </div>
 
-          {igDemoData ? (
-            <div className="sp-demo-grid">
-              {renderMiniBarSection('By City', igDemoData.byCity)}
-              {renderMiniBarSection('By Country', igDemoData.byCountry)}
-              {renderMiniBarSection('By Age', igDemoData.byAge)}
-              {renderMiniBarSection('By Gender', igDemoData.byGender)}
-            </div>
+          {pageViewChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={pageViewChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11, fill: '#888' }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+                <YAxis stroke="#888" tick={{ fontSize: 12, fill: '#888' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                {pvChannelKeys.map(key => (
+                  <Line key={key} type="monotone" dataKey={getChannelName(key)} stroke={CHANNEL_COLORS[getChannelName(key)] || '#0ff'} strokeWidth={2} dot={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="no-data" style={{ minHeight: '150px' }}>No audience data available for this channel</div>
+            <div className="no-data" style={{ minHeight: '200px' }}>No page view data available</div>
           )}
         </div>
-      )}
+      </div>
+
+      <div style={{ display: activeSection === 'linkedin-demo' ? 'block' : 'none' }}>
+        {liChannelKeys.length > 0 ? (
+          <div className="ja-chart-container" style={{ marginBottom: '24px' }}>
+            <div className="sp-section-header">
+              <h4>LinkedIn Demographics</h4>
+              {liChannelKeys.length > 1 && (
+                <select className="ja-select" value={demoChannel} onChange={e => setDemoChannel(e.target.value)}>
+                  {liChannelKeys.map(key => (
+                    <option key={key} value={key}>{getChannelName(key)}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {linkedinDemoData ? (
+              <div className="sp-demo-grid">
+                {renderMiniBarSection('By Function', linkedinDemoData.byFunction)}
+                {renderMiniBarSection('By Seniority', linkedinDemoData.bySeniority)}
+                {renderMiniBarSection('By Industry', linkedinDemoData.byIndustry)}
+                {renderMiniBarSection('By Country', linkedinDemoData.byCountry)}
+              </div>
+            ) : (
+              <div className="no-data" style={{ minHeight: '150px' }}>No demographic data available for this channel</div>
+            )}
+          </div>
+        ) : (
+          <div className="ja-chart-container">
+            <div className="no-data" style={{ minHeight: '200px' }}>No LinkedIn data available</div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: activeSection === 'instagram-demo' ? 'block' : 'none' }}>
+        {igChannelKeys.length > 0 ? (
+          <div className="ja-chart-container">
+            <div className="sp-section-header">
+              <h4>Instagram Audience</h4>
+              {igChannelKeys.length > 1 && (
+                <select className="ja-select" value={igDemoChannel} onChange={e => setIgDemoChannel(e.target.value)}>
+                  {igChannelKeys.map(key => (
+                    <option key={key} value={key}>{getChannelName(key)}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {igDemoData ? (
+              <div className="sp-demo-grid">
+                {renderMiniBarSection('By City', igDemoData.byCity)}
+                {renderMiniBarSection('By Country', igDemoData.byCountry)}
+                {renderMiniBarSection('By Age', igDemoData.byAge)}
+                {renderMiniBarSection('By Gender', igDemoData.byGender)}
+              </div>
+            ) : (
+              <div className="no-data" style={{ minHeight: '150px' }}>No audience data available for this channel</div>
+            )}
+          </div>
+        ) : (
+          <div className="ja-chart-container">
+            <div className="no-data" style={{ minHeight: '200px' }}>No Instagram data available</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,9 +1,11 @@
 export { default as MarketIntelligenceSection } from './MarketIntelligenceSection';
-export { default as Opportunities } from './Opportunities';
-export { default as CompanyProfile } from './CompanyProfile';
+export { default as ClientHistory } from './ClientHistory';
+export { default as FDAAlerts } from './FDAAlerts';
 export { default as PharmaPipeline } from './PharmaPipeline';
 export { default as KOLInsights } from './KOLInsights';
+export { default as DrugSpending } from './DrugSpending';
 export { default as ResearchTrends } from './ResearchTrends';
 export { default as PatentWatch } from './PatentWatch';
 export { default as MarketBenchmarks } from './MarketBenchmarks';
 export { default as PDUFACalendar } from './PDUFACalendar';
+export { default as CompanyModal } from './CompanyModal';

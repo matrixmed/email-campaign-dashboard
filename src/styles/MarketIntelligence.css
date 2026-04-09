@@ -98,6 +98,25 @@
   border-bottom: 2px solid #0ff;
 }
 
+.mi-section .last-updated-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: var(--radius-sm, 4px);
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary, #8a8a8a);
+  white-space: nowrap;
+}
+
+.mi-section .last-updated-tag svg {
+  color: var(--color-text-tertiary, #8a8a8a);
+  flex-shrink: 0;
+}
+
 .mi-content {
   width: 100%;
 }
@@ -247,10 +266,12 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+  overflow-x: auto;
 }
 
 .mi-section .table-section table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
 }
 
@@ -274,6 +295,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 14px;
   font-family: var(--font-body, 'Rubik', sans-serif);
+  white-space: nowrap;
 }
 
 .mi-section .table-section table tbody tr:hover {
@@ -383,6 +405,18 @@
 .mi-back-btn:hover {
   border-color: #0ff;
   color: #0ff;
+}
+
+.mi-source-link {
+  color: #0ff;
+  text-decoration: none;
+  font-size: 13px;
+  transition: opacity 0.2s;
+}
+
+.mi-source-link:hover {
+  opacity: 0.7;
+  text-decoration: underline;
 }
 
 .mi-export-btn {
@@ -541,10 +575,12 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+  overflow-x: auto;
 }
 
 .company-profile .table-section table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
 }
 
@@ -568,10 +604,72 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 14px;
   font-family: var(--font-body, 'Rubik', sans-serif);
+  white-space: nowrap;
 }
 
 .company-profile .table-section table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.company-modal-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.company-modal-highlight {
+  text-align: center;
+  padding: 28px 20px;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.06), transparent);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+.company-modal-highlight-num {
+  font-size: 48px;
+  font-weight: 700;
+  font-family: var(--font-heading, 'Lora', serif);
+  color: #0ff;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.company-modal-highlight-label {
+  font-size: 16px;
+  color: var(--color-text-primary, #fff);
+  font-weight: 500;
+}
+
+.company-modal-highlight-sub {
+  font-size: 13px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  margin-top: 4px;
+}
+
+.company-modal-section h4 {
+  margin: 0 0 12px 0;
+  color: var(--color-text-primary, #fff);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  padding-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+
+.company-modal-tab-content {
+  margin-top: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.mi-company-link {
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.mi-company-link:hover {
+  color: #0ff;
 }
 
 @media (max-width: 1024px) {

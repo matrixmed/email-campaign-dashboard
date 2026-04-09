@@ -1893,3 +1893,253 @@
   color: #aaa;
   flex-shrink: 0;
 }
+
+.ca-sub-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 12px 0 20px;
+  border-bottom: 1px solid #3a3a3a;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ca-sub-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ca-sub-tab {
+  padding: 10px 18px;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  position: relative;
+  transition: all 0.2s ease;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+}
+
+.ca-sub-tab:hover {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ca-sub-tab.active {
+  color: #0ff;
+  background: rgba(0, 255, 255, 0.06);
+  border-bottom: 2px solid #0ff;
+}
+
+body.light .ca-sub-tab {
+  color: #888;
+}
+
+body.light .ca-sub-tab:hover {
+  color: #555;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+body.light .ca-sub-tab.active {
+  color: #0077ff;
+  background: rgba(0, 119, 255, 0.06);
+  border-bottom-color: #0077ff;
+}
+
+body.light .ca-sub-tabs {
+  border-bottom-color: #e0e0e0;
+}
+
+.sp-followers-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sp-grand-total {
+  text-align: center;
+  padding: 28px 24px;
+  background: var(--color-bg-card, #2a2a2d);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 10px;
+}
+
+.sp-grand-total-value {
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+
+.sp-grand-total-label {
+  font-size: 13px;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+}
+
+.sp-platform-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.sp-platform-card {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.sp-platform-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.sp-platform-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sp-platform-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sp-platform-card-title {
+  flex: 1;
+}
+
+.sp-platform-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sp-platform-total {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.sp-platform-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sp-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-channel-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.sp-channel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sp-channel-name {
+  font-size: 13px;
+  color: #ccc;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sp-channel-bar-wrapper {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sp-channel-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.sp-channel-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+body.light .sp-grand-total {
+  background: #f8f9fa;
+  border-color: #e0e0e0;
+}
+
+body.light .sp-grand-total-value {
+  color: #333;
+}
+
+body.light .sp-grand-total-label {
+  color: #888;
+}
+
+body.light .sp-platform-card-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light .sp-platform-name {
+  color: #666;
+}
+
+body.light .sp-channel-name {
+  color: #555;
+}
+
+body.light .sp-channel-count {
+  color: #333;
+}
+
+body.light .sp-channel-bar-wrapper {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 768px) {
+  .sp-platform-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-grand-total-value {
+    font-size: 2rem;
+  }
+
+  .ca-sub-tabs {
+    gap: 0;
+  }
+}

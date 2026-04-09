@@ -7,6 +7,9 @@ import EngagementPatterns from '../components/audience/EngagementPatterns';
 import PrintListManagement from '../components/printManagement/PrintListManagement';
 import NCOAUpload from '../components/printManagement/NCOAUpload';
 import ShadowEngagers from '../components/audience/ShadowEngagers';
+import HCPTargeting from '../components/audience/HCPTargeting';
+import PrintListDisplay from '../components/audience/PrintListDisplay';
+import DigitalListDisplay from '../components/audience/DigitalListDisplay';
 import '../styles/AnalyticsHub.css';
 
 const AudienceAnalyticsPage = () => {
@@ -15,6 +18,9 @@ const AudienceAnalyticsPage = () => {
   });
   const [printSearch, setPrintSearch] = useState('');
   const [shadowSearch, setShadowSearch] = useState('');
+  const [targetingSearch, setTargetingSearch] = useState('');
+  const [printListSearch, setPrintListSearch] = useState('');
+  const [digitalListSearch, setDigitalListSearch] = useState('');
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
@@ -49,6 +55,39 @@ const AudienceAnalyticsPage = () => {
             />
           </div>
         )}
+        {activeTab === 'hcp-targeting' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={targetingSearch}
+              onChange={(e) => setTargetingSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
+        {activeTab === 'print-lists' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={printListSearch}
+              onChange={(e) => setPrintListSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
+        {activeTab === 'digital-lists' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={digitalListSearch}
+              onChange={(e) => setDigitalListSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
       </div>
 
       <div className="analytics-tabs">
@@ -70,6 +109,26 @@ const AudienceAnalyticsPage = () => {
         >
           <span>NPI Lookup</span>
         </button>
+        {/* DISABLED - not verified yet
+        <button
+          className={`tab-button ${activeTab === 'hcp-targeting' ? 'active' : ''}`}
+          onClick={() => handleTabClick('hcp-targeting')}
+        >
+          <span>HCP Targeting</span>
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'print-lists' ? 'active' : ''}`}
+          onClick={() => handleTabClick('print-lists')}
+        >
+          <span>Print Lists</span>
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'digital-lists' ? 'active' : ''}`}
+          onClick={() => handleTabClick('digital-lists')}
+        >
+          <span>Digital Lists</span>
+        </button>
+        */}
         <button
           className={`tab-button ${activeTab === 'list-analysis' ? 'active' : ''}`}
           onClick={() => handleTabClick('list-analysis')}
@@ -122,8 +181,17 @@ const AudienceAnalyticsPage = () => {
       {activeTab === 'dma-breakdown' && (
         <DMABreakdown />
       )}
+      {activeTab === 'hcp-targeting' && (
+        <HCPTargeting externalSearch={targetingSearch} />
+      )}
       {activeTab === 'shadow-engagers' && (
         <ShadowEngagers externalSearch={shadowSearch} />
+      )}
+      {activeTab === 'print-lists' && (
+        <PrintListDisplay externalSearch={printListSearch} />
+      )}
+      {activeTab === 'digital-lists' && (
+        <DigitalListDisplay externalSearch={digitalListSearch} />
       )}
       {/* DISABLED - not verified yet
       {activeTab === 'engagement-patterns' && (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import '../../styles/SpecialtyBreakdown.css';
 import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
-import { classifyCampaign, stripAbGroup } from '../../utils/campaignClassifier';
+import { classifyCampaign, stripAbGroup, getDiseaseFromCampaign } from '../../utils/campaignClassifier';
 import { API_BASE_URL } from '../../config/api';
 import { getIndustry } from '../../utils/industryKeywords';
 
@@ -113,9 +113,8 @@ const SpecialtyBreakdown = ({ searchTerm = '' }) => {
       if (analyzeBy === 'market') {
         const industry = getIndustry(baseName, brandIndustryMap);
         if (!industry) return;
-        const { topic } = classifyCampaign(baseName);
         groupKey = industry;
-        topicKey = topic;
+        topicKey = getDiseaseFromCampaign(baseName) || 'General';
       } else {
         const { bucket, topic } = classifyCampaign(baseName);
         groupKey = bucket;

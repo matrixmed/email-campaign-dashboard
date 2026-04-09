@@ -5,6 +5,7 @@ import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 import { API_BASE_URL } from '../../config/api';
 import { KEYWORD_INDUSTRY_MAP, getIndustryFromMap } from '../../utils/industryKeywords';
+import { getDiseaseFromCampaign, classifyCampaign } from '../../utils/campaignClassifier';
 import NormalDistributionModal from './NormalDistributionModal';
 
 const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy = 'content', onAnalyzeByChange, onDetectByDiseaseChange }) => {
@@ -54,105 +55,8 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
     return name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
   };
 
-  const BUCKETS = {
-    "Clinical Updates": [/(?:^|[\s_-])cu(?:$|[\s_-])/i, /\bclinical\s*updates\b/i],
-    "Expert Perspectives": [/(?:^|[\s_-])ep(?:$|[\s_-])/i, /\bexpert\s*perspectives\b/i, /JCADTV\s*Expert\s*Perspectives/i],
-    "Hot Topics": [/(?:^|[\s_-])ht(?:$|[\s_-])/i, /\bhot\s*topics\b/i],
-    "Custom Email": [/\bcustom\s*email\b/i]
-  };
-
-  const TOPICS = {
-    "Clinical Updates": [
-      "Allergy & Pulmonology", "Breast Cancer", "Cardiology", "Colorectal Surgery",
-      "Diabetes", "Gastroenterology", "Generalized Pustular Psoriasis", "Infectious Disease",
-      "Neonatology", "Neuroscience", "Oncology", "Ophthalmology", "Acne"
-    ],
-    "Expert Perspectives": [
-      "RCC", "Vitiligo", "Skincare science", "Melanoma", "GPP", "Atopic Dermatitis",
-      "Multiple Myeloma"
-    ],
-    "Hot Topics": [
-      "Alzheimers", "Breast Cancer", "MCL", "NSCLC", "Melanoma",
-      "Multiple Myeloma", "Ophthalmology", "Pigmented Lesions", "CLL",
-      "Inflammatory Diseases", "Metastatic Breast Cancer"
-    ]
-  };
-
   const extractBucketAndTopic = (campaignName) => {
-    const name = campaignName.toLowerCase();
-
-    let bucket = null;
-    for (const [bucketName, patterns] of Object.entries(BUCKETS)) {
-      for (const pattern of patterns) {
-        if (pattern.test(name)) {
-          bucket = bucketName;
-          break;
-        }
-      }
-      if (bucket) break;
-    }
-
-    if (!bucket) {
-      return { bucket: 'Custom Email', topic: 'Other' };
-    }
-
-    if (bucket === 'Custom Email') {
-      for (const brand of brands) {
-        if (name.includes(brand.toLowerCase())) {
-          return { bucket, topic: brand };
-        }
-      }
-      return { bucket, topic: 'Other' };
-    }
-
-    if (bucket === 'Expert Perspectives') {
-      if (/gpp|generalized\s*pustular\s*psoriasis|spevigo/i.test(name)) {
-        return { bucket, topic: 'GPP' };
-      }
-      if (/melanoma|castle/i.test(name)) {
-        return { bucket, topic: 'Melanoma' };
-      }
-      if (/rcc|cabometyx/i.test(name)) {
-        return { bucket, topic: 'RCC' };
-      }
-      if (/skincare|skinbetter/i.test(name)) {
-        return { bucket, topic: 'Skincare science' };
-      }
-    }
-
-    if (bucket === 'Clinical Updates') {
-      if (/allergy.*pulmo/i.test(name)) {
-        return { bucket, topic: 'Allergy & Pulmonology' };
-      }
-      if (/colorectal/i.test(name)) {
-        return { bucket, topic: 'Colorectal Surgery' };
-      }
-      if (/neuro/i.test(name) && !/neonat/i.test(name)) {
-        return { bucket, topic: 'Neuroscience' };
-      }
-      if (/gpp|generalized\s*pustular\s*psoriasis/i.test(name)) {
-        return { bucket, topic: 'Generalized Pustular Psoriasis' };
-      }
-    }
-
-    for (const topic of TOPICS[bucket] || []) {
-      const variants = [
-        topic,
-        topic.replace(/ /g, ''),
-        topic.replace(/ & /g, ''),
-        topic.replace(/&/g, 'and')
-      ];
-
-      for (const variant of variants) {
-        const escapedVariant = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`\\b${escapedVariant}\\b`, 'i');
-        if (regex.test(name)) {
-          return { bucket, topic };
-        }
-      }
-    }
-
-    return { bucket, topic: 'Other' };
+    return classifyCampaign(campaignName);
   };
 
   const extractIndustryAndDisease = (campaignName) => {
@@ -261,14 +165,14 @@ const AnomalyDetection = ({ searchTerm = '', detectByDisease = false, analyzeBy 
       if (analyzeBy === 'market') {
         processedCampaigns = combinedCampaigns
           .map(c => {
-            const { industry, disease } = extractIndustryAndDisease(c.CleanedName);
-            const { topic } = extractBucketAndTopic(c.CleanedName);
+            const { industry } = extractIndustryAndDisease(c.CleanedName);
+            const disease = getDiseaseFromCampaign(c.CleanedName) || 'General';
             return {
               ...c,
               Market: industry,
-              Disease: disease !== 'Other' ? disease : topic,
+              Disease: disease,
               Bucket: industry || 'Unknown',
-              Topic: disease !== 'Other' ? disease : topic
+              Topic: disease
             };
           })
           .filter(c => c.Market !== null);

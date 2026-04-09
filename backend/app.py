@@ -43,6 +43,7 @@ from routes.programs import programs_bp
 from routes.print_lists import print_lists_bp
 from routes.shadow_engagers import shadow_engagers_bp
 from routes.market_intelligence import market_intelligence_bp
+from routes.list_management import list_management_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
@@ -65,6 +66,7 @@ app.register_blueprint(programs_bp, url_prefix='/api/programs')
 app.register_blueprint(print_lists_bp, url_prefix='/api/print-lists')
 app.register_blueprint(shadow_engagers_bp, url_prefix='/api/shadow-engagers')
 app.register_blueprint(market_intelligence_bp, url_prefix='/api/market-intelligence')
+app.register_blueprint(list_management_bp, url_prefix='/api/list-management')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

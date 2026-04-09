@@ -71,14 +71,18 @@
   color: var(--color-text-tertiary, #8a8a8a);
 }
 
+.social-table-scroll {
+  overflow-x: auto;
+}
+
 .social-metrics-table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .social-metrics-table .text-column {
-  width: 600px;
+  min-width: 400px;
   text-align: left;
   position: relative;
   vertical-align: middle;
@@ -89,18 +93,20 @@
 
 @media (min-width: 1800px) {
   .social-metrics-table .text-column {
-    width: 800px;
+    min-width: 600px;
   }
 }
 
 .social-metrics-table .channel-column {
-  width: 100px;
   min-width: 100px;
+  white-space: nowrap;
 }
 
 .social-metrics-table .metric-column {
   text-align: right;
   padding-right: 12px;
+  white-space: nowrap;
+  min-width: 110px;
 }
 
 .social-metrics-table th {
@@ -112,6 +118,7 @@
   font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444 !important;
   text-align: left;
+  white-space: nowrap;
 }
 
 .social-metrics-table th.sortable {
@@ -957,7 +964,7 @@ body.light .profile-info-section p {
 
 @media (max-width: 768px) {
   .social-metrics-table .text-column {
-    width: 40%;
+    min-width: 250px;
   }
 
   .demographics-grid {

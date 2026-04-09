@@ -429,6 +429,7 @@ def generate_batch_json():
 
                 "Buy_Component_Type": contract.buy_component_type if contract else campaign.buy_component_type or "",
                 "Campaign_Type": "email",
+                "frequency": contract.frequency if contract and contract.frequency else "Weekly",
 
                 "_metadata_source": "unified_api",
                 "_match_confidence": campaign.match_confidence
@@ -448,7 +449,8 @@ def generate_batch_json():
                         "Buy_Component_Type": agg_contract.buy_component_type if agg_contract else '',
                         "contract_number": agg_contract.contract_number if agg_contract else '',
                         "metric": agg.get('agg_metric', agg_contract.metric if agg_contract else ''),
-                        "value": agg.get('agg_value', '')
+                        "value": agg.get('agg_value', ''),
+                        "frequency": agg_contract.frequency if agg_contract and agg_contract.frequency else "Monthly"
                     })
 
             batch_records.append(record)
@@ -478,6 +480,7 @@ def generate_batch_json():
 
                 "agg_metric": agg.get('agg_metric', agg_contract.metric if agg_contract else ''),
                 "agg_value": agg.get('agg_value', ''),
+                "frequency": agg_contract.frequency if agg_contract and agg_contract.frequency else "Monthly",
 
                 "_metadata_source": "standalone_agg"
             }

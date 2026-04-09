@@ -123,7 +123,7 @@ const DocumentationPage = () => {
               <li><strong>Audience Analytics</strong> &mdash; User-level querying, NPI lookup, list analysis, shadow engager detection, and engagement pattern detection.</li>
               <li><strong>Basis Performance</strong> &mdash; Programmatic display (DSP) optimization metrics from the Basis platform.</li>
               <li><strong>Content Performance</strong> &mdash; Digital journal, video, and social media content metrics.</li>
-              <li><strong>Content Analytics</strong> &mdash; Analytical tools for publication comparison, anomaly detection, device/traffic/geographic/demographic breakdowns, YouTube analytics, and social profile metrics.</li>
+              <li><strong>Content Analytics</strong> &mdash; Four main tabs (Walsworth, Google Analytics, YouTube, Social Profiles) each with their own sub-tabs for publication comparison, anomaly detection, device/traffic/geographic/demographic breakdowns, YouTube analytics, and social profile insights.</li>
               <li><strong>CMI Contracts</strong> &mdash; Contract management information for placement tracking.</li>
               <li><strong>Brand Management</strong> &mdash; Brand directory organized by sales team member.</li>
             </ol>
@@ -634,7 +634,7 @@ const DocumentationPage = () => {
             </p>
             <ul>
               <li><strong>Group by:</strong> Market or Content (determines how campaigns are pooled).</li>
-              <li><strong>Filter by:</strong> All or By Disease (hierarchical display with parent groups and children when grouped by disease).</li>
+              <li><strong>Filter by:</strong> All or By Disease (hierarchical display with parent groups and children when grouped by disease). In market mode, sub-topics are disease states only&mdash;brand names, abbreviations, and synonyms are consolidated (e.g., GPP + Spevigo + Generalized Pustular Psoriasis all merge). Journals, conferences, and specialty names are excluded.</li>
             </ul>
             <p>
               Each card shows: group name, average open rate, campaign count, and a color-coded delta vs. the overall average
@@ -719,7 +719,7 @@ const DocumentationPage = () => {
             <h4>Grouping Modes</h4>
             <ul>
               <li><strong>Group by Content:</strong> Campaigns are classified into buckets (Clinical Updates, Expert Perspectives, Hot Topics, Custom Email) based on regex patterns in campaign names.</li>
-              <li><strong>Group by Market:</strong> Campaigns are mapped to market categories using the brand-management database and keyword matching.</li>
+              <li><strong>Group by Market:</strong> Campaigns are mapped to market categories using the brand-management database and keyword matching. Sub-topics are <strong>disease states only</strong> &mdash; brand names (e.g., Spevigo), abbreviations (e.g., GPP), and full disease names (e.g., Generalized Pustular Psoriasis) are all consolidated into the canonical disease name. Journals (JCAD), conferences (AAD), and specialties (Oncology) are not shown as sub-topics.</li>
             </ul>
 
             <h4>Detection Level</h4>
@@ -863,7 +863,7 @@ const DocumentationPage = () => {
             <h4>Configuration</h4>
             <ul>
               <li><strong>Group by:</strong> Content (bucket) or Market.</li>
-              <li><strong>Filter by:</strong> All or By Topic.</li>
+              <li><strong>Filter by:</strong> All or By Topic. In market mode, topics are disease states only&mdash;brand names, abbreviations, and synonyms are consolidated into canonical disease names. Journals, conferences, and specialty names map to &ldquo;Other.&rdquo;</li>
               <li><strong>Merge Toggle:</strong> When enabled, sub-specialties are combined (e.g., "Dermatology - Cosmetic" and "Dermatology - Medical" merge into "Dermatology").</li>
             </ul>
 
@@ -2821,107 +2821,72 @@ const DocumentationPage = () => {
             <h3>Overview</h3>
             <p>
               Content Analytics provides analytical tools for publication and content performance data.
-              It is organized into four tabs: <strong>Walsworth</strong> (publication comparison, anomalies, issue comparison),
-              <strong>Google Analytics</strong> (device, traffic, geographic, and demographic breakdowns),
-              <strong>YouTube</strong> (channel analytics), and <strong>Social Profiles</strong> (follower metrics and audience demographics for LinkedIn, Facebook, and Instagram).
+              It follows the standard app layout: main header with search bar, four primary tabs, a sub-header showing the active tab name,
+              and sub-tabs within each tab for different views.
             </p>
-            <h4>Global Controls (Walsworth Tab)</h4>
-            <ul>
-              <li><strong>Publication Selector:</strong> Multi-select dropdown with checkboxes. Initially the first 5 publications are selected.</li>
-              <li><strong>Metrics Selector:</strong> Multi-select for: Visits Per Issue, Page Views Per Issue, Unique Views Per Issue, Avg Time In Issue. At least 1 must be selected.</li>
-              <li><strong>Analyze By:</strong> Toggle between Time, Sessions, or Views (determines anomaly calculation basis).</li>
-            </ul>
+            <p>
+              Primary tabs: <strong>Walsworth</strong>, <strong>Google Analytics</strong>, <strong>YouTube</strong>, <strong>Social Profiles</strong>.
+              Each tab has its own set of sub-tabs (no sub-sub-tabs).
+            </p>
           </div>
 
           <div className="docs-card">
-            <h3>Publication Comparison (Walsworth Tab)</h3>
+            <h3>Walsworth Tab</h3>
+            <p>Sub-header: "Walsworth". Three sub-tabs:</p>
+            <h4>Publications Sub-tab</h4>
             <p>
-              Compares metrics across selected publications. Supports a "Per Issue" toggle
-              that normalizes metrics by dividing by issue count. Two view modes are available via a toggle:
+              Compares metrics across selected publications with a section-header-bar containing Metrics and Publications dropdowns.
+              Supports a "Per Issue" toggle that normalizes metrics by dividing by issue count. Two view modes:
             </p>
             <ul>
               <li><strong>Comparison:</strong> Bar chart and sortable data table showing metrics side-by-side across publications.</li>
-              <li><strong>Trends:</strong> Line chart with one line per publication plotted over issue sequence. Includes a metric selector dropdown to choose which metric to trend. Delta callout cards display the latest value versus the publication average with percentage difference.</li>
+              <li><strong>Trends:</strong> Line chart with one line per publication plotted over issue sequence. Delta callout cards display the latest value versus the publication average.</li>
             </ul>
-          </div>
-
-          <div className="docs-card">
-            <h3>Journal Anomalies (Walsworth Tab)</h3>
+            <h4>Journal Sub-tab</h4>
+            <p>Placeholder for future journal content.</p>
+            <h4>Anomaly Detection Sub-tab</h4>
             <p>
-              Identifies issues whose performance significantly deviates from their publication's average using Z-Score analysis
-              (same methodology as Campaign Analytics anomaly detection, applied to journal metrics instead).
+              Identifies issues whose performance significantly deviates from their publication's average using Z-Score analysis.
+              Uses the same section-header-bar style as Campaign Analytics anomaly detection:
             </p>
             <ul>
-              <li>Toggle between Underperforming and Overperforming.</li>
+              <li>Title has clickable Over/Under toggle (click to switch between overperforming and underperforming).</li>
+              <li>"Analyze by" controls (Time, Visits, Page Views) appear in the header stats area.</li>
               <li>Threshold: |Z-Score| &gt; 1.5.</li>
-              <li>Displays: publication, issue name, metric value, publication mean, deviation %, Z-Score.</li>
+              <li>Displays: severity, publication, issue name, metric value, publication mean, deviation %, Z-Score.</li>
             </ul>
           </div>
 
           <div className="docs-card">
-            <h3>Device Insights (Google Analytics Tab)</h3>
-            <p>Breaks down traffic by device type (Desktop, Mobile, Tablet).</p>
+            <h3>Google Analytics Tab</h3>
+            <p>Sub-header: "Google Analytics". Four sub-tabs, each with its own section-header-bar and view mode toggles:</p>
             <ul>
-              <li><strong>Overview:</strong> Pie chart of device distribution and summary statistics.</li>
-              <li><strong>Drilldown:</strong> Select a specific page/journal to see its device breakdown as a bar chart.</li>
+              <li><strong>Device Insights:</strong> Device type breakdown (Desktop, Mobile, Tablet). Toggle: Overview / By Journal.</li>
+              <li><strong>Traffic Sources:</strong> Traffic source analysis (Direct, Organic, Referral, Paid). Toggle: Overview / Source drilldown.</li>
+              <li><strong>Geographic:</strong> Geographic traffic breakdown. Toggle: Overview / Country / City.</li>
+              <li><strong>Demographics:</strong> Age and gender breakdown. Toggle: Overview / Age / Gender.</li>
             </ul>
           </div>
 
           <div className="docs-card">
-            <h3>Traffic Insights (Google Analytics Tab)</h3>
-            <p>Analyzes traffic sources (Direct, Organic, Referral, Paid, etc.).</p>
+            <h3>YouTube Tab</h3>
+            <p>Sub-header: "YouTube". Three sub-tabs:</p>
             <ul>
-              <li><strong>Overview:</strong> Pie chart and bar chart of top traffic sources.</li>
-              <li><strong>Drilldown:</strong> Select a traffic source to see which pages receive traffic from it, with sessions, users, bounce rate, and avg session duration.</li>
+              <li><strong>Overview:</strong> Traffic sources, device distribution, and playback location charts.</li>
+              <li><strong>Traffic Sources:</strong> Expandable matrix of traffic sources with per-video drilldown.</li>
+              <li><strong>Audience:</strong> Age group, gender, subscription status, search terms, and external referral URLs.</li>
             </ul>
           </div>
 
           <div className="docs-card">
-            <h3>Geographic Insights (Google Analytics Tab)</h3>
-            <p>Geographic breakdown of content traffic.</p>
+            <h3>Social Profiles Tab</h3>
+            <p>Sub-header: "Social Profiles". Five sub-tabs:</p>
             <ul>
-              <li><strong>Overview:</strong> World map with color-coded traffic intensity.</li>
-              <li><strong>Drilldown:</strong> Click a country to see states (for US) or details. Click a US state to see cities. Includes searchable lists and bar charts.</li>
-            </ul>
-          </div>
-
-          <div className="docs-card">
-            <h3>Demographics Insights (Google Analytics Tab)</h3>
-            <p>Age and gender breakdown of the content audience.</p>
-            <ul>
-              <li><strong>Overview:</strong> Pie charts for age groups (18-24, 25-34, 35-44, 45-54, 55-64, 65+) and gender (Male, Female, Unknown).</li>
-              <li><strong>Drilldown:</strong> Per-page breakdown with bar charts and insights about the most common demographics.</li>
-            </ul>
-          </div>
-
-          <div className="docs-card">
-            <h3>Issue Comparison (Walsworth Tab)</h3>
-            <p>
-              Side-by-side comparison of individual publication issues. Sortable table with columns: Issue Name, Publication,
-              Date, Page Views, Visits, Avg Time in Issue. Default sort: newest first.
-            </p>
-          </div>
-
-          <div className="docs-card">
-            <h3>YouTube Insights (YouTube Tab)</h3>
-            <p>
-              Aggregated YouTube channel analytics across all videos. Breakdown categories: traffic sources, playback locations,
-              countries, US states, cities, devices, operating systems, age groups, genders, subscription status, search terms,
-              and external URLs. Includes overview cards, pie/bar charts, and drilldown capabilities.
-            </p>
-          </div>
-
-          <div className="docs-card">
-            <h3>Social Profiles (Social Profiles Tab)</h3>
-            <p>
-              Displays social media follower metrics and audience demographics across LinkedIn, Facebook, and Instagram channels.
-            </p>
-            <ul>
-              <li><strong>Follower Overview Cards:</strong> Summary cards showing follower counts for each channel across LinkedIn, Facebook, and Instagram.</li>
-              <li><strong>Follower Growth Charts:</strong> Line charts showing follower growth over the last 90 days. Toggle between LinkedIn and Facebook data.</li>
-              <li><strong>Page Views Charts:</strong> Line charts displaying page view trends. Toggle between LinkedIn and Facebook.</li>
-              <li><strong>LinkedIn Demographics:</strong> Audience breakdown by job function, seniority level, industry, and country.</li>
-              <li><strong>Instagram Audience Demographics:</strong> Audience breakdown by city, country, age group, and gender.</li>
+              <li><strong>Followers:</strong> Grand total follower count across all platforms, with per-platform cards showing channel-level breakdowns with progress bars.</li>
+              <li><strong>Growth:</strong> Line chart of follower growth over the last 90 days. Toggle between LinkedIn and Facebook. Insight cards for organic/paid gain and avg daily growth.</li>
+              <li><strong>Page Views:</strong> Line chart of page view trends over the last 90 days. Toggle between LinkedIn and Facebook.</li>
+              <li><strong>LinkedIn Demographics:</strong> Audience breakdown by job function, seniority, industry, and country. Channel selector when multiple channels exist.</li>
+              <li><strong>Instagram Audience:</strong> Audience breakdown by city, country, age, and gender. Channel selector when multiple channels exist.</li>
             </ul>
           </div>
         </section>

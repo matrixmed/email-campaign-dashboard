@@ -1994,7 +1994,8 @@ const ReportsManager = () => {
                 placement_description: contractInfo?.placement_description || agg.placement_description || '',
                 buy_component_type: contractInfo?.buy_component_type || agg.buy_component_type || '',
                 metric: contractInfo?.metric || agg.agg_metric || agg.contract_metric || '',
-                value: agg.agg_value || ''
+                value: agg.agg_value || '',
+                frequency: contractInfo?.frequency || agg.frequency || 'Monthly'
             };
         });
 
@@ -2027,7 +2028,8 @@ const ReportsManager = () => {
             if (dataType.includes('AGG')) {
                 aggNoData[`${name} AGG`] = {
                     ...baseEntry,
-                    metric: report.contract_metric || contractInfo?.metric || ''
+                    metric: report.contract_metric || contractInfo?.metric || '',
+                    frequency: contractInfo?.frequency || report.frequency || 'Weekly'
                 };
             }
         });
@@ -2047,7 +2049,8 @@ const ReportsManager = () => {
                 gcm_placement_id: [],
                 target_list_id: '',
                 creative_code: contractInfo?.creative_code || '',
-                metric: report.contract_metric || contractInfo?.metric || ''
+                metric: report.contract_metric || contractInfo?.metric || '',
+                frequency: contractInfo?.frequency || report.frequency || 'Monthly'
             };
         });
 

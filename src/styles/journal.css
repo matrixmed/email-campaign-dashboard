@@ -216,22 +216,25 @@ body.light .digital-journals-container .last-updated-tag {
   border-top: 1px solid var(--color-border, #333336);
 }
 
+.journal-table-scroll {
+  overflow-x: auto;
+}
+
 .digital-journals-table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
 }
 
 .digital-journals-table .journal-title-column {
-  max-width: 600px;
-  width: 600px;
+  min-width: 400px;
   position: relative;
   vertical-align: middle;
 }
 
 @media (min-width: 1800px) {
   .digital-journals-table .journal-title-column {
-    max-width: 800px;
-    width: 800px;
+    min-width: 600px;
   }
 }
 
@@ -244,6 +247,7 @@ body.light .digital-journals-container .last-updated-tag {
   font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444 !important;
   text-align: left;
+  white-space: nowrap;
 }
 
 .digital-journals-table td {
@@ -252,6 +256,7 @@ body.light .digital-journals-container .last-updated-tag {
   font-size: 15px;
   font-family: var(--font-body, 'Rubik', sans-serif);
   border-bottom: 1px solid #444;
+  white-space: nowrap;
 }
 
 .digital-journals-table tbody tr:last-child td {

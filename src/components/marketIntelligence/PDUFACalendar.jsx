@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import LastUpdatedTag from './LastUpdatedTag';
 
 const AREA_COLORS = {
   dermatology: { primary: '#00857a', bg: 'rgba(0, 133, 122, 0.15)' },
@@ -7,7 +8,7 @@ const AREA_COLORS = {
   neuroscience: { primary: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' },
 };
 
-const PDUFACalendar = ({ searchTerm }) => {
+const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('pending');
@@ -47,6 +48,7 @@ const PDUFACalendar = ({ searchTerm }) => {
     <div className="mi-tab-content">
       <div className="mi-section-header">
         <h3>PDUFA Decisions</h3>
+        <LastUpdatedTag date={lastUpdated} />
       </div>
 
       <div className="mi-subtabs">
@@ -75,7 +77,7 @@ const PDUFACalendar = ({ searchTerm }) => {
               <tr key={i}>
                 <td className="mi-bold" style={{whiteSpace: 'nowrap'}}>{d.target_date}</td>
                 <td>{d.drug_name}</td>
-                <td>{d.company_name}</td>
+                <td className="mi-company-link" onClick={() => onSelectCompany(d.company_name)}>{d.company_name}</td>
                 <td>{d.application_type || '-'}</td>
                 <td>{d.therapeutic_area ? <span className="mi-area-tag" style={getAreaStyle(d.therapeutic_area)}>{d.therapeutic_area}</span> : '-'}</td>
                 <td><span className={d.status === 'pending' ? 'mi-status-pending' : d.status === 'approved' ? 'mi-status-approved' : 'mi-status-past'}>{d.status}</span></td>

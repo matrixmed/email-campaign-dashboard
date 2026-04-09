@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import '../../styles/CampaignBenchmarks.css';
 import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
-import { classifyCampaign } from '../../utils/campaignClassifier';
+import { classifyCampaign, getDiseaseFromCampaign } from '../../utils/campaignClassifier';
 import { getIndustry } from '../../utils/industryKeywords';
 
 const INITIAL_SHOW = 5;
@@ -85,9 +85,8 @@ const CampaignBenchmarks = ({ onClearCache }) => {
       if (overviewMode === 'market') {
         const industry = getIndustry(name, brandIndustryMap);
         if (!industry) return;
-        const { topic } = classifyCampaign(name);
         groupKey = industry;
-        topicKey = topic;
+        topicKey = getDiseaseFromCampaign(name) || 'General';
       } else {
         const { bucket, topic } = classifyCampaign(name);
         groupKey = bucket;

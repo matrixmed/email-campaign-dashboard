@@ -14,6 +14,7 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     const [flagsByCampaign, setFlagsByCampaign] = useState({});
     const [flagSummary, setFlagSummary] = useState({ high: 0, medium: 0, low: 0 });
     const [showFlagDetails, setShowFlagDetails] = useState(null);
+    const [showBannerDetails, setShowBannerDetails] = useState(false);
     const campaignsPerPage = 2;
 
     useEffect(() => {
@@ -308,80 +309,149 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
 
             {(() => {
                 const activeFlagCount = { high: 0, medium: 0, low: 0, total: 0 };
-                const seenCampaigns = new Set();
+                const flaggedCampaigns = [];
 
                 metrics.forEach(campaign => {
                     const activeFlags = getCampaignFlags(campaign.Campaign, campaign);
-                    if (activeFlags.length > 0 && !seenCampaigns.has(campaign.Campaign)) {
-                        seenCampaigns.add(campaign.Campaign);
+                    if (activeFlags.length > 0) {
                         activeFlagCount.total++;
+                        const campaignEntry = { name: campaign.Campaign, flags: [] };
                         activeFlags.forEach(f => {
                             if (f.severity === 'HIGH') activeFlagCount.high++;
                             else if (f.severity === 'MEDIUM') activeFlagCount.medium++;
                             else if (f.severity === 'LOW') activeFlagCount.low++;
+                            campaignEntry.flags.push(f);
                         });
+                        flaggedCampaigns.push(campaignEntry);
                     }
                 });
 
                 if (activeFlagCount.total === 0) return null;
 
                 return (
-                    <div style={{
-                        background: '#2a2a3e',
-                        border: '1px solid #444',
-                        borderRadius: '6px',
-                        padding: '12px 16px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ fontSize: '14px', color: '#ccc' }}>
-                                Data Validation Alerts
-                            </span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                {activeFlagCount.high > 0 && (
-                                    <span style={{
-                                        background: '#d32f2f',
-                                        color: '#fff',
-                                        padding: '2px 8px',
-                                        borderRadius: '10px',
-                                        fontSize: '11px',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        {activeFlagCount.high} HIGH
-                                    </span>
-                                )}
-                                {activeFlagCount.medium > 0 && (
-                                    <span style={{
-                                        background: '#ff9800',
-                                        color: '#fff',
-                                        padding: '2px 8px',
-                                        borderRadius: '10px',
-                                        fontSize: '11px',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        {activeFlagCount.medium} MEDIUM
-                                    </span>
-                                )}
-                                {activeFlagCount.low > 0 && (
-                                    <span style={{
-                                        background: '#2196f3',
-                                        color: '#fff',
-                                        padding: '2px 8px',
-                                        borderRadius: '10px',
-                                        fontSize: '11px',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        {activeFlagCount.low} LOW
-                                    </span>
-                                )}
+                    <div style={{ marginBottom: '16px' }}>
+                        <div
+                            onClick={() => setShowBannerDetails(!showBannerDetails)}
+                            style={{
+                                background: '#2a2a3e',
+                                border: '1px solid #444',
+                                borderRadius: showBannerDetails ? '6px 6px 0 0' : '6px',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '14px', color: '#ccc' }}>
+                                    Data Validation Alerts
+                                </span>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    {activeFlagCount.high > 0 && (
+                                        <span style={{
+                                            background: '#d32f2f',
+                                            color: '#fff',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {activeFlagCount.high} HIGH
+                                        </span>
+                                    )}
+                                    {activeFlagCount.medium > 0 && (
+                                        <span style={{
+                                            background: '#ff9800',
+                                            color: '#fff',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {activeFlagCount.medium} MEDIUM
+                                        </span>
+                                    )}
+                                    {activeFlagCount.low > 0 && (
+                                        <span style={{
+                                            background: '#2196f3',
+                                            color: '#fff',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {activeFlagCount.low} LOW
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '12px', color: '#888' }}>
+                                    {activeFlagCount.total} campaign{activeFlagCount.total !== 1 ? 's' : ''} flagged
+                                </span>
+                                <svg
+                                    viewBox="0 0 20 20"
+                                    fill="#888"
+                                    width="16"
+                                    height="16"
+                                    style={{
+                                        transform: showBannerDetails ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.2s ease',
+                                    }}
+                                >
+                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
                             </div>
                         </div>
-                        <span style={{ fontSize: '12px', color: '#888' }}>
-                            {activeFlagCount.total} campaign{activeFlagCount.total !== 1 ? 's' : ''} flagged.
-                        </span>
+                        {showBannerDetails && (
+                            <div style={{
+                                background: '#1e1e2e',
+                                border: '1px solid #444',
+                                borderTop: 'none',
+                                borderRadius: '0 0 6px 6px',
+                                padding: '12px 16px',
+                            }}>
+                                {flaggedCampaigns.map((entry, idx) => (
+                                    <div key={idx} style={{
+                                        padding: '8px 0',
+                                        borderBottom: idx < flaggedCampaigns.length - 1 ? '1px solid #333' : 'none',
+                                    }}>
+                                        <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '4px' }}>
+                                            {entry.name}
+                                        </div>
+                                        {entry.flags.map((flag, fIdx) => (
+                                            <div key={fIdx} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                marginLeft: '12px',
+                                                marginTop: '2px',
+                                                fontSize: '11px',
+                                            }}>
+                                                <span style={{
+                                                    color: getSeverityColor(flag.severity),
+                                                    fontWeight: 'bold',
+                                                    minWidth: '50px',
+                                                }}>
+                                                    {flag.severity}
+                                                </span>
+                                                <span style={{ color: '#aaa' }}>
+                                                    {flag.category}
+                                                    {flag.local_value && flag.api_value && (
+                                                        <> — Local: {flag.local_value.toLocaleString()} vs API: {flag.api_value.toLocaleString()}</>
+                                                    )}
+                                                    {flag.deviation_pct && (
+                                                        <> ({flag.deviation_pct.toFixed(1)}%)</>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
             })()}

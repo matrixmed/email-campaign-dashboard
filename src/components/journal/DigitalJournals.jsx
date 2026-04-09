@@ -984,6 +984,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                         </div>
                     )}
 
+                    <div className="journal-table-scroll">
                     <table className="digital-journals-table">
                         <thead>
                             <tr>
@@ -1015,6 +1016,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                                 ))}
                         </tbody>
                     </table>
+                    </div>
 
                     <div className="table-footer">
                         <div className="pagination">
@@ -1122,6 +1124,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                         </div>
                     )}
 
+                    <div className="journal-table-scroll">
                     <table className="digital-journals-table">
                     <thead>
                         <tr>
@@ -1151,6 +1154,7 @@ const DigitalJournals = ({ embedded, externalSearch, forceSource }) => {
                         ))}
                     </tbody>
                 </table>
+                </div>
 
                 <div className="table-footer">
                     <div className="pagination">

@@ -421,6 +421,340 @@ def get_patent_expirations():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@market_intelligence_bp.route('/drug-spending', methods=['GET'])
+def get_drug_spending():
+    limit = request.args.get('limit', 100, type=int)
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT brand_name, generic_name, manufacturer,
+                   total_spending, total_claims, total_beneficiaries,
+                   avg_spending_per_claim, year, spending_change_pct
+            FROM drug_spending
+            WHERE total_spending > 0
+            ORDER BY total_spending DESC
+            LIMIT %(limit)s
+        """, {'limit': limit})
+
+        columns = [desc[0] for desc in cur.description]
+        drugs = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for d in drugs:
+            for k, v in d.items():
+                if hasattr(v, '__float__'):
+                    d[k] = float(v)
+
+        cur.execute("""
+            SELECT manufacturer, SUM(total_spending) as total,
+                   COUNT(DISTINCT brand_name) as drug_count
+            FROM drug_spending
+            WHERE total_spending > 0 AND manufacturer IS NOT NULL
+            GROUP BY manufacturer
+            ORDER BY total DESC
+            LIMIT 50
+        """)
+
+        mfr_cols = [desc[0] for desc in cur.description]
+        by_manufacturer = [dict(zip(mfr_cols, row)) for row in cur.fetchall()]
+
+        for m in by_manufacturer:
+            for k, v in m.items():
+                if hasattr(v, '__float__'):
+                    m[k] = float(v)
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'drugs': drugs,
+            'by_manufacturer': by_manufacturer,
+            'total': len(drugs)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+REDDIT_TOPICS = {
+    "Atopic Dermatitis": ["atopic dermatitis", "eczema", "dupilumab", "dupixent", "tralokinumab", "abrocitinib", "upadacitinib", "rinvoq", "cibinqo"],
+    "Psoriasis": ["psoriasis", "plaque psoriasis", "psoriatic", "skyrizi", "risankizumab", "tremfya", "guselkumab", "cosentyx", "secukinumab", "otezla", "apremilast", "bimekizumab", "taltz", "stelara"],
+    "Acne": ["acne", "isotretinoin", "accutane", "retinoid", "benzoyl peroxide", "spironolactone", "doxycycline acne", "tretinoin"],
+    "Melanoma": ["melanoma", "pembrolizumab", "keytruda", "nivolumab", "opdivo", "ipilimumab", "yervoy", "dabrafenib", "trametinib"],
+    "Vitiligo": ["vitiligo", "ruxolitinib", "opzelura"],
+    "Alopecia": ["alopecia", "hair loss", "minoxidil", "finasteride", "baricitinib", "olumiant"],
+    "Rosacea": ["rosacea", "ivermectin", "soolantra", "metronidazole"],
+    "Breast Cancer": ["breast cancer", "her2", "enhertu", "trastuzumab", "palbociclib", "ibrance", "ribociclib", "kisqali", "abemaciclib", "verzenio", "tamoxifen"],
+    "Lung Cancer": ["lung cancer", "nsclc", "non-small cell", "osimertinib", "tagrisso", "durvalumab", "imfinzi", "lorlatinib", "sotorasib", "adagrasib"],
+    "CLL / Lymphoma": ["cll", "chronic lymphocytic leukemia", "lymphoma", "acalabrutinib", "calquence", "ibrutinib", "imbruvica", "venetoclax", "venclexta", "zanubrutinib", "brukinsa"],
+    "Multiple Myeloma": ["multiple myeloma", "myeloma", "carvykti", "tecvayli", "daratumumab", "darzalex", "lenalidomide", "revlimid", "bortezomib", "velcade"],
+    "Colorectal Cancer": ["colorectal", "colon cancer", "rectal cancer", "cetuximab", "bevacizumab", "avastin"],
+    "Renal Cell Carcinoma": ["renal cell", "kidney cancer", "cabozantinib", "cabometyx", "axitinib", "inlyta", "lenvatinib", "lenvima"],
+    "Immunotherapy": ["immunotherapy", "checkpoint inhibitor", "pd-1", "pd-l1", "car-t", "car t", "bispecific", "antibody drug conjugate", "adc"],
+    "Alzheimer's": ["alzheimer", "dementia", "lecanemab", "leqembi", "donanemab", "kisunla", "aducanumab", "aduhelm", "amyloid"],
+    "Parkinson's": ["parkinson", "levodopa", "carbidopa", "dopamine agonist"],
+    "Multiple Sclerosis": ["multiple sclerosis", "ms relapse", "ocrevus", "ocrelizumab", "tecfidera", "gilenya", "tysabri", "kesimpta"],
+    "Migraine": ["migraine", "headache", "cgrp", "aimovig", "erenumab", "fremanezumab", "ajovy", "galcanezumab", "emgality", "rimegepant", "nurtec", "ubrelvy", "atogepant", "qulipta"],
+    "Epilepsy": ["epilepsy", "seizure", "anticonvulsant", "levetiracetam", "lamotrigine", "valproate", "cenobamate"],
+    "Depression / Anxiety": ["depression", "anxiety", "ssri", "snri", "antidepressant", "sertraline", "zoloft", "escitalopram", "lexapro", "bupropion", "wellbutrin", "ketamine", "spravato", "psilocybin"],
+    "Schizophrenia / Bipolar": ["schizophrenia", "bipolar", "antipsychotic", "aripiprazole", "abilify", "olanzapine", "quetiapine", "seroquel", "lithium", "clozapine"],
+    "GLP-1 / Obesity": ["glp-1", "ozempic", "semaglutide", "wegovy", "mounjaro", "tirzepatide", "zepbound", "obesity", "weight loss drug", "orforglipron"],
+    "JAK Inhibitors": ["jak inhibitor", "janus kinase", "tofacitinib", "xeljanz", "baricitinib", "olumiant", "upadacitinib", "rinvoq", "ruxolitinib", "abrocitinib", "deucravacitinib", "sotyktu"],
+    "Biologics": ["biologic", "biosimilar", "monoclonal antibody", "mab therapy", "infusion", "subcutaneous injection"],
+    "Prior Authorization": ["prior auth", "prior authorization", "insurance denial", "step therapy", "formulary", "coverage denied", "appeal"],
+    "Burnout / Wellness": ["burnout", "work life balance", "mental health physician", "physician wellness", "physician suicide", "compassion fatigue", "moral injury"],
+    "AI in Medicine": ["artificial intelligence", "ai in medicine", "machine learning", "chatgpt", "ai diagnosis", "ai radiology", "large language model", "llm medicine"],
+    "Residency / Training": ["residency", "intern year", "attending", "fellowship", "match day", "step 1", "step 2", "board exam", "medical education", "pgy"],
+    "Scope of Practice": ["scope of practice", "nurse practitioner", "physician assistant", "midlevel", "noctor", "independent practice", "supervision"],
+    "Clinical Trials": ["clinical trial", "phase 3", "phase 2", "randomized controlled", "fda approval", "fda approved", "nda", "breakthrough therapy"],
+    "Drug Pricing": ["drug price", "drug cost", "pharmaceutical pricing", "insulin cost", "medication cost", "copay", "out of pocket"],
+    "Telehealth": ["telehealth", "telemedicine", "virtual visit", "remote patient", "video visit"],
+    "EHR / Documentation": ["ehr", "electronic health record", "epic", "documentation burden", "charting", "note bloat", "pajama time", "inbox"],
+    "Dermatology General": ["dermatology", "dermatologist", "skin cancer", "basal cell", "squamous cell", "mohs", "biopsy skin", "cryotherapy", "cosmetic dermatology"],
+    "Oncology General": ["oncology", "oncologist", "chemotherapy", "radiation therapy", "tumor board", "cancer staging", "palliative", "hospice"],
+    "Neurology General": ["neurology", "neurologist", "stroke", "tpa", "eeg", "emg", "neuropathy", "nerve conduction"],
+    "Pain Management": ["pain management", "chronic pain", "opioid", "gabapentin", "pregabalin", "nerve block", "pain clinic"],
+    "Pediatrics": ["pediatric", "neonatal", "nicu", "childhood cancer", "pediatric dermatology"],
+    "Supplements / Alternative": ["supplement", "vitamin d", "turmeric", "collagen", "probiotics", "alternative medicine", "naturopath", "homeopathy"],
+    "Skincare / Cosmetic": ["skincare", "moisturizer", "sunscreen", "spf", "retinol", "niacinamide", "hyaluronic acid", "chemical peel", "laser treatment", "botox", "filler"],
+}
+
+
+@market_intelligence_bp.route('/reddit/topics', methods=['GET'])
+def get_reddit_topics():
+    subreddit = request.args.get('subreddit')
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        filters = []
+        params = {}
+        if subreddit and subreddit != 'all':
+            filters.append("subreddit = %(subreddit)s")
+            params['subreddit'] = subreddit
+
+        where = "WHERE " + " AND ".join(filters) if filters else ""
+
+        cur.execute(f"""
+            SELECT post_id, subreddit, title, body, score, num_comments
+            FROM reddit_hcp_posts
+            {where}
+        """, params)
+
+        posts = cur.fetchall()
+
+        topic_stats = {}
+        for topic in REDDIT_TOPICS:
+            topic_stats[topic] = {'topic': topic, 'posts': 0, 'total_score': 0, 'total_comments': 0, 'top_post': None}
+
+        for post_id, sub, title, body, score, num_comments in posts:
+            text_combined = f"{title or ''} {body or ''}".lower()
+            for topic, keywords in REDDIT_TOPICS.items():
+                if any(kw in text_combined for kw in keywords):
+                    topic_stats[topic]['posts'] += 1
+                    topic_stats[topic]['total_score'] += (score or 0)
+                    topic_stats[topic]['total_comments'] += (num_comments or 0)
+                    if not topic_stats[topic]['top_post'] or (score or 0) > topic_stats[topic]['top_post']['score']:
+                        topic_stats[topic]['top_post'] = {
+                            'title': title[:120] if title else '', 'score': score,
+                            'subreddit': sub, 'num_comments': num_comments
+                        }
+
+        results = [v for v in topic_stats.values() if v['posts'] > 0]
+        results.sort(key=lambda x: x['total_score'], reverse=True)
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'topics': results,
+            'total_posts_analyzed': len(posts)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@market_intelligence_bp.route('/reddit', methods=['GET'])
+def get_reddit_posts():
+    subreddit = request.args.get('subreddit')
+    limit = request.args.get('limit', 5000, type=int)
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        filters = []
+        params = {'limit': limit}
+
+        if subreddit and subreddit != 'all':
+            filters.append("p.subreddit = %(subreddit)s")
+            params['subreddit'] = subreddit
+
+        where = "WHERE " + " AND ".join(filters) if filters else ""
+
+        cur.execute(f"""
+            SELECT p.post_id, p.subreddit, p.title, p.body, p.score,
+                   p.num_comments, p.author, p.author_flair,
+                   p.created_utc, p.retrieved_at
+            FROM reddit_hcp_posts p
+            {where}
+            ORDER BY p.score DESC
+            LIMIT %(limit)s
+        """, params)
+
+        columns = [desc[0] for desc in cur.description]
+        posts = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for p in posts:
+            for k, v in p.items():
+                if hasattr(v, 'isoformat'):
+                    p[k] = v.isoformat()
+
+        cur.execute("""
+            SELECT subreddit, COUNT(*) as post_count,
+                   AVG(score) as avg_score,
+                   SUM(num_comments) as total_comments
+            FROM reddit_hcp_posts
+            GROUP BY subreddit
+            ORDER BY post_count DESC
+        """)
+
+        sub_cols = [desc[0] for desc in cur.description]
+        subreddits = [dict(zip(sub_cols, row)) for row in cur.fetchall()]
+
+        for s in subreddits:
+            for k, v in s.items():
+                if hasattr(v, '__float__'):
+                    s[k] = float(v)
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'posts': posts,
+            'subreddits': subreddits,
+            'total': len(posts)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@market_intelligence_bp.route('/reddit/post/<post_id>/comments', methods=['GET'])
+def get_reddit_comments(post_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT comment_id, body, score, author, author_flair,
+                   created_utc, depth
+            FROM reddit_hcp_comments
+            WHERE post_id = %(post_id)s
+            ORDER BY score DESC
+        """, {'post_id': post_id})
+
+        columns = [desc[0] for desc in cur.description]
+        comments = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for c in comments:
+            for k, v in c.items():
+                if hasattr(v, 'isoformat'):
+                    c[k] = v.isoformat()
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'comments': comments,
+            'total': len(comments)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@market_intelligence_bp.route('/client-history', methods=['GET'])
+def get_client_history():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT pharma_company, brand, agency, sales_member, industry
+            FROM brand_editor_agency
+            WHERE is_active = true
+            ORDER BY pharma_company, brand
+        """)
+
+        columns = [desc[0] for desc in cur.description]
+        clients = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        companies = {}
+        for c in clients:
+            company = c['pharma_company'] or 'Unknown'
+            if company not in companies:
+                companies[company] = {'company': company, 'brands': [], 'agencies': set(), 'sales': set()}
+            companies[company]['brands'].append(c['brand'])
+            if c['agency']:
+                companies[company]['agencies'].add(c['agency'])
+            if c['sales_member']:
+                companies[company]['sales'].add(c['sales_member'])
+
+        result = []
+        for comp in sorted(companies.values(), key=lambda x: len(x['brands']), reverse=True):
+            result.append({
+                'company': comp['company'],
+                'brands': comp['brands'],
+                'brand_count': len(comp['brands']),
+                'agencies': list(comp['agencies']),
+                'sales_members': list(comp['sales']),
+            })
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'clients': result,
+            'total_companies': len(result),
+            'total_brands': sum(c['brand_count'] for c in result)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@market_intelligence_bp.route('/fda-approvals', methods=['GET'])
+def get_fda_approvals():
+    days = request.args.get('days', 730, type=int)
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT application_number, brand_name, generic_name, sponsor_name,
+                   submission_type, submission_status, approval_date,
+                   therapeutic_area, dosage_form, route, product_type,
+                   is_new_indication, submission_description
+            FROM fda_approvals
+            WHERE approval_date >= CURRENT_DATE - interval '1 day' * %(days)s
+            ORDER BY approval_date DESC
+        """, {'days': days})
+
+        columns = [desc[0] for desc in cur.description]
+        approvals = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for a in approvals:
+            for k, v in a.items():
+                if hasattr(v, 'isoformat'):
+                    a[k] = v.isoformat()
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'approvals': approvals,
+            'total': len(approvals)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @market_intelligence_bp.route('/market-benchmarks', methods=['GET'])
 def get_market_benchmarks():
     channel = request.args.get('channel')
@@ -440,10 +774,11 @@ def get_market_benchmarks():
 
         cur.execute(f"""
             SELECT source, metric_name, metric_value, metric_unit,
-                   channel, therapeutic_area, platform, year, quarter, notes
+                   channel, therapeutic_area, platform, year, quarter, notes,
+                   source_url, category
             FROM market_benchmarks
             {where}
-            ORDER BY channel, metric_name
+            ORDER BY category, metric_name
         """, params)
 
         columns = [desc[0] for desc in cur.description]
@@ -585,57 +920,68 @@ def get_company_profile(company_name):
         conn = get_connection()
         cur = conn.cursor()
 
-        search = f"%{company_name}%"
-
         cur.execute("""
+            SELECT alias FROM company_aliases
+            WHERE canonical_name = (
+                SELECT canonical_name FROM company_aliases WHERE alias ILIKE %(name)s LIMIT 1
+            )
+        """, {'name': f"%{company_name}%"})
+        alias_rows = cur.fetchall()
+        aliases = [r[0] for r in alias_rows] if alias_rows else [company_name]
+        alias_params = {f'a{i}': f"%{a}%" for i, a in enumerate(aliases)}
+
+        def ilike_any(column):
+            return " OR ".join([f"{column} ILIKE %({f'a{i}'})s" for i in range(len(aliases))])
+
+        cur.execute(f"""
             SELECT nct_id, title, phase, status, conditions, interventions,
                    enrollment_count, primary_completion_date, therapeutic_area
             FROM clinical_trials
-            WHERE sponsor_name ILIKE %(search)s AND sponsor_class = 'INDUSTRY'
+            WHERE ({ilike_any('sponsor_name')}) AND sponsor_class = 'INDUSTRY'
             ORDER BY primary_completion_date ASC NULLS LAST
-        """, {'search': search})
+        """, alias_params)
         trial_cols = [d[0] for d in cur.description]
         trials = [dict(zip(trial_cols, r)) for r in cur.fetchall()]
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT drug_name, company_name, application_type,
                    therapeutic_area, target_date, status
             FROM pdufa_dates
-            WHERE company_name ILIKE %(search)s
+            WHERE {ilike_any('company_name')}
             ORDER BY target_date
-        """, {'search': search})
+        """, alias_params)
         pdufa_cols = [d[0] for d in cur.description]
         pdufa = [dict(zip(pdufa_cols, r)) for r in cur.fetchall()]
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT npi, physician_name, specialty,
                    total_payments, payment_count, avg_payment, max_payment, program_year
             FROM open_payments_summary
-            WHERE manufacturer_name ILIKE %(search)s
+            WHERE {ilike_any('manufacturer_name')}
             ORDER BY total_payments DESC
-        """, {'search': search})
+        """, alias_params)
         kol_cols = [d[0] for d in cur.description]
         kols = [dict(zip(kol_cols, r)) for r in cur.fetchall()]
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT op.npi, op.physician_name, op.specialty,
                    op.total_payments, op.payment_count
             FROM open_payments_summary op
             INNER JOIN user_profiles up ON op.npi = up.npi
-            WHERE op.manufacturer_name ILIKE %(search)s
+            WHERE ({ilike_any('op.manufacturer_name')})
             AND up.npi IS NOT NULL AND up.npi != ''
             ORDER BY op.total_payments DESC
-        """, {'search': search})
+        """, alias_params)
         matched_cols = [d[0] for d in cur.description]
         matched_kols = [dict(zip(matched_cols, r)) for r in cur.fetchall()]
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT SUM(total_payments) as total_spend,
                    COUNT(DISTINCT npi) as hcp_count,
                    ROUND(AVG(total_payments)::numeric, 2) as avg_per_hcp
             FROM open_payments_summary
-            WHERE manufacturer_name ILIKE %(search)s
-        """, {'search': search})
+            WHERE {ilike_any('manufacturer_name')}
+        """, alias_params)
         spend_row = cur.fetchone()
         spend_summary = {
             'total_spend': float(spend_row[0]) if spend_row[0] else 0,
@@ -643,21 +989,53 @@ def get_company_profile(company_name):
             'avg_per_hcp': float(spend_row[2]) if spend_row[2] else 0
         }
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT drug_name, active_ingredient, patent_expiration_date,
                    COUNT(*) as patent_count
             FROM patent_expirations
-            WHERE applicant ILIKE %(search)s
+            WHERE ({ilike_any('applicant')})
             AND patent_expiration_date >= CURRENT_DATE
             AND drug_name IS NOT NULL AND drug_name != ''
             GROUP BY drug_name, active_ingredient, patent_expiration_date
             ORDER BY patent_expiration_date ASC
             LIMIT 30
-        """, {'search': search})
+        """, alias_params)
         patent_cols = [d[0] for d in cur.description]
         patents = [dict(zip(patent_cols, r)) for r in cur.fetchall()]
 
-        all_items = trials + kols + pdufa + patents + matched_kols
+        cur.execute(f"""
+            SELECT brand_name, generic_name, submission_type, approval_date,
+                   therapeutic_area, is_new_indication, submission_description
+            FROM fda_approvals
+            WHERE {ilike_any('sponsor_name')}
+            ORDER BY approval_date DESC
+            LIMIT 50
+        """, alias_params)
+        fda_cols = [d[0] for d in cur.description]
+        fda_items = [dict(zip(fda_cols, r)) for r in cur.fetchall()]
+
+        cur.execute(f"""
+            SELECT brand_name, generic_name, manufacturer,
+                   total_spending, total_claims, total_beneficiaries,
+                   avg_spending_per_claim, year
+            FROM drug_spending
+            WHERE ({ilike_any('manufacturer')}) AND total_spending > 0
+            ORDER BY total_spending DESC
+            LIMIT 30
+        """, alias_params)
+        spending_cols = [d[0] for d in cur.description]
+        spending_items = [dict(zip(spending_cols, r)) for r in cur.fetchall()]
+
+        cur.execute(f"""
+            SELECT brand, agency, sales_member
+            FROM brand_editor_agency
+            WHERE ({ilike_any('pharma_company')}) AND is_active = true
+            ORDER BY brand
+        """, alias_params)
+        client_cols = [d[0] for d in cur.description]
+        client_brands = [dict(zip(client_cols, r)) for r in cur.fetchall()]
+
+        all_items = trials + kols + pdufa + patents + matched_kols + fda_items + spending_items
         for item in all_items:
             for k, v in item.items():
                 if hasattr(v, 'isoformat'):
@@ -666,6 +1044,23 @@ def get_company_profile(company_name):
                     item[k] = float(v)
 
         upcoming = [t for t in trials if t.get('primary_completion_date') and t['primary_completion_date'] >= str(__import__('datetime').date.today())]
+
+        total_distinct_kols = len(set(k['npi'] for k in kols if k.get('npi')))
+        matched_distinct_kols = len(set(k['npi'] for k in matched_kols if k.get('npi')))
+
+        seen_npi = set()
+        deduped_kols = []
+        for k in kols:
+            if k.get('npi') and k['npi'] not in seen_npi:
+                seen_npi.add(k['npi'])
+                deduped_kols.append(k)
+
+        seen_npi_matched = set()
+        deduped_matched = []
+        for k in matched_kols:
+            if k.get('npi') and k['npi'] not in seen_npi_matched:
+                seen_npi_matched.add(k['npi'])
+                deduped_matched.append(k)
 
         conn.close()
 
@@ -684,15 +1079,30 @@ def get_company_profile(company_name):
                 'items': pdufa
             },
             'kols': {
-                'total': len(kols),
-                'in_audience': len(matched_kols),
-                'items': kols,
-                'matched': matched_kols,
+                'total': total_distinct_kols,
+                'in_audience': matched_distinct_kols,
+                'items': deduped_kols,
+                'matched': deduped_matched,
                 'spend': spend_summary
             },
             'patents': {
                 'total': len(patents),
                 'items': patents
+            },
+            'fda': {
+                'total': len(fda_items),
+                'new_indications': len([f for f in fda_items if f.get('is_new_indication')]),
+                'items': fda_items
+            },
+            'spending': {
+                'total': len(spending_items),
+                'items': spending_items
+            },
+            'client': {
+                'is_client': len(client_brands) > 0,
+                'brands': [c['brand'] for c in client_brands],
+                'agencies': list(set(c['agency'] for c in client_brands if c.get('agency'))),
+                'sales': list(set(c['sales_member'] for c in client_brands if c.get('sales_member'))),
             }
         })
     except Exception as e:
@@ -742,8 +1152,29 @@ def get_mi_summary():
         cur.execute("SELECT COUNT(*) FROM market_benchmarks")
         stats['benchmarks'] = cur.fetchone()[0]
 
+        last_updated = {}
+        queries = {
+            'clinical_trials': "SELECT MAX(updated_at) FROM clinical_trials",
+            'pdufa_dates': "SELECT MAX(updated_at) FROM pdufa_dates",
+            'open_payments': "SELECT MAX(created_at) FROM open_payments",
+            'pubmed_trends': "SELECT MAX(created_at) FROM pubmed_trends",
+            'patent_expirations': "SELECT MAX(created_at) FROM patent_expirations",
+            'market_benchmarks': "SELECT MAX(updated_at) FROM market_benchmarks",
+            'reddit': "SELECT MAX(retrieved_at) FROM reddit_hcp_posts",
+            'fda_approvals': "SELECT MAX(created_at) FROM fda_approvals",
+            'drug_spending': "SELECT MAX(created_at) FROM drug_spending",
+            'client_history': "SELECT MAX(updated_at) FROM brand_editor_agency",
+        }
+        for key, query in queries.items():
+            try:
+                cur.execute(query)
+                val = cur.fetchone()[0]
+                last_updated[key] = val.isoformat() if val and hasattr(val, 'isoformat') else None
+            except:
+                last_updated[key] = None
+
         conn.close()
 
-        return jsonify({'status': 'success', 'stats': stats})
+        return jsonify({'status': 'success', 'stats': stats, 'last_updated': last_updated})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

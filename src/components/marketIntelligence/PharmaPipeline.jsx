@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import LastUpdatedTag from './LastUpdatedTag';
 
 const AREA_COLORS = {
   dermatology: { primary: '#00857a', bg: 'rgba(0, 133, 122, 0.15)' },
@@ -7,11 +8,11 @@ const AREA_COLORS = {
   neuroscience: { primary: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' },
 };
 
-const PharmaPipeline = ({ searchTerm }) => {
+const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('sponsors');
-  const [displayCount, setDisplayCount] = useState(25);
+  const [displayCount, setDisplayCount] = useState(100);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -26,7 +27,7 @@ const PharmaPipeline = ({ searchTerm }) => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { setDisplayCount(25); }, [subTab, searchTerm]);
+  useEffect(() => { setDisplayCount(100); }, [subTab, searchTerm]);
 
   const getAreaStyle = (area) => {
     const c = AREA_COLORS[area];
@@ -50,9 +51,8 @@ const PharmaPipeline = ({ searchTerm }) => {
     return t.sponsor_name?.toLowerCase().includes(term) || t.title?.toLowerCase().includes(term) || t.conditions?.toLowerCase().includes(term);
   }) || [];
 
-  const currentData = subTab === 'sponsors' ? filteredSponsors : filteredTrials;
-  const visibleData = currentData.slice(0, displayCount);
-  const hasMore = displayCount < currentData.length;
+  const trialsVisible = filteredTrials.slice(0, displayCount);
+  const trialsHasMore = displayCount < filteredTrials.length;
 
   if (loading) {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Loading clinical trials...</p></div>;
@@ -61,7 +61,8 @@ const PharmaPipeline = ({ searchTerm }) => {
   return (
     <div className="mi-tab-content">
       <div className="mi-section-header">
-        <h3>Pharma Pipeline</h3>
+        <h3>Clinical Trials</h3>
+        <LastUpdatedTag date={lastUpdated} />
       </div>
 
       <div className="mi-subtabs">
@@ -84,9 +85,9 @@ const PharmaPipeline = ({ searchTerm }) => {
               </tr>
             </thead>
             <tbody>
-              {visibleData.map((s, i) => (
+              {filteredSponsors.map((s, i) => (
                 <tr key={i}>
-                  <td className="mi-bold">{s.sponsor_name}</td>
+                  <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(s.sponsor_name)}>{s.sponsor_name}</td>
                   <td>{s.trial_count}</td>
                   <td>{s.upcoming_count > 0 ? <span className="mi-highlight">{s.upcoming_count}</span> : '0'}</td>
                 </tr>
@@ -97,36 +98,37 @@ const PharmaPipeline = ({ searchTerm }) => {
       )}
 
       {subTab === 'completing' && (
-        <div className="table-section">
-          <table>
-            <thead>
-              <tr>
-                <th>Completion</th>
-                <th>Sponsor</th>
-                <th>Title</th>
-                <th>Area</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleData.map((t, i) => (
-                <tr key={i}>
-                  <td style={{whiteSpace: 'nowrap'}}>{t.primary_completion_date}</td>
-                  <td className="mi-bold">{t.sponsor_name}</td>
-                  <td className="mi-truncate">{t.title}</td>
-                  <td><span className="mi-area-tag" style={getAreaStyle(t.therapeutic_area)}>{t.therapeutic_area}</span></td>
+        <>
+          <div className="table-section">
+            <table>
+              <thead>
+                <tr>
+                  <th style={{width: 110}}>Completion</th>
+                  <th style={{width: 200}}>Sponsor</th>
+                  <th>Title</th>
+                  <th style={{width: 110}}>Area</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {hasMore && (
-        <div className="load-more-container">
-          <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 25)}>
-            Load More ({visibleData.length} of {currentData.length})
-          </button>
-        </div>
+              </thead>
+              <tbody>
+                {trialsVisible.map((t, i) => (
+                  <tr key={i}>
+                    <td style={{whiteSpace: 'nowrap'}}>{t.primary_completion_date}</td>
+                    <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(t.sponsor_name)}>{t.sponsor_name}</td>
+                    <td style={{whiteSpace: 'normal', lineHeight: 1.4}}>{t.title}</td>
+                    <td><span className="mi-area-tag" style={getAreaStyle(t.therapeutic_area)}>{t.therapeutic_area}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {trialsHasMore && (
+            <div className="load-more-container">
+              <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 100)}>
+                Load More ({trialsVisible.length} of {filteredTrials.length})
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

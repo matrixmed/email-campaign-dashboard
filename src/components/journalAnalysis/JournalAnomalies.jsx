@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import _ from 'lodash';
+import '../../styles/AnomalyDetection.css';
+import '../../styles/SectionHeaders.css';
 import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const WALSWORTH_BLOB_URL = "https://emaildash.blob.core.windows.net/json-data/walsworth_metrics.json?sp=r&st=2026-01-15T18:57:16Z&se=2027-09-24T02:12:16Z&spr=https&sv=2024-11-04&sr=b&sig=w1q9PY%2FMzuTUvwwOV%2Bcub%2FV7Cygeff3ESRaC2l1KvPM%3D";
 
-const JournalAnomalies = ({ searchTerm = '', analyzeBy = 'time' }) => {
+const JournalAnomalies = ({ searchTerm = '', analyzeBy = 'time', onAnalyzeByChange }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [anomalies, setAnomalies] = useState([]);
   const [showOverperforming, setShowOverperforming] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     fetchAndAnalyze();
@@ -129,114 +130,124 @@ const JournalAnomalies = ({ searchTerm = '', analyzeBy = 'time' }) => {
 
   const filteredAnomalies = anomalies.filter(matchesSearch);
 
-  const publicationStats = _.groupBy(filteredAnomalies, 'publication');
-  const topUnderperformingPubs = Object.entries(publicationStats)
-    .map(([pub, issues]) => ({ publication: pub, count: issues.length }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
   return (
-    <div className="ja-section-container">
-      <div className="ja-anomaly-header">
-        <div className="ja-anomaly-title-row">
-          <h2>{showOverperforming ? 'Overperforming Issues' : 'Underperforming Issues'}</h2>
-          <div
-            className="ja-info-icon-wrapper"
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
+    <div className="anomaly-detection-container">
+      <div className="section-header-bar">
+        <h3 className="anomaly-section-title">
+          <span
+            className="anomaly-prefix-toggle"
+            onClick={() => setShowOverperforming(!showOverperforming)}
           >
-          </div>
-        </div>
-
-        <div className="ja-anomaly-controls">
-          <div className="ja-toggle-group">
-            <button
-              className={`ja-toggle-btn ${!showOverperforming ? 'active' : ''}`}
-              onClick={() => setShowOverperforming(false)}
-            >
-              Underperforming
-            </button>
-            <button
-              className={`ja-toggle-btn ${showOverperforming ? 'active' : ''}`}
-              onClick={() => setShowOverperforming(true)}
-            >
-              Overperforming
-            </button>
+            <span key={showOverperforming ? 'over' : 'under'} className="anomaly-prefix-text">
+              {showOverperforming ? 'Over' : 'Under'}
+            </span>
+            <svg className="anomaly-prefix-icon" width="14" height="14" viewBox="0 0 14 14">
+              <path d="M7 1.5L10 4.5H4L7 1.5Z" fill="currentColor"/>
+              <path d="M7 12.5L4 9.5H10L7 12.5Z" fill="currentColor"/>
+            </svg>
+          </span>
+          performing Issues
+        </h3>
+        <div className="section-header-stats">
+          <div className="anomaly-controls-inline">
+            <span className="control-label">Analyze by</span>
+            <div className="anomaly-mode-toggle">
+              <button
+                className={`mode-toggle-btn ${analyzeBy === 'time' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange?.('time')}
+              >
+                Time
+              </button>
+              <button
+                className={`mode-toggle-btn ${analyzeBy === 'visits' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange?.('visits')}
+              >
+                Visits
+              </button>
+              <button
+                className={`mode-toggle-btn ${analyzeBy === 'views' ? 'active' : ''}`}
+                onClick={() => onAnalyzeByChange?.('views')}
+              >
+                Page Views
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="ja-loading">
-          <div className="spinner">
-            <div></div><div></div><div></div><div></div><div></div><div></div>
-          </div>
-          <p>Analyzing journal data...</p>
-        </div>
-      ) : filteredAnomalies.length > 0 ? (
-        <div className="ja-anomaly-grid">
-          {filteredAnomalies.map((anomaly, idx) => (
-            <div
-              key={idx}
-              className={`ja-anomaly-card ${showOverperforming ? 'overperforming' : ''}`}
-            >
-              <div className="ja-anomaly-card-header">
-                <span className={`ja-anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
-                  {getSeverityLabel(anomaly.zScore)}
-                </span>
-                <span className="ja-anomaly-publication">{anomaly.publication}</span>
-              </div>
-
-              <h3 className="ja-anomaly-issue-name">{anomaly.issue_name}</h3>
-
-              <div className="ja-anomaly-metrics">
-                <div className="ja-anomaly-metric">
-                  <span className="ja-anomaly-metric-label">{getMetricLabel()}</span>
-                  <span className={`ja-anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
-                    {formatMetricValue(anomaly.metricValue)}
-                  </span>
-                </div>
-                <div className="ja-anomaly-metric">
-                  <span className="ja-anomaly-metric-label">Publication Average</span>
-                  <span className="ja-anomaly-metric-value">
-                    {formatMetricValue(anomaly.mean)}
-                  </span>
-                </div>
-                <div className="ja-anomaly-metric highlight">
-                  <span className="ja-anomaly-metric-label">Deviation</span>
-                  <span className={`ja-anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
-                    {showOverperforming ? '+' : ''}{anomaly.deviationPercent.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="ja-anomaly-stats">
-                <div className="ja-anomaly-stat">
-                  <span className="ja-anomaly-stat-label">Total Visits</span>
-                  <span className="ja-anomaly-stat-value">
-                    {formatNumber(anomaly.current?.total_issue_visits || 0)}
-                  </span>
-                </div>
-                <div className="ja-anomaly-stat">
-                  <span className="ja-anomaly-stat-label">Z-Score</span>
-                  <span className="ja-anomaly-stat-value">
-                    {showOverperforming ? '+' : ''}{anomaly.zScore.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+      <div className="anomaly-content-section">
+        {isLoading ? (
+          <div className="loading-container">
+            <div className="spinner">
+              <div></div><div></div><div></div><div></div><div></div><div></div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="ja-no-data">
-          <p>No significant {showOverperforming ? 'overperformers' : 'anomalies'} detected{searchTerm ? ' matching search' : ''}.</p>
-          <p className="ja-no-data-subtitle">
-            {showOverperforming
-              ? 'No issues are significantly exceeding expected performance.'
-              : 'All issues are performing within expected ranges for their publication.'}
-          </p>
-        </div>
-      )}
+            <p>Analyzing journal data...</p>
+          </div>
+        ) : filteredAnomalies.length > 0 ? (
+          <div className="ja-anomaly-grid">
+            {filteredAnomalies.map((anomaly, idx) => (
+              <div
+                key={idx}
+                className={`ja-anomaly-card ${showOverperforming ? 'overperforming' : ''}`}
+              >
+                <div className="ja-anomaly-card-header">
+                  <span className={`ja-anomaly-severity ${showOverperforming ? 'positive' : ''}`}>
+                    {getSeverityLabel(anomaly.zScore)}
+                  </span>
+                  <span className="ja-anomaly-publication">{anomaly.publication}</span>
+                </div>
+
+                <h3 className="ja-anomaly-issue-name">{anomaly.issue_name}</h3>
+
+                <div className="ja-anomaly-metrics">
+                  <div className="ja-anomaly-metric">
+                    <span className="ja-anomaly-metric-label">{getMetricLabel()}</span>
+                    <span className={`ja-anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
+                      {formatMetricValue(anomaly.metricValue)}
+                    </span>
+                  </div>
+                  <div className="ja-anomaly-metric">
+                    <span className="ja-anomaly-metric-label">Publication Average</span>
+                    <span className="ja-anomaly-metric-value">
+                      {formatMetricValue(anomaly.mean)}
+                    </span>
+                  </div>
+                  <div className="ja-anomaly-metric highlight">
+                    <span className="ja-anomaly-metric-label">Deviation</span>
+                    <span className={`ja-anomaly-metric-value ${showOverperforming ? 'positive' : 'negative'}`}>
+                      {showOverperforming ? '+' : ''}{anomaly.deviationPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="ja-anomaly-stats">
+                  <div className="ja-anomaly-stat">
+                    <span className="ja-anomaly-stat-label">Total Visits</span>
+                    <span className="ja-anomaly-stat-value">
+                      {formatNumber(anomaly.current?.total_issue_visits || 0)}
+                    </span>
+                  </div>
+                  <div className="ja-anomaly-stat">
+                    <span className="ja-anomaly-stat-label">Z-Score</span>
+                    <span className="ja-anomaly-stat-value">
+                      {showOverperforming ? '+' : ''}{anomaly.zScore.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="ja-no-data">
+            <p>No significant {showOverperforming ? 'overperformers' : 'anomalies'} detected{searchTerm ? ' matching search' : ''}.</p>
+            <p className="ja-no-data-subtitle">
+              {showOverperforming
+                ? 'No issues are significantly exceeding expected performance.'
+                : 'All issues are performing within expected ranges for their publication.'}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

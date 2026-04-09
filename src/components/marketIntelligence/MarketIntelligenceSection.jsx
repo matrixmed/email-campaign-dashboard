@@ -63,7 +63,7 @@ const MarketIntelligenceSection = () => {
     { key: 'spending', label: 'Drug Spending' },
     { key: 'research', label: 'Research Trends' },
     { key: 'patents', label: 'Patent Watch' },
-    { key: 'benchmarks', label: 'Benchmarks' },
+    // { key: 'benchmarks', label: 'Benchmarks' },
   ];
 
   const handleTabChange = (key) => {

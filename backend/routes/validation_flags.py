@@ -37,6 +37,7 @@ def get_active_flags():
             WHERE is_active = TRUE
                 AND is_resolved = FALSE
                 AND expires_at > NOW()
+                AND (file_type IS NULL OR file_type != 'database')
             ORDER BY
                 CASE severity
                     WHEN 'HIGH' THEN 1

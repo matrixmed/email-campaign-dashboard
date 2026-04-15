@@ -122,20 +122,23 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
     const getCampaignFlags = (campaignName, currentMetrics) => {
         let flags = [];
 
-        const namesToCheck = [campaignName];
-        if (currentMetrics?.Deployments) {
-            namesToCheck.push(...currentMetrics.Deployments);
-        }
+        const namesToCheck = [...new Set([campaignName, ...(currentMetrics?.Deployments || [])])];
 
+        const seenIds = new Set();
         for (const nameToCheck of namesToCheck) {
             if (flagsByCampaign[nameToCheck]) {
-                flags = [...flags, ...flagsByCampaign[nameToCheck]];
+                for (const f of flagsByCampaign[nameToCheck]) {
+                    if (!seenIds.has(f.id)) {
+                        seenIds.add(f.id);
+                        flags.push(f);
+                    }
+                }
             }
             for (const flagName of Object.keys(flagsByCampaign)) {
                 if (nameToCheck.includes(flagName) || flagName.includes(nameToCheck)) {
-                    const matchedFlags = flagsByCampaign[flagName];
-                    for (const f of matchedFlags) {
-                        if (!flags.find(existing => existing.id === f.id)) {
+                    for (const f of flagsByCampaign[flagName]) {
+                        if (!seenIds.has(f.id)) {
+                            seenIds.add(f.id);
                             flags.push(f);
                         }
                     }

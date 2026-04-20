@@ -180,8 +180,9 @@ const CampaignPerformancePage = () => {
       try {
         const response = await fetch(`${blobUrl}&_t=${Date.now()}`);
         const jsonData = await response.json();
-        setMetricsData(jsonData);
-        setRawFilteredData(jsonData);
+        const filteredJsonData = jsonData.filter(item => !/\btest\b/.test(item.Campaign || ''));
+        setMetricsData(filteredJsonData);
+        setRawFilteredData(filteredJsonData);
       } catch (error) {
       }
     }

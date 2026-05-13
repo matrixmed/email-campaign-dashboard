@@ -9,11 +9,13 @@ import SpecialtyBreakdown from './SpecialtyBreakdown';
 import ClickAnalytics from './ClickAnalytics';
 import SubjectLineAnalysis from './SubjectLineAnalysis';
 import GeographicRates from './GeographicRates';
+import GeographicInsights from './GeographicInsights';
 import { useSearch } from '../../context/SearchContext';
 
 const AnalyticsHub = () => {
   const { searchTerms, setSearchTerm: setGlobalSearchTerm } = useSearch();
   const [activeView, setActiveView] = useState('monthly');
+  const [geoView, setGeoView] = useState('rates');
   const [searchTerm, setSearchTerm] = useState(searchTerms.campaignAnalytics || '');
   const [selectedMetric, setSelectedMetric] = useState('Unique_Open_Rate');
   const [analyzeBy, setAnalyzeBy] = useState('market');
@@ -69,11 +71,12 @@ const AnalyticsHub = () => {
     clicks: 0,
     'subject-lines': 0,
     'geographic-rates': 0,
+    'geographic-insights': 0,
     deliverability: 0,
     journeys: 0
   });
 
-  const cacheableTabs = ['timing', 'benchmarks', 'geographic', 'specialty', 'clicks', 'subject-lines', 'geographic-rates', 'deliverability', 'journeys'];
+  const cacheableTabs = ['timing', 'benchmarks', 'geographic', 'specialty', 'clicks', 'subject-lines', 'geographic-rates', 'geographic-insights', 'deliverability', 'journeys'];
 
   const handleTabChange = useCallback((tab) => {
     setActiveView(tab);
@@ -117,7 +120,7 @@ const AnalyticsHub = () => {
         <button className={`tab-button ${activeView === 'subject-lines' ? 'active' : ''}`} onClick={() => handleTabChange('subject-lines')}>Subject Lines</button>
         <button className={`tab-button ${activeView === 'clicks' ? 'active' : ''}`} onClick={() => handleTabChange('clicks')}>Click Analytics</button>
         <button className={`tab-button ${activeView === 'specialty' ? 'active' : ''}`} onClick={() => handleTabChange('specialty')}>Specialty Breakdown</button>
-        <button className={`tab-button ${activeView === 'geographic-rates' ? 'active' : ''}`} onClick={() => handleTabChange('geographic-rates')}>Geographic Rates</button>
+        <button className={`tab-button ${activeView === 'geographic' ? 'active' : ''}`} onClick={() => handleTabChange('geographic')}>Geographic</button>
         <button className={`tab-button ${activeView === 'timing' ? 'active' : ''}`} onClick={() => handleTabChange('timing')}>Timing Intelligence</button>
       </div>
 
@@ -180,9 +183,30 @@ const AnalyticsHub = () => {
             <SubjectLineAnalysis key={`subject-lines-${clearKeys['subject-lines']}`} searchTerm={searchTerm} />
           </div>
         )}
-        {visitedTabs['geographic-rates'] && (
-          <div style={{ display: activeView === 'geographic-rates' ? 'block' : 'none' }}>
-            <GeographicRates key={`geographic-rates-${clearKeys['geographic-rates']}`} searchTerm={searchTerm} />
+        {visitedTabs.geographic && (
+          <div style={{ display: activeView === 'geographic' ? 'block' : 'none' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <button
+                className={`tab-button ${geoView === 'rates' ? 'active' : ''}`}
+                onClick={() => setGeoView('rates')}
+                style={{ fontSize: 13 }}
+              >
+                Campaign Rates
+              </button>
+              <button
+                className={`tab-button ${geoView === 'insights' ? 'active' : ''}`}
+                onClick={() => setGeoView('insights')}
+                style={{ fontSize: 13 }}
+              >
+                Audience & Market
+              </button>
+            </div>
+            <div style={{ display: geoView === 'rates' ? 'block' : 'none' }}>
+              <GeographicRates key={`geographic-rates-${clearKeys['geographic-rates']}`} searchTerm={searchTerm} />
+            </div>
+            <div style={{ display: geoView === 'insights' ? 'block' : 'none' }}>
+              <GeographicInsights key={`geographic-insights-${clearKeys['geographic-insights']}`} onClearCache={handleClearCache} />
+            </div>
           </div>
         )}
       </div>

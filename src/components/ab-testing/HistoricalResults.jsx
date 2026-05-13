@@ -1,11 +1,105 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import _ from 'lodash';
 import { API_BASE_URL } from '../../config/api';
+import { runAnalysis } from '../../utils/statistics';
 import '../../styles/AudienceQueryBuilder.css';
 
-const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
+const cleanCampaignName = (name) =>
+  name.split(/\s*[-–—]\s*deployment\s*#?\d+|\s+deployment\s*#?\d+/i)[0].trim();
+
+const stripAbGroup = (name) =>
+  name.replace(/\s*[-–—]\s*group\s+[a-z]\b/i, '').trim();
+
+const extractGroupLabel = (name) => {
+  const match = name.match(/[-–—]\s*group\s+([a-z])\b/i);
+  return match ? match[1].toUpperCase() : null;
+};
+
+const buildMetricsMap = (campaigns) => {
+  if (!campaigns || campaigns.length === 0) return {};
+
+  const abCampaigns = campaigns.filter(item =>
+    item?.Campaign && /[-–—]\s*group\s+[a-z]\b/i.test(item.Campaign)
+  );
+
+  const byCleanName = _.groupBy(abCampaigns, item => cleanCampaignName(item.Campaign));
+  const merged = Object.entries(byCleanName).map(([cleanName, deployments]) => {
+    if (deployments.length === 1) {
+      return { ...deployments[0], Campaign: cleanName };
+    }
+    const deployment1 = deployments.find(d => {
+      const name = d.Campaign.toLowerCase();
+      return name.includes('deployment 1') || name.includes('deployment #1') || name.includes('deployment1');
+    });
+    const base = deployment1 || deployments[0];
+    return {
+      Campaign: cleanName,
+      Send_Date: base.Send_Date,
+      Sent: base.Sent,
+      Delivered: base.Delivered,
+      Unique_Opens: _.sumBy(deployments, 'Unique_Opens'),
+      Total_Opens: _.sumBy(deployments, 'Total_Opens'),
+      Unique_Clicks: _.sumBy(deployments, 'Unique_Clicks'),
+      Total_Clicks: _.sumBy(deployments, 'Total_Clicks'),
+    };
+  });
+
+  const map = {};
+  merged.forEach(item => {
+    const label = extractGroupLabel(item.Campaign);
+    if (!label) return;
+    const base = stripAbGroup(item.Campaign);
+    if (!map[base]) map[base] = {};
+    map[base][label] = item;
+  });
+  return map;
+};
+
+const computeResults = (groups, metricsByLabel) => {
+  const sorted = [...groups].sort((a, b) =>
+    (a.group_label || '').localeCompare(b.group_label || '')
+  );
+  if (sorted.length < 2) return [];
+
+  const [ga, gb] = sorted;
+  const ma = metricsByLabel?.[ga.group_label];
+  const mb = metricsByLabel?.[gb.group_label];
+
+  const successA = ma?.Unique_Opens || 0;
+  const deliveredA = ma?.Delivered || 0;
+  const successB = mb?.Unique_Opens || 0;
+  const deliveredB = mb?.Delivered || 0;
+
+  if (deliveredA === 0 || deliveredB === 0) return [];
+
+  const analysis = runAnalysis(successA, deliveredA, successB, deliveredB);
+  const winnerLabel = analysis.winner === 'A'
+    ? ga.group_label
+    : analysis.winner === 'B'
+      ? gb.group_label
+      : 'none';
+
+  return [{
+    metric_name: 'Unique_Open_Rate',
+    group_a_value: analysis.rateA,
+    group_b_value: analysis.rateB,
+    winner: winnerLabel,
+    is_significant: analysis.isSignificant,
+    p_value: analysis.pValue,
+    relative_lift: analysis.relativeLift,
+  }];
+};
+
+const HistoricalResults = ({
+  filterCategory = '',
+  filterMarket = '',
+  campaignsData = [],
+  onTestReactivated,
+}) => {
   const [historical, setHistorical] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [reactivatingId, setReactivatingId] = useState(null);
 
   useEffect(() => {
     fetchHistorical();
@@ -25,13 +119,61 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
     }
   };
 
+  const metricsMap = useMemo(() => buildMetricsMap(campaignsData), [campaignsData]);
+
+  const enriched = useMemo(() => {
+    return historical.map(test => {
+      const hasResults = Array.isArray(test.results) && test.results.length > 0;
+      if (hasResults) return test;
+
+      const metricsByLabel = metricsMap[test.base_campaign_name] || {};
+      const computed = computeResults(test.groups || [], metricsByLabel);
+
+      const groupsWithMetrics = (test.groups || []).map(g => {
+        const m = metricsByLabel[g.group_label];
+        if (!m) return g;
+        return {
+          ...g,
+          metrics: {
+            Delivered: m.Delivered || 0,
+            Unique_Opens: m.Unique_Opens || 0,
+          }
+        };
+      });
+
+      return { ...test, results: computed, groups: groupsWithMetrics };
+    });
+  }, [historical, metricsMap]);
+
   const filtered = useMemo(() => {
-    return historical.filter(h => {
+    return enriched.filter(h => {
       if (filterCategory && h.category !== filterCategory) return false;
       if (filterMarket && h.market !== filterMarket) return false;
       return true;
     });
-  }, [historical, filterCategory, filterMarket]);
+  }, [enriched, filterCategory, filterMarket]);
+
+  const handleReactivate = async (test, e) => {
+    e.stopPropagation();
+    if (!test.id || reactivatingId) return;
+    setReactivatingId(test.id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/ab-testing/tests/${test.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setHistorical(prev => prev.filter(t => t.id !== test.id));
+        if (onTestReactivated && data.test) onTestReactivated(data.test);
+      }
+    } catch (err) {
+      console.error('Failed to reactivate test:', err);
+    } finally {
+      setReactivatingId(null);
+    }
+  };
 
   const categorySummary = useMemo(() => {
     if (filtered.length === 0) return null;
@@ -45,7 +187,10 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
 
     filtered.forEach(test => {
       const primary = test.results?.find(r => r.metric_name === 'Unique_Open_Rate') || test.results?.[0];
-      if (!primary) return;
+      if (!primary) {
+        noWinner++;
+        return;
+      }
 
       if (primary.is_significant && primary.winner !== 'none') {
         significantTests++;
@@ -70,10 +215,14 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
       }
 
       if (primary.is_significant && primary.winner !== 'none') {
-        const winIdx = primary.winner === 'A' ? 0 : 1;
-        const loseIdx = primary.winner === 'A' ? 1 : 0;
-        const winGroup = test.groups?.[winIdx];
-        const loseGroup = test.groups?.[loseIdx];
+        const sortedGroups = [...(test.groups || [])].sort((a, b) =>
+          (a.group_label || '').localeCompare(b.group_label || '')
+        );
+        const winIdx = sortedGroups.findIndex(g => g.group_label === primary.winner);
+        if (winIdx === -1) return;
+        const loseIdx = winIdx === 0 ? 1 : 0;
+        const winGroup = sortedGroups[winIdx];
+        const loseGroup = sortedGroups[loseIdx];
         const winSub = winGroup?.subcategory || 'Untagged';
         const loseSub = loseGroup?.subcategory || 'Untagged';
 
@@ -136,8 +285,10 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
   const getWinnerGroupInfo = (test) => {
     const primary = getPrimaryResult(test);
     if (!primary || !primary.is_significant || primary.winner === 'none') return null;
-    const winIdx = primary.winner === 'A' ? 0 : 1;
-    return test.groups?.[winIdx];
+    const sortedGroups = [...(test.groups || [])].sort((a, b) =>
+      (a.group_label || '').localeCompare(b.group_label || '')
+    );
+    return sortedGroups.find(g => g.group_label === primary.winner) || null;
   };
 
   const toggleExpand = (id) => {
@@ -228,7 +379,7 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
                     <div className="ab-summary-breakdown-detail">
                       Won {a.wins} test{a.wins !== 1 ? 's' : ''} &middot; avg lift +{a.avgLift}%
                       <br />
-                      Beat: {a.beaten}
+                      Defeated: {a.beaten}
                       {a.topMarket !== '-' && (<><br />Top market: {a.topMarket}</>)}
                     </div>
                   </div>
@@ -244,6 +395,7 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
           const primary = getPrimaryResult(test);
           const winnerGroup = getWinnerGroupInfo(test);
           const isExpanded = expandedId === test.id;
+          const isReactivating = reactivatingId === test.id;
 
           return (
             <div key={test.id} className="ab-historical-item">
@@ -273,6 +425,15 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
                   <span className="ab-historical-date">
                     {test.updated_at ? new Date(test.updated_at).toLocaleDateString() : '-'}
                   </span>
+                  <button
+                    type="button"
+                    className="ab-reactivate-btn"
+                    onClick={(e) => handleReactivate(test, e)}
+                    disabled={isReactivating}
+                    title="Move this test back to Active Tests"
+                  >
+                    {isReactivating ? 'Reactivating...' : 'Reactivate'}
+                  </button>
                 </div>
               </div>
               {isExpanded && <ExpandedTestDetail test={test} />}
@@ -286,6 +447,9 @@ const HistoricalResults = ({ filterCategory = '', filterMarket = '' }) => {
 
 const ExpandedTestDetail = ({ test }) => {
   const primary = test.results?.find(r => r.metric_name === 'Unique_Open_Rate') || test.results?.[0];
+  const sortedGroups = [...(test.groups || [])].sort((a, b) =>
+    (a.group_label || '').localeCompare(b.group_label || '')
+  );
 
   return (
     <div className="ab-expanded-detail">
@@ -303,7 +467,7 @@ const ExpandedTestDetail = ({ test }) => {
       <div className="ab-expanded-groups">
         <h4>Group Breakdown</h4>
         <div className="ab-expanded-groups-grid">
-          {(test.groups || []).map((group, idx) => {
+          {sortedGroups.map((group, idx) => {
             const isWinner = primary?.winner === group.group_label;
             const groupResult = idx === 0 ? primary?.group_a_value : primary?.group_b_value;
 
@@ -351,12 +515,12 @@ const ExpandedTestDetail = ({ test }) => {
                   {r.metric_name.replace(/_/g, ' ')}
                 </div>
                 <div className="ab-expanded-result-values">
-                  <span className={r.winner === 'A' ? 'ab-expanded-result-winner' : ''}>
-                    A: {r.group_a_value?.toFixed(2)}%
+                  <span className={r.winner !== 'none' && r.winner === sortedGroups[0]?.group_label ? 'ab-expanded-result-winner' : ''}>
+                    {sortedGroups[0]?.group_label || 'A'}: {r.group_a_value?.toFixed(2)}%
                   </span>
                   <span className="ab-expanded-result-vs">vs</span>
-                  <span className={r.winner === 'B' ? 'ab-expanded-result-winner' : ''}>
-                    B: {r.group_b_value?.toFixed(2)}%
+                  <span className={r.winner !== 'none' && r.winner === sortedGroups[1]?.group_label ? 'ab-expanded-result-winner' : ''}>
+                    {sortedGroups[1]?.group_label || 'B'}: {r.group_b_value?.toFixed(2)}%
                   </span>
                 </div>
                 <div className="ab-expanded-result-detail">

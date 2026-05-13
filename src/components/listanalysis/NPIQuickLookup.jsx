@@ -3,6 +3,9 @@ import { API_BASE_URL } from '../../config/api';
 import '../../styles/NPIQuickLookup.css';
 import '../../styles/SectionHeaders.css';
 import { getSpecialtyFromTaxonomy } from './taxonomyMapping';
+import TablePagination from '../common/TablePagination';
+
+const PER_PAGE = 100;
 
 const formatZipcode = (zip) => {
   if (!zip) return '';
@@ -42,10 +45,8 @@ const NPIQuickLookup = () => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [tableState, setTableState] = useState({
-    displayCount: 10,
-    isFullyExpanded: false
-  });
+  const [hideNonActive, setHideNonActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleLookup = async () => {
     if (!npiInput.trim()) {
@@ -87,6 +88,12 @@ const NPIQuickLookup = () => {
       return;
     }
 
+    const exportResults = hideNonActive
+      ? results.results.filter(p => !p.provider_status || p.provider_status === 'Active')
+      : results.results;
+
+    if (exportResults.length === 0) return;
+
     const escapeCSV = (value) => {
       if (value === null || value === undefined) return '""';
       const str = String(value);
@@ -102,13 +109,23 @@ const NPIQuickLookup = () => {
       'City',
       'State',
       'Zipcode',
-      'Is Active',
-      'Source'
+      'Flag',
+      'Source',
+      'Status'
     ];
 
     const csvRows = [headers.map(h => escapeCSV(h)).join(',')];
 
-    results.results.forEach(profile => {
+    exportResults.forEach(profile => {
+      const statusFlag = profile.provider_status && profile.provider_status !== 'Active'
+        ? profile.provider_status : '';
+      const addrFlag = profile.address_flag_event
+        ? (profile.address_flag_event === 'undeliverable' ? 'Undeliverable' : 'Address flagged')
+        : '';
+      const flag = [statusFlag, addrFlag].filter(Boolean).join(' / ');
+      const status = profile.source === 'Market'
+        ? ''
+        : (profile.audience_active === false ? 'Inactive' : (profile.audience_active ? 'Active' : ''));
       const row = [
         profile.npi || '',
         formatName(profile.first_name),
@@ -118,8 +135,9 @@ const NPIQuickLookup = () => {
         formatName(profile.city),
         profile.state || '',
         formatZipcode(profile.zipcode),
-        profile.is_active ? 'Yes' : 'No',
-        profile.source || ''
+        flag,
+        profile.source || '',
+        status
       ];
       csvRows.push(row.map(cell => escapeCSV(cell)).join(','));
     });
@@ -143,10 +161,8 @@ const NPIQuickLookup = () => {
     setNpiInput('');
     setResults(null);
     setError(null);
-    setTableState({
-      displayCount: 10,
-      isFullyExpanded: false
-    });
+    setHideNonActive(false);
+    setCurrentPage(1);
   };
 
   return (
@@ -181,10 +197,14 @@ const NPIQuickLookup = () => {
 
       {results && (() => {
         const allResults = results.results || [];
-        const totalCount = allResults.length;
-        const displayLimit = tableState.isFullyExpanded ? totalCount : tableState.displayCount;
-        const visibleData = allResults.slice(0, displayLimit);
-        const hasMore = totalCount > visibleData.length;
+        const filteredResults = hideNonActive
+          ? allResults.filter(p => !p.provider_status || p.provider_status === 'Active')
+          : allResults;
+        const hiddenCount = allResults.length - filteredResults.length;
+        const totalCount = filteredResults.length;
+        const totalPages = Math.max(1, Math.ceil(totalCount / PER_PAGE));
+        const pageStart = (currentPage - 1) * PER_PAGE;
+        const visibleData = filteredResults.slice(pageStart, pageStart + PER_PAGE);
 
         return (
           <div className="npi-lookup-results">
@@ -195,13 +215,26 @@ const NPIQuickLookup = () => {
                   <span className="missing-count"> ({results.missing} not found)</span>
                 )}
               </p>
-              {(results.audience_count > 0 || results.market_count > 0) && (
+              {(results.owned_count > 0 || results.licensed_count > 0 || results.market_count > 0) && (
                 <p className="source-breakdown">
-                  <span className="source-audience">{results.audience_count || 0} from Audience</span>
+                  <span className="source-owned">{results.owned_count || 0} Owned</span>
                   {' | '}
-                  <span className="source-market">{results.market_count || 0} from Market</span>
+                  <span className="source-licensed">{results.licensed_count || 0} Licensed</span>
+                  {' | '}
+                  <span className="source-market">{results.market_count || 0} Market</span>
                 </p>
               )}
+              <label className="hide-non-active-toggle" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={hideNonActive}
+                  onChange={(e) => setHideNonActive(e.target.checked)}
+                />
+                Hide non-active (retired, deceased, etc.)
+                {hideNonActive && hiddenCount > 0 && (
+                  <span style={{ color: '#888' }}>— {hiddenCount} hidden</span>
+                )}
+              </label>
             </div>
 
             {results.missing_npis && results.missing_npis.length > 0 && (
@@ -214,27 +247,9 @@ const NPIQuickLookup = () => {
               <div className="results-data-section">
                 <div className="table-header-row">
                   <h4>Results ({totalCount.toLocaleString()} profiles)</h4>
-                  <div className="table-action-buttons">
-                    {totalCount > 10 && (
-                      <button
-                        className="btn-expand-table"
-                        onClick={() => setTableState(prev => ({
-                          ...prev,
-                          isFullyExpanded: !prev.isFullyExpanded,
-                          displayCount: prev.isFullyExpanded ? 10 : totalCount
-                        }))}
-                      >
-                        {tableState.isFullyExpanded ? 'Collapse' : 'Expand All'}
-                      </button>
-                    )}
-                    <button
-                      className="btn-export"
-                      onClick={handleDownloadCSV}
-                      disabled={totalCount === 0}
-                    >
-                      Export
-                    </button>
-                  </div>
+                  {totalCount > 0 && (
+                    <button className="export-button" onClick={handleDownloadCSV}>Export CSV</button>
+                  )}
                 </div>
 
                 <div className="results-table-container">
@@ -249,12 +264,22 @@ const NPIQuickLookup = () => {
                         <th>City</th>
                         <th>State</th>
                         <th>Zipcode</th>
-                        <th>Status</th>
+                        <th>Flag</th>
                         <th>Source</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleData.map((profile, index) => (
+                      {visibleData.map((profile, index) => {
+                        const statusFlag = profile.provider_status && profile.provider_status !== 'Active'
+                          ? profile.provider_status : '';
+                        const addrFlag = profile.address_flag_event
+                          ? (profile.address_flag_event === 'undeliverable' ? 'Undeliverable' : 'Address flagged')
+                          : '';
+                        const addrTooltip = profile.address_flag_reason || '';
+                        const isMarket = profile.source === 'Market';
+                        const audienceActive = profile.audience_active;
+                        return (
                         <tr key={index}>
                           <td className="npi-cell">{profile.npi}</td>
                           <td>{formatName(profile.first_name)}</td>
@@ -265,34 +290,45 @@ const NPIQuickLookup = () => {
                           <td>{profile.state}</td>
                           <td>{formatZipcode(profile.zipcode)}</td>
                           <td>
-                            <span className={`status-badge ${profile.is_active ? 'active' : 'inactive'}`}>
-                              {profile.is_active ? 'Active' : 'Inactive'}
-                            </span>
+                            {statusFlag && (
+                              <span className="status-badge inactive" style={{ marginRight: 4 }}>
+                                {statusFlag}
+                              </span>
+                            )}
+                            {addrFlag && (
+                              <span
+                                className="status-badge inactive"
+                                title={addrTooltip}
+                                style={{ background: 'rgba(239,68,68,0.15)', borderColor: '#ef4444', color: '#fca5a5' }}
+                              >
+                                {addrFlag}
+                              </span>
+                            )}
                           </td>
                           <td>
-                            <span className={`source-badge ${profile.source === 'Audience' ? 'audience' : 'market'}`}>
+                            <span className={`source-badge ${profile.source ? profile.source.toLowerCase() : 'unknown'}`}>
                               {profile.source || 'N/A'}
                             </span>
                           </td>
+                          <td>
+                            {!isMarket && audienceActive !== null && audienceActive !== undefined && (
+                              <span className={`status-badge ${audienceActive ? 'active' : 'inactive'}`}>
+                                {audienceActive ? 'Active' : 'Inactive'}
+                              </span>
+                            )}
+                          </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                {hasMore && !tableState.isFullyExpanded && (
-                  <div className="load-more-container">
-                    <button
-                      className="btn-load-more"
-                      onClick={() => setTableState(prev => ({
-                        ...prev,
-                        displayCount: prev.displayCount + 10
-                      }))}
-                    >
-                      Load More ({visibleData.length} of {totalCount})
-                    </button>
-                  </div>
-                )}
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
               </div>
             )}
           </div>

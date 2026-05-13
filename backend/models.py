@@ -33,10 +33,81 @@ class UserProfile(Base):
     print_lists_unsubscribed = Column(JSON, default=list)
     digital_lists_subscribed = Column(JSON, default=list)
     digital_lists_unsubscribed = Column(JSON, default=list)
+    target_lists = Column(JSON, default=list)
+    ac_tags = Column(JSON, default=list)
+    ac_segments = Column(JSON, default=list)
     unsubscribe_reason = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    inactive_reason = Column(Text)
+    inactive_source = Column(Text)
+    inactive_at = Column(DateTime)
 
     __table_args__ = (
         Index('idx_email_specialty', 'email', 'specialty'),
+    )
+
+class UniversalProfile(Base):
+    __tablename__ = 'universal_profiles'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(10), unique=True, nullable=False, index=True)
+    entity_type = Column(String(1))
+
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    middle_name = Column(String(100))
+    organization_name = Column(String(255))
+    credential = Column(String(50))
+
+    mailing_address_1 = Column(String(255))
+    mailing_address_2 = Column(String(255))
+    mailing_city = Column(String(100))
+    mailing_state = Column(String(50))
+    mailing_zipcode = Column(String(20))
+    mailing_country = Column(String(100))
+
+    practice_address_1 = Column(String(255))
+    practice_address_2 = Column(String(255))
+    practice_city = Column(String(100))
+    practice_state = Column(String(50))
+    practice_zipcode = Column(String(20))
+    practice_country = Column(String(100))
+
+    primary_taxonomy_code = Column(String(50))
+    primary_specialty = Column(String(255), index=True)
+
+    enumeration_date = Column(Date)
+    last_update_date = Column(Date)
+    deactivation_date = Column(Date)
+    is_active = Column(Boolean, default=True, index=True)
+    provider_status = Column(String(50), default='Active')
+    provider_status_source = Column(String(20))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced_at = Column(DateTime, index=True)
+    old_mailing_address_1 = Column(String(255))
+    old_mailing_address_2 = Column(String(255))
+    old_mailing_city = Column(String(100))
+    old_mailing_state = Column(String(50))
+    old_mailing_zipcode = Column(String(20))
+    old_practice_address_1 = Column(String(255))
+    old_practice_address_2 = Column(String(255))
+    old_practice_city = Column(String(100))
+    old_practice_state = Column(String(50))
+    old_practice_zipcode = Column(String(20))
+    address_history = Column(JSON, default=list)
+    print_lists_subscribed = Column(JSON, default=list)
+    print_lists_unsubscribed = Column(JSON, default=list)
+    digital_lists_subscribed = Column(JSON, default=list)
+    digital_lists_unsubscribed = Column(JSON, default=list)
+    target_lists = Column(JSON, default=list)
+    unsubscribe_reason = Column(Text)
+
+    __table_args__ = (
+        Index('idx_npi_active', 'npi', 'is_active'),
+        Index('idx_state_specialty', 'practice_state', 'primary_specialty'),
+        Index('idx_last_synced', 'last_synced_at'),
     )
 
 class CampaignInteraction(Base):
@@ -548,65 +619,53 @@ class BasisExchangeStats(Base):
         Index('idx_exchange_performance', 'exchange_name', 'ctr', 'ecpc'),
     )
 
-class UniversalProfile(Base):
-    __tablename__ = 'universal_profiles'
+class PrintOnlyContact(Base):
+    __tablename__ = 'print_only_contacts'
 
     id = Column(Integer, primary_key=True)
-    npi = Column(String(10), unique=True, nullable=False, index=True)
-    entity_type = Column(String(1))
-
     first_name = Column(String(100))
     last_name = Column(String(100))
-    middle_name = Column(String(100))
-    organization_name = Column(String(255))
-    credential = Column(String(50))
-
-    mailing_address_1 = Column(String(255))
-    mailing_address_2 = Column(String(255))
-    mailing_city = Column(String(100))
-    mailing_state = Column(String(50))
-    mailing_zipcode = Column(String(20))
-    mailing_country = Column(String(100))
-
-    practice_address_1 = Column(String(255))
-    practice_address_2 = Column(String(255))
-    practice_city = Column(String(100))
-    practice_state = Column(String(50))
-    practice_zipcode = Column(String(20))
-    practice_country = Column(String(100))
-
-    primary_taxonomy_code = Column(String(50))
-    primary_specialty = Column(String(255), index=True)
-
-    enumeration_date = Column(Date)
-    last_update_date = Column(Date)
-    deactivation_date = Column(Date)
-    is_active = Column(Boolean, default=True, index=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_synced_at = Column(DateTime, index=True)
-    old_mailing_address_1 = Column(String(255))
-    old_mailing_address_2 = Column(String(255))
-    old_mailing_city = Column(String(100))
-    old_mailing_state = Column(String(50))
-    old_mailing_zipcode = Column(String(20))
-    old_practice_address_1 = Column(String(255))
-    old_practice_address_2 = Column(String(255))
-    old_practice_city = Column(String(100))
-    old_practice_state = Column(String(50))
-    old_practice_zipcode = Column(String(20))
-    address_history = Column(JSON, default=list)
+    title = Column(String(255))
+    company = Column(String(255))
+    email = Column(String(255))
+    npi = Column(String(50))
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(50))
+    zipcode = Column(String(20))
+    country = Column(String(100))
+    specialty = Column(String(255))
     print_lists_subscribed = Column(JSON, default=list)
     print_lists_unsubscribed = Column(JSON, default=list)
-    digital_lists_subscribed = Column(JSON, default=list)
-    digital_lists_unsubscribed = Column(JSON, default=list)
     unsubscribe_reason = Column(Text)
+    source = Column(String(255))
+    address_history = Column(JSON, default=list)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_npi_active', 'npi', 'is_active'),
-        Index('idx_state_specialty', 'practice_state', 'primary_specialty'),
-        Index('idx_last_synced', 'last_synced_at'),
+        Index('idx_poc_name', 'first_name', 'last_name'),
+        Index('idx_poc_company', 'company'),
+    )
+
+class ACMembershipEvent(Base):
+    __tablename__ = 'ac_membership_events'
+
+    id = Column(BigInteger, primary_key=True)
+    user_profile_id = Column(Integer)
+    email = Column(Text, nullable=False)
+    dimension = Column(Text, nullable=False)
+    name = Column(Text, nullable=False)
+    event = Column(Text, nullable=False)
+    at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    source = Column(Text, nullable=False, default='ac_sync')
+    reason = Column(Text)
+
+    __table_args__ = (
+        Index('idx_ame_user', 'user_profile_id', 'at'),
+        Index('idx_ame_email', 'email', 'at'),
+        Index('idx_ame_dim_name', 'dimension', 'name', 'at'),
     )
 
 class CampaignValidationFlag(Base):
@@ -1309,6 +1368,25 @@ class GAAnonymousProfile(Base):
         Index('idx_gap_client', 'ga_client_id'),
         Index('idx_gap_matched', 'matched_email'),
         Index('idx_gap_confidence', 'match_confidence'),
+    )
+
+class LeasingDecision(Base):
+    __tablename__ = 'leasing_decisions'
+
+    id = Column(Integer, primary_key=True)
+    npi = Column(String(20), nullable=False, index=True)
+    action = Column(String(30), nullable=False)
+    license_source = Column(String(20))
+    brand_context = Column(String(255))
+    notes = Column(Text)
+    decided_at = Column(DateTime, default=datetime.utcnow, index=True)
+    decided_by = Column(String(255))
+    status = Column(String(20), default='pending', nullable=False, index=True)
+    executed_at = Column(DateTime)
+
+    __table_args__ = (
+        Index('idx_ld_npi_status', 'npi', 'status'),
+        Index('idx_ld_action_status', 'action', 'status'),
     )
 
 def init_db():

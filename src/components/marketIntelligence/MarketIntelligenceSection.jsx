@@ -2,25 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import ClientHistory from './ClientHistory';
 import FDAAlerts from './FDAAlerts';
+import ConferenceCalendar from './ConferenceCalendar';
 import PharmaPipeline from './PharmaPipeline';
 import PDUFACalendar from './PDUFACalendar';
 import KOLInsights from './KOLInsights';
 import DrugSpending from './DrugSpending';
-import ResearchTrends from './ResearchTrends';
 import PatentWatch from './PatentWatch';
+import ResearchTrends from './ResearchTrends';
 import MarketBenchmarks from './MarketBenchmarks';
 import CompanyModal from './CompanyModal';
 import '../../styles/MarketIntelligence.css';
 
 const TAB_DATA_MAP = {
+  triggers: 'fda_approvals',
   clients: 'client_history',
   fda: 'fda_approvals',
+  conferences: 'client_history',
   pipeline: 'clinical_trials',
   pdufa: 'pdufa_dates',
   kol: 'open_payments',
   spending: 'drug_spending',
-  research: null,
   patents: 'patent_expirations',
+  research: null,
   benchmarks: 'market_benchmarks',
 };
 
@@ -57,12 +60,13 @@ const MarketIntelligenceSection = () => {
   const tabs = [
     { key: 'clients', label: 'Client History' },
     { key: 'fda', label: 'FDA Alerts' },
+    { key: 'conferences', label: 'Conferences' },
     { key: 'pipeline', label: 'Clinical Trials' },
     { key: 'pdufa', label: 'PDUFA Calendar' },
     { key: 'kol', label: 'KOL Insights' },
     { key: 'spending', label: 'Drug Spending' },
-    { key: 'research', label: 'Research Trends' },
     { key: 'patents', label: 'Patent Watch' },
+    { key: 'research', label: 'Research Trends' },
     // { key: 'benchmarks', label: 'Benchmarks' },
   ];
 
@@ -121,12 +125,13 @@ const MarketIntelligenceSection = () => {
       <div className="mi-content">
         {activeTab === 'clients' && <ClientHistory searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
         {activeTab === 'fda' && <FDAAlerts searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
+        {activeTab === 'conferences' && <ConferenceCalendar searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
         {activeTab === 'pipeline' && <PharmaPipeline searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
         {activeTab === 'pdufa' && <PDUFACalendar searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
         {activeTab === 'kol' && <KOLInsights searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
         {activeTab === 'spending' && <DrugSpending searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
-        {activeTab === 'research' && <ResearchTrends lastUpdated={getLastUpdatedForTab('research')} />}
         {activeTab === 'patents' && <PatentWatch searchTerm={searchTerm} onSelectCompany={openCompanyModal} lastUpdated={currentLastUpdated} />}
+        {activeTab === 'research' && <ResearchTrends lastUpdated={getLastUpdatedForTab('research')} />}
         {activeTab === 'benchmarks' && <MarketBenchmarks lastUpdated={currentLastUpdated} />}
       </div>
 

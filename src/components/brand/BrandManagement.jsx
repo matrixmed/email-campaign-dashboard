@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '../../styles/BrandManagement.css';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const BrandManagement = () => {
   const [brands, setBrands] = useState([]);
@@ -222,12 +223,11 @@ const BrandManagement = () => {
 
   const filterBrands = (brandsList) => {
     if (!searchText) return brandsList;
-    const search = searchText.toLowerCase();
     return brandsList.filter(b =>
-      (b.brand || '').toLowerCase().includes(search) ||
-      (b.agency || '').toLowerCase().includes(search) ||
-      (b.pharma_company || '').toLowerCase().includes(search) ||
-      (b.industry || '').toLowerCase().includes(search)
+      matchesSearchTerm(b.brand, searchText) ||
+      matchesSearchTerm(b.agency, searchText) ||
+      matchesSearchTerm(b.pharma_company, searchText) ||
+      matchesSearchTerm(b.industry, searchText)
     );
   };
 

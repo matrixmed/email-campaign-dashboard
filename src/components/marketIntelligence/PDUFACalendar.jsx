@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const AREA_COLORS = {
   dermatology: { primary: '#00857a', bg: 'rgba(0, 133, 122, 0.15)' },
@@ -12,6 +17,9 @@ const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('pending');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => { setCurrentPage(1); }, [subTab, searchTerm]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,15 +37,29 @@ const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Loading PDUFA dates...</p></div>;
   }
 
-  const filterBySearch = (d) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return d.drug_name?.toLowerCase().includes(term) || d.company_name?.toLowerCase().includes(term);
-  };
+  const filterBySearch = (d) =>
+    matchesSearchTerm(d.drug_name, searchTerm) ||
+    matchesSearchTerm(d.company_name, searchTerm);
 
   const pending = data?.dates?.filter(d => d.status === 'pending' && filterBySearch(d)) || [];
   const past = data?.dates?.filter(d => d.status !== 'pending' && filterBySearch(d)) || [];
   const currentData = subTab === 'pending' ? pending : past;
+  const totalPages = Math.max(1, Math.ceil(currentData.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const visibleData = currentData.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    const headers = ['Target Date', 'Drug', 'Company', 'Type', 'Therapeutic Area', 'Status'];
+    const rows = currentData.map(d => [
+      d.target_date || '',
+      d.drug_name || '',
+      d.company_name || '',
+      d.application_type || '',
+      d.therapeutic_area || '',
+      d.status || '',
+    ]);
+    exportTableCSV(`pdufa_${subTab}`, headers, rows);
+  };
 
   const getAreaStyle = (area) => {
     const c = AREA_COLORS[area];
@@ -58,6 +80,9 @@ const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
         <button className={`mi-subtab ${subTab === 'past' ? 'active' : ''}`} onClick={() => setSubTab('past')}>
           Past ({past.length})
         </button>
+        {currentData.length > 0 && (
+          <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExport}>Export CSV</button>
+        )}
       </div>
 
       <div className="table-section">
@@ -73,7 +98,7 @@ const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
             </tr>
           </thead>
           <tbody>
-            {currentData.map((d, i) => (
+            {visibleData.map((d, i) => (
               <tr key={i}>
                 <td className="mi-bold" style={{whiteSpace: 'nowrap'}}>{d.target_date}</td>
                 <td>{d.drug_name}</td>
@@ -86,6 +111,11 @@ const PDUFACalendar = ({ searchTerm, onSelectCompany, lastUpdated }) => {
           </tbody>
         </table>
       </div>
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

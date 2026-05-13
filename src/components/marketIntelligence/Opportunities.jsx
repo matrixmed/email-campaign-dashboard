@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const Opportunities = ({ searchTerm, onSelectCompany }) => {
   const [data, setData] = useState(null);
@@ -37,10 +38,9 @@ const Opportunities = ({ searchTerm, onSelectCompany }) => {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Scoring opportunities...</p></div>;
   }
 
-  const filtered = data?.opportunities?.filter(o => {
-    if (!searchTerm) return true;
-    return o.company?.toLowerCase().includes(searchTerm.toLowerCase());
-  }) || [];
+  const filtered = data?.opportunities?.filter(o =>
+    matchesSearchTerm(o.company, searchTerm)
+  ) || [];
 
   const hot = filtered.filter(o => o.opportunity_score >= 70).length;
   const warm = filtered.filter(o => o.opportunity_score >= 50 && o.opportunity_score < 70).length;

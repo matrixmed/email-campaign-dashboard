@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const BasisDomains = ({ searchTerm, startDate, endDate }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState('impressions');
   const [sortDir, setSortDir] = useState('desc');
-  const [displayCount, setDisplayCount] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -52,10 +59,6 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
     }
   };
 
-  const loadMore = () => {
-    setDisplayCount(prev => prev + 25);
-  };
-
   if (loading) {
     return (
       <div className="domains-container">
@@ -82,10 +85,9 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
   let domains = [...data.data];
 
   if (searchTerm) {
-    const term = searchTerm.toLowerCase();
     domains = domains.filter(d =>
-      d.property_name?.toLowerCase().includes(term) ||
-      d.exchange?.toLowerCase().includes(term)
+      matchesSearchTerm(d.property_name, searchTerm) ||
+      matchesSearchTerm(d.exchange, searchTerm)
     );
   }
 
@@ -132,8 +134,25 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
     </th>
   );
 
-  const displayedDomains = domains.slice(0, displayCount);
-  const hasMore = displayCount < domains.length;
+  const totalPages = Math.max(1, Math.ceil(domains.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const displayedDomains = domains.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    const headers = ['Domain/App', 'Status', 'Impressions', 'Clicks', 'Spend', 'eCPM', 'vs Avg %', 'CTR %', 'eCPC'];
+    const rows = domains.map(d => [
+      d.property_name || '',
+      d.status || '',
+      d.impressions || 0,
+      d.clicks || 0,
+      d.spend || 0,
+      d.ecpm || 0,
+      d.vs_avg_ecpm || 0,
+      ((d.ctr || 0) * 100).toFixed(3),
+      d.ecpc || '',
+    ]);
+    exportTableCSV('basis_domains', headers, rows);
+  };
 
   return (
     <div className="domains-container">
@@ -165,10 +184,8 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
                 <span className="exchange-stat-label">Avg CTR</span>
               </div>
             </div>
-            {hasMore && (
-              <button className="expand-all-btn" onClick={() => setDisplayCount(domains.length)}>
-                Expand All
-              </button>
+            {domains.length > 0 && (
+              <button className="export-button" onClick={handleExport}>Export CSV</button>
             )}
           </div>
         </div>
@@ -193,7 +210,7 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
                 <tr key={idx}>
                   <td title={d.property_name}>
                     <div className="exchange-name-cell">
-                      <span className="exchange-rank">{idx + 1}</span>
+                      <span className="exchange-rank">{pageStart + idx + 1}</span>
                       <span className="exchange-name">
                         {d.property_name?.length > 50 ? d.property_name.slice(0, 50) + '...' : d.property_name}
                       </span>
@@ -215,13 +232,11 @@ const BasisDomains = ({ searchTerm, startDate, endDate }) => {
           </table>
         </div>
 
-        {hasMore && (
-          <div className="load-more-container">
-            <button className="load-more-btn" onClick={loadMore}>
-              Load More ({(domains.length - displayCount).toLocaleString()} remaining)
-            </button>
-          </div>
-        )}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

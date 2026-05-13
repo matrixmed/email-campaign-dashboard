@@ -451,12 +451,12 @@ const DocumentationPage = () => {
               Arrow buttons (&#8592; / &#8594;) allow browsing through campaigns without closing the modal. Keyboard shortcuts are also supported: Left Arrow = previous, Right Arrow = next, Escape = close.
             </p>
 
-            <h4>Upload Metadata (CMI Reporting)</h4>
+            <h4>Upload CMI Contract Data</h4>
             <p>
-              The "Upload Metadata" button in the campaign modal is <strong>not</strong> related to the extended analytics
+              The "Upload CMI Contract Data" button in the campaign modal is <strong>not</strong> related to the extended analytics
               displayed within the modal (clicks, geography, audience breakdown, etc.). Those analytics are derived
-              from separately processed campaign data. Instead, the upload metadata function is used to attach
-              <strong> CMI contract reporting metadata</strong> to a campaign, so that the campaign appears with the
+              from separately processed campaign data. Instead, this function attaches
+              <strong> CMI contract reporting metadata</strong> to a campaign so that it appears with the
               correct placement information in the <strong>Reports Management</strong> section.
             </p>
             <p>
@@ -469,8 +469,18 @@ const DocumentationPage = () => {
               <li><strong>CMI Placement ID (optional):</strong> A text input for the CMI placement identifier. This ID links the campaign to its corresponding CMI contract record.</li>
             </ul>
             <p>
-              At least one file or a placement ID must be provided to submit. The upload button text changes from "Upload Metadata"
-              (blue) to "Update Metadata" (green) once CMI metadata has been attached to the campaign.
+              At least one file or a placement ID must be provided to submit. The button text changes from "Upload CMI Contract Data"
+              (blue) to "Update CMI Contract Data" (green) once data has been attached to the campaign.
+            </p>
+            <h4>Target List → Profile Backfill</h4>
+            <p>
+              When a Target List Excel file is uploaded, the system also extracts every NPI from the file
+              and, in a background task, looks them up in <code>universal_profiles</code> and <code>user_profiles</code>.
+              For each match, an entry is appended to the profile's <code>target_lists</code> JSON array
+              containing <code>campaign_id</code>, <code>campaign_name</code>, <code>target_list_id</code>, and
+              <code>attached_at</code>. Re-uploading the same campaign replaces the existing entry rather than
+              duplicating. This enables reverse lookup &mdash; "which campaigns has this HCP been targeted by?" &mdash;
+              for attribution, frequency-capping, and engagement analysis.
             </p>
           </div>
 
@@ -543,7 +553,7 @@ const DocumentationPage = () => {
               <li>Subject Lines</li>
               <li>Click Analytics</li>
               <li>Specialty Insights</li>
-              <li>Geographic Rates</li>
+              <li>Geographic (Campaign Rates / Audience &amp; Market)</li>
               <li>Timing Intelligence</li>
             </ul>
             <p>
@@ -650,6 +660,14 @@ const DocumentationPage = () => {
               <li><strong>Filter by:</strong> All or By Disease (narrows the comparison pool).</li>
             </ul>
 
+            <h4>Market Classification</h4>
+            <p>
+              In Market mode the frontend classifies every campaign using a combined map of disease/specialty/brand keywords (<code>src/utils/industryKeywords.js</code>)
+              plus the Brand Management table. Both the selected campaign&rsquo;s market and the full peer map are sent to the backend with the request so
+              the backend filters peers by exact market match. If a campaign cannot be classified, the response includes a <code>warning</code> field
+              surfaced in the UI as &ldquo;This campaign could not be classified into a market. Add its brand in Brand Management or update the campaign name.&rdquo;
+            </p>
+
             <h4>Results</h4>
             <p>After selecting a campaign and clicking &ldquo;Run,&rdquo; three result views are available:</p>
             <ul>
@@ -657,6 +675,10 @@ const DocumentationPage = () => {
               <li><strong>Similar Campaigns:</strong> Table listing matching campaigns with delta formatting. Positive deltas (where the selected campaign is higher) appear in green; negative deltas in red.</li>
               <li><strong>Percentile Rankings:</strong> Horizontal bars for each metric showing the percentile position with the actual value.</li>
             </ul>
+            <p>
+              When zero peers are found, the section renders the warning message instead of empty grade cards; when the request fails or times out,
+              the error message is shown directly so the user can distinguish &ldquo;no peers&rdquo; from &ldquo;request failed.&rdquo;
+            </p>
           </div>
 
           <div className="docs-card">
@@ -886,10 +908,15 @@ const DocumentationPage = () => {
           </div>
 
           <div className="docs-card">
-            <h3>Geographic Rates</h3>
-            <p>Provides U.S. regional and state-level campaign performance analysis.</p>
+            <h3>Geographic</h3>
+            <p>
+              One tab with two subviews toggled by buttons at the top: <strong>Campaign Rates</strong> (open/click rates by state and region)
+              and <strong>Audience &amp; Market</strong> (where the audience lives vs the total NPI market, penetration, opportunity).
+            </p>
 
-            <h4>Regional Breakdown (Preloaded)</h4>
+            <h4>Subview: Campaign Rates</h4>
+
+            <h5>Regional Breakdown (Preloaded)</h5>
             <p>
               Loads instantly from the campaign metadata blob&mdash;no database query required. Displays two elements:
             </p>
@@ -898,7 +925,7 @@ const DocumentationPage = () => {
               <li><strong>Interactive SVG Map:</strong> A color-coded U.S. map with regions shaded by performance. A toggle switches the map between <strong>Open Rate</strong> and <strong>Audience %</strong> views. Regions are color-gradient coded (higher values receive more intense coloring). Hovering over a region displays a tooltip with the region name and metric value.</li>
             </ul>
 
-            <h4>State Map &amp; Rankings (On-Demand)</h4>
+            <h5>State Map &amp; Rankings (On-Demand)</h5>
             <p>
               Clicking "Generate Map &amp; State Rates" queries the database for state-level unique open rates and click rates.
               Displays an interactive color-coded US map and state ranking cards (5 per row, 10 initially,
@@ -907,12 +934,32 @@ const DocumentationPage = () => {
             <ul>
               <li><strong>Metric Toggle:</strong> Unique Open Rate, Total Open Rate, Unique Click Rate, or Total Click Rate — controls map and state cards.</li>
             </ul>
-            <h4>Rate Calculations (Per State)</h4>
+            <h5>Rate Calculations (Per State)</h5>
             <div className="docs-formula">
               <code>Unique Open Rate = (Unique_Opens / Sent) &times; 100</code><br/>
               <code>Total Open Rate = (Total_Opens / Sent) &times; 100</code><br/>
               <code>Unique Click Rate = (Unique_Clicks / Unique_Opens) &times; 100</code><br/>
               <code>Total Click Rate = (Total_Clicks / Total_Opens) &times; 100</code>
+            </div>
+
+            <h4>Subview: Audience &amp; Market</h4>
+            <p>
+              Hits <code>/api/analytics/geographic-main</code> to produce a full owned+licensed-vs-total-market view.
+              Tab and section labels read <strong>Owned/Licensed vs Market</strong> rather than &ldquo;Audience vs Market&rdquo; to keep terminology consistent with the rest of the app.
+              The endpoint has a 60s statement timeout and returns structured errors the frontend surfaces with a Retry button
+              (instead of silently showing empty tiles). Tabs inside the subview include:
+            </p>
+            <ul>
+              <li><strong>Owned + Licensed vs Total Market:</strong> Two state heatmaps side-by-side &mdash; audience users (owned + licensed combined; the precomputed dataset is not yet split by source) per state and active NPIs per state &mdash; with count/penetration color-mode toggle.</li>
+              <li><strong>Metro &amp; Urban/Rural:</strong> Top metro areas (New York, LA, Chicago, etc.) with audience count, NPI count, engagement rate, and penetration rate, plus urban/suburban/rural distribution for audience vs NPIs.</li>
+              <li><strong>Custom Map:</strong> Filters by specialty, campaign, engagement (all / opened / never_opened), date range, and granularity (state / ZIP prefix / city). The &ldquo;Never Opened&rdquo; option uses a <code>NOT&nbsp;EXISTS</code> anti-join against <code>campaign_interactions</code>, not a Python set-diff. Map and summary regenerate on &ldquo;Generate Map.&rdquo;</li>
+            </ul>
+            <h5>Key Calculations</h5>
+            <div className="docs-formula">
+              <code>Penetration Rate = (Audience Users / Active NPIs) &times; 100</code><br/>
+              <code>Opportunity Score = 100 &minus; Penetration Rate</code><br/>
+              <code>Addressable NPIs = max(0, NPI count &minus; Audience count)</code><br/>
+              <code>Engagement Rate = (Engaged Users / Audience Users) &times; 100</code>
             </div>
           </div>
 
@@ -939,7 +986,13 @@ const DocumentationPage = () => {
             </div>
 
             <h4>Section 2: Full Analysis (On-Demand)</h4>
-            <p>Filter bar with Date Range, Campaign Selector, and Specialty Selector, plus a &ldquo;Generate Analysis&rdquo; button. Runs a backend query against the interactions table.</p>
+            <p>
+              Filter bar with Date Range, Campaign Selector, and Specialty Selector, plus a &ldquo;Generate Analysis&rdquo; button.
+              Runs one backend query against <code>campaign_interactions</code> (~17.5M rows) using <code>COUNT(*) FILTER (WHERE event_type = ...)</code> in a single pass instead of multiple CTE scans.
+              Date Range defaults to last 6 months; the &ldquo;All Time&rdquo; option caps at 12 months server-side to prevent runaway scans.
+              <code>user_profiles</code> and <code>campaign_deployments</code> joins only attach when a specialty or campaign filter is actually supplied.
+              A 60s statement timeout + a 90s client-side AbortController return a structured error (shown in the UI with a Retry button) instead of a silent spinner-disappear.
+            </p>
             <div className="docs-subsection">
               <h5>Hour &times; Day Heatmap</h5>
               <p>A 7-day by 24-hour grid (168 cells) with two modes:</p>
@@ -1632,6 +1685,20 @@ const DocumentationPage = () => {
             <h4>Show Total Sends</h4>
             <p>Toggle checkbox (hidden on Hot Topics / Expert Perspectives templates). When enabled, displays aggregate send volume metrics on the dashboard.</p>
 
+            <h4>Show Date</h4>
+            <p>Toggle checkbox that only appears for multi-campaign templates. When enabled, inserts a <strong>Send Date</strong> column into the campaign comparison table, formatted as M/D/YY (e.g., 3/4/26).</p>
+
+            <h4>Campaign Comparison Table &mdash; Name Deduplication</h4>
+            <p>
+              The first column of the multi-campaign comparison table automatically strips common prefix/suffix tokens across the selected campaigns so only the unique portion of each name is shown per row. Parenthesized groups (e.g., <code>(Target List)</code>) are treated atomically and never split. When a version-tag anchor such as <code>eNL</code> precedes the differing segment, it is re-prepended to the row label.
+              The column header adapts to the content: <strong>Campaign Month</strong> if all stripped labels are month names, <strong>Campaign</strong> if any stripping occurred, otherwise <strong>Campaign Name</strong>.
+            </p>
+
+            <h4>Campaign Comparison Table &mdash; Row Order</h4>
+            <p>
+              Rows are sorted by <code>send_date</code> ascending &mdash; the <strong>first-deployed campaign appears at the top</strong>, with later deployments below it. This applies to all multi-campaign templates (Hot Topics Multi, Expert Perspectives Multi, and the generic Multi None/One/Two/Three layouts).
+            </p>
+
             <h4>Merge Subspecialties</h4>
             <p>
               Toggle checkbox. When enabled, all subspecialty data is combined into parent specialties (grouping by the text before the first dash
@@ -2111,6 +2178,19 @@ const DocumentationPage = () => {
               Lift (color-coded), Significance status, and Date. Expanding a row reveals the description, notes, group-by-group
               breakdown, and all pairwise metric comparisons.
             </p>
+            <p>
+              Winner, lift, and significance for each historical test are computed client-side from the live
+              <code> /api/ab-testing/campaigns</code> data using the same two-proportion z-test applied to active tests
+              (Unique Open Rate, with deployment-merging). This ensures a test that showed &ldquo;Group A wins&rdquo;
+              while Active will continue to show &ldquo;Group A&rdquo; after being marked Completed.
+            </p>
+
+            <h4>Reactivate</h4>
+            <p>
+              Each historical row has a <strong>Reactivate</strong> button that flips the test&rsquo;s status back to
+              <code> active</code> via <code>PUT /api/ab-testing/tests/{'{'}id{'}'}</code>. The test is immediately removed
+              from Historical Results, added back to the Active Tests list, and the UI switches to the Active tab.
+            </p>
           </div>
         </section>
 
@@ -2334,8 +2414,32 @@ const DocumentationPage = () => {
             <h3>Overview</h3>
             <p>
               Audience Analytics provides tools for querying individual users, analyzing audience segments, looking up NPIs,
-              analyzing list crossover, breaking down DMAs, identifying shadow engagers, detecting engagement patterns, managing print subscriptions, and processing NCOA address updates. It is organized into 9 sub-tabs:
-              Find Users, Analyze Users, NPI Lookup, List Analytics, DMA Breakdown, Shadow Engagers, Engagement Queries, Print Management, and NCOA Upload.
+              looking up HCPs by specialty, analyzing list crossover, breaking down DMAs, identifying shadow engagers, detecting engagement patterns, managing print subscriptions, processing NCOA address updates, and onboarding new subscribers from form exports. It is organized into 11 sub-tabs:
+              Find Users, Analyze Users, NPI Lookup, Specialty Lookup, HCP Targeting, Print Lists, Digital Lists, IQVIA List Efficiency, Subscriber Intake, DMA Breakdown, and Shadow Engagers.
+            </p>
+          </div>
+
+          <div className="docs-card">
+            <h3>Source Classification (Owned / Licensed / Market)</h3>
+            <p>
+              All audience-vs-market views in this section &mdash; NPI Quick Lookup, Specialty Lookup, Find Users, Analyze Users,
+              HCP Targeting, and Digital Lists &mdash; replace the legacy <code>Audience</code> label with a three-way classification:
+            </p>
+            <ul>
+              <li><strong>Owned:</strong> User is currently in at least one segment outside <code>IQVIA HCPs</code>/<code>HLD HCPs</code> &mdash; or, if no current segments, the most recent <code>added</code> event in <code>ac_membership_events</code> was a non-IQVIA/HLD segment.</li>
+              <li><strong>Licensed:</strong> User is currently in only <code>IQVIA HCPs</code> and/or <code>HLD HCPs</code> segments &mdash; or, if no current segments, the most recent <code>added</code> event was IQVIA/HLD.</li>
+              <li><strong>Market:</strong> User exists only in <code>universal_profiles</code> (the broader market universe) and is not in our audience.</li>
+            </ul>
+            <p>
+              "Once owned, always owned" is enforced by the current-state rule: if a user is in any non-IQVIA/HLD segment today, they are Owned regardless of history.
+              If they have no current segments, the most recent membership event determines classification, so a user moved from <code>Matrix Owned</code> to only <code>HLD HCPs</code> would now show as Licensed.
+            </p>
+            <p>
+              Backed by a shared SQL helper in <code>backend/routes/source_classification.py</code> &mdash; the same <code>CASE</code> expression is reused across endpoints to keep classification consistent.
+              For pre-computed views (HCP Targeting blob, Geographic heatmap), the frontend calls <code>POST /api/users/source-status-lookup</code> after loading the blob to enrich rows by NPI/email.
+            </p>
+            <p>
+              Print Lists are intentionally excluded from this classification &mdash; they operate on a different audience model.
             </p>
           </div>
 
@@ -2352,8 +2456,11 @@ const DocumentationPage = () => {
             </ul>
             <h4>Results</h4>
             <p>
-              Results display in a table with columns: Email, First Name, Last Name, Specialty, Campaign Count, Opens, Clicks, Rates.
-              Results are paginated with a "Load More" button and sortable by clicking column headers. CSV export is available.
+              Results display in a table with columns: Email, NPI, Name, Specialty, <strong>Source</strong> (Owned/Licensed), <strong>Status</strong> (Active/Inactive),
+              Campaign Count, Opens, Clicks, Rates. Source and Status are also included in the CSV export.
+              Source is determined by the user's <code>ac_segments</code> array (or, for users with no current segments, the most recent <code>added</code> event in <code>ac_membership_events</code>):
+              Licensed if all current segments are <code>IQVIA HCPs</code>/<code>HLD HCPs</code>; Owned otherwise.
+              Results are paginated (100 rows per page) using the standard pagination controls and sortable by clicking column headers. An &ldquo;Export CSV&rdquo; button sits at the top of the results.
             </p>
             <h4>Tier System</h4>
             <p>
@@ -2371,15 +2478,84 @@ const DocumentationPage = () => {
             <h4>Results</h4>
             <ul>
               <li>Summary: "Found X of Y NPIs" with count from each source.</li>
-              <li>Source Breakdown: "X from Audience | Y from Market".</li>
+              <li>Source Breakdown: "X Owned | Y Licensed | Z Market".</li>
               <li>Missing NPIs listed separately.</li>
-              <li>Table columns: NPI, First Name, Last Name, Specialty (mapped from taxonomy code), Address, City, State, Zipcode, Status (Active/Inactive badge), Source (Audience/Market badge).</li>
-              <li>Expand/Collapse All button for results &gt; 10. Export CSV available.</li>
+              <li>Table columns: NPI, First Name, Last Name, Specialty (mapped from taxonomy code), Address, City, State, Zipcode, Flag, Source (Owned/Licensed/Market badge), Status (Active/Inactive for audience users).</li>
+              <li>Standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top of the table.</li>
+            </ul>
+            <h4>Source Classification</h4>
+            <ul>
+              <li><strong>Owned:</strong> User is currently in at least one segment outside <code>IQVIA HCPs</code> / <code>HLD HCPs</code> (or, if no current segments, the most recent <code>added</code> event in <code>ac_membership_events</code> was a non-IQVIA/HLD segment).</li>
+              <li><strong>Licensed:</strong> User is currently in only <code>IQVIA HCPs</code> and/or <code>HLD HCPs</code> segments (or, if no current segments, the most recent <code>added</code> event was IQVIA/HLD).</li>
+              <li><strong>Market:</strong> User exists only in <code>universal_profiles</code> (not in our audience).</li>
             </ul>
           </div>
 
           <div className="docs-card">
+            <h3>Specialty Lookup</h3>
+            <p>
+              Returns all HCPs in the Market Universe (<code>universal_profiles</code>) plus your Audience (<code>user_profiles</code>) that match
+              one or more specialties. Reuses the same specialty selection modal used in Find Users.
+            </p>
+            <h4>Specialty Selection</h4>
+            <ul>
+              <li>Click the selector to open the specialty modal. Search, Select All, Clear All, and multi-select are all supported.</li>
+              <li>Selected specialties display as removable chips under the selector.</li>
+              <li>Specialty list is sourced from the <code>/api/users/specialties</code> endpoint (same as Find Users).</li>
+            </ul>
+            <h4>Primary Action: Lookup NPIs</h4>
+            <ul>
+              <li>Columns: NPI, First Name, Last Name, Specialty, Address, City, State, Zipcode, Flag, Source (Owned/Licensed/Market), Status (Active/Inactive for audience users).</li>
+              <li>"Hide non-active" toggle filters retired/deceased/inactive providers from the result table.</li>
+              <li>Owned/Licensed records come from <code>user_profiles.specialty</code>; Market records come from <code>universal_profiles.primary_taxonomy_code</code> (reverse-mapped from the selected specialty text, since <code>primary_specialty</code> is NULL).</li>
+              <li>Standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top of the table.</li>
+            </ul>
+            <h4>Secondary Action: Calculate Specialty Counts</h4>
+            <ul>
+              <li>Discrete button placed next to "Lookup NPIs". Returns per-specialty totals across both tables.</li>
+              <li>Table columns: Specialty, Market Universe, Licensed, Owned, Coverage (%). All columns sortable; standard pagination (100 rows per page).</li>
+              <li>Coverage = (Licensed + Owned) / Market Universe by default.</li>
+              <li>&ldquo;Hide non-active&rdquo; toggle re-fetches counts with inactive providers excluded.</li>
+              <li>&ldquo;Merge subspecialties&rdquo; toggle merges everything before the first " - " in the specialty name (same logic as the Dashboard Builder merge toggle). Aggregate-only; does not affect the main lookup.</li>
+              <li>&ldquo;Only Owned&rdquo; toggle hides the Licensed column and recalculates Coverage as Owned / Market Universe — useful for evaluating organic reach without leased segments.</li>
+              <li>CSV export available (columns shift based on the Only Owned toggle).</li>
+            </ul>
+            <p>Backed by <code>POST /api/npi/specialty-lookup</code> and <code>GET /api/npi/specialty-counts</code>. The counts endpoint returns raw taxonomy-code counts from <code>universal_profiles</code>; the frontend maps codes to specialty text using <code>taxonomyMapping.js</code>.</p>
+          </div>
+
+          <div className="docs-card">
             <h3>List Efficiency Analysis</h3>
+            <p>
+              Three sub-tabs: <strong>Explorer</strong> (browse all lists/segments/tags as first-class entities),
+              <strong>IQVIA Crossover</strong> (file-based crossover + engagement analysis),
+              and <strong>Leasing Decision</strong> (live, DB-backed ownership analysis and decision workflow).
+            </p>
+
+            <h4>Sub-tab 1: Explorer</h4>
+            <p>
+              The "Find Users" pattern, but for lists and segments themselves. One filter row + one entity table.
+              Each row is a brand (aggregated target lists), AC segment, AC tag, or digital list — with size,
+              ownership breakdown (Owned / IQVIA / HLD / Missing), Owned %, market/agency, and top specialty.
+              Click any row to drill into a detail modal showing ownership stats, top specialties, sample members,
+              and overlapping entities across all four types.
+            </p>
+            <ul>
+              <li><strong>Filter chips:</strong> All / Brands / AC Segments / AC Tags / Digital Lists (with counts).</li>
+              <li><strong>Search:</strong> Matches name, market, agency, or top specialty.</li>
+              <li><strong>Market filter:</strong> From <code>brand_editor_agency.industry</code>.</li>
+              <li><strong>Sort:</strong> Size, Owned % (high or low), Name.</li>
+              <li><strong>Min size:</strong> Hide tiny entities.</li>
+              <li><strong>Refresh button:</strong> Forces server-side cache rebuild (otherwise cache is 15 min).</li>
+              <li><strong>Drill-down overlaps:</strong> Click any overlap row to navigate to that entity's detail. Lets you walk the graph of relationships (e.g., Matrix Owned Emails → Spevigo brand → IQVIA HCPs segment).</li>
+            </ul>
+            <p>
+              Backed by <code>GET /api/list-leasing/entities</code> and <code>GET /api/list-leasing/entities/&lt;type&gt;/&lt;name&gt;</code>.
+              First request builds the index from <code>user_profiles.ac_segments / ac_tags / digital_lists_subscribed</code> and
+              <code>universal_profiles.target_lists</code> (60-100s); subsequent requests served from a 15-minute in-memory cache.
+              Filter/sort/search persist via localStorage.
+            </p>
+
+            <h4>Sub-tab 2: IQVIA Crossover</h4>
             <p>A 3-step workflow for analyzing list crossover and engagement by coverage tier.</p>
             <div className="docs-steps">
               <div className="docs-step">
@@ -2406,6 +2582,65 @@ const DocumentationPage = () => {
               </div>
             </div>
             <p>State is persisted in localStorage under the key <code>listAnalysisState</code>.</p>
+
+            <h4>Sub-tab 3: Leasing Decision</h4>
+            <p>
+              Live replacement for the standalone Python <code>list_leasing_analysis</code> tool. Builds three
+              ownership sets directly from the database — Matrix Owned (from <code>ac_segments</code>: "Matrix Owned Emails"),
+              IQVIA Licensed ("IQVIA HCPs"), HLD Licensed ("HLD HCPs") — and classifies every targeted HCP into one of:
+            </p>
+            <ul>
+              <li><strong>MMC Owned (let license expire)</strong> &mdash; owned AND on an IQVIA/HLD lease (redundant spend)</li>
+              <li><strong>MMC Owned</strong> &mdash; owned only</li>
+              <li><strong>IQVIA + HLD Licensed</strong> &mdash; on both leases, not owned</li>
+              <li><strong>IQVIA Licensed</strong> / <strong>HLD Licensed</strong> &mdash; single lease, not owned</li>
+              <li><strong>Missing</strong> &mdash; on a brand list but not owned/licensed (acquisition target)</li>
+            </ul>
+
+            <h4>Source Selection</h4>
+            <ul>
+              <li><strong>Universe:</strong> Universal Derms (taxonomy <code>207N*</code>, default), All Active Profiles, or upload a custom universe file.</li>
+              <li><strong>Brand Target Lists:</strong> Two modes — <em>From Dashboard</em> (multi-select campaigns already attached to <code>user_profiles.target_lists</code> / <code>universal_profiles.target_lists</code>, grouped by brand via <code>brand_editor_agency</code>) or <em>Upload Files</em> (transient one-off Excel/CSV uploads with a brand label, not persisted to DB).</li>
+              <li><strong>Filters:</strong> Time window (3m / 6m / 12m / All time), Market (industry from <code>brand_editor_agency</code>), Specialty.</li>
+              <li>Modes can be mixed — DB picks + uploaded files in the same run.</li>
+            </ul>
+
+            <h4>Result Views</h4>
+            <ul>
+              <li><strong>Summary:</strong> Status count cards across the universe.</li>
+              <li><strong>Brand Breakdown:</strong> Per-brand totals — Total NPIs, MMC Owned, Let Expire, IQVIA-only, HLD-only, Missing, Owned %. Exportable.</li>
+              <li><strong>Master Match Results:</strong> Specialty pivot across the full universe with reach %.</li>
+              <li><strong>Top HCPs:</strong> NPIs on the most brand lists (saturation/fatigue indicator).</li>
+              <li><strong>Combined (Unique):</strong> Universe NPIs that appear on ≥1 brand list with ownership.</li>
+              <li><strong>Match Results:</strong> Specialty pivot of matched (brand-targeted) NPIs only.</li>
+              <li><strong>Per-Brand:</strong> Drill into a single brand's NPI list.</li>
+            </ul>
+
+            <h4>Decision Queue</h4>
+            <p>
+              Surfaces every "Let Expire" candidate as an actionable row. Inline action dropdown
+              (Let Expire / Keep / Convert to Owned) and a bulk "Mark All as Let Expire". Decisions are
+              persisted to the <code>leasing_decisions</code> table (audit trail with status: pending / executed / reverted).
+              Export the queue as CSV to share with vendors at renewal time.
+            </p>
+
+            <h4>HCP Drill-Down</h4>
+            <p>
+              Click any NPI link in any view. Shows profile basics, current AC segments + tags, engagement summary,
+              target list history, segment change timeline (from <code>ac_membership_events</code>), past decisions, and an
+              "Add Decision" form.
+            </p>
+
+            <h4>Endpoints</h4>
+            <ul>
+              <li><code>GET /api/list-leasing/available-sources</code> &mdash; brands + campaigns within window</li>
+              <li><code>POST /api/list-leasing/upload-temp-file</code> &mdash; parse a file, return token (2-hour TTL)</li>
+              <li><code>POST /api/list-leasing/run-analysis</code> &mdash; main computation, returns all views</li>
+              <li><code>GET/POST/PATCH/DELETE /api/list-leasing/decisions</code> &mdash; decision CRUD</li>
+              <li><code>GET /api/list-leasing/hcp/&lt;npi&gt;</code> &mdash; full HCP drill-down</li>
+              <li><code>POST /api/list-leasing/redundancy-check</code> &mdash; inline NPI list redundancy check (e.g., from Campaign Modal)</li>
+            </ul>
+            <p>Scope is persisted in localStorage under <code>leasingDecisionScope</code>. Active sub-tab persists under <code>listEfficiencySubTab</code>.</p>
           </div>
 
           <div className="docs-card">
@@ -2519,17 +2754,42 @@ const DocumentationPage = () => {
           <div className="docs-card">
             <h3>NCOA Upload</h3>
             <p>
-              Standalone tab for processing NCOA (National Change of Address) files. Styled identically to DMA Breakdown
-              with section header bar, drag-and-drop zone, and results tables.
+              Standalone tab for processing Walsworth NCOA (National Change of Address) CSV exports. Drag-and-drop a file,
+              the backend matches each row against <code>universal_profiles</code>, <code>user_profiles</code>, and
+              <code>print_only_contacts</code>, then returns a diff plan you can review and selectively apply.
             </p>
+
+            <h4>Matching</h4>
             <ul>
-              <li>Drag-and-drop CSV upload (same pattern as DMA Breakdown).</li>
-              <li>Matches subscribers by normalized name + address (no NPI in NCOA files).</li>
-              <li>Results split into three tables: Address Updates, Unsubscribe Candidates, Not Found.</li>
-              <li>Return codes 20-29 or unchanged address = unsubscribe candidate; different new address = address update.</li>
-              <li>Select/deselect individual entries with checkboxes before confirming.</li>
-              <li>Address updates cascade to print_list_subscribers, user_profiles, and universal_profiles tables.</li>
+              <li>NCOA files contain no NPI &mdash; matching is by normalized last name + first-name compatibility (one is a prefix of the other to allow nicknames) + normalized old address (with suite-stripping fallback).</li>
+              <li>On <code>universal_profiles</code>, the old address is checked against both <code>mailing_address_1</code> and <code>practice_address_1</code>; whichever side matched is the side that gets updated.</li>
+              <li>On <code>user_profiles</code> and <code>print_only_contacts</code>, matched against the single <code>address</code> column.</li>
+              <li>One NCOA row can match across multiple tables &mdash; the preview shows each match as its own row, tagged with the target table and side (Universal · mailing, Audience · address, etc.).</li>
+              <li>Rows where the new address already equals what we have land in &ldquo;Already Current&rdquo; (collapsible, no-op).</li>
             </ul>
+
+            <h4>Return Code Behavior</h4>
+            <ul>
+              <li><strong>Codes 19&ndash;29</strong> (foreign move, PO Box no-forwarding, vacant, undeliverable, etc.): Treated as undeliverable. Backend clears <code>print_lists_subscribed</code> JSONB and merges into <code>print_lists_unsubscribed</code> with reason <code>NCOA: &lt;decoded&gt;</code>; sets <code>is_active = FALSE</code> on universal_profiles and print_only_contacts (matching the standalone <code>ncoa.py</code> script). user_profiles keeps <code>is_active = TRUE</code> &mdash; print-undeliverable doesn&rsquo;t kill the email subscription.</li>
+              <li><strong>Codes 30&ndash;38</strong> (legitimate moves with a new address): Address fields are updated, the previous values shift to <code>old_*</code> columns, and an <code>address_update</code> event is pushed into <code>address_history</code> with source <code>walsworth_ncoa</code> and the return code.</li>
+              <li><strong>Missing new address</strong> or <strong>old == new</strong>: Treated as undeliverable regardless of return code.</li>
+              <li>Every write logs to <code>print_list_activity_log</code> with action <code>ncoa_address_update</code> or <code>ncoa_undeliverable</code>.</li>
+            </ul>
+
+            <h4>Endpoints</h4>
+            <ul>
+              <li><code>POST /api/list-management/ncoa/preview</code> &mdash; multipart CSV upload, returns <code>{`{address_updates, undeliverable, already_current, not_found, summary}`}</code>.</li>
+              <li><code>POST /api/list-management/ncoa/apply</code> &mdash; JSON body with the user-selected entries from the preview, returns <code>{`{applied: {address_updates, undeliverable}, errors}`}</code>.</li>
+              <li>The legacy <code>/api/print-lists/ncoa-upload</code> endpoint (in <code>print_lists.py</code>, writes to the legacy <code>print_list_subscribers</code> flat table) is no longer used by the UI but is left in place.</li>
+            </ul>
+
+            <h4>CSV Schema (Walsworth)</h4>
+            <p>
+              Header row uses these column names: <code>Individual Name</code>, <code>Return Code</code>, <code>Previous Delivery Address</code>,
+              <code>Previous Suite/Apartment</code>, <code>Previous City/State/ZIP+4</code>, <code>Current Delivery Address</code>,
+              <code>Current Suite/Apartment</code>, <code>Current City/State/ZIP+4</code>. ZIP+4 is concatenated (e.g. <code>463858031</code>);
+              the backend keeps only the first 5 digits when writing.
+            </p>
           </div>
 
           <div className="docs-card">
@@ -2545,6 +2805,207 @@ const DocumentationPage = () => {
               <li>For each user, it tracks campaigns where they clicked but had zero opens, after filtering out bot clicks (IP-based, behavioral, and timing filters).</li>
               <li>A confidence score (0&ndash;100%) is calculated based on: ratio of no-open-click campaigns to total clicked campaigns, number of campaigns with clicks but no opens, total clean clicks, and penalty for campaigns where opens did fire.</li>
               <li>Classifications: <strong>Confirmed</strong> (&ge;75%), <strong>Likely</strong> (50&ndash;74%), <strong>Potential</strong> (30&ndash;49%), <strong>Unlikely</strong> (&lt;30%).</li>
+            </ul>
+            <p>Results table uses standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top.</p>
+          </div>
+
+          <div className="docs-card">
+            <h3>HCP Targeting</h3>
+            <p>
+              HCP-level targeting view powered by the <code>hcp_cluster_blob.json</code> dataset. Filter by disease state,
+              content medium, or engagement category. Click any row to open the holistic profile modal.
+            </p>
+            <ul>
+              <li>Standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top of the table.</li>
+              <li>Modal navigation arrows (or ← / → keys) step through the current page&rsquo;s rows; Esc closes.</li>
+            </ul>
+
+            <h4>HCP Profile Modal</h4>
+            <p>
+              Timeline-first holistic profile. On open, the modal calls <code>POST /api/users/profile-timeline</code> with the
+              row&rsquo;s email and/or NPI and renders the user&rsquo;s entire history alongside engagement and current
+              subscription state. Anonymous GA users skip the API call and show only the GA Match tab.
+            </p>
+            <ul>
+              <li><strong>Header</strong> &mdash; name, Owned/Licensed source badge, Active/Inactive status, GA Match badge if applicable, prev/next position, close.</li>
+              <li><strong>Counts strip</strong> &mdash; lists, tags, segments, target lists, sent, opens, clicks, bounces, unsubs &mdash; pulled from the profile-timeline response.</li>
+              <li><strong>Timeline tab (default)</strong> &mdash; chronological event spine grouped by day. Filter chips: All / Engagement / List &amp; Tag / Target Lists / Bounces / Unsubs. Free-text search across event name, campaign, brand, agency, URL. Dot colors: cyan = engagement, violet = list/tag/segment movement, amber = bounce, red = unsub, magenta-ringed = target-list inclusion (agency-curated).</li>
+              <li><strong>Current State tab</strong> &mdash; cards for Digital Lists, Tags, Segments, Target Lists, Print Lists, and Unsubscribed-from. Empty cards are hidden so print-only or digital-only users see only relevant sections.</li>
+              <li><strong>Engagement tab</strong> &mdash; sent/opens/clicks/bounces stats with open and click-through rates; engagement-by-disease-state and topic-affinity bars; click categories.</li>
+              <li><strong>Campaigns tab</strong> &mdash; per-campaign table with Brand, Agency, Type, Sent, Opens, Clicks. Rows where the user was on the agency-supplied target list get a magenta &ldquo;Target&rdquo; tag inline next to the campaign name.</li>
+              <li><strong>GA Match tab (conditional)</strong> &mdash; only renders when the HCP has GA session data. Session list with expandable per-event detail; falls back to a probabilistic-match table when only candidate matches exist.</li>
+            </ul>
+
+            <h4>Backend &mdash; <code>POST /api/users/profile-timeline</code></h4>
+            <p>
+              Input: <code>{`{ email, npi }`}</code> (one or both). Looks up the user via <code>user_profiles</code>, then
+              UNIONs membership history from <code>ac_membership_events</code> (lists / tags / segments / master; unsub events
+              detected via the <code>[unsub] {`{name}`}</code> prefix) with engagement events from
+              <code>campaign_interactions</code>. Joins <code>campaign_reporting_metadata</code> for brand /
+              supplier / target-list metadata and a LATERAL pick of <code>brand_editor_agency</code> for the agency and
+              pharma company per brand. Returns <code>profile</code>, <code>current_state</code>, <code>totals</code>,
+              and a single chronological <code>timeline</code> array.
+            </p>
+          </div>
+
+          <div className="docs-card">
+            <h3>Print Lists / Digital Lists</h3>
+            <p>
+              Both list views render members in a server-paginated table (100 rows per page) using the standard pagination
+              control. An &ldquo;Export CSV&rdquo; button sits at the top of the table. Print Lists splits across three tabs:
+              Subscribed, Unsubscribed, and Blacklisted Addresses.
+            </p>
+            <p>
+              <strong>Row click &mdash; HCP Profile Modal:</strong> Clicking any row in Digital Lists or Print Lists opens the
+              same holistic profile modal as HCP Targeting (timeline-first, with Current State / Engagement / Campaigns / GA
+              Match tabs). Print Lists action buttons (the &minus; unsubscribe and + resubscribe icons in edit mode) stop
+              propagation so they do not trigger the profile modal. Modal prev/next steps through the current visible page;
+              ← / → / Esc keys are supported.
+            </p>
+            <p>
+              Print Lists &ldquo;In Audience&rdquo; column color-codes Yes by source: <span style={{ color: '#22c55e', fontWeight: 600 }}>green</span> for
+              Owned and <span style={{ color: '#d9b87f', fontWeight: 600 }}>tan/yellow</span> for Licensed (IQVIA HCPs / HLD HCPs).
+              Source is also included as a column in the CSV export.
+            </p>
+
+            <h4>Edit Mode (Print Lists only)</h4>
+            <p>
+              The header has an &ldquo;✎ Edit&rdquo; toggle on the left. By default the table is read-only &mdash; clicking the toggle
+              arms editing and reveals a <code>+ Add</code> button next to the list dropdown plus a per-row action button
+              (&minus; for subscribed rows, + for unsubscribed rows). Every destructive action still triggers a confirm modal,
+              so editing is two layers of safety: arm the buttons, then confirm.
+            </p>
+            <ul>
+              <li><strong>Add Subscriber:</strong> Modal with NPI/name/address/list-checkbox form. NPI or name+address blur triggers a lookup against <code>universal_profiles</code> &rarr; <code>user_profiles</code> &rarr; <code>print_only_contacts</code>; on a hit, the form pre-fills and a banner says which table the lists will be appended to. On submit, lists are appended to the matched record&rsquo;s <code>print_lists_subscribed</code> JSONB; with no match a new <code>print_only_contacts</code> row is inserted. Blacklisted addresses are blocked at this step.</li>
+              <li><strong>Unsubscribe (− button):</strong> Modal that lets you pick which lists to remove and a multi-select reason (Moved, Retired, Deceased, Business closed, No longer at this address, Address undeliverable, Not interested, Switched specialties, plus a free-text Other). Reasons are joined with &ldquo;; &rdquo; into <code>unsubscribe_reason</code>. List names move from the row&rsquo;s <code>print_lists_subscribed</code> JSONB into <code>print_lists_unsubscribed</code> JSONB. If the chosen reason implies an address problem (Moved / Business closed / No longer at address / Address undeliverable), an &ldquo;Also blacklist this address&rdquo; checkbox appears; checking it cascades-unsubscribes everyone else at that address.</li>
+              <li><strong>Resubscribe (+ button on Unsubscribed tab):</strong> Confirms via <code>window.confirm</code>, then moves the currently-selected list names back from <code>print_lists_unsubscribed</code> to <code>print_lists_subscribed</code>. Blocked if the address is currently blacklisted.</li>
+              <li><strong>Add to Unsubscribed:</strong> The same Add modal has a Subscribe / Unsubscribe toggle at the top &mdash; switching to Unsubscribe mode lets you put someone directly on an unsubscribe list (e.g. a Hot Topics opt-out where the person was never &ldquo;subscribed&rdquo; to anything). Custom list names can be typed in (comma-separated) on top of the standard checkboxes.</li>
+            </ul>
+
+            <h4>Blacklisted Addresses Tab</h4>
+            <p>
+              Address-level rejection list. One row per blacklisted address with: address, city, state, zip, reason,
+              affected-count (how many records currently sit in <code>print_lists_unsubscribed</code> at this address),
+              and date added. Click the row caret to expand and see exactly which people were affected (table#id, name, NPI).
+            </p>
+            <ul>
+              <li>In edit mode, a <code>+ Add Blacklist</code> button appears at the top of the tab and × delete buttons appear at the end of each row.</li>
+              <li>Adding a blacklist entry runs a cascade across <code>universal_profiles</code>, <code>user_profiles</code>, and <code>print_only_contacts</code>: every active subscriber at that address has their <code>print_lists_subscribed</code> JSONB cleared and merged into <code>print_lists_unsubscribed</code> with the blacklist reason. The cascade is on by default in the modal but can be unchecked.</li>
+              <li>Once blacklisted, future Add attempts at that address return a 409 with the blacklist reason &mdash; the Add modal surfaces this as an inline error and refuses to write.</li>
+              <li>Deleting a blacklist entry only removes the future-block; previously cascaded unsubscribes stay unsubscribed.</li>
+            </ul>
+
+            <h4>Endpoints (under <code>/api/list-management/print-lists</code>)</h4>
+            <ul>
+              <li><code>POST /lookup</code> &mdash; pre-fill helper used by the Add modal; tries NPI then name+address across the three tables.</li>
+              <li><code>POST /subscribe</code> &mdash; routes to UP / UP-by-name / user_profiles / print_only_contacts; appends JSONB; logs to <code>print_list_activity_log</code>.</li>
+              <li><code>POST /unsubscribe</code> &mdash; moves lists from subscribed JSONB to unsubscribed JSONB; sets <code>unsubscribe_reason</code>; optional <code>also_blacklist</code> creates a blacklist entry and cascades.</li>
+              <li><code>POST /resubscribe</code> &mdash; reverse of unsubscribe; blocked if address is blacklisted.</li>
+              <li><code>GET /blacklist</code>, <code>POST /blacklist</code>, <code>DELETE /blacklist/:id</code>, <code>GET /blacklist/:id/affected</code>.</li>
+            </ul>
+            <p>
+              Digital Lists shows a row of brand-total hero cards above the tabs &mdash; JCAD, NPPA, BT, Oncology, ICNS, NHR &mdash;
+              counting only currently-active subscribers. Totals are computed from the <code>subscribed_counts</code> map on
+              <code>/api/list-management/digital-lists/overview</code> by summing exact list names &mdash; no more, no less:
+            </p>
+            <ul>
+              <li><strong>JCAD</strong> = JCAD US Subscribers + JCAD International Subscribers + JCAD NPPA (MMC) + JCAD Comp</li>
+              <li><strong>NPPA</strong> = JCAD NPPA (MMC)</li>
+              <li><strong>BT</strong> = BT US Subscribers + BT Comp</li>
+              <li><strong>Oncology</strong> = Oncology (MMC)</li>
+              <li><strong>ICNS</strong> = ICNS International Subscribers + ICNS US Subscribers</li>
+              <li><strong>NHR</strong> = Nutrition Health Review</li>
+            </ul>
+            <p>
+              NPPA overlaps with JCAD by design (it&rsquo;s a subset that&rsquo;s also called out on its own card).
+            </p>
+          </div>
+
+          <div className="docs-card">
+            <h3>Pagination &amp; Export Standard</h3>
+            <p>
+              All tables in Audience Analytics &mdash; Find Users, Analyze Users, NPI Lookup, Specialty Lookup, HCP Targeting,
+              Print Lists, Digital Lists, and Shadow Engagers &mdash; use the same pagination component as Campaign Performance
+              (Previous / numbered page buttons / Next, up to 5 page buttons visible) at <strong>100 rows per page</strong>
+              with no rows-per-page selector. The &ldquo;Export CSV&rdquo; button is always anchored at the top-right of the
+              table area. The DMA Breakdown and IQVIA List Efficiency Analysis tools are intentionally exempt from this
+              standard.
+            </p>
+          </div>
+
+          <div className="docs-card">
+            <h3>Subscriber Intake</h3>
+            <p>
+              Onboarding pipeline for new subscribers from form exports. Accepts CSV uploads from four sources, cleans and
+              normalizes the data, looks up matching records in <code>universal_profiles</code> and <code>user_profiles</code>,
+              then splits the rows into editable buckets that map to specific Active Campaign lists. The Run button writes
+              to <code>user_profiles.digital_lists_subscribed</code> (digital buckets) and <code>print_list_subscribers</code>
+              (print buckets); it does not call ActiveCampaign directly &mdash; AC writes are deferred to a future layer.
+            </p>
+
+            <h4>Source Types (auto-detected from CSV headers; can be overridden)</h4>
+            <ul>
+              <li><strong>JCAD (WordPress):</strong> Gravity Forms export with four publication checkboxes (JCAD Print, JCAD Digital, NPPA Print, NPPA Digital) plus full address fields.</li>
+              <li><strong>Oncology Matrix:</strong> Same address structure as JCAD with cancer-area columns (Breast, Multiple Myeloma, Lung, RCC, Melanoma, Prostate) and a content-format choice. Routes to a single bucket.</li>
+              <li><strong>ICNS:</strong> Different column shape with split name (Prefix/First/Middle/Last/Suffix) and an explicit Type-of-Professional field. Includes self-reported Industry value.</li>
+              <li><strong>Social Media (Phase 1):</strong> Minimal input (first, last, email, optional NPI, optional specialty). Common for Instagram and other social-media signups.</li>
+            </ul>
+
+            <h4>Data Cleaning (defensive: transform what we&rsquo;re confident about, flag the rest)</h4>
+            <ul>
+              <li><strong>Names:</strong> Strip <code>Dr</code>/<code>Dr.</code>/<code>Mr.</code>/<code>Mrs.</code> prefixes, drop trailing single-letter middle initials, smart title-case (handles Mc/Mac, hyphens, particles like de/van/von, all-caps and all-lowercase inputs).</li>
+              <li><strong>Email:</strong> Lowercase + trim. Flag known typo domains (<code>gnail.com</code> → suggested <code>gmail.com</code>, etc.) without auto-fixing. Flag invalid format.</li>
+              <li><strong>Degree:</strong> Strip parenthetical qualifications (<code>MBBS, MD (1st year)</code> → <code>MBBS, MD</code>), expand long forms (<code>Family Nurse Practitioner</code> → <code>FNP</code>, <code>Master&rsquo;s of Science in Nursing</code> → <code>MSN</code>), normalize separators (slashes and periods → commas per the JCAD video rule), uppercase known abbreviation tokens, flag tokens that don&rsquo;t match any known pattern.</li>
+              <li><strong>State:</strong> Convert full names to two-letter codes for US (50 + DC + territories) and Canada (10 provinces + 3 territories). Drop state for non-Canada international per the JCAD video rule. Flag column-shift suspects (state field contains a country name).</li>
+              <li><strong>Country:</strong> Normalize variants (<code>USA</code>/<code>U.S.</code>/<code>America</code> → <code>United States</code>; <code>UK</code>/<code>England</code> → <code>United Kingdom</code>). Compute <code>is_us</code> and <code>is_us_or_canada</code> flags.</li>
+              <li><strong>Address:</strong> Detect UK split-number pattern (<code>addr1=&quot;40&quot;</code> + <code>addr2=&quot;Manscombe Road&quot;</code> → merge); dedupe identical addr1/addr2; split secondary designators (<code>Ste 207</code>/<code>Suite 300</code>/<code>Apt X</code>/<code>Unit Y</code>) out of addr1 into addr2; apply USPS suffix abbreviations (<code>Avenue</code> → <code>Ave</code>, <code>Road</code> → <code>Rd</code>, etc.); detect placeholder cities (<code>-</code>, <code>_</code>, <code>Select</code>); flag column-shift in city.</li>
+              <li><strong>Zip:</strong> Validate 5-digit (or 5+4) for US; <code>A0A 0A0</code> for Canada (auto-format). Flag alphabetic zips as column-shift suspects.</li>
+              <li><strong>NPI:</strong> Strip non-digits, validate 10-digit and starts-with-1, flag invalid format.</li>
+              <li><strong>Specialty inference:</strong> When the source doesn&rsquo;t supply a specialty field, infer from degree + job title + type-of-professional (<code>Dermatology Resident</code>, <code>Esthetician</code>, <code>Student in a Healthcare Organization</code>, <code>Nurse Practitioner</code>, etc.). Flag if nothing can be inferred.</li>
+            </ul>
+
+            <h4>Match &amp; Enrichment (tiered)</h4>
+            <ol>
+              <li><strong>NPI given:</strong> Direct lookup in <code>universal_profiles</code> (confidence 1.0).</li>
+              <li><strong>Email match:</strong> Found in <code>user_profiles</code> &mdash; pulls existing record plus <code>source_classification</code> (Owned/Licensed) via the shared <code>classify_source_sql_expr</code> helper (confidence 0.9, or 0.95 if email&rarr;NPI&rarr;universal succeeds).</li>
+              <li><strong>Name + state:</strong> Filter <code>universal_profiles</code> by lowercased first/last with <code>primary_taxonomy_code LIKE &apos;207N%&apos;</code> (derm scope) and matching practice or mailing state. Single hit = confident (0.85), multiple = ambiguous, zero = fall back to non-derm scope (0.6 if single hit) or no match.</li>
+              <li><strong>Industry detection:</strong> Compare company name and email-domain root against <code>brand_editor_agency.agency</code> / <code>pharma_company</code> / <code>brand</code> (all active rows). For ICNS, also accept self-reported <code>Type of professional = Industry</code>.</li>
+            </ol>
+
+            <h4>Bucket Routing (data-driven per source)</h4>
+            <ul>
+              <li><strong>Print buckets</strong> (write to <code>print_list_subscribers</code>): JCAD Print, JCAD NPPA Print, JCAD Comp Print.</li>
+              <li><strong>Digital buckets</strong> (write to <code>user_profiles.digital_lists_subscribed</code>): JCAD US Subscribers, JCAD NPPA Digital, JCAD International Subscribers, JCAD Comp Digital, Oncology MMC, ICNS US, ICNS International.</li>
+              <li><strong>Review-only buckets</strong> (no auto-write): Already Owned, Currently Licensed (flagged for future AC migration), Ambiguous Match (inline candidate picker), Cleaning Issues, No NPI / Non-HCP, Manual Review.</li>
+            </ul>
+
+            <h4>Source-Specific Routing Rules</h4>
+            <ul>
+              <li><strong>International (JCAD):</strong> Eligible only for JCAD International Subscribers (digital). Print and NPPA are skipped even if checked.</li>
+              <li><strong>NPPA-over-JCAD (digital only):</strong> If a US NP/PA checks both JCAD Digital and NPPA Digital, route only to JCAD NPPA Digital (since every JCAD send includes NPPA recipients). Print is unaffected &mdash; checking both print boxes lands them on both lists.</li>
+              <li><strong>Industry contacts (JCAD):</strong> Route to JCAD Comp Print and/or JCAD Comp Digital based on what they checked, regardless of the regular eligibility rules.</li>
+              <li><strong>ICNS Industry override:</strong> Industry contacts (matched or self-reported) route to ICNS US with <code>specialty</code> overridden to <code>industry</code>, regardless of country.</li>
+              <li><strong>Oncology Matrix:</strong> One bucket (<code>Oncology MMC</code>) for everyone. Cancer-area selections and content-format preference are preserved as row metadata for future use.</li>
+              <li><strong>Already Owned:</strong> Email already in <code>user_profiles</code> with Owned classification &mdash; review-only bucket; user can choose to refresh address.</li>
+              <li><strong>Currently Licensed:</strong> Email already in <code>user_profiles</code> with Licensed classification (IQVIA/HLD) &mdash; review-only bucket flagging the migration intent for the future AC-write layer.</li>
+            </ul>
+
+            <h4>UI</h4>
+            <ul>
+              <li>Drag-and-drop CSV upload with optional source-type override (auto-detection by default).</li>
+              <li>Bucket tab strip across the top with count badges; click a tab to view that bucket&rsquo;s editable table.</li>
+              <li>Each cell is editable inline. Cells the cleaner changed are highlighted yellow with a hover-tooltip showing the original value. Cells with flags are highlighted red with the flag message in the tooltip.</li>
+              <li>Ambiguous rows show an inline candidate picker (matching universal_profiles records with NPI, name, specialty, city/state) &mdash; clicking a candidate fills the row.</li>
+              <li>Per-bucket actions: <strong>Run</strong> (writes the bucket&rsquo;s rows to the appropriate backend table) and <strong>Export CSV</strong> (right-aligned per the project standard, downloads the edited values).</li>
+              <li>Working state is persisted to <code>localStorage</code> so reloading the tab keeps the upload, edits, and candidate selections.</li>
+            </ul>
+
+            <h4>Backend</h4>
+            <ul>
+              <li><code>backend/subscriber_cleaner.py</code> &mdash; pure cleaning functions (no DB), per-field with diff and flag tracking.</li>
+              <li><code>backend/subscriber_matcher.py</code> &mdash; batched lookup against <code>universal_profiles</code>, <code>user_profiles</code>, <code>print_list_subscribers</code>, and <code>brand_editor_agency</code>.</li>
+              <li><code>backend/subscriber_router.py</code> &mdash; rule engine returning bucket assignments per source type.</li>
+              <li><code>backend/routes/subscriber_intake.py</code> &mdash; <code>POST /api/subscriber-intake/process</code> (upload + clean + match + route), <code>POST /api/subscriber-intake/run-print</code>, <code>POST /api/subscriber-intake/run-digital</code>.</li>
             </ul>
           </div>
         </section>
@@ -2616,8 +3077,8 @@ const DocumentationPage = () => {
             <h3>Domain Performance Tab</h3>
             <p>
               Property/domain-level metrics with columns: Domain/App, Status badge, Impressions, Clicks, Spend, eCPM,
-              vs Avg %, CTR %, eCPC. Sortable headers with initial sort by impressions descending. Loads 100 at a time
-              with "Load More" button.
+              vs Avg %, CTR %, eCPC. Sortable headers with initial sort by impressions descending. Standard pagination
+              (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top of the table.
             </p>
           </div>
 

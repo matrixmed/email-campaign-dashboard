@@ -565,8 +565,10 @@ def campaign_benchmarks():
         campaign_id = data.get('campaign_id')
         campaign_name = data.get('campaign_name')
         filters = data.get('filters', {})
+        client_selected_industry = data.get('selected_industry')
+        peer_markets = data.get('peer_markets') or {}
 
-        print(f"[BENCHMARKS] Request: campaign_id={campaign_id}, campaign_name={campaign_name}, filters={filters}")
+        print(f"[BENCHMARKS] Request: campaign_id={campaign_id}, campaign_name={campaign_name}, filters={filters}, client_industry={client_selected_industry}, peer_markets_count={len(peer_markets)}")
 
         campaigns_data = get_blob_data('dashboard_metrics.json')
         if not campaigns_data or not isinstance(campaigns_data, list):
@@ -586,7 +588,8 @@ def campaign_benchmarks():
         filter_by_disease = filters.get('filter_by_disease', False)
         filter_month = filters.get('month', 'all')
 
-        brand_map = get_brand_industry_map() if analyze_by in ('industry', 'market') else {}
+        use_client_markets = analyze_by in ('industry', 'market') and bool(peer_markets)
+        brand_map = {} if use_client_markets else (get_brand_industry_map() if analyze_by in ('industry', 'market') else {})
 
         selected_classification = classify_campaign(selected_campaign['campaign_name'])
         selected_topic = selected_classification['topic']
@@ -595,12 +598,16 @@ def campaign_benchmarks():
         selected_bucket = None
 
         if analyze_by in ('industry', 'market'):
-            selected_industry, matched_brand = extract_industry_from_campaign(selected_campaign['campaign_name'], brand_map)
+            if use_client_markets:
+                selected_industry = client_selected_industry or peer_markets.get(selected_campaign['campaign_name'])
+            else:
+                selected_industry, matched_brand = extract_industry_from_campaign(selected_campaign['campaign_name'], brand_map)
+
             if selected_industry:
                 selected_bucket = selected_industry
-                print(f"[BENCHMARKS] Matched brand '{matched_brand}' to industry '{selected_industry}'")
+                print(f"[BENCHMARKS] Market: '{selected_industry}'")
             else:
-                print(f"[BENCHMARKS] WARNING: No industry found for campaign, available brands: {list(brand_map.keys())[:20]}...")
+                print(f"[BENCHMARKS] No industry classified for selected campaign")
                 selected_bucket = selected_classification['bucket']
         else:
             selected_bucket = selected_classification['bucket']
@@ -618,7 +625,12 @@ def campaign_benchmarks():
             camp_topic = camp_classification['topic']
 
             if analyze_by in ('industry', 'market'):
-                camp_industry, _ = extract_industry_from_campaign(camp.get('campaign_name', ''), brand_map)
+                if not selected_industry:
+                    return 0
+                if use_client_markets:
+                    camp_industry = peer_markets.get(camp.get('campaign_name', ''))
+                else:
+                    camp_industry, _ = extract_industry_from_campaign(camp.get('campaign_name', ''), brand_map)
                 if not camp_industry or camp_industry != selected_industry:
                     return 0
                 score = 60
@@ -806,7 +818,10 @@ def campaign_benchmarks():
         success_factors = []
 
         if analyze_by in ('industry', 'market'):
-            bucket_campaigns = [c for c in campaigns_data if extract_industry_from_campaign(c.get('campaign_name', ''), brand_map)[0] == selected_industry]
+            if use_client_markets:
+                bucket_campaigns = [c for c in campaigns_data if peer_markets.get(c.get('campaign_name', '')) == selected_industry]
+            else:
+                bucket_campaigns = [c for c in campaigns_data if extract_industry_from_campaign(c.get('campaign_name', ''), brand_map)[0] == selected_industry]
             factor_label = f'Market: {selected_industry}'
         else:
             bucket_campaigns = [c for c in campaigns_data if classify_campaign(c.get('campaign_name', ''))['bucket'] == selected_bucket]
@@ -856,6 +871,15 @@ def campaign_benchmarks():
 
         print(f"[BENCHMARKS] Found {len(similar_campaigns)} similar campaigns, grade: {grade}")
 
+        warning = None
+        if not similar_campaigns:
+            if analyze_by in ('industry', 'market') and not selected_industry:
+                warning = "This campaign could not be classified into a market. Add its brand in Brand Management or update the campaign name."
+            elif analyze_by in ('industry', 'market'):
+                warning = f"No peer campaigns found in market '{selected_industry}'."
+            else:
+                warning = f"No peer campaigns found for content type '{selected_bucket}'."
+
         return jsonify({
             'campaign': selected_campaign,
             'classification': {
@@ -869,7 +893,8 @@ def campaign_benchmarks():
             'benchmarks': benchmarks,
             'success_factors': success_factors,
             'grade': grade,
-            'overall_score': avg_percentile
+            'overall_score': avg_percentile,
+            'warning': warning
         }), 200
 
     except Exception as e:
@@ -880,6 +905,8 @@ def campaign_benchmarks():
 
 @analytics_bp.route('/timing-intelligence', methods=['POST'])
 def timing_intelligence():
+    conn = None
+    cursor = None
     try:
         data = request.json or {}
         specialties = data.get('specialties', [])
@@ -888,171 +915,110 @@ def timing_intelligence():
 
         print(f"[TIMING] Received request: specialties={len(specialties)}, campaigns={len(campaigns)}, date_range={date_range}")
 
-        conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-        date_filter = ""
         if date_range == '3months':
             date_filter = "AND ci.timestamp >= NOW() - INTERVAL '3 months'"
-        elif date_range == '6months':
-            date_filter = "AND ci.timestamp >= NOW() - INTERVAL '6 months'"
         elif date_range == '1year':
             date_filter = "AND ci.timestamp >= NOW() - INTERVAL '1 year'"
+        elif date_range == 'all':
+            date_filter = "AND ci.timestamp >= NOW() - INTERVAL '12 months'"
+        else:
+            date_filter = "AND ci.timestamp >= NOW() - INTERVAL '6 months'"
 
+        up_join = ""
         specialty_filter = ""
         if specialties:
-            specialty_placeholders = ', '.join(['%s'] * len(specialties))
-            specialty_filter = f"AND up.specialty IN ({specialty_placeholders})"
+            up_join = "INNER JOIN user_profiles up ON up.email = LOWER(ci.email)"
+            placeholders = ', '.join(['%s'] * len(specialties))
+            specialty_filter = f"AND up.specialty IN ({placeholders})"
 
+        cd_join = ""
         campaign_filter = ""
         if campaigns:
-            campaign_conditions = []
-            for _ in campaigns:
-                campaign_conditions.append("cd.campaign_base_name LIKE %s")
-            campaign_filter = f"AND ({' OR '.join(campaign_conditions)})"
+            cd_join = "INNER JOIN campaign_deployments cd ON cd.campaign_id = ci.campaign_id"
+            conditions = ' OR '.join(['cd.campaign_base_name LIKE %s'] * len(campaigns))
+            campaign_filter = f"AND ({conditions})"
 
-        query_params = []
-        if specialties:
-            query_params.extend(specialties)
-        if campaigns:
-            query_params.extend([f"{c}%" for c in campaigns])
-        if specialties:
-            query_params.extend(specialties)
-        if campaigns:
-            query_params.extend([f"{c}%" for c in campaigns])
-        if specialties:
-            query_params.extend(specialties)
-        if campaigns:
-            query_params.extend([f"{c}%" for c in campaigns])
+        def build_params():
+            p = []
+            if specialties:
+                p.extend(specialties)
+            if campaigns:
+                p.extend([f"{c}%" for c in campaigns])
+            return p
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SET LOCAL statement_timeout = '60s'")
 
         heatmap_query = f"""
-            WITH total_delivered AS (
-                SELECT COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as total
-                FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE ci.event_type = 'sent'
-                {date_filter}
-                {specialty_filter}
-                {campaign_filter}
-            ),
-            sent_data AS (
-                SELECT
-                    EXTRACT(HOUR FROM ci.timestamp) as hour,
-                    EXTRACT(DOW FROM ci.timestamp) as day_of_week,
-                    COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as unique_sends
-                FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE ci.event_type = 'sent'
-                {date_filter}
-                {specialty_filter}
-                {campaign_filter}
-                GROUP BY EXTRACT(HOUR FROM ci.timestamp), EXTRACT(DOW FROM ci.timestamp)
-            ),
-            open_data AS (
-                SELECT
-                    EXTRACT(HOUR FROM ci.timestamp) as hour,
-                    EXTRACT(DOW FROM ci.timestamp) as day_of_week,
-                    COUNT(DISTINCT ci.email || '-' || ci.campaign_id) as unique_opens
-                FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE ci.event_type = 'open'
-                {date_filter}
-                {specialty_filter}
-                {campaign_filter}
-                GROUP BY EXTRACT(HOUR FROM ci.timestamp), EXTRACT(DOW FROM ci.timestamp)
-            ),
-            total_opens AS (
-                SELECT SUM(unique_opens) as total FROM open_data
-            )
             SELECT
-                COALESCE(od.hour, sd.hour) as hour,
-                COALESCE(od.day_of_week, sd.day_of_week) as day_of_week,
-                COALESCE(od.unique_opens, 0) as unique_opens,
-                COALESCE(sd.unique_sends, 0) as unique_sends,
-                td.total as total_delivered,
-                to2.total as total_opens
-            FROM open_data od
-            FULL OUTER JOIN sent_data sd ON od.hour = sd.hour AND od.day_of_week = sd.day_of_week
-            CROSS JOIN total_delivered td
-            CROSS JOIN total_opens to2
+                EXTRACT(HOUR FROM ci.timestamp)::int AS hour,
+                EXTRACT(DOW  FROM ci.timestamp)::int AS dow,
+                COUNT(*) FILTER (WHERE ci.event_type = 'open') AS opens,
+                COUNT(*) FILTER (WHERE ci.event_type = 'sent') AS sends
+            FROM campaign_interactions ci
+            {up_join}
+            {cd_join}
+            WHERE ci.event_type IN ('open','sent')
+            {date_filter}
+            {specialty_filter}
+            {campaign_filter}
+            GROUP BY 1, 2
         """
-
-        cursor.execute(heatmap_query, query_params)
-        heatmap_results = cursor.fetchall()
+        cursor.execute(heatmap_query, build_params())
+        rows = cursor.fetchall()
 
         day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        heatmap_opens = {d: {h: None for h in range(24)} for d in day_names}
+        heatmap_sends = {d: {h: None for h in range(24)} for d in day_names}
+        day_totals = {d: {'opens': 0} for d in day_names}
 
-        heatmap_opens = {day: {hour: None for hour in range(24)} for day in day_names}
+        total_opens = sum(int(r['opens'] or 0) for r in rows)
+        total_sends = sum(int(r['sends'] or 0) for r in rows)
 
-        heatmap_sends = {day: {hour: None for hour in range(24)} for day in day_names}
-
-        day_totals = {day: {'opens': 0, 'total_opens': 0} for day in day_names}
-
-        total_opens_overall = heatmap_results[0]['total_opens'] if heatmap_results else 0
-        total_sends_overall = heatmap_results[0]['total_delivered'] if heatmap_results else 0
-
-        for row in heatmap_results:
-            hour = int(row['hour'])
-            dow = int(row['day_of_week'])
-            day_name = day_names[dow]
-            unique_opens = float(row['unique_opens']) if row['unique_opens'] else 0
-            unique_sends = float(row['unique_sends']) if row['unique_sends'] else 0
-            total_opens = float(row['total_opens']) if row['total_opens'] else 0
-            total_delivered = float(row['total_delivered']) if row['total_delivered'] else 0
-
-            if total_opens > 0 and unique_opens > 0:
-                pct_of_opens = (unique_opens / total_opens) * 100
-                heatmap_opens[day_name][hour] = round(pct_of_opens, 2)
-
-            if total_delivered > 0 and unique_sends > 0:
-                pct_of_sends = (unique_sends / total_delivered) * 100
-                heatmap_sends[day_name][hour] = round(pct_of_sends, 2)
-
-            day_totals[day_name]['opens'] += int(unique_opens)
-            day_totals[day_name]['total_opens'] = int(total_opens)
+        for r in rows:
+            hour = int(r['hour'])
+            dow = int(r['dow'])
+            day = day_names[dow]
+            opens = int(r['opens'] or 0)
+            sends = int(r['sends'] or 0)
+            if total_opens > 0 and opens > 0:
+                heatmap_opens[day][hour] = round(opens / total_opens * 100, 2)
+            if total_sends > 0 and sends > 0:
+                heatmap_sends[day][hour] = round(sends / total_sends * 100, 2)
+            day_totals[day]['opens'] += opens
 
         day_of_week_performance = {}
         for day, totals in day_totals.items():
-            if totals['total_opens'] > 0:
-                pct_of_opens = (totals['opens'] / totals['total_opens']) * 100
+            if total_opens > 0:
                 day_of_week_performance[day] = {
-                    'open_rate': round(pct_of_opens, 2),
+                    'open_rate': round(totals['opens'] / total_opens * 100, 2),
                     'campaigns': totals['opens']
                 }
-
-        time_query_params = []
-        if specialties:
-            time_query_params.extend(specialties)
-        if campaigns:
-            time_query_params.extend([f"{c}%" for c in campaigns])
 
         time_to_open_query = f"""
             WITH first_events AS (
                 SELECT
                     ci.email,
                     ci.campaign_id,
-                    MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'sent') as sent_time,
-                    MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'open') as first_open_time
+                    MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'sent') AS sent_time,
+                    MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'open') AS open_time
                 FROM campaign_interactions ci
-                INNER JOIN user_profiles up ON ci.email = LOWER(up.email)
-                LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
-                WHERE ci.event_type IN ('sent', 'open')
+                {up_join}
+                {cd_join}
+                WHERE ci.event_type IN ('sent','open')
                 {date_filter}
                 {specialty_filter}
                 {campaign_filter}
                 GROUP BY ci.email, ci.campaign_id
-                HAVING MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'open') IS NOT NULL
+                HAVING MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'sent') IS NOT NULL
+                   AND MIN(ci.timestamp) FILTER (WHERE ci.event_type = 'open') IS NOT NULL
             )
-            SELECT
-                EXTRACT(EPOCH FROM (first_open_time - sent_time))/3600 as hours_to_open
+            SELECT EXTRACT(EPOCH FROM (open_time - sent_time))/3600 AS hours_to_open
             FROM first_events
-            WHERE sent_time IS NOT NULL
+            WHERE open_time > sent_time
         """
-
-        cursor.execute(time_to_open_query, time_query_params)
+        cursor.execute(time_to_open_query, build_params())
         time_results = cursor.fetchall()
 
         buckets = [
@@ -1066,24 +1032,23 @@ def timing_intelligence():
             {'label': '7+ days', 'min': 168, 'max': 999999, 'count': 0}
         ]
 
-        total_opens = len(time_results)
-        within_24h = 0
         all_times = []
-
+        within_24h = 0
         for row in time_results:
             hours = row['hours_to_open']
-            if hours is not None:
-                all_times.append(hours)
-                if hours <= 24:
-                    within_24h += 1
+            if hours is None or hours < 0:
+                continue
+            all_times.append(hours)
+            if hours <= 24:
+                within_24h += 1
+            for bucket in buckets:
+                if bucket['min'] <= hours < bucket['max']:
+                    bucket['count'] += 1
+                    break
 
-                for bucket in buckets:
-                    if bucket['min'] <= hours < bucket['max']:
-                        bucket['count'] += 1
-                        break
-
+        tto_total = len(all_times)
         for bucket in buckets:
-            bucket['percentage'] = (bucket['count'] / total_opens * 100) if total_opens > 0 else 0
+            bucket['percentage'] = (bucket['count'] / tto_total * 100) if tto_total > 0 else 0
 
         if all_times:
             all_times.sort()
@@ -1100,14 +1065,11 @@ def timing_intelligence():
         time_to_open_data = {
             'buckets': buckets,
             'median': median_str,
-            'peak_window': '1-6 hours' if total_opens > 0 else 'N/A',
-            'percent_24h': round((within_24h / total_opens * 100), 1) if total_opens > 0 else 0
+            'peak_window': '1-6 hours' if tto_total > 0 else 'N/A',
+            'percent_24h': round((within_24h / tto_total * 100), 1) if tto_total > 0 else 0
         }
 
-        cursor.close()
-        conn.close()
-
-        print(f"[TIMING] Successfully processed request")
+        print(f"[TIMING] Success: {len(rows)} heatmap rows, {tto_total} time-to-open samples")
 
         return jsonify({
             'heatmap_opens': heatmap_opens,
@@ -1117,25 +1079,31 @@ def timing_intelligence():
         }), 200
 
     except Exception as e:
-        print(f"[TIMING] Error in timing-intelligence: {str(e)}")
+        print(f"[TIMING] Error: {str(e)}")
         import traceback
         traceback.print_exc()
-
-        return jsonify({
-            'error': str(e),
-            'heatmap_opens': {},
-            'heatmap_sends': {},
-            'day_of_week': {},
-            'time_to_open': {'buckets': [], 'median': 'N/A', 'peak_window': 'N/A', 'percent_24h': 0}
-        }), 500
+        msg = str(e)
+        if 'statement timeout' in msg.lower() or 'canceling statement' in msg.lower():
+            msg = 'Query timed out. Try a shorter date range or narrower filter.'
+        return jsonify({'error': msg}), 500
+    finally:
+        if cursor is not None:
+            try: cursor.close()
+            except Exception: pass
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 @analytics_bp.route('/geographic-main', methods=['GET'])
 def geographic_main():
+    conn = None
+    cursor = None
     try:
         print(f"[GEO-MAIN] Fetching main geographic data using SQL aggregation")
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SET LOCAL statement_timeout = '60s'")
 
         audience_count_query = "SELECT COUNT(*) as count FROM user_profiles"
         cursor.execute(audience_count_query)
@@ -1472,9 +1440,6 @@ def geographic_main():
         city_data = dict(sorted(city_data.items(), key=lambda x: x[1]['audience_count'], reverse=True)[:100])
         print(f"[GEO-MAIN] City data entries: {len(city_data)}")
 
-        cursor.close()
-        conn.close()
-
         print(f"[GEO-MAIN] Successfully processed: {total_states} states, {total_users} users")
 
         return jsonify({
@@ -1502,22 +1467,22 @@ def geographic_main():
         print(f"[GEO-MAIN] Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'error': str(e),
-            'full_map': {},
-            'state_heatmap': {},
-            'npi_by_state': {},
-            'penetration': {},
-            'opportunity': {},
-            'metro_areas': [],
-            'urban_rural': {},
-            'zipcode_data': {},
-            'city_data': {},
-            'breakdown': {}
-        }), 500
+        msg = str(e)
+        if 'statement timeout' in msg.lower() or 'canceling statement' in msg.lower():
+            msg = 'Geographic query timed out.'
+        return jsonify({'error': msg}), 500
+    finally:
+        if cursor is not None:
+            try: cursor.close()
+            except Exception: pass
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 @analytics_bp.route('/geographic-custom', methods=['POST'])
 def geographic_custom():
+    conn = None
+    cursor = None
     try:
         data = request.json or {}
         specialties = data.get('specialties', [])
@@ -1530,6 +1495,7 @@ def geographic_custom():
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SET LOCAL statement_timeout = '60s'")
 
         specialty_filter = ""
         specialty_params = []
@@ -1544,19 +1510,14 @@ def geographic_custom():
                 FROM user_profiles up
                 WHERE up.zipcode IS NOT NULL AND up.zipcode != ''
                 {specialty_filter}
+                AND NOT EXISTS (
+                    SELECT 1 FROM campaign_interactions ci
+                    WHERE ci.email = LOWER(up.email) AND ci.event_type = 'open'
+                )
             """
             cursor.execute(base_query, specialty_params)
-            all_users = cursor.fetchall()
-
-            opened_query = """
-                SELECT DISTINCT email FROM campaign_interactions
-                WHERE event_type = 'open'
-            """
-            cursor.execute(opened_query)
-            opened_emails = set(row['email'] for row in cursor.fetchall())
-
-            custom_results = [u for u in all_users if u['email'] not in opened_emails]
-            print(f"[GEO-CUSTOM] Never opened: {len(custom_results)} of {len(all_users)} users")
+            custom_results = cursor.fetchall()
+            print(f"[GEO-CUSTOM] Never opened: {len(custom_results)} users")
 
         elif engagement_filter == 'opened':
             date_filter = ""
@@ -1642,9 +1603,6 @@ def geographic_custom():
                     top_item = state
                     top_count = count
 
-            cursor.close()
-            conn.close()
-
             return jsonify({
                 'state_data': response_data,
                 'granularity': granularity,
@@ -1669,9 +1627,6 @@ def geographic_custom():
                     top_item = f"{prefix}xx ({data['state']})"
                     top_count = count
 
-            cursor.close()
-            conn.close()
-
             return jsonify({
                 'zipcode_data': response_data,
                 'granularity': granularity,
@@ -1695,9 +1650,6 @@ def geographic_custom():
                     top_item = city
                     top_count = count
 
-            cursor.close()
-            conn.close()
-
             return jsonify({
                 'city_data': response_data,
                 'granularity': granularity,
@@ -1712,11 +1664,17 @@ def geographic_custom():
         print(f"[GEO-CUSTOM] Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'error': str(e),
-            'state_data': {},
-            'breakdown': {}
-        }), 500
+        msg = str(e)
+        if 'statement timeout' in msg.lower() or 'canceling statement' in msg.lower():
+            msg = 'Query timed out. Try narrowing specialties or campaigns.'
+        return jsonify({'error': msg}), 500
+    finally:
+        if cursor is not None:
+            try: cursor.close()
+            except Exception: pass
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 @analytics_bp.route('/geographic-enhanced', methods=['GET'])
 def geographic_enhanced():

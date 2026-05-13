@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import UniversalProfile, UserProfile, get_session
+from routes.source_classification import classify_source, classify_source_sql_expr
 import csv
 import io
 
@@ -57,6 +58,7 @@ def bulk_npi_lookup():
                     'primary_taxonomy_code': profile.primary_taxonomy_code,
                     'primary_specialty': profile.primary_specialty,
                     'is_active': profile.is_active,
+                    'provider_status': profile.provider_status or 'Active',
                     'enumeration_date': profile.enumeration_date.isoformat() if profile.enumeration_date else None,
                     'last_update_date': profile.last_update_date.isoformat() if profile.last_update_date else None,
                     'deactivation_date': profile.deactivation_date.isoformat() if profile.deactivation_date else None
@@ -131,7 +133,7 @@ def csv_npi_lookup():
                     'First Name', 'Last Name', 'Middle Name', 'Organization Name', 'Credential',
                     'Mailing Address 1', 'Mailing Address 2', 'Mailing City', 'Mailing State', 'Mailing Zipcode',
                     'Practice Address 1', 'Practice Address 2', 'Practice City', 'Practice State', 'Practice Zipcode',
-                    'Primary Specialty', 'Entity Type', 'Is Active'
+                    'Primary Specialty', 'Entity Type', 'Is Active', 'Flag'
                 ]
                 all_columns = original_columns + new_columns
 
@@ -161,7 +163,8 @@ def csv_npi_lookup():
                             'Practice Zipcode': profile.practice_zipcode or '',
                             'Primary Specialty': profile.primary_specialty or '',
                             'Entity Type': profile.entity_type or '',
-                            'Is Active': 'Yes' if profile.is_active else 'No'
+                            'Is Active': 'Yes' if profile.is_active else 'No',
+                            'Flag': profile.provider_status if profile.provider_status and profile.provider_status != 'Active' else ''
                         })
                     else:
                         for col in new_columns:
@@ -247,10 +250,34 @@ def quick_npi_lookup():
             placeholders = ','.join([f':npi_{i}' for i in range(len(cleaned_npis))])
             params = {f'npi_{i}': npi for i, npi in enumerate(cleaned_npis)}
 
+            source_expr = classify_source_sql_expr('up')
+            flag_event_expr = """COALESCE(
+                (SELECT e->>'event' FROM jsonb_array_elements(COALESCE(univ.address_history, '[]'::jsonb)) e
+                 WHERE e->>'event' IN ('address_flagged_invalid','undeliverable')
+                 ORDER BY e->>'changed_at' DESC NULLS LAST LIMIT 1),
+                (SELECT e->>'event' FROM jsonb_array_elements(COALESCE(up.address_history, '[]'::jsonb)) e
+                 WHERE e->>'event' IN ('address_flagged_invalid','undeliverable')
+                 ORDER BY e->>'changed_at' DESC NULLS LAST LIMIT 1)
+            )"""
+            flag_reason_expr = """COALESCE(
+                (SELECT e->>'reason' FROM jsonb_array_elements(COALESCE(univ.address_history, '[]'::jsonb)) e
+                 WHERE e->>'event' IN ('address_flagged_invalid','undeliverable')
+                 ORDER BY e->>'changed_at' DESC NULLS LAST LIMIT 1),
+                (SELECT e->>'reason' FROM jsonb_array_elements(COALESCE(up.address_history, '[]'::jsonb)) e
+                 WHERE e->>'event' IN ('address_flagged_invalid','undeliverable')
+                 ORDER BY e->>'changed_at' DESC NULLS LAST LIMIT 1)
+            )"""
             user_query = text(f"""
-                SELECT npi, first_name, last_name, specialty, degree, address, city, state, zipcode
-                FROM user_profiles
-                WHERE npi IS NOT NULL AND npi != '' AND npi IN ({placeholders})
+                SELECT up.npi, up.first_name, up.last_name, up.specialty, up.degree,
+                       up.address, up.city, up.state, up.zipcode,
+                       COALESCE(univ.provider_status, 'Active') AS provider_status,
+                       up.is_active AS up_is_active,
+                       ({source_expr}) AS source_class,
+                       ({flag_event_expr}) AS address_flag_event,
+                       ({flag_reason_expr}) AS address_flag_reason
+                FROM user_profiles up
+                LEFT JOIN universal_profiles univ ON up.npi = univ.npi
+                WHERE up.npi IS NOT NULL AND up.npi != '' AND up.npi IN ({placeholders})
             """)
 
             user_results = session.execute(user_query, params).fetchall()
@@ -264,6 +291,11 @@ def quick_npi_lookup():
                         zipcode = str(zipcode).strip()
                         if len(zipcode) == 9 and zipcode.isdigit():
                             zipcode = f"{zipcode[:5]}-{zipcode[5:]}"
+                    provider_status = row[9] if len(row) > 9 else 'Active'
+                    up_is_active = bool(row[10]) if row[10] is not None else True
+                    source_class = row[11] or 'Owned'
+                    address_flag_event = row[12] if len(row) > 12 else None
+                    address_flag_reason = row[13] if len(row) > 13 else None
                     results.append({
                         'npi': npi,
                         'first_name': row[1],
@@ -277,8 +309,12 @@ def quick_npi_lookup():
                         'city': row[6],
                         'state': row[7],
                         'zipcode': zipcode,
-                        'is_active': True,
-                        'source': 'Audience'
+                        'is_active': provider_status == 'Active',
+                        'provider_status': provider_status,
+                        'audience_active': up_is_active,
+                        'source': source_class,
+                        'address_flag_event': address_flag_event,
+                        'address_flag_reason': address_flag_reason,
                     })
 
             remaining_npis = [npi for npi in cleaned_npis if npi not in found_npis]
@@ -297,6 +333,21 @@ def quick_npi_lookup():
                             zipcode = str(zipcode).strip()
                             if len(zipcode) == 9 and zipcode.isdigit():
                                 zipcode = f"{zipcode[:5]}-{zipcode[5:]}"
+                        provider_status = profile.provider_status or 'Active'
+                        history = profile.address_history or []
+                        if isinstance(history, str):
+                            try:
+                                import json as _json
+                                history = _json.loads(history)
+                            except Exception:
+                                history = []
+                        flag_event = None
+                        flag_reason = None
+                        flag_events = [e for e in history if isinstance(e, dict) and e.get('event') in ('address_flagged_invalid', 'undeliverable')]
+                        if flag_events:
+                            latest = max(flag_events, key=lambda e: e.get('changed_at') or '')
+                            flag_event = latest.get('event')
+                            flag_reason = latest.get('reason')
                         results.append({
                             'npi': profile.npi,
                             'first_name': profile.first_name,
@@ -310,13 +361,18 @@ def quick_npi_lookup():
                             'city': profile.practice_city or profile.mailing_city,
                             'state': profile.practice_state or profile.mailing_state,
                             'zipcode': zipcode,
-                            'is_active': profile.is_active if profile.is_active is not None else True,
-                            'source': 'Market'
+                            'is_active': provider_status == 'Active',
+                            'provider_status': provider_status,
+                            'audience_active': None,
+                            'source': 'Market',
+                            'address_flag_event': flag_event,
+                            'address_flag_reason': flag_reason,
                         })
 
             missing_npis = [npi for npi in cleaned_npis if npi not in found_npis]
 
-            audience_count = sum(1 for r in results if r.get('source') == 'Audience')
+            owned_count = sum(1 for r in results if r.get('source') == 'Owned')
+            licensed_count = sum(1 for r in results if r.get('source') == 'Licensed')
             market_count = sum(1 for r in results if r.get('source') == 'Market')
 
             return jsonify({
@@ -324,7 +380,9 @@ def quick_npi_lookup():
                 'count': len(results),
                 'requested': len(cleaned_npis),
                 'found': len(results),
-                'audience_count': audience_count,
+                'owned_count': owned_count,
+                'licensed_count': licensed_count,
+                'audience_count': owned_count + licensed_count,
                 'market_count': market_count,
                 'missing': len(missing_npis),
                 'missing_npis': missing_npis,
@@ -388,7 +446,8 @@ def debug_npi(npi):
                 'mailing_city': universal_profile.mailing_city,
                 'mailing_state': universal_profile.mailing_state,
                 'mailing_zipcode': universal_profile.mailing_zipcode,
-                'is_active': universal_profile.is_active
+                'is_active': universal_profile.is_active,
+                'provider_status': universal_profile.provider_status or 'Active'
             }
 
         return jsonify({
@@ -405,3 +464,255 @@ def debug_npi(npi):
         return jsonify({'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}), 500
     finally:
         session.close()
+
+
+@npi_bp.route('/specialty-lookup', methods=['POST'])
+def specialty_lookup():
+    try:
+        data = request.get_json()
+        if not data or 'specialties' not in data:
+            return jsonify({'status': 'error', 'message': 'Missing "specialties" field'}), 400
+
+        specialties = data['specialties']
+        if not isinstance(specialties, list) or not specialties:
+            return jsonify({'status': 'error', 'message': '"specialties" must be a non-empty array'}), 400
+
+        specialties = [s for s in (str(x).strip() for x in specialties) if s]
+
+        taxonomy_codes = data.get('taxonomy_codes') or []
+        if not isinstance(taxonomy_codes, list):
+            taxonomy_codes = []
+        taxonomy_codes = [c for c in (str(x).strip() for x in taxonomy_codes) if c]
+
+        hide_inactive = bool(data.get('hide_inactive', False))
+
+        session = get_session()
+        try:
+            from sqlalchemy import text
+
+            placeholders = ','.join([f':spec_{i}' for i in range(len(specialties))])
+            params = {f'spec_{i}': s for i, s in enumerate(specialties)}
+
+            source_expr = classify_source_sql_expr('up')
+            audience_q = text(f"""
+                SELECT up.npi, up.first_name, up.last_name, up.specialty, up.degree,
+                       up.address, up.city, up.state, up.zipcode,
+                       COALESCE(univ.provider_status, 'Active') AS provider_status,
+                       up.is_active AS up_is_active,
+                       ({source_expr}) AS source_class
+                FROM user_profiles up
+                LEFT JOIN universal_profiles univ ON up.npi = univ.npi
+                WHERE up.specialty IN ({placeholders})
+                  AND up.npi IS NOT NULL AND up.npi != ''
+            """)
+            audience_rows = session.execute(audience_q, params).fetchall()
+
+            results = []
+            found_npis = set()
+
+            for row in audience_rows:
+                npi = str(row[0]).strip() if row[0] else None
+                if not npi or npi in found_npis:
+                    continue
+                provider_status = row[9] if len(row) > 9 else 'Active'
+                if hide_inactive and provider_status and provider_status != 'Active':
+                    continue
+                found_npis.add(npi)
+                zipcode = row[8]
+                if zipcode:
+                    zipcode = str(zipcode).strip()
+                    if len(zipcode) == 9 and zipcode.isdigit():
+                        zipcode = f"{zipcode[:5]}-{zipcode[5:]}"
+                up_is_active = bool(row[10]) if len(row) > 10 and row[10] is not None else True
+                source_class = row[11] if len(row) > 11 and row[11] else 'Owned'
+                results.append({
+                    'npi': npi,
+                    'first_name': row[1],
+                    'last_name': row[2],
+                    'middle_name': None,
+                    'organization_name': None,
+                    'specialty': row[3] if row[3] else None,
+                    'taxonomy_code': None,
+                    'address': row[5],
+                    'address_2': None,
+                    'city': row[6],
+                    'state': row[7],
+                    'zipcode': zipcode,
+                    'is_active': provider_status == 'Active',
+                    'provider_status': provider_status,
+                    'audience_active': up_is_active,
+                    'source': source_class
+                })
+
+            if taxonomy_codes:
+                universal_query = session.query(UniversalProfile).filter(
+                    UniversalProfile.primary_taxonomy_code.in_(taxonomy_codes)
+                )
+            else:
+                universal_query = session.query(UniversalProfile).filter(
+                    UniversalProfile.primary_specialty.in_(specialties)
+                )
+            if hide_inactive:
+                universal_query = universal_query.filter(
+                    (UniversalProfile.provider_status == 'Active') | (UniversalProfile.provider_status.is_(None))
+                )
+            universal_profiles = universal_query.all()
+
+            for profile in universal_profiles:
+                if profile.npi in found_npis:
+                    continue
+                provider_status = profile.provider_status or 'Active'
+                if hide_inactive and provider_status != 'Active':
+                    continue
+                found_npis.add(profile.npi)
+                specialty = profile.primary_specialty if profile.primary_specialty else profile.primary_taxonomy_code
+                zipcode = profile.practice_zipcode or profile.mailing_zipcode
+                if zipcode:
+                    zipcode = str(zipcode).strip()
+                    if len(zipcode) == 9 and zipcode.isdigit():
+                        zipcode = f"{zipcode[:5]}-{zipcode[5:]}"
+                results.append({
+                    'npi': profile.npi,
+                    'first_name': profile.first_name,
+                    'last_name': profile.last_name,
+                    'middle_name': profile.middle_name,
+                    'organization_name': profile.organization_name,
+                    'specialty': specialty,
+                    'taxonomy_code': profile.primary_taxonomy_code,
+                    'address': profile.practice_address_1 or profile.mailing_address_1,
+                    'address_2': profile.practice_address_2 or profile.mailing_address_2,
+                    'city': profile.practice_city or profile.mailing_city,
+                    'state': profile.practice_state or profile.mailing_state,
+                    'zipcode': zipcode,
+                    'is_active': provider_status == 'Active',
+                    'provider_status': provider_status,
+                    'audience_active': None,
+                    'source': 'Market'
+                })
+
+            owned_count = sum(1 for r in results if r.get('source') == 'Owned')
+            licensed_count = sum(1 for r in results if r.get('source') == 'Licensed')
+            market_count = sum(1 for r in results if r.get('source') == 'Market')
+
+            return jsonify({
+                'status': 'success',
+                'count': len(results),
+                'found': len(results),
+                'requested': len(results),
+                'owned_count': owned_count,
+                'licensed_count': licensed_count,
+                'audience_count': owned_count + licensed_count,
+                'market_count': market_count,
+                'missing': 0,
+                'missing_npis': [],
+                'specialties': specialties,
+                'hide_inactive': hide_inactive,
+                'results': results
+            }), 200
+        finally:
+            session.close()
+
+    except Exception as e:
+        import traceback
+        return jsonify({'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@npi_bp.route('/specialty-counts', methods=['GET'])
+def specialty_counts():
+    try:
+        session = get_session()
+        try:
+            from sqlalchemy import text
+
+            source_expr = classify_source_sql_expr('up')
+
+            universal_sql = text("""
+                SELECT primary_taxonomy_code AS code,
+                       (provider_status IS NULL OR provider_status = 'Active') AS active_flag,
+                       COUNT(*) AS cnt
+                FROM universal_profiles
+                WHERE primary_taxonomy_code IS NOT NULL AND primary_taxonomy_code != ''
+                GROUP BY primary_taxonomy_code, active_flag
+            """)
+
+            audience_sql = text(f"""
+                SELECT up.specialty AS specialty,
+                       ({source_expr}) AS source_class,
+                       up.is_active AS active_flag,
+                       COUNT(*) AS cnt
+                FROM user_profiles up
+                WHERE up.specialty IS NOT NULL AND up.specialty != ''
+                GROUP BY up.specialty, source_class, active_flag
+            """)
+
+            universal_map = {}
+            for row in session.execute(universal_sql).fetchall():
+                code = row[0]
+                is_active = bool(row[1])
+                cnt = int(row[2])
+                if not code:
+                    continue
+                entry = universal_map.setdefault(code, {'all': 0, 'active': 0})
+                entry['all'] += cnt
+                if is_active:
+                    entry['active'] += cnt
+
+            universal_taxonomy_counts = [
+                {'taxonomy_code': code, 'count': v['all'], 'count_active': v['active']}
+                for code, v in universal_map.items()
+            ]
+
+            owned_map = {}
+            licensed_map = {}
+            for row in session.execute(audience_sql).fetchall():
+                spec = row[0]
+                src = row[1]
+                is_active = bool(row[2])
+                cnt = int(row[3])
+                if not spec:
+                    continue
+                target = licensed_map if src == 'Licensed' else owned_map
+                entry = target.setdefault(spec, {'all': 0, 'active': 0})
+                entry['all'] += cnt
+                if is_active:
+                    entry['active'] += cnt
+
+            owned_specialty_counts = [
+                {'specialty': k, 'count': v['all'], 'count_active': v['active']}
+                for k, v in owned_map.items()
+            ]
+            licensed_specialty_counts = [
+                {'specialty': k, 'count': v['all'], 'count_active': v['active']}
+                for k, v in licensed_map.items()
+            ]
+            all_specs = set(owned_map.keys()) | set(licensed_map.keys())
+            audience_specialty_counts = [
+                {
+                    'specialty': spec,
+                    'count': owned_map.get(spec, {'all': 0})['all'] + licensed_map.get(spec, {'all': 0})['all'],
+                    'count_active': owned_map.get(spec, {'active': 0})['active'] + licensed_map.get(spec, {'active': 0})['active'],
+                }
+                for spec in all_specs
+            ]
+
+            return jsonify({
+                'status': 'success',
+                'universal_total': sum(v['all'] for v in universal_map.values()),
+                'universal_total_active': sum(v['active'] for v in universal_map.values()),
+                'audience_total': sum(v['all'] for v in owned_map.values()) + sum(v['all'] for v in licensed_map.values()),
+                'audience_total_active': sum(v['active'] for v in owned_map.values()) + sum(v['active'] for v in licensed_map.values()),
+                'owned_total': sum(v['all'] for v in owned_map.values()),
+                'owned_total_active': sum(v['active'] for v in owned_map.values()),
+                'licensed_total': sum(v['all'] for v in licensed_map.values()),
+                'licensed_total_active': sum(v['active'] for v in licensed_map.values()),
+                'universal_taxonomy_counts': universal_taxonomy_counts,
+                'audience_specialty_counts': audience_specialty_counts,
+                'owned_specialty_counts': owned_specialty_counts,
+                'licensed_specialty_counts': licensed_specialty_counts
+            }), 200
+        finally:
+            session.close()
+
+    except Exception as e:
+        import traceback
+        return jsonify({'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}), 500

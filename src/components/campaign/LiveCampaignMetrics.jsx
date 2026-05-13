@@ -67,7 +67,8 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
                         Total_Clicks: sumMetric('Total_Clicks'),
                         Filtered_Bot_Clicks: sumMetric('Filtered_Bot_Clicks'),
                         DeploymentCount: validDeployments.length,
-                        Deployments: validDeployments.map(d => d.Campaign)
+                        Deployments: validDeployments.map(d => d.Campaign),
+                        DeploymentDetails: validDeployments,
                     };
 
                     combined.Delivery_Rate = Number(((combined.Delivered / deployment1.Sent) * 100).toFixed(2));
@@ -177,15 +178,29 @@ const LiveCampaignMetrics = ({ searchTerm = '' }) => {
             }
 
             if (flag.api_value) {
+                const matchingDeployment = currentMetrics?.DeploymentDetails?.find(
+                    d => d.Campaign === flag.campaign_name
+                );
+
+                const pickValue = (key) => {
+                    const fromDep = matchingDeployment?.[key];
+                    if (fromDep != null && fromDep !== "NA") return fromDep;
+                    const fromCombined = currentMetrics?.[key];
+                    if (fromCombined != null && fromCombined !== "NA") return fromCombined;
+                    return null;
+                };
+
                 let localValue = null;
-                if (flag.issue_type === 'opens_deviation' && currentMetrics?.Unique_Opens != null) {
-                    localValue = currentMetrics.Unique_Opens;
-                } else if (flag.issue_type === 'sent_deviation' && currentMetrics?.Sent != null) {
-                    localValue = currentMetrics.Sent;
+                if (flag.issue_type === 'opens_deviation') {
+                    localValue = pickValue('Unique_Opens');
+                } else if (flag.issue_type === 'sent_deviation') {
+                    localValue = pickValue('Sent');
                 }
+
                 if (localValue != null) {
-                    const deviation = Math.abs(localValue - flag.api_value) / flag.api_value;
-                    if (deviation < 0.01) {
+                    const tolerancePct = flag.tolerance_pct != null ? flag.tolerance_pct : 10;
+                    const deviationPct = Math.abs(localValue - flag.api_value) / flag.api_value * 100;
+                    if (deviationPct <= tolerancePct) {
                         return false;
                     }
                 }

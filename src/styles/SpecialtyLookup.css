@@ -1,0 +1,134 @@
+.specialty-lookup .specialty-lookup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.specialty-lookup .selector-button {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: var(--color-bg-elevated, #333);
+  border: 1px solid var(--color-border, #555);
+  border-radius: 4px;
+  color: var(--color-text-primary, #fff);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.specialty-lookup .selector-button:hover {
+  border-color: var(--color-accent, #0ff);
+  background-color: var(--color-bg-card, #2a2a2d);
+}
+
+.specialty-lookup .specialty-lookup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.specialty-lookup .specialty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: rgba(0, 255, 255, 0.08);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: var(--color-accent, #0ff);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.specialty-lookup .specialty-chip-remove {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  opacity: 0.7;
+}
+
+.specialty-lookup .specialty-chip-remove:hover {
+  opacity: 1;
+}
+
+.specialty-lookup .specialty-lookup-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.specialty-lookup .btn-secondary-subtle {
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--color-text-secondary, #b8b8b8);
+  border: 1px solid var(--color-border, #555);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.specialty-lookup .btn-secondary-subtle:hover:not(:disabled) {
+  border-color: var(--color-accent, #0ff);
+  color: var(--color-accent, #0ff);
+}
+
+.specialty-lookup .btn-secondary-subtle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.specialty-lookup .counts-toggles-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.specialty-lookup .results-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.specialty-lookup .results-table th.sortable:hover {
+  color: #fff;
+}
+
+body.light .specialty-lookup .selector-button {
+  background-color: #fff;
+  border-color: #ccc;
+  color: #333;
+}
+
+body.light .specialty-lookup .selector-button:hover {
+  border-color: #0077ff;
+}
+
+body.light .specialty-lookup .specialty-chip {
+  background-color: rgba(0, 119, 255, 0.08);
+  border-color: rgba(0, 119, 255, 0.3);
+  color: #0077ff;
+}
+
+body.light .specialty-lookup .btn-secondary-subtle {
+  color: #666;
+  border-color: #ccc;
+}
+
+body.light .specialty-lookup .btn-secondary-subtle:hover:not(:disabled) {
+  border-color: #0077ff;
+  color: #0077ff;
+}

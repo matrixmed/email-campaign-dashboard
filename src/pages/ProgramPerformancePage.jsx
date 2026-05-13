@@ -3,6 +3,7 @@ import _ from 'lodash';
 import ProgramCard from '../components/programs/ProgramCard';
 import ProgramCreator from '../components/programs/ProgramCreator';
 import { API_BASE_URL } from '../config/api';
+import { matchesSearchTerm } from '../utils/searchUtils';
 import '../styles/ProgramPerformance.css';
 import '../styles/AnalyticsHub.css';
 
@@ -231,8 +232,7 @@ const ProgramPerformancePage = () => {
   const filteredPrograms = useMemo(() => {
     let filtered = programs.filter(p => activeTab === 'active' ? p.status === 'active' : p.status === 'completed');
     if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      filtered = filtered.filter(p => p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+      filtered = filtered.filter(p => matchesSearchTerm(p.name, searchTerm) || matchesSearchTerm(p.description, searchTerm));
     }
     return filtered;
   }, [programs, activeTab, searchTerm]);

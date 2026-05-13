@@ -3,6 +3,7 @@ import '../../styles/TimingIntelligence.css';
 import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 import { getIndustry } from '../../utils/industryKeywords';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const METRICS_BLOB_URL = 'https://emaildash.blob.core.windows.net/json-data/dashboard_metrics.json?sp=r&st=2025-06-09T18:55:36Z&se=2027-06-17T02:55:36Z&spr=https&sv=2024-11-04&sr=b&sig=9o5%2B%2BHmlqiFuAQmw9bGl0D2485Z8xTy0XXsb10S2aCI%3D';
 
@@ -16,6 +17,7 @@ const TimingIntelligence = ({ onClearCache }) => {
 
   const [heatmapData, setHeatmapData] = useState(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [heatmapError, setHeatmapError] = useState(null);
   const [heatmapMode, setHeatmapMode] = useState('opens');
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState([]);
@@ -187,20 +189,36 @@ const TimingIntelligence = ({ onClearCache }) => {
 
   const fetchHeatmapData = async () => {
     setHeatmapLoading(true);
+    setHeatmapError(null);
+    setHeatmapData(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90_000);
     try {
       const response = await fetch(`${API_BASE}/analytics/timing-intelligence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           specialties: selectedSpecialties,
           campaigns: selectedCampaigns,
           date_range: dateRange
         })
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || `Server returned ${response.status}`);
+      }
       const data = await response.json();
+      if (data?.error) throw new Error(data.error);
       setHeatmapData(data);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        setHeatmapError('Query timed out after 90 seconds. Try narrowing the date range, specialties, or campaigns.');
+      } else {
+        setHeatmapError(error.message || 'Failed to load timing analysis');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setHeatmapLoading(false);
     }
   };
@@ -218,16 +236,16 @@ const TimingIntelligence = ({ onClearCache }) => {
   };
 
   const handleSelectAllSpecialties = () => {
-    setSelectedSpecialties(specialties.filter(spec => spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())));
+    setSelectedSpecialties(specialties.filter(spec => matchesSearchTerm(spec, specialtySearchTerm)));
   };
   const handleClearAllSpecialties = () => setSelectedSpecialties([]);
   const handleSelectAllCampaigns = () => {
-    setSelectedCampaigns(campaigns.filter(c => c.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())).map(c => c.campaign_name));
+    setSelectedCampaigns(campaigns.filter(c => matchesSearchTerm(c.campaign_name, campaignSearchTerm)).map(c => c.campaign_name));
   };
   const handleClearAllCampaigns = () => setSelectedCampaigns([]);
 
-  const filteredSpecialties = specialties.filter(spec => spec.toLowerCase().includes(specialtySearchTerm.toLowerCase()));
-  const filteredCampaigns = campaigns.filter(c => c.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase()));
+  const filteredSpecialties = specialties.filter(spec => matchesSearchTerm(spec, specialtySearchTerm));
+  const filteredCampaigns = campaigns.filter(c => matchesSearchTerm(c.campaign_name, campaignSearchTerm));
 
   const formatHourShort = (h) => {
     if (h === 0) return '12a';
@@ -590,6 +608,18 @@ const TimingIntelligence = ({ onClearCache }) => {
             <div></div><div></div><div></div><div></div><div></div><div></div>
           </div>
           <p>Running full timing analysis...</p>
+        </div>
+      )}
+
+      {heatmapError && !heatmapLoading && (
+        <div className="ti-callout" style={{ marginTop: 16, borderColor: '#a33', color: '#f88' }}>
+          {heatmapError}
+          <button
+            style={{ marginLeft: 12, padding: '4px 12px', background: 'transparent', border: '1px solid currentColor', color: 'inherit', borderRadius: 4, cursor: 'pointer' }}
+            onClick={() => { setHeatmapError(null); fetchHeatmapData(); }}
+          >
+            Retry
+          </button>
         </div>
       )}
 

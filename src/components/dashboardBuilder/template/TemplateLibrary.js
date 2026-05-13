@@ -81,31 +81,103 @@ export const reformatCampaignTitle = (campaignName, brands = []) => {
   return { displayTitle, pharmaCompany, pharmaLogoFile };
 };
 
-export const detectMonthOnlyDifference = (campaignNames) => {
-  if (!campaignNames || campaignNames.length <= 1) {
-    return { isMonthOnly: false };
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december'
+];
+const MONTH_ONLY_RE = new RegExp(`^(${MONTH_NAMES.join('|')})$`, 'i');
+
+export const formatSendDate = (iso) => {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  if (!m) return String(iso);
+  return `${parseInt(m[2], 10)}/${parseInt(m[3], 10)}/${m[1].slice(2)}`;
+};
+
+const tokenizeCampaignName = (name) => {
+  const s = String(name);
+  const tokens = [];
+  let i = 0;
+  while (i < s.length) {
+    if (/\s/.test(s[i])) { i++; continue; }
+    if (s[i] === '(') {
+      let depth = 1;
+      let j = i + 1;
+      while (j < s.length && depth > 0) {
+        if (s[j] === '(') depth++;
+        else if (s[j] === ')') depth--;
+        j++;
+      }
+      tokens.push(s.slice(i, j));
+      i = j;
+    } else {
+      let j = i;
+      while (j < s.length && !/\s/.test(s[j]) && s[j] !== '(') j++;
+      tokens.push(s.slice(i, j));
+      i = j;
+    }
+  }
+  return tokens;
+};
+
+export const dedupCampaignNames = (campaignNames) => {
+  if (!campaignNames || campaignNames.length === 0) {
+    return { isMonthOnly: false, labels: [], headerLabel: 'Campaign Name', baseName: '', months: [] };
+  }
+  if (campaignNames.length === 1) {
+    return { isMonthOnly: false, labels: [campaignNames[0]], headerLabel: 'Campaign Name', baseName: campaignNames[0], months: [] };
   }
 
-  const monthNames = [
-    'january', 'february', 'march', 'april', 'may', 'june',
-    'july', 'august', 'september', 'october', 'november', 'december'
-  ];
-  const monthRegex = new RegExp(`\\b(${monthNames.join('|')})\\b`, 'gi');
+  const tokensList = campaignNames.map(n => tokenizeCampaignName(n));
+  const minLen = Math.min(...tokensList.map(t => t.length));
 
-  const stripped = campaignNames.map(name => name.replace(monthRegex, '<<MONTH>>').trim());
-  const allSame = stripped.every(s => s === stripped[0]);
+  let prefixEnd = 0;
+  while (prefixEnd < minLen && tokensList.every(t => t[prefixEnd] === tokensList[0][prefixEnd])) {
+    prefixEnd++;
+  }
 
-  if (!allSame) return { isMonthOnly: false };
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixEnd &&
+    tokensList.every(t => t[t.length - 1 - suffixLen] === tokensList[0][t.length - 1 - suffixLen])
+  ) {
+    suffixLen++;
+  }
 
-  const months = campaignNames.map(name => {
-    const match = name.match(monthRegex);
-    return match ? match[0] : 'Unknown';
+  const anchorWord = prefixEnd > 0 ? tokensList[0][prefixEnd - 1] : '';
+  const anchorIsVersionTag = /^[a-z]*[A-Z]/.test(anchorWord) && anchorWord.length <= 5;
+
+  const labels = tokensList.map((tokens, i) => {
+    const middle = tokens.slice(prefixEnd, tokens.length - suffixLen);
+    let label = middle.join(' ').trim();
+    if (!label) return campaignNames[i];
+    if (anchorIsVersionTag && /^#|^\d/.test(label)) {
+      label = `${anchorWord} ${label}`;
+    }
+    return label;
   });
 
-  const baseName = stripped[0].replace(/<<MONTH>>/g, '').replace(/\s+/g, ' ').trim();
+  const stripped = prefixEnd > 0 || suffixLen > 0;
+  const allMonths = labels.every(l => MONTH_ONLY_RE.test(l));
+  let headerLabel;
+  if (allMonths) headerLabel = 'Campaign Month';
+  else if (stripped) headerLabel = 'Campaign';
+  else headerLabel = 'Campaign Name';
 
-  return { isMonthOnly: true, baseName, months };
+  const prefixTokens = tokensList[0].slice(0, prefixEnd);
+  const suffixTokens = suffixLen > 0 ? tokensList[0].slice(tokensList[0].length - suffixLen) : [];
+  const baseName = [...prefixTokens, ...suffixTokens].join(' ').replace(/\s+/g, ' ').trim();
+
+  return {
+    isMonthOnly: allMonths,
+    labels,
+    headerLabel,
+    baseName,
+    months: allMonths ? labels : []
+  };
 };
+
+export const detectMonthOnlyDifference = (campaignNames) => dedupCampaignNames(campaignNames);
 
 export const addMatrixLogo = (components, theme) => {
   if (theme !== 'matrix') {
@@ -261,7 +333,7 @@ export const generateSingleNoneTemplate = (campaign, theme, mergeSubspecialties 
       getTopSpecialties(campaign.specialty_performance, true) :
       Object.entries(campaign.specialty_performance)
         .filter(([name, data]) => {
-          return data.audience_total >= 100 &&
+          return data.audience_total >= 5 &&
                 !name.toLowerCase().includes('unknown') &&
                 !name.toLowerCase().includes('staff') &&
                 data.unique_open_rate > 0;
@@ -360,7 +432,7 @@ export function getTopSpecialties(specialtyData, mergeSubspecialties) {
   
   return processedData
     .filter(([name, data]) => {
-      return data.audience_total >= 100 && 
+      return data.audience_total >= 5 &&
             !name.toLowerCase().includes('unknown') &&
             !name.toLowerCase().includes('staff') &&
             data.unique_open_rate > 0;
@@ -443,21 +515,28 @@ function aggregateMultiCampaignData(campaigns, mergeSubspecialties) {
   return aggregated;
 }
 
-function generateMultiCampaignTableData(campaigns) {
-  const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
-  const dedup = detectMonthOnlyDifference(campaignNames);
+function generateMultiCampaignTableData(campaigns, showDate = false) {
+  const sortedCampaigns = [...campaigns].sort(
+    (a, b) => String(a.send_date || '').localeCompare(String(b.send_date || ''))
+  );
+  const campaignNames = sortedCampaigns.map(c => c.campaign_name || 'Unknown');
+  const dedup = dedupCampaignNames(campaignNames);
 
-  const rows = campaigns.map((campaign, index) => [
-    dedup.isMonthOnly ? dedup.months[index] : (campaign.campaign_name || 'Unknown'),
-    (campaign.volume_metrics?.sent || 0).toLocaleString(),
-    (campaign.volume_metrics?.delivered || 0).toLocaleString(),
-    (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
-    `${(campaign.core_metrics?.unique_open_rate || 0).toFixed(1)}%`,
-    (campaign.volume_metrics?.total_opens || 0).toLocaleString(),
-    `${(campaign.core_metrics?.total_open_rate || 0).toFixed(1)}%`,
-    `${(campaign.core_metrics?.unique_click_rate || 0).toFixed(1)}%`,
-    `${(campaign.core_metrics?.total_click_rate || 0).toFixed(1)}%`
-  ]);
+  const rows = sortedCampaigns.map((campaign, index) => {
+    const row = [dedup.labels[index] || campaign.campaign_name || 'Unknown'];
+    if (showDate) row.push(formatSendDate(campaign.send_date));
+    row.push(
+      (campaign.volume_metrics?.sent || 0).toLocaleString(),
+      (campaign.volume_metrics?.delivered || 0).toLocaleString(),
+      (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
+      `${(campaign.core_metrics?.unique_open_rate || 0).toFixed(1)}%`,
+      (campaign.volume_metrics?.total_opens || 0).toLocaleString(),
+      `${(campaign.core_metrics?.total_open_rate || 0).toFixed(1)}%`,
+      `${(campaign.core_metrics?.unique_click_rate || 0).toFixed(1)}%`,
+      `${(campaign.core_metrics?.total_click_rate || 0).toFixed(1)}%`
+    );
+    return row;
+  });
 
   return { rows, dedup };
 }
@@ -630,7 +709,7 @@ export const generateSingleTwoTemplate = (campaign, theme, mergeSubspecialties =
       getTopSpecialties(campaign.specialty_performance, true) : 
       Object.entries(campaign.specialty_performance)
         .filter(([name, data]) => {
-          return data.audience_total >= 100 && 
+          return data.audience_total >= 5 &&
                 !name.toLowerCase().includes('unknown') &&
                 !name.toLowerCase().includes('staff') &&
                 data.unique_open_rate > 0;
@@ -672,13 +751,13 @@ export const generateSingleThreeTemplate = (campaign, theme, mergeSubspecialties
   return components;
 };
 
-export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
+export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
   const aggregatedData = aggregateMultiCampaignData(campaigns, mergeSubspecialties);
 
   const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
-  const dedup = detectMonthOnlyDifference(campaignNames);
+  const dedup = dedupCampaignNames(campaignNames);
 
   let titleText;
   if (dedup.isMonthOnly) {
@@ -709,7 +788,7 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
       id: 'multi-unique-engagement',
       title: 'UNIQUE ENGAGEMENT RATE',
       value: `${aggregatedData.core_metrics?.unique_open_rate?.toFixed(1)}%`,
-      subtitle: 'Aggregated across campaigns'
+      subtitle: ''
     },
     {
       id: 'multi-healthcare-professionals',
@@ -774,19 +853,21 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
     });
   }
 
-  const tableResult = generateMultiCampaignTableData(campaigns);
-  const firstHeaderCol = tableResult.dedup.isMonthOnly ? 'Campaign Month' : 'Campaign Name';
+  const tableResult = generateMultiCampaignTableData(campaigns, showDate);
+  const tableHeaders = [tableResult.dedup.headerLabel];
+  if (showDate) tableHeaders.push('Send Date');
+  tableHeaders.push(
+    'Sent', 'Delivered', 'Unique Opens',
+    'Unique Open Rate', 'Total Opens', 'Total Open Rate',
+    'Unique Click Rate', 'Total Click Rate'
+  );
   components.push({
     id: 'campaign-comparison-table',
     type: 'table',
     title: '',
     config: {
       customData: tableResult.rows,
-      headers: [
-        firstHeaderCol, 'Sent', 'Delivered', 'Unique Opens',
-        'Unique Open Rate', 'Total Opens', 'Total Open Rate',
-        'Unique Click Rate', 'Total Click Rate'
-      ]
+      headers: tableHeaders
     },
     position: { x: 15, y: 188, width: 748, height: 210 },
     style: {
@@ -809,8 +890,8 @@ export const generateMultiNoneTemplate = (campaigns, theme, mergeSubspecialties 
   return components;
 };
 
-export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
-  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
+export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
+  const components = generateMultiNoneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes, showDate);
   const themeColors = getThemeColors(theme);
 
   const audienceComponent = components.find(c => c.id === 'aggregated-audience-breakdown');
@@ -841,8 +922,8 @@ export const generateMultiOneTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
-  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
+export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
+  const components = generateMultiOneTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes, showDate);
   const themeColors = getThemeColors(theme);
 
   const matrixLogoIndex = components.findIndex(c => c.id === 'matrix-logo-bottom');
@@ -878,8 +959,8 @@ export const generateMultiTwoTemplate = (campaigns, theme, mergeSubspecialties =
   return components;
 };
 
-export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false) => {
-  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends);
+export const generateMultiThreeTemplate = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
+  const components = generateMultiTwoTemplate(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes, showDate);
   const themeColors = getThemeColors(theme);
 
   const secondTable = components.find(c => c.id === 'additional-table-2');
@@ -925,7 +1006,7 @@ export const TEMPLATE_GENERATORS = {
 };
 
 export const generateTemplate = (config) => {
-  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, bannerImpressionsMode = false } = config;
+  const { template, campaigns, theme, type, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, bannerImpressionsMode = false, showDate = false } = config;
   const generator = TEMPLATE_GENERATORS[template.id];
 
   if (!generator) {
@@ -936,7 +1017,7 @@ export const generateTemplate = (config) => {
   if (type === 'single') {
     components = generator(campaigns[0], theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
   } else {
-    components = generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes);
+    components = generator(campaigns, theme, mergeSubspecialties, costComparisonMode, showTotalSends, selectedTableTypes, showDate);
   }
 
   if (bannerImpressionsMode) {

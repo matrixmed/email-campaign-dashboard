@@ -1054,6 +1054,42 @@ body.light .ab-historical-tag {
   white-space: nowrap;
 }
 
+.ab-reactivate-btn {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-family: var(--font-body, 'Rubik', sans-serif);
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #333336);
+  background: transparent;
+  color: var(--color-text-secondary, #b8b8b8);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.ab-reactivate-btn:hover:not(:disabled) {
+  background: rgba(0, 255, 255, 0.08);
+  border-color: var(--color-accent, #0ff);
+  color: var(--color-accent, #0ff);
+}
+
+.ab-reactivate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+body.light .ab-reactivate-btn {
+  border-color: #ddd;
+  color: #555;
+}
+
+body.light .ab-reactivate-btn:hover:not(:disabled) {
+  background: rgba(10, 143, 143, 0.08);
+  border-color: #0a8f8f;
+  color: #0a8f8f;
+}
+
 .ab-sig-badge.sig-yes {
   background: rgba(16, 185, 129, 0.1);
   color: var(--color-success, #10b981);

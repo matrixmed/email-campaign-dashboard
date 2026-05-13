@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/AudienceQueryBuilder.css';
 import '../../styles/SectionHeaders.css';
+import '../../styles/NPIQuickLookup.css';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import ListPickerModal from '../common/ListPickerModal';
+import TablePagination from '../common/TablePagination';
 
 const AudienceQueryBuilder = ({ activeSection }) => {
     const loadPersistedState = () => {
@@ -12,6 +16,9 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                 return {
                     selectedSpecialties: parsed.selectedSpecialties || [],
                     selectedCampaigns: parsed.selectedCampaigns || [],
+                    selectedLists: parsed.selectedLists || [],
+                    selectedTags: parsed.selectedTags || [],
+                    selectedSegments: parsed.selectedSegments || [],
                     searchMode: parsed.searchMode || 'specialty',
                     engagementType: parsed.engagementType || 'all',
                     specialtyMergeMode: parsed.specialtyMergeMode || false
@@ -23,6 +30,9 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         return {
             selectedSpecialties: [],
             selectedCampaigns: [],
+            selectedLists: [],
+            selectedTags: [],
+            selectedSegments: [],
             searchMode: 'specialty',
             engagementType: 'all',
             specialtyMergeMode: false
@@ -34,13 +44,22 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const [searchMode, setSearchMode] = useState(persisted.searchMode);
     const [selectedSpecialties, setSelectedSpecialties] = useState(persisted.selectedSpecialties);
     const [selectedCampaigns, setSelectedCampaigns] = useState(persisted.selectedCampaigns);
+    const [selectedLists, setSelectedLists] = useState(persisted.selectedLists);
+    const [selectedTags, setSelectedTags] = useState(persisted.selectedTags);
+    const [selectedSegments, setSelectedSegments] = useState(persisted.selectedSegments);
     const [engagementType, setEngagementType] = useState(persisted.engagementType);
     const [specialtyMergeMode, setSpecialtyMergeMode] = useState(persisted.specialtyMergeMode);
+    const [availableLists, setAvailableLists] = useState([]);
+    const [availableTags, setAvailableTags] = useState([]);
+    const [availableSegments, setAvailableSegments] = useState([]);
     const [specialties, setSpecialties] = useState([]);
     const [specialtiesLoading, setSpecialtiesLoading] = useState(true);
     const [campaigns, setCampaigns] = useState([]);
     const [showSpecialtySelector, setShowSpecialtySelector] = useState(false);
     const [showCampaignSelector, setShowCampaignSelector] = useState(false);
+    const [showListSelector, setShowListSelector] = useState(false);
+    const [showTagSelector, setShowTagSelector] = useState(false);
+    const [showSegmentSelector, setShowSegmentSelector] = useState(false);
     const [specialtySearchTerm, setSpecialtySearchTerm] = useState('');
     const [campaignSearchTerm, setCampaignSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
@@ -48,11 +67,10 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const [error, setError] = useState('');
 
     const [findUsersTableState, setFindUsersTableState] = useState({
-        displayCount: 10,
         sortColumn: null,
-        sortDirection: null,
-        isFullyExpanded: false
+        sortDirection: null
     });
+    const [findUsersPage, setFindUsersPage] = useState(1);
 
     const [analysisForm, setAnalysisForm] = useState({
         userInput: '',
@@ -63,11 +81,10 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const [analysisError, setAnalysisError] = useState('');
 
     const [analyzeUsersTableState, setAnalyzeUsersTableState] = useState({
-        displayCount: 10,
         sortColumn: null,
-        sortDirection: null,
-        isFullyExpanded: false
+        sortDirection: null
     });
+    const [analyzeUsersPage, setAnalyzeUsersPage] = useState(1);
 
     const [patternForm, setPatternForm] = useState({
         pattern_type: 'infrequent_responders',
@@ -94,6 +111,9 @@ const AudienceQueryBuilder = ({ activeSection }) => {
             const stateToPersist = {
                 selectedSpecialties,
                 selectedCampaigns,
+                selectedLists,
+                selectedTags,
+                selectedSegments,
                 searchMode,
                 engagementType,
                 specialtyMergeMode
@@ -104,12 +124,24 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                 localStorage.removeItem('audienceQueryState');
             }
         }
-    }, [selectedSpecialties, selectedCampaigns, searchMode, engagementType, specialtyMergeMode]);
+    }, [selectedSpecialties, selectedCampaigns, selectedLists, selectedTags, selectedSegments, searchMode, engagementType, specialtyMergeMode]);
 
     useEffect(() => {
         fetchSpecialties();
         fetchCampaigns();
     }, [specialtyMergeMode]);
+
+    useEffect(() => {
+        Promise.all([
+            fetch(`${API_BASE_URL}/api/list-management/digital-lists/overview`).then(r => r.json()).catch(() => ({})),
+            fetch(`${API_BASE_URL}/api/list-management/tags/overview`).then(r => r.json()).catch(() => ({})),
+            fetch(`${API_BASE_URL}/api/list-management/segments/overview`).then(r => r.json()).catch(() => ({})),
+        ]).then(([l, t, s]) => {
+            setAvailableLists(Object.entries(l.subscribed_counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
+            setAvailableTags(Object.entries(t.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
+            setAvailableSegments(Object.entries(s.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
+        });
+    }, []);
 
     const fetchSpecialties = async () => {
         setSpecialtiesLoading(true);
@@ -144,14 +176,16 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         setResults(null);
         setSelectedSpecialties([]);
         setSelectedCampaigns([]);
+        setSelectedLists([]);
+        setSelectedTags([]);
+        setSelectedSegments([]);
         setEngagementType('all');
         setError('');
         setFindUsersTableState({
-            displayCount: 10,
             sortColumn: null,
-            sortDirection: null,
-            isFullyExpanded: false
+            sortDirection: null
         });
+        setFindUsersPage(1);
     };
 
     const clearAnalyzeUsers = () => {
@@ -159,11 +193,10 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         setAnalysisForm({ userInput: '', inputType: 'email' });
         setAnalysisError('');
         setAnalyzeUsersTableState({
-            displayCount: 10,
             sortColumn: null,
-            sortDirection: null,
-            isFullyExpanded: false
+            sortDirection: null
         });
+        setAnalyzeUsersPage(1);
     };
 
     const clearEngagementPatterns = () => {
@@ -188,24 +221,25 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         setResults(null);
         setSelectedSpecialties([]);
         setSelectedCampaigns([]);
+        setSelectedLists([]);
+        setSelectedTags([]);
+        setSelectedSegments([]);
         setEngagementType('all');
         setError('');
         setFindUsersTableState({
-            displayCount: 10,
             sortColumn: null,
-            sortDirection: null,
-            isFullyExpanded: false
+            sortDirection: null
         });
+        setFindUsersPage(1);
 
         setAnalysisResults(null);
         setAnalysisForm({ userInput: '', inputType: 'email' });
         setAnalysisError('');
         setAnalyzeUsersTableState({
-            displayCount: 10,
             sortColumn: null,
-            sortDirection: null,
-            isFullyExpanded: false
+            sortDirection: null
         });
+        setAnalyzeUsersPage(1);
 
         clearEngagementPatterns();
 
@@ -232,7 +266,7 @@ const AudienceQueryBuilder = ({ activeSection }) => {
 
     const handleSelectAllSpecialties = () => {
         const filteredSpecialties = specialties.filter(spec =>
-            spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+            matchesSearchTerm(spec, specialtySearchTerm)
         );
         setSelectedSpecialties(filteredSpecialties);
     };
@@ -244,7 +278,7 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const handleSelectAllCampaigns = () => {
         const filteredCampaigns = campaigns
             .filter(campaign =>
-                campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+                matchesSearchTerm(campaign.campaign_name, campaignSearchTerm)
             )
             .map(c => c.campaign_name);
         setSelectedCampaigns(filteredCampaigns);
@@ -263,20 +297,25 @@ const AudienceQueryBuilder = ({ activeSection }) => {
             const requestData = {
                 search_mode: searchMode,
                 specialty_list: searchMode === 'specialty' ? selectedSpecialties : [],
-                campaign_list: selectedCampaigns,
+                campaign_list: searchMode === 'campaign' ? selectedCampaigns : [],
+                list_filter: searchMode === 'list' ? selectedLists : [],
+                tag_filter: searchMode === 'tag' ? selectedTags : [],
+                segment_filter: searchMode === 'segment' ? selectedSegments : [],
                 engagement_type: engagementType,
                 specialty_merge_mode: specialtyMergeMode,
                 export_csv: false
             };
 
-            if (searchMode === 'specialty') {
-                if (selectedSpecialties.length === 0) {
-                    throw new Error('Please select at least one specialty');
-                }
-            } else if (searchMode === 'campaign') {
-                if (selectedCampaigns.length === 0) {
-                    throw new Error('Please select at least one campaign');
-                }
+            if (searchMode === 'specialty' && selectedSpecialties.length === 0) {
+                throw new Error('Please select at least one specialty');
+            } else if (searchMode === 'campaign' && selectedCampaigns.length === 0) {
+                throw new Error('Please select at least one campaign');
+            } else if (searchMode === 'list' && selectedLists.length === 0) {
+                throw new Error('Please select at least one list');
+            } else if (searchMode === 'tag' && selectedTags.length === 0) {
+                throw new Error('Please select at least one tag');
+            } else if (searchMode === 'segment' && selectedSegments.length === 0) {
+                throw new Error('Please select at least one segment');
             }
 
             const response = await fetch(`${API_BASE}/users/engagement-query`, {
@@ -310,28 +349,37 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const handleExportFindUsers = () => {
         if (!results || !results.users) return;
 
+        const isMembership = ['list', 'tag', 'segment'].includes(searchMode);
         const headers = [
-            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty',
+            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Source', 'Status',
+            ...(isMembership ? ['Membership Status', 'Current Memberships'] : []),
             'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
             'UOR %', 'TOR %', 'UCR %', 'TCR %'
         ];
 
-        const rows = results.users.map(user => [
-            user.email,
-            user.npi || '',
-            user.first_name || '',
-            user.last_name || '',
-            user.specialty || '',
-            user.campaign_count || 0,
-            user.unique_opens || 0,
-            user.total_opens || 0,
-            user.unique_clicks || 0,
-            user.total_clicks || 0,
-            user.unique_open_rate || 0,
-            user.total_open_rate || 0,
-            user.unique_click_rate || 0,
-            user.total_click_rate || 0
-        ]);
+        const rows = results.users.map(user => {
+            const isActive = user.user_is_active !== undefined ? user.user_is_active : user.is_active;
+            const statusVal = isActive === true ? 'Active' : (isActive === false ? 'Inactive' : '');
+            return [
+                user.email,
+                user.npi || '',
+                user.first_name || '',
+                user.last_name || '',
+                user.specialty || '',
+                user.source || '',
+                statusVal,
+                ...(isMembership ? [user.membership_status || '', (user.current_membership || []).join(' | ')] : []),
+                user.campaign_count || 0,
+                user.unique_opens || 0,
+                user.total_opens || 0,
+                user.unique_clicks || 0,
+                user.total_clicks || 0,
+                user.unique_open_rate || 0,
+                user.total_open_rate || 0,
+                user.unique_click_rate || 0,
+                user.total_click_rate || 0
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
@@ -407,27 +455,32 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         if (!analysisResults || !analysisResults.users) return;
 
         const headers = [
-            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty',
+            'Email', 'NPI', 'First Name', 'Last Name', 'Specialty', 'Source', 'Status',
             'Campaigns', 'Unique Opens', 'Total Opens', 'Unique Clicks', 'Total Clicks',
             'UOR %', 'TOR %', 'UCR %', 'TCR %'
         ];
 
-        const rows = analysisResults.users.map(user => [
-            user.email,
-            user.npi || '',
-            user.first_name || '',
-            user.last_name || '',
-            user.specialty || '',
-            user.campaign_count || 0,
-            user.unique_opens || 0,
-            user.total_opens || 0,
-            user.unique_clicks || 0,
-            user.total_clicks || 0,
-            user.unique_open_rate || 0,
-            user.total_open_rate || 0,
-            user.unique_click_rate || 0,
-            user.total_click_rate || 0
-        ]);
+        const rows = analysisResults.users.map(user => {
+            const statusVal = user.is_active === true ? 'Active' : (user.is_active === false ? 'Inactive' : '');
+            return [
+                user.email,
+                user.npi || '',
+                user.first_name || '',
+                user.last_name || '',
+                user.specialty || '',
+                user.source || '',
+                statusVal,
+                user.campaign_count || 0,
+                user.unique_opens || 0,
+                user.total_opens || 0,
+                user.unique_clicks || 0,
+                user.total_clicks || 0,
+                user.unique_open_rate || 0,
+                user.total_open_rate || 0,
+                user.unique_click_rate || 0,
+                user.total_click_rate || 0
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
@@ -651,39 +704,39 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     }, [patternTableState]);
 
     const filteredSpecialties = specialties.filter(spec =>
-        spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+        matchesSearchTerm(spec, specialtySearchTerm)
     );
 
     const filteredCampaigns = campaigns.filter(campaign =>
-        campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+        matchesSearchTerm(campaign.campaign_name, campaignSearchTerm)
     );
+
+    const PER_PAGE = 100;
 
     let findUsersDisplayData = [];
     let findUsersVisibleData = [];
-    let findUsersHasMore = false;
+    let findUsersTotalPages = 1;
     if (results && results.users) {
         findUsersDisplayData = results.users;
         if (findUsersTableState.sortColumn) {
             findUsersDisplayData = sortUsers(findUsersDisplayData, findUsersTableState.sortColumn, findUsersTableState.sortDirection);
         }
-        const maxDisplay = Math.min(findUsersDisplayData.length, 1000);
-        const displayLimit = findUsersTableState.isFullyExpanded ? maxDisplay : findUsersTableState.displayCount;
-        findUsersVisibleData = findUsersDisplayData.slice(0, displayLimit);
-        findUsersHasMore = findUsersDisplayData.length > findUsersVisibleData.length;
+        findUsersTotalPages = Math.max(1, Math.ceil(findUsersDisplayData.length / PER_PAGE));
+        const findStart = (findUsersPage - 1) * PER_PAGE;
+        findUsersVisibleData = findUsersDisplayData.slice(findStart, findStart + PER_PAGE);
     }
 
     let analyzeUsersDisplayData = [];
     let analyzeUsersVisibleData = [];
-    let analyzeUsersHasMore = false;
+    let analyzeUsersTotalPages = 1;
     if (analysisResults && analysisResults.users) {
         analyzeUsersDisplayData = analysisResults.users;
         if (analyzeUsersTableState.sortColumn) {
             analyzeUsersDisplayData = sortUsers(analyzeUsersDisplayData, analyzeUsersTableState.sortColumn, analyzeUsersTableState.sortDirection);
         }
-        const maxDisplay = Math.min(analyzeUsersDisplayData.length, 1000);
-        const displayLimit = analyzeUsersTableState.isFullyExpanded ? maxDisplay : analyzeUsersTableState.displayCount;
-        analyzeUsersVisibleData = analyzeUsersDisplayData.slice(0, displayLimit);
-        analyzeUsersHasMore = analyzeUsersDisplayData.length > analyzeUsersVisibleData.length;
+        analyzeUsersTotalPages = Math.max(1, Math.ceil(analyzeUsersDisplayData.length / PER_PAGE));
+        const analyzeStart = (analyzeUsersPage - 1) * PER_PAGE;
+        analyzeUsersVisibleData = analyzeUsersDisplayData.slice(analyzeStart, analyzeStart + PER_PAGE);
     }
 
     let patternDisplayData = [];
@@ -727,6 +780,27 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                     >
                                         Campaign
                                     </button>
+                                    <button
+                                        type="button"
+                                        className={`mode-button ${searchMode === 'list' ? 'active' : ''}`}
+                                        onClick={() => setSearchMode('list')}
+                                    >
+                                        List
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`mode-button ${searchMode === 'tag' ? 'active' : ''}`}
+                                        onClick={() => setSearchMode('tag')}
+                                    >
+                                        Tag
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`mode-button ${searchMode === 'segment' ? 'active' : ''}`}
+                                        onClick={() => setSearchMode('segment')}
+                                    >
+                                        Segment
+                                    </button>
                                 </div>
                             </div>
 
@@ -760,21 +834,68 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                     </div>
                                 )}
 
-                                <div className="form-group full-width">
-                                    <label>
-                                        {searchMode === 'campaign' ? 'Select Campaigns' : 'Filter by Campaigns'}
-                                    </label>
-                                    <button
-                                        type="button"
-                                        className="selector-button"
-                                        onClick={() => setShowCampaignSelector(true)}
-                                    >
-                                        {selectedCampaigns.length === 0
-                                            ? 'Select Campaigns'
-                                            : `${selectedCampaigns.length} Campaign${selectedCampaigns.length !== 1 ? 's' : ''} Selected`
-                                        }
-                                    </button>
-                                </div>
+                                {(searchMode === 'specialty' || searchMode === 'campaign') && (
+                                    <div className="form-group full-width">
+                                        <label>
+                                            {searchMode === 'campaign' ? 'Select Campaigns' : 'Filter by Campaigns'}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            className="selector-button"
+                                            onClick={() => setShowCampaignSelector(true)}
+                                        >
+                                            {selectedCampaigns.length === 0
+                                                ? 'Select Campaigns'
+                                                : `${selectedCampaigns.length} Campaign${selectedCampaigns.length !== 1 ? 's' : ''} Selected`
+                                            }
+                                        </button>
+                                    </div>
+                                )}
+
+                                {searchMode === 'list' && (
+                                    <div className="form-group full-width">
+                                        <label>Select Lists</label>
+                                        <button
+                                            type="button"
+                                            className="selector-button"
+                                            onClick={() => setShowListSelector(true)}
+                                        >
+                                            {selectedLists.length === 0
+                                                ? 'Select Lists'
+                                                : `${selectedLists.length} List${selectedLists.length !== 1 ? 's' : ''} Selected`}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {searchMode === 'tag' && (
+                                    <div className="form-group full-width">
+                                        <label>Select Tags</label>
+                                        <button
+                                            type="button"
+                                            className="selector-button"
+                                            onClick={() => setShowTagSelector(true)}
+                                        >
+                                            {selectedTags.length === 0
+                                                ? 'Select Tags'
+                                                : `${selectedTags.length} Tag${selectedTags.length !== 1 ? 's' : ''} Selected`}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {searchMode === 'segment' && (
+                                    <div className="form-group full-width">
+                                        <label>Select Segments</label>
+                                        <button
+                                            type="button"
+                                            className="selector-button"
+                                            onClick={() => setShowSegmentSelector(true)}
+                                        >
+                                            {selectedSegments.length === 0
+                                                ? 'Select Segments'
+                                                : `${selectedSegments.length} Segment${selectedSegments.length !== 1 ? 's' : ''} Selected`}
+                                        </button>
+                                    </div>
+                                )}
 
                                 <div className="form-group">
                                     <label htmlFor="engagement_type">Engagement Status</label>
@@ -853,28 +974,10 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                 {results.users && results.users.length > 0 && (
                                     <div className="sample-data-section">
                                         <div className="table-header-row">
-                                            <h4>User Data ({findUsersDisplayData.length.toLocaleString()} users{findUsersDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
-                                            <div className="table-action-buttons">
-                                                {findUsersDisplayData.length > 10 && (
-                                                    <button
-                                                        className="btn-expand-table"
-                                                        onClick={() => setFindUsersTableState(prev => ({
-                                                            ...prev,
-                                                            isFullyExpanded: !prev.isFullyExpanded,
-                                                            displayCount: prev.isFullyExpanded ? 10 : Math.min(findUsersDisplayData.length, 1000)
-                                                        }))}
-                                                    >
-                                                        {findUsersTableState.isFullyExpanded ? 'Collapse' : `Expand All${findUsersDisplayData.length > 1000 ? ' (Max 1,000)' : ''}`}
-                                                    </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    className="btn-export"
-                                                    onClick={handleExportFindUsers}
-                                                >
-                                                    Export
-                                                </button>
-                                            </div>
+                                            <h4>User Data ({findUsersDisplayData.length.toLocaleString()} users)</h4>
+                                            {findUsersDisplayData.length > 0 && (
+                                                <button className="export-button" onClick={handleExportFindUsers}>Export CSV</button>
+                                            )}
                                         </div>
 
                                         <div className="table-container">
@@ -892,6 +995,12 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                                         </th>
                                                         <th onClick={() => handleFindUsersSort('specialty')} className="sortable">
                                                             Specialty {findUsersTableState.sortColumn === 'specialty' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('source')} className="sortable">
+                                                            Source {findUsersTableState.sortColumn === 'source' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleFindUsersSort('user_is_active')} className="sortable">
+                                                            Status {findUsersTableState.sortColumn === 'user_is_active' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
                                                         </th>
                                                         <th onClick={() => handleFindUsersSort('campaign_count')} className="sortable">
                                                             Campaigns {findUsersTableState.sortColumn === 'campaign_count' && (findUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
@@ -923,42 +1032,56 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {findUsersVisibleData.map((user, idx) => (
-                                                        <tr key={idx}>
-                                                            <td>{user.email}</td>
-                                                            <td>{user.npi || ''}</td>
-                                                            <td>{user.first_name} {user.last_name}</td>
-                                                            <td>{user.specialty}</td>
-                                                            <td title={(user.campaigns_sent || []).join(', ')}>
-                                                                {user.campaign_count || 0} campaign{user.campaign_count !== 1 ? 's' : ''}
-                                                            </td>
-                                                            <td>{user.unique_opens || 0}</td>
-                                                            <td>{user.total_opens || 0}</td>
-                                                            <td>{user.unique_clicks || 0}</td>
-                                                            <td>{user.total_clicks || 0}</td>
-                                                            <td>{user.unique_open_rate || 0}%</td>
-                                                            <td>{user.total_open_rate || 0}%</td>
-                                                            <td>{user.unique_click_rate || 0}%</td>
-                                                            <td>{user.total_click_rate || 0}%</td>
-                                                        </tr>
-                                                    ))}
+                                                    {findUsersVisibleData.map((user, idx) => {
+                                                        const statusBadge = user.membership_status === 'former'
+                                                            ? <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '3px', border: '1px solid #b45309', background: 'rgba(180, 83, 9, 0.15)', color: '#fbbf24', fontSize: '0.7rem', fontWeight: 600, marginRight: '6px' }} title={`Was on ${searchMode} at some point; no longer`}>former</span>
+                                                            : user.membership_status === 'partial'
+                                                                ? <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '3px', border: '1px solid #4b5563', background: 'rgba(75, 85, 99, 0.2)', color: '#d1d5db', fontSize: '0.7rem', fontWeight: 600, marginRight: '6px' }} title={`Currently on: ${(user.current_membership || []).join(', ')}`}>partial</span>
+                                                                : user.membership_status === 'current'
+                                                                    ? <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '3px', border: '1px solid #166534', background: 'rgba(22, 101, 52, 0.2)', color: '#86efac', fontSize: '0.7rem', fontWeight: 600, marginRight: '6px' }} title="Currently on all selected">current</span>
+                                                                    : null;
+                                                        const rowStyle = user.membership_status === 'former' || user.user_is_active === false ? { opacity: 0.7 } : undefined;
+                                                        return (
+                                                            <tr key={idx} style={rowStyle}>
+                                                                <td>{statusBadge}{user.email}</td>
+                                                                <td>{user.npi || ''}</td>
+                                                                <td>{user.first_name} {user.last_name}</td>
+                                                                <td>{user.specialty}</td>
+                                                                <td>
+                                                                    {user.source ? (
+                                                                        <span className={`source-badge ${user.source.toLowerCase()}`}>{user.source}</span>
+                                                                    ) : ''}
+                                                                </td>
+                                                                <td>
+                                                                    {user.user_is_active === true ? (
+                                                                        <span className="status-badge active">Active</span>
+                                                                    ) : user.user_is_active === false ? (
+                                                                        <span className="status-badge inactive">Inactive</span>
+                                                                    ) : ''}
+                                                                </td>
+                                                                <td title={(user.campaigns_sent || []).join(', ')}>
+                                                                    {user.campaign_count || 0} campaign{user.campaign_count !== 1 ? 's' : ''}
+                                                                </td>
+                                                                <td>{user.unique_opens || 0}</td>
+                                                                <td>{user.total_opens || 0}</td>
+                                                                <td>{user.unique_clicks || 0}</td>
+                                                                <td>{user.total_clicks || 0}</td>
+                                                                <td>{user.unique_open_rate || 0}%</td>
+                                                                <td>{user.total_open_rate || 0}%</td>
+                                                                <td>{user.unique_click_rate || 0}%</td>
+                                                                <td>{user.total_click_rate || 0}%</td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
 
-                                        {findUsersHasMore && !findUsersTableState.isFullyExpanded && (
-                                            <div className="load-more-container">
-                                                <button
-                                                    className="btn-load-more"
-                                                    onClick={() => setFindUsersTableState(prev => ({
-                                                        ...prev,
-                                                        displayCount: prev.displayCount + 10
-                                                    }))}
-                                                >
-                                                    Load More ({findUsersVisibleData.length} of {Math.min(findUsersDisplayData.length, 1000)})
-                                                </button>
-                                            </div>
-                                        )}
+                                        <TablePagination
+                                            currentPage={findUsersPage}
+                                            totalPages={findUsersTotalPages}
+                                            onPageChange={setFindUsersPage}
+                                        />
                                     </div>
                                 )}
 
@@ -1025,28 +1148,10 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                             <div className="results-section">
                                 <div className="sample-data-section">
                                         <div className="table-header-row">
-                                            <h4>Results ({analyzeUsersDisplayData.length} users{analyzeUsersDisplayData.length > 1000 ? ', showing max 1,000' : ''})</h4>
-                                            <div className="table-action-buttons">
-                                                {analyzeUsersDisplayData.length > 10 && (
-                                                    <button
-                                                        className="btn-expand-table"
-                                                        onClick={() => setAnalyzeUsersTableState(prev => ({
-                                                            ...prev,
-                                                            isFullyExpanded: !prev.isFullyExpanded,
-                                                            displayCount: prev.isFullyExpanded ? 10 : Math.min(analyzeUsersDisplayData.length, 1000)
-                                                        }))}
-                                                    >
-                                                        {analyzeUsersTableState.isFullyExpanded ? 'Collapse' : `Expand All${analyzeUsersDisplayData.length > 1000 ? ' (Max 1,000)' : ''}`}
-                                                    </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    className="btn-export"
-                                                    onClick={handleExportAnalyzeUsers}
-                                                >
-                                                    Export
-                                                </button>
-                                            </div>
+                                            <h4>Results ({analyzeUsersDisplayData.length} users)</h4>
+                                            {analyzeUsersDisplayData.length > 0 && (
+                                                <button className="export-button" onClick={handleExportAnalyzeUsers}>Export CSV</button>
+                                            )}
                                         </div>
 
                                         <div className="table-container">
@@ -1064,6 +1169,12 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                                         </th>
                                                         <th onClick={() => handleAnalyzeUsersSort('specialty')} className="sortable">
                                                             Specialty {analyzeUsersTableState.sortColumn === 'specialty' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('source')} className="sortable">
+                                                            Source {analyzeUsersTableState.sortColumn === 'source' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
+                                                        </th>
+                                                        <th onClick={() => handleAnalyzeUsersSort('is_active')} className="sortable">
+                                                            Status {analyzeUsersTableState.sortColumn === 'is_active' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
                                                         </th>
                                                         <th onClick={() => handleAnalyzeUsersSort('campaign_count')} className="sortable">
                                                             Campaigns {analyzeUsersTableState.sortColumn === 'campaign_count' && (analyzeUsersTableState.sortDirection === 'asc' ? '▲' : '▼')}
@@ -1101,6 +1212,18 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                                             <td>{user.npi || ''}</td>
                                                             <td>{user.first_name} {user.last_name}</td>
                                                             <td>{user.specialty}</td>
+                                                            <td>
+                                                                {user.source ? (
+                                                                    <span className={`source-badge ${user.source.toLowerCase()}`}>{user.source}</span>
+                                                                ) : ''}
+                                                            </td>
+                                                            <td>
+                                                                {user.is_active === true ? (
+                                                                    <span className="status-badge active">Active</span>
+                                                                ) : user.is_active === false ? (
+                                                                    <span className="status-badge inactive">Inactive</span>
+                                                                ) : ''}
+                                                            </td>
                                                             <td title={(user.campaigns_sent || []).join(', ')}>
                                                                 {user.campaign_count || 0} campaign{user.campaign_count !== 1 ? 's' : ''}
                                                             </td>
@@ -1118,19 +1241,11 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                             </table>
                                         </div>
 
-                                        {analyzeUsersHasMore && !analyzeUsersTableState.isFullyExpanded && (
-                                            <div className="load-more-container">
-                                                <button
-                                                    className="btn-load-more"
-                                                    onClick={() => setAnalyzeUsersTableState(prev => ({
-                                                        ...prev,
-                                                        displayCount: prev.displayCount + 10
-                                                    }))}
-                                                >
-                                                    Load More ({analyzeUsersVisibleData.length} of {Math.min(analyzeUsersDisplayData.length, 1000)})
-                                                </button>
-                                            </div>
-                                        )}
+                                        <TablePagination
+                                            currentPage={analyzeUsersPage}
+                                            totalPages={analyzeUsersTotalPages}
+                                            onPageChange={setAnalyzeUsersPage}
+                                        />
                                 </div>
                             </div>
                         )}
@@ -1322,6 +1437,42 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showListSelector && (
+                <ListPickerModal
+                    title="Select Lists"
+                    options={availableLists}
+                    selected={selectedLists}
+                    onChange={setSelectedLists}
+                    onClose={() => setShowListSelector(false)}
+                    searchPlaceholder="Search lists"
+                    emptyLabel="No lists available. Run sync_lists.py to populate."
+                />
+            )}
+
+            {showTagSelector && (
+                <ListPickerModal
+                    title="Select Tags"
+                    options={availableTags}
+                    selected={selectedTags}
+                    onChange={setSelectedTags}
+                    onClose={() => setShowTagSelector(false)}
+                    searchPlaceholder="Search tags"
+                    emptyLabel="No tags available. Run sync_tags.py to populate."
+                />
+            )}
+
+            {showSegmentSelector && (
+                <ListPickerModal
+                    title="Select Segments"
+                    options={availableSegments}
+                    selected={selectedSegments}
+                    onChange={setSelectedSegments}
+                    onClose={() => setShowSegmentSelector(false)}
+                    searchPlaceholder="Search segments"
+                    emptyLabel="No segments available. Run sync_segments.py to populate."
+                />
             )}
         </div>
     );

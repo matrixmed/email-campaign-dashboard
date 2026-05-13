@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { THEMES, THEME_INFO, TEMPLATE_TYPES, getSmartTemplateSelection } from './template/LayoutTemplates';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const TemplateSelectionModal = ({ 
   isOpen, 
@@ -38,7 +39,7 @@ const TemplateSelectionModal = ({
   if (!isOpen) return null;
 
   const filteredCampaigns = campaigns.filter(campaign =>
-    campaign.campaign_name.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesSearchTerm(campaign.campaign_name, searchTerm)
   );
 
   const singleTemplates = [

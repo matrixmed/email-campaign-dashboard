@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const BrandAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
   const [campaigns, setCampaigns] = useState([]);
@@ -48,8 +49,8 @@ const BrandAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
 
   const filteredCampaigns = searchTerm
     ? campaigns.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+        matchesSearchTerm(c.name, searchTerm) ||
+        matchesSearchTerm(c.brand, searchTerm)
       )
     : campaigns;
 

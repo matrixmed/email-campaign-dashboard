@@ -298,6 +298,19 @@ const ABTestingPage = () => {
     });
   }, []);
 
+  const handleTestReactivated = useCallback((reactivatedTest) => {
+    setStoredTests(prev => {
+      const idx = prev.findIndex(t => t.id === reactivatedTest.id);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = reactivatedTest;
+        return updated;
+      }
+      return [...prev, reactivatedTest];
+    });
+    setActiveTab('active');
+  }, []);
+
   return (
     <div className="ab-testing-page analytics-hub">
       <div className="page-header">
@@ -376,6 +389,8 @@ const ABTestingPage = () => {
         <HistoricalResults
           filterCategory={filterCategory}
           filterMarket={filterMarket}
+          campaignsData={metricsData}
+          onTestReactivated={handleTestReactivated}
         />
       )}
     </div>

@@ -52,7 +52,7 @@ const TableComponent = ({
       }
     } else if (config.dataType === 'specialty' && campaign?.specialty_performance) {
       const specialties = Object.entries(campaign.specialty_performance)
-        .filter(([name, data]) => data.audience_total >= 100)
+        .filter(([name, data]) => data.audience_total >= 5)
         .sort(([,a], [,b]) => (b.unique_open_rate || 0) - (a.unique_open_rate || 0))
         .slice(0, 5);
       

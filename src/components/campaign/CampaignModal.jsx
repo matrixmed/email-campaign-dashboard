@@ -24,6 +24,10 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
     });
     const [audienceLimit, setAudienceLimit] = useState(8);
     const [clicksLimit, setClicksLimit] = useState(5);
+    const [targetListInfo, setTargetListInfo] = useState(null);
+    const [targetListBreakdown, setTargetListBreakdown] = useState(null);
+    const [targetListLoading, setTargetListLoading] = useState(false);
+    const [targetListError, setTargetListError] = useState(null);
 
     const currentIndex = campaign && allCampaigns.length > 0
         ? allCampaigns.findIndex(c => c.Campaign === campaign.Campaign)
@@ -38,8 +42,45 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
             setManualPlacementId('');
             setAudienceLimit(8);
             setClicksLimit(5);
+            setTargetListInfo(null);
+            setTargetListBreakdown(null);
+            setTargetListError(null);
         }
     }, [campaign?.Campaign, isOpen]);
+
+    useEffect(() => {
+        async function fetchTargetListInfo() {
+            if (!isOpen || !campaign || isCompareMode) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/target-list-info`);
+                if (!response.ok) return;
+                const data = await response.json();
+                setTargetListInfo(data);
+            } catch (error) {
+                setTargetListInfo(null);
+            }
+        }
+        fetchTargetListInfo();
+    }, [isOpen, campaign?.Campaign, isCompareMode]);
+
+    const handleCalculateTargetListBreakdown = async () => {
+        if (!campaign || targetListLoading) return;
+        setTargetListLoading(true);
+        setTargetListError(null);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaign.Campaign)}/target-list-breakdown`);
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            setTargetListBreakdown(data);
+        } catch (error) {
+            setTargetListError(error.message || 'Failed to calculate breakdown');
+        } finally {
+            setTargetListLoading(false);
+        }
+    };
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -528,7 +569,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                     }}
                                 >
                                     {hasMetadata && <span>✓</span>}
-                                    {hasMetadata ? 'Update Metadata' : 'Upload Metadata'}
+                                    {hasMetadata ? 'Update CMI Contract Data' : 'Upload CMI Contract Data'}
                                 </button>
                             </div>
                         </div>
@@ -622,6 +663,91 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                                 </table>
                             </div>
                         </div>
+
+                        {targetListInfo?.has_target_list && (
+                            <div className="target-list-section">
+                                <div className="target-list-header">
+                                    <div className="target-list-summary">
+                                        <span className="target-list-count">{formatNumber(targetListInfo.target_npi_count)}</span>
+                                        <span className="target-list-label">{targetListInfo.target_npi_count === 1 ? 'person' : 'people'} in target list</span>
+                                        {targetListInfo.target_email_count > 0 && targetListInfo.target_email_count !== targetListInfo.target_npi_count && (
+                                            <span className="target-list-sublabel">({formatNumber(targetListInfo.target_email_count)} matched to email)</span>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="target-list-button"
+                                        onClick={handleCalculateTargetListBreakdown}
+                                        disabled={targetListLoading}
+                                    >
+                                        {targetListLoading ? (
+                                            <>
+                                                <span className="target-list-spinner"></span>
+                                                Calculating...
+                                            </>
+                                        ) : targetListBreakdown ? (
+                                            'Recalculate Breakdown'
+                                        ) : (
+                                            'Calculate Target List Breakdown'
+                                        )}
+                                    </button>
+                                </div>
+
+                                {targetListError && (
+                                    <div className="target-list-error">{targetListError}</div>
+                                )}
+
+                                {(() => {
+                                    if (!targetListBreakdown) return null;
+                                    const hasAnyData = (br) => (br.sent || 0) + (br.bounces || 0) + (br.unique_opens || 0) + (br.total_opens || 0) + (br.unique_clicks || 0) + (br.total_clicks || 0) > 0;
+                                    const t = targetListBreakdown.target_list;
+                                    const r = targetListBreakdown.rest_of_audience;
+                                    if (!hasAnyData(t) && !hasAnyData(r)) {
+                                        return (
+                                            <div className="target-list-empty">
+                                                No interaction data found for this campaign yet. Calculate again once sends are recorded.
+                                            </div>
+                                        );
+                                    }
+                                    const showRate = (rate, denom) => denom > 0 ? formatPercentage(rate) : '—';
+                                    const showCount = (val, available) => available ? formatNumber(val) : '—';
+                                    const renderCard = (cohort, title, className) => (
+                                        <div className={`delivery-stats target-list-card ${className}`}>
+                                            <h4>{title}</h4>
+                                            <table className="detail-table">
+                                                <tbody>
+                                                    <tr><td>Sent</td><td>{showCount(cohort.sent, cohort.sent > 0)}</td></tr>
+                                                    <tr><td>Delivered</td><td>{showCount(cohort.delivered, cohort.sent > 0)}</td></tr>
+                                                    <tr><td>Delivery Rate</td><td>{showRate(cohort.delivery_rate, cohort.sent)}</td></tr>
+                                                    <tr><td>Bounces</td><td>{formatNumber(cohort.bounces)}</td></tr>
+                                                    <tr><td>Unique Opens</td><td>{formatNumber(cohort.unique_opens)}</td></tr>
+                                                    <tr><td>Unique Open Rate</td><td>{showRate(cohort.unique_open_rate, cohort.delivered)}</td></tr>
+                                                    <tr><td>Total Opens</td><td>{formatNumber(cohort.total_opens)}</td></tr>
+                                                    <tr><td>Total Open Rate</td><td>{showRate(cohort.total_open_rate, cohort.delivered)}</td></tr>
+                                                    <tr><td>Unique Clicks</td><td>{formatNumber(cohort.unique_clicks)}</td></tr>
+                                                    <tr><td>Unique Click Rate</td><td>{showRate(cohort.unique_click_rate, cohort.unique_opens)}</td></tr>
+                                                    <tr><td>Total Clicks</td><td>{formatNumber(cohort.total_clicks)}</td></tr>
+                                                    <tr><td>Total Click Rate</td><td>{showRate(cohort.total_click_rate, cohort.total_opens)}</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                    const sentMissing = t.sent === 0 && r.sent === 0;
+                                    return (
+                                        <>
+                                            {sentMissing && (
+                                                <div className="target-list-note">
+                                                    Send/delivery counts unavailable for this campaign — showing engagement metrics only.
+                                                </div>
+                                            )}
+                                            <div className="campaign-modal-details target-list-results">
+                                                {renderCard(t, 'Target List', 'target-list-card-target')}
+                                                {renderCard(r, 'Rest of Audience', 'target-list-card-rest')}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
 
                         {campaignMetadata && (
                             <>
@@ -824,7 +950,7 @@ const CampaignModal = ({ isOpen, onClose, campaign, compareCampaigns, isCompareM
                 <div className="upload-modal-content">
                     <div className="upload-modal-header">
                         <div className="upload-header-text">
-                            <h3>Upload Metadata</h3>
+                            <h3>Upload CMI Contract Data</h3>
                             <p className="upload-campaign-name">{campaign.Campaign}</p>
                         </div>
                         <button

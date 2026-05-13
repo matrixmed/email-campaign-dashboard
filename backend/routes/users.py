@@ -8,6 +8,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from db_pool import get_db_connection
+from routes.source_classification import classify_source_sql_expr
 
 users_bp = Blueprint('users', __name__)
 
@@ -71,6 +72,420 @@ def get_specialties():
             'error': str(e)
         }), 500
 
+@users_bp.route('/source-status-lookup', methods=['POST'])
+def source_status_lookup():
+    try:
+        data = request.get_json() or {}
+        emails = data.get('emails') or []
+        npis = data.get('npis') or []
+        emails = [str(e).strip().lower() for e in emails if str(e).strip()]
+        npis = [str(n).strip() for n in npis if str(n).strip()]
+
+        if not emails and not npis:
+            return jsonify({'success': True, 'by_email': {}, 'by_npi': {}}), 200
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        source_expr = classify_source_sql_expr('up')
+
+        by_email = {}
+        by_npi = {}
+
+        if emails:
+            cursor.execute(f"""
+                SELECT LOWER(up.email) AS email_lc, up.npi, up.is_active, ({source_expr}) AS source
+                FROM user_profiles up
+                WHERE LOWER(up.email) = ANY(%s)
+            """, (emails,))
+            for row in cursor.fetchall():
+                by_email[row['email_lc']] = {
+                    'source': row['source'],
+                    'is_active': row['is_active']
+                }
+                if row['npi']:
+                    by_npi[row['npi']] = {
+                        'source': row['source'],
+                        'is_active': row['is_active']
+                    }
+
+        if npis:
+            cursor.execute(f"""
+                SELECT up.npi, LOWER(up.email) AS email_lc, up.is_active, ({source_expr}) AS source
+                FROM user_profiles up
+                WHERE up.npi = ANY(%s)
+            """, (npis,))
+            for row in cursor.fetchall():
+                if row['npi']:
+                    by_npi[row['npi']] = {
+                        'source': row['source'],
+                        'is_active': row['is_active']
+                    }
+                if row['email_lc']:
+                    by_email[row['email_lc']] = {
+                        'source': row['source'],
+                        'is_active': row['is_active']
+                    }
+
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True, 'by_email': by_email, 'by_npi': by_npi}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@users_bp.route('/profile-timeline', methods=['POST'])
+def profile_timeline():
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        npi = (data.get('npi') or '').strip()
+
+        if not email and not npi:
+            return jsonify({'success': False, 'error': 'email or npi is required'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SET statement_timeout = '20s'")
+        source_expr = classify_source_sql_expr('up')
+
+        if email:
+            cursor.execute(f"""
+                SELECT up.id, up.email, up.npi, up.first_name, up.last_name, up.specialty,
+                       up.degree, up.city, up.state, up.zipcode, up.is_active, up.created_at,
+                       up.unsubscribe_reason, up.inactive_reason, up.inactive_at,
+                       up.digital_lists_subscribed, up.digital_lists_unsubscribed,
+                       up.ac_tags, up.ac_segments, up.target_lists,
+                       up.print_lists_subscribed, up.print_lists_unsubscribed,
+                       ({source_expr}) AS source
+                FROM user_profiles up
+                WHERE LOWER(up.email) = %s
+                LIMIT 1
+            """, (email,))
+        else:
+            cursor.execute(f"""
+                SELECT up.id, up.email, up.npi, up.first_name, up.last_name, up.specialty,
+                       up.degree, up.city, up.state, up.zipcode, up.is_active, up.created_at,
+                       up.unsubscribe_reason, up.inactive_reason, up.inactive_at,
+                       up.digital_lists_subscribed, up.digital_lists_unsubscribed,
+                       up.ac_tags, up.ac_segments, up.target_lists,
+                       up.print_lists_subscribed, up.print_lists_unsubscribed,
+                       ({source_expr}) AS source
+                FROM user_profiles up
+                WHERE up.npi = %s
+                LIMIT 1
+            """, (npi,))
+
+        prof = cursor.fetchone()
+        if not prof:
+            try:
+                cursor.execute("SET statement_timeout = 0")
+            except Exception:
+                pass
+            cursor.close()
+            conn.close()
+            return jsonify({'success': True, 'found': False, 'profile': None, 'current_state': None, 'totals': None, 'timeline': []}), 200
+
+        profile_id = prof['id']
+        prof_email = (prof['email'] or '').lower()
+
+        def _list(v):
+            if not v:
+                return []
+            if isinstance(v, list):
+                return [x for x in v if x]
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return [x for x in parsed if x] if isinstance(parsed, list) else []
+                except Exception:
+                    return []
+            return []
+
+        def _names(items):
+            out = []
+            for x in items:
+                if isinstance(x, dict):
+                    label = x.get('name') or x.get('campaign_name') or x.get('list_name') or x.get('target_list_id')
+                    if label:
+                        out.append(str(label))
+                elif x is not None:
+                    out.append(str(x))
+            return out
+
+        digital_lists = _names(_list(prof.get('digital_lists_subscribed')))
+        digital_unsub = _names(_list(prof.get('digital_lists_unsubscribed')))
+        print_lists = _names(_list(prof.get('print_lists_subscribed')))
+        print_unsub = _names(_list(prof.get('print_lists_unsubscribed')))
+        ac_tags = _names(_list(prof.get('ac_tags')))
+        ac_segments = _names(_list(prof.get('ac_segments')))
+        target_lists = _names(_list(prof.get('target_lists')))
+
+        cursor.execute("""
+            SELECT dimension, name, event, at, source, reason
+            FROM ac_membership_events
+            WHERE user_profile_id = %s
+            ORDER BY at DESC
+            LIMIT 500
+        """, (profile_id,))
+        membership_rows = cursor.fetchall()
+
+        engagement_rows = []
+        engagement_totals_rows = []
+        campaigns_summary_rows = []
+        metadata_by_campaign = {}
+        agency_by_brand = {}
+        if prof_email:
+            cursor.execute("""
+                SELECT event_type, COUNT(*) AS cnt
+                FROM campaign_interactions
+                WHERE LOWER(email) = %s
+                GROUP BY event_type
+            """, (prof_email,))
+            engagement_totals_rows = cursor.fetchall()
+
+            cursor.execute("""
+                SELECT
+                    ci.campaign_id,
+                    COALESCE(
+                        NULLIF(TRIM(cd.campaign_base_name), ''),
+                        NULLIF(TRIM(ci.campaign_name), ''),
+                        'Campaign #' || ci.campaign_id
+                    ) AS name,
+                    MAX(ci.campaign_subject) AS subject,
+                    SUM((ci.event_type = 'sent')::int) AS sent,
+                    SUM((ci.event_type = 'open')::int) AS opens,
+                    SUM((ci.event_type = 'click')::int) AS clicks,
+                    SUM((ci.event_type = 'bounce')::int) AS bounces,
+                    MAX(ci.timestamp) AS last_event
+                FROM campaign_interactions ci
+                LEFT JOIN campaign_deployments cd ON cd.campaign_id = ci.campaign_id
+                WHERE LOWER(ci.email) = %s
+                GROUP BY ci.campaign_id, cd.campaign_base_name, ci.campaign_name
+                ORDER BY MAX(ci.timestamp) DESC NULLS LAST
+            """, (prof_email,))
+            campaigns_summary_rows = cursor.fetchall()
+
+            cursor.execute("""
+                SELECT
+                    ci.campaign_id,
+                    COALESCE(
+                        NULLIF(TRIM(cd.campaign_base_name), ''),
+                        NULLIF(TRIM(ci.campaign_name), ''),
+                        'Campaign #' || ci.campaign_id
+                    ) AS campaign_name,
+                    ci.campaign_subject,
+                    ci.event_type,
+                    ci.timestamp,
+                    ci.url
+                FROM campaign_interactions ci
+                LEFT JOIN campaign_deployments cd ON cd.campaign_id = ci.campaign_id
+                WHERE LOWER(ci.email) = %s
+                ORDER BY ci.timestamp DESC
+                LIMIT 500
+            """, (prof_email,))
+            engagement_rows = cursor.fetchall()
+
+            campaign_ids = list({r['campaign_id'] for r in campaigns_summary_rows if r.get('campaign_id')})
+            if campaign_ids:
+                cursor.execute("""
+                    SELECT campaign_id, brand_name, supplier, target_list_id, placement_description
+                    FROM campaign_reporting_metadata
+                    WHERE campaign_id = ANY(%s)
+                """, (campaign_ids,))
+                for row in cursor.fetchall():
+                    metadata_by_campaign[row['campaign_id']] = row
+
+            brand_names = list({m['brand_name'] for m in metadata_by_campaign.values() if m.get('brand_name')})
+            if brand_names:
+                cursor.execute("""
+                    SELECT DISTINCT ON (brand) brand, agency, pharma_company
+                    FROM brand_editor_agency
+                    WHERE brand = ANY(%s)
+                """, (brand_names,))
+                for row in cursor.fetchall():
+                    agency_by_brand[row['brand']] = row
+
+        try:
+            cursor.execute("SET statement_timeout = 0")
+        except Exception:
+            pass
+        cursor.close()
+        conn.close()
+
+        totals = {
+            'sent': 0, 'opens': 0, 'clicks': 0, 'bounces': 0,
+            'unsubs': 0, 'list_adds': 0, 'list_removes': 0,
+            'tag_adds': 0, 'tag_removes': 0,
+            'segment_adds': 0, 'segment_removes': 0,
+        }
+
+        for row in engagement_totals_rows:
+            etype = (row['event_type'] or '').lower()
+            cnt = row['cnt'] or 0
+            if etype == 'sent':
+                totals['sent'] = cnt
+            elif etype == 'open':
+                totals['opens'] = cnt
+            elif etype == 'click':
+                totals['clicks'] = cnt
+            elif etype == 'bounce':
+                totals['bounces'] = cnt
+
+        campaigns_summary = []
+        for r in campaigns_summary_rows:
+            meta = metadata_by_campaign.get(r.get('campaign_id')) or {}
+            brand = meta.get('brand_name')
+            agency_row = agency_by_brand.get(brand) if brand else None
+            campaigns_summary.append({
+                'campaign_id': r.get('campaign_id'),
+                'name': r.get('name'),
+                'subject': r.get('subject'),
+                'sent': r.get('sent') or 0,
+                'opens': r.get('opens') or 0,
+                'clicks': r.get('clicks') or 0,
+                'bounces': r.get('bounces') or 0,
+                'last_event': r['last_event'].isoformat() if r.get('last_event') else None,
+                'brand': brand,
+                'agency': (agency_row or {}).get('agency') or meta.get('supplier'),
+                'pharma': (agency_row or {}).get('pharma_company'),
+                'target_list_id': meta.get('target_list_id'),
+                'placement': meta.get('placement_description'),
+                'from_target_list': bool(meta.get('target_list_id')),
+            })
+
+        timeline = []
+
+        for r in membership_rows:
+            dim = r['dimension']
+            name = r['name'] or ''
+            ev = r['event']
+            is_unsub = dim == 'list' and name.startswith('[unsub] ')
+            display_name = name[len('[unsub] '):] if is_unsub else name
+            ts = r['at'].isoformat() if r['at'] else None
+
+            if is_unsub:
+                totals['unsubs'] += 1
+                timeline.append({
+                    'ts': ts,
+                    'category': 'unsub',
+                    'event': 'unsubscribed',
+                    'dimension': 'list',
+                    'name': display_name,
+                    'reason': r.get('reason'),
+                    'source': r.get('source'),
+                })
+                continue
+
+            if dim == 'list':
+                if ev == 'added':
+                    totals['list_adds'] += 1
+                elif ev == 'removed':
+                    totals['list_removes'] += 1
+            elif dim == 'tag':
+                if ev == 'added':
+                    totals['tag_adds'] += 1
+                elif ev == 'removed':
+                    totals['tag_removes'] += 1
+            elif dim == 'segment':
+                if ev == 'added':
+                    totals['segment_adds'] += 1
+                elif ev == 'removed':
+                    totals['segment_removes'] += 1
+
+            timeline.append({
+                'ts': ts,
+                'category': 'membership',
+                'event': ev,
+                'dimension': dim,
+                'name': display_name,
+                'reason': r.get('reason'),
+                'source': r.get('source'),
+            })
+
+        for r in engagement_rows:
+            etype = (r['event_type'] or '').lower()
+            ts = r['timestamp'].isoformat() if r['timestamp'] else None
+            meta = metadata_by_campaign.get(r.get('campaign_id')) or {}
+            brand = meta.get('brand_name')
+            agency_row = agency_by_brand.get(brand) if brand else None
+            from_target_list = bool(meta.get('target_list_id'))
+            timeline.append({
+                'ts': ts,
+                'category': 'bounce' if etype == 'bounce' else 'engagement',
+                'event': etype,
+                'campaign_id': r.get('campaign_id'),
+                'campaign_name': r.get('campaign_name'),
+                'campaign_subject': r.get('campaign_subject'),
+                'url': r.get('url'),
+                'brand': brand,
+                'agency': (agency_row or {}).get('agency') or meta.get('supplier'),
+                'pharma': (agency_row or {}).get('pharma_company'),
+                'target_list_id': meta.get('target_list_id'),
+                'placement': meta.get('placement_description'),
+                'from_target_list': from_target_list,
+            })
+
+        timeline.sort(key=lambda e: e['ts'] or '', reverse=True)
+
+        first_seen = None
+        last_activity = None
+        if timeline:
+            valid_ts = [e['ts'] for e in timeline if e['ts']]
+            if valid_ts:
+                last_activity = valid_ts[0]
+                first_seen = valid_ts[-1]
+        if not first_seen and prof.get('created_at'):
+            first_seen = prof['created_at'].isoformat()
+
+        first = (prof.get('first_name') or '').strip()
+        last = (prof.get('last_name') or '').strip()
+        full_name = (f"{first} {last}").strip() or None
+
+        profile_out = {
+            'id': profile_id,
+            'email': prof.get('email'),
+            'npi': prof.get('npi'),
+            'first_name': first or None,
+            'last_name': last or None,
+            'name': full_name,
+            'specialty': prof.get('specialty'),
+            'degree': prof.get('degree'),
+            'city': prof.get('city'),
+            'state': prof.get('state'),
+            'zipcode': prof.get('zipcode'),
+            'is_active': prof.get('is_active'),
+            'source': prof.get('source'),
+            'unsubscribe_reason': prof.get('unsubscribe_reason'),
+            'inactive_reason': prof.get('inactive_reason'),
+            'inactive_at': prof['inactive_at'].isoformat() if prof.get('inactive_at') else None,
+            'first_seen': first_seen,
+            'last_activity': last_activity,
+        }
+
+        current_state = {
+            'digital_lists': digital_lists,
+            'digital_lists_unsubscribed': digital_unsub,
+            'print_lists': print_lists,
+            'print_lists_unsubscribed': print_unsub,
+            'tags': ac_tags,
+            'segments': ac_segments,
+            'target_lists': target_lists,
+        }
+
+        return jsonify({
+            'success': True,
+            'found': True,
+            'profile': profile_out,
+            'current_state': current_state,
+            'totals': totals,
+            'campaigns_summary': campaigns_summary,
+            'timeline': timeline,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @users_bp.route('/analyze-list', methods=['POST'])
 def analyze_list():
     try:
@@ -92,6 +507,7 @@ def analyze_list():
         user_list_normalized = [u.lower() if input_type == 'email' else u for u in user_list]
         placeholders = ','.join(['%s'] * len(user_list_normalized))
 
+        source_expr = classify_source_sql_expr('up')
         if input_type == 'email':
             query = f"""
                 SELECT
@@ -100,6 +516,8 @@ def analyze_list():
                     up.first_name,
                     up.last_name,
                     up.specialty,
+                    up.is_active AS up_is_active,
+                    ({source_expr}) AS source,
                     cd.campaign_base_name as campaign_name,
                     ci.event_type,
                     COUNT(*) as event_count
@@ -107,7 +525,7 @@ def analyze_list():
                 LEFT JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE LOWER(up.email) IN ({placeholders})
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                GROUP BY up.id, up.email, up.npi, up.first_name, up.last_name, up.specialty, up.is_active, up.ac_segments, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
         else:
@@ -118,6 +536,8 @@ def analyze_list():
                     up.first_name,
                     up.last_name,
                     up.specialty,
+                    up.is_active AS up_is_active,
+                    ({source_expr}) AS source,
                     cd.campaign_base_name as campaign_name,
                     ci.event_type,
                     COUNT(*) as event_count
@@ -125,7 +545,7 @@ def analyze_list():
                 LEFT JOIN campaign_interactions ci ON LOWER(up.email) = ci.email
                 LEFT JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
                 WHERE up.npi IN ({placeholders})
-                GROUP BY up.email, up.npi, up.first_name, up.last_name, up.specialty, cd.campaign_base_name, ci.event_type
+                GROUP BY up.id, up.email, up.npi, up.first_name, up.last_name, up.specialty, up.is_active, up.ac_segments, cd.campaign_base_name, ci.event_type
                 ORDER BY up.email, cd.campaign_base_name
             """
 
@@ -146,6 +566,8 @@ def analyze_list():
                     'first_name': row['first_name'],
                     'last_name': row['last_name'],
                     'specialty': row['specialty'],
+                    'is_active': row.get('up_is_active'),
+                    'source': row.get('source'),
                     'campaigns': {},
                     'total_sends': 0,
                     'unique_opens': 0,
@@ -206,6 +628,8 @@ def analyze_list():
                 'first_name': user_data['first_name'],
                 'last_name': user_data['last_name'],
                 'specialty': user_data['specialty'],
+                'is_active': user_data.get('is_active'),
+                'source': user_data.get('source'),
                 'campaigns_sent': user_campaigns,
                 'campaign_count': user_data['total_sends'],
                 'total_sends': user_data['total_sends'],
@@ -227,7 +651,7 @@ def analyze_list():
             writer = csv.writer(output)
 
             writer.writerow([
-                'Email', 'First Name', 'Last Name', 'Specialty',
+                'Email', 'First Name', 'Last Name', 'Specialty', 'Source', 'Status',
                 'Total Sends', 'Unique Opens', 'Total Opens',
                 'Unique Clicks', 'Total Clicks',
                 'Unique Open Rate (%)', 'Total Open Rate (%)',
@@ -235,11 +659,16 @@ def analyze_list():
             ])
 
             for user in enriched_users:
+                source_val = user.get('source') or ''
+                is_active_val = user.get('is_active')
+                status_val = 'Active' if is_active_val else ('Inactive' if is_active_val is False else '')
                 writer.writerow([
                     user.get('email', ''),
                     user.get('first_name', ''),
                     user.get('last_name', ''),
                     user.get('specialty', ''),
+                    source_val,
+                    status_val,
                     user.get('total_sends', 0),
                     user.get('unique_opens', 0),
                     user.get('total_opens', 0),
@@ -731,6 +1160,23 @@ def engagement_patterns():
 
         raw_results = cursor.fetchall()
         results = [dict(row) for row in raw_results]
+
+        if results:
+            emails = list({(r.get('email') or '').lower() for r in results if r.get('email')})
+            if emails:
+                source_expr = classify_source_sql_expr('up')
+                cursor.execute(f"""
+                    SELECT LOWER(up.email) AS email_lc, up.is_active, ({source_expr}) AS source
+                    FROM user_profiles up
+                    WHERE LOWER(up.email) = ANY(%s)
+                """, (emails,))
+                lookup = {row['email_lc']: row for row in cursor.fetchall()}
+                for r in results:
+                    em = (r.get('email') or '').lower()
+                    info = lookup.get(em) or {}
+                    r['source'] = info.get('source')
+                    r['is_active'] = info.get('is_active')
+
         cursor.close()
         conn.close()
 
@@ -777,19 +1223,87 @@ def engagement_query():
 
         specialty_list = data.get('specialty_list', [])
         campaign_list = data.get('campaign_list', [])
+        list_filter = data.get('list_filter', [])
+        tag_filter = data.get('tag_filter', [])
+        segment_filter = data.get('segment_filter', [])
         engagement_type = data.get('engagement_type', 'all')
         specialty_merge_mode = data.get('specialty_merge_mode', False)
         search_mode = data.get('search_mode', 'specialty')
         export_csv = data.get('export_csv', False)
 
-        print(f"[ENGAGEMENT-QUERY] Mode: {search_mode}, Campaigns: {campaign_list}, Specialties: {specialty_list}")
+        print(f"[ENGAGEMENT-QUERY] Mode: {search_mode}, Campaigns: {campaign_list}, Specialties: {specialty_list}, Lists: {list_filter}, Tags: {tag_filter}, Segments: {segment_filter}")
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         params = []
 
-        if search_mode == 'specialty':
+        if search_mode in ('list', 'tag', 'segment'):
+            membership_column = {
+                'list': 'digital_lists_subscribed',
+                'tag': 'ac_tags',
+                'segment': 'ac_segments',
+            }[search_mode]
+            filter_values = {
+                'list': list_filter,
+                'tag': tag_filter,
+                'segment': segment_filter,
+            }[search_mode]
+
+            if not filter_values:
+                return jsonify({'success': False, 'error': f'Please select at least one {search_mode}'}), 400
+
+            unsubscribed_column = {
+                'list': 'digital_lists_unsubscribed',
+                'tag': None,
+                'segment': None,
+            }[search_mode]
+
+            jsonb_clauses = [f"jsonb_exists_any({membership_column}::jsonb, %s)"]
+            params.append(filter_values)
+            if unsubscribed_column:
+                jsonb_clauses.append(f"jsonb_exists_any({unsubscribed_column}::jsonb, %s)")
+                params.append(filter_values)
+
+            members_where = (
+                f"({' OR '.join(jsonb_clauses)} OR id IN ("
+                f"  SELECT user_profile_id FROM ac_membership_events "
+                f"  WHERE dimension = %s AND name = ANY(%s) "
+                f"    AND user_profile_id IS NOT NULL"
+                f"))"
+            )
+            params.append(search_mode)
+            params.append(filter_values)
+
+            query = f"""
+                WITH list_members AS (
+                    SELECT id, LOWER(email) AS email_lc, npi, first_name, last_name,
+                           specialty, is_active, {membership_column} AS current_membership
+                    FROM user_profiles
+                    WHERE email IS NOT NULL
+                      AND {members_where}
+                )
+                SELECT
+                    lm.email_lc as email,
+                    lm.id as user_profile_id,
+                    lm.npi,
+                    COALESCE(lm.first_name, '') as first_name,
+                    COALESCE(lm.last_name, '') as last_name,
+                    COALESCE(lm.specialty, 'Unknown') as specialty,
+                    lm.current_membership,
+                    lm.is_active as user_is_active,
+                    cd.campaign_base_name,
+                    ci.event_type,
+                    COUNT(*) as event_count
+                FROM list_members lm
+                JOIN campaign_interactions ci ON ci.email = lm.email_lc
+                JOIN campaign_deployments cd ON ci.campaign_id = cd.campaign_id
+                GROUP BY lm.id, lm.email_lc, lm.npi, lm.first_name, lm.last_name, lm.specialty,
+                         lm.current_membership, lm.is_active, cd.campaign_base_name, ci.event_type
+                ORDER BY lm.email_lc, cd.campaign_base_name
+            """
+
+        elif search_mode == 'specialty':
             query = """
                 SELECT
                     ci.email as email,
@@ -888,13 +1402,34 @@ def engagement_query():
 
                 print(f"[DEBUG] Creating user {email}, NPI from DB: {row.get('npi')}")
 
+                membership_status = None
+                if search_mode in ('list', 'tag', 'segment'):
+                    current = row.get('current_membership') or []
+                    current_set = set(current) if isinstance(current, list) else set()
+                    filter_set = set({
+                        'list': list_filter,
+                        'tag': tag_filter,
+                        'segment': segment_filter,
+                    }[search_mode])
+                    overlap = current_set & filter_set
+                    if not overlap:
+                        membership_status = 'former'
+                    elif overlap == filter_set:
+                        membership_status = 'current'
+                    else:
+                        membership_status = 'partial'
+
                 users_data[email] = {
                     'email': email,
+                    'user_profile_id': row.get('user_profile_id'),
                     'npi': row['npi'],
                     'first_name': row['first_name'],
                     'last_name': row['last_name'],
                     'specialty': user_specialty,
                     'has_profile': row['npi'] is not None or (row['first_name'] != '' and row['last_name'] != ''),
+                    'membership_status': membership_status,
+                    'user_is_active': row.get('user_is_active'),
+                    'current_membership': list(row.get('current_membership') or []) if search_mode in ('list', 'tag', 'segment') else None,
                     'campaigns': {},
                     'total_sends': 0,
                     'unique_opens': 0,
@@ -989,7 +1524,10 @@ def engagement_query():
                 'unique_open_rate': unique_open_rate,
                 'total_open_rate': total_open_rate,
                 'unique_click_rate': unique_click_rate,
-                'total_click_rate': total_click_rate
+                'total_click_rate': total_click_rate,
+                'membership_status': user_data.get('membership_status'),
+                'user_is_active': user_data.get('user_is_active'),
+                'current_membership': user_data.get('current_membership'),
             })
 
             aggregate_stats['total_users'] += 1
@@ -1002,6 +1540,23 @@ def engagement_query():
             aggregate_stats['campaigns'].update(user_campaigns)
             if not user_data['has_profile']:
                 aggregate_stats['users_without_profile'] += 1
+
+        if enriched_users:
+            emails = list({(u.get('email') or '').lower() for u in enriched_users if u.get('email')})
+            if emails:
+                source_expr = classify_source_sql_expr('up')
+                cursor.execute(f"""
+                    SELECT LOWER(up.email) AS email_lc, up.is_active, ({source_expr}) AS source
+                    FROM user_profiles up
+                    WHERE LOWER(up.email) = ANY(%s)
+                """, (emails,))
+                lookup = {row['email_lc']: row for row in cursor.fetchall()}
+                for u in enriched_users:
+                    em = (u.get('email') or '').lower()
+                    info = lookup.get(em) or {}
+                    u['source'] = info.get('source')
+                    if u.get('user_is_active') is None:
+                        u['user_is_active'] = info.get('is_active')
 
         cursor.close()
         conn.close()
@@ -1031,7 +1586,7 @@ def engagement_query():
             writer = csv.writer(output)
 
             writer.writerow([
-                'Email', 'First Name', 'Last Name', 'Specialty',
+                'Email', 'First Name', 'Last Name', 'Specialty', 'Source', 'Status',
                 'Campaigns Sent', 'Campaign Count',
                 'Unique Opens', 'Total Opens',
                 'Unique Clicks', 'Total Clicks',
@@ -1050,11 +1605,17 @@ def engagement_query():
                 else:
                     users_without_data += 1
 
+                source_val = user.get('source') or ''
+                is_active_val = user.get('user_is_active')
+                status_val = 'Active' if is_active_val else ('Inactive' if is_active_val is False else '')
+
                 writer.writerow([
                     user.get('email', ''),
                     user.get('first_name', ''),
                     user.get('last_name', ''),
                     user.get('specialty', ''),
+                    source_val,
+                    status_val,
                     ', '.join(user.get('campaigns_sent', [])),
                     campaign_count,
                     user.get('unique_opens', 0),

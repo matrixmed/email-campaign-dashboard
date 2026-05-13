@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, Clock, CheckCircle, FileText, Eye, Copy, Link, Unlink, PlusCircle } from 'lucide-react';
 import '../../styles/ReportsManager.css';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const ReportsManager = () => {
     const [reportsData, setReportsData] = useState([]);
@@ -87,60 +88,36 @@ const ReportsManager = () => {
     const [currentCampaignIndex, setCurrentCampaignIndex] = useState(-1);
 
     const getPharmaCompanyFromBrand = (brandName) => {
-        if (!brandName) return '';
+        if (!brandName || brandsData.length === 0) return '';
 
-        const normalizedBrand = brandName.toLowerCase().trim();
+        const normalize = (s) => String(s || '')
+            .toLowerCase()
+            .replace(/\b(hcp|pan|ma|medical affairs|dtc|consumer|rx|branded|unbranded)\b/g, '')
+            .replace(/[^\w\s-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
 
-        const brandToPharma = {
-            'taltz': 'Lilly', 'verzenio': 'Lilly', 'trulicity': 'Lilly', 'mounjaro': 'Lilly',
-            'zepbound': 'Lilly', 'retevmo': 'Lilly', 'jaypirca': 'Lilly', 'kisunla': 'Lilly',
-            'ebglyss': 'Lilly', 'omvoh': 'Lilly', 'cyramza': 'Lilly', 'erbitux': 'Lilly',
-            'olumiant': 'Lilly', 'emgality': 'Lilly', 'reyvow': 'Lilly', 'lyumjev': 'Lilly',
-            'humalog': 'Lilly', 'humulin': 'Lilly', 'basaglar': 'Lilly',
-            'pirtobrutinib': 'Lilly', 'imlunestrant': 'Lilly', 'lebrikizumab': 'Lilly',
-            'tagrisso': 'AstraZeneca', 'farxiga': 'AstraZeneca', 'lynparza': 'AstraZeneca',
-            'imfinzi': 'AstraZeneca', 'calquence': 'AstraZeneca', 'enhertu': 'AstraZeneca',
-            'breztri': 'AstraZeneca', 'symbicort': 'AstraZeneca', 'fasenra': 'AstraZeneca',
-            'saphnelo': 'AstraZeneca', 'tezspire': 'AstraZeneca', 'lokelma': 'AstraZeneca',
-            'beyfortus': 'AstraZeneca', 'ultomiris': 'AstraZeneca', 'soliris': 'AstraZeneca',
-            'airsupra': 'AstraZeneca', 'truqap': 'AstraZeneca', 'capivasertib': 'AstraZeneca',
-            'dato-dxd': 'AstraZeneca', 'volrustomig': 'AstraZeneca',
-            'skyrizi': 'Abbvie', 'rinvoq': 'Abbvie', 'humira': 'Abbvie', 'botox': 'Abbvie',
-            'vraylar': 'Abbvie', 'ubrelvy': 'Abbvie', 'qulipta': 'Abbvie', 'venclexta': 'Abbvie',
-            'imbruvica': 'Abbvie', 'epkinly': 'Abbvie', 'elahere': 'Abbvie', 'linzess': 'Abbvie',
-            'stelara': 'J&J', 'darzalex': 'J&J', 'tremfya': 'J&J', 'erleada': 'J&J',
-            'carvykti': 'J&J', 'tecvayli': 'J&J', 'talvey': 'J&J', 'rybrevant': 'J&J',
-            'spravato': 'J&J', 'invega': 'J&J', 'xarelto': 'J&J', 'simponi': 'J&J',
-            'remicade': 'J&J', 'balversa': 'J&J', 'akeega': 'J&J', 'nipocalimab': 'J&J',
-            'ofev': 'BI', 'trajenta': 'BI', 'jardiance': 'BI', 'synjardy': 'BI',
-            'stiolto': 'BI', 'spiriva': 'BI', 'gilotrif': 'BI', 'praxbind': 'BI',
-            'pradaxa': 'BI', 'spevigo': 'BI', 'ayvakyt': 'BI',
-            'cabometyx': 'Exelixis', 'cometriq': 'Exelixis',
-            'dg': 'DG', 'dsi': 'DSI'
-        };
+        const normalizedBrand = normalize(brandName);
+        if (!normalizedBrand) return '';
 
-        for (const [brand, pharma] of Object.entries(brandToPharma)) {
-            if (normalizedBrand.includes(brand)) {
-                return pharma;
-            }
-        }
+        const candidates = brandsData
+            .filter(b => b.pharma_company && b.brand)
+            .map(b => ({ ...b, normBrand: normalize(b.brand) }))
+            .filter(b => b.normBrand);
 
-        if (brandsData.length > 0) {
-            const exactMatch = brandsData.find(b => b.brand?.toLowerCase() === normalizedBrand);
-            if (exactMatch?.pharma_company) {
-                return exactMatch.pharma_company;
-            }
+        const exactMatch = candidates.find(b => b.normBrand === normalizedBrand);
+        if (exactMatch) return exactMatch.pharma_company;
 
-            const partialMatch = brandsData.find(b => {
-                const dbBrand = b.brand?.toLowerCase() || '';
-                return normalizedBrand.includes(dbBrand) || dbBrand.includes(normalizedBrand);
-            });
-            if (partialMatch?.pharma_company) {
-                return partialMatch.pharma_company;
-            }
-        }
+        const scored = candidates
+            .map(b => {
+                if (normalizedBrand.includes(b.normBrand)) return { b, score: b.normBrand.length };
+                if (b.normBrand.includes(normalizedBrand)) return { b, score: normalizedBrand.length };
+                return { b, score: 0 };
+            })
+            .filter(x => x.score > 0)
+            .sort((a, b) => b.score - a.score);
 
-        return '';
+        return scored.length > 0 ? scored[0].b.pharma_company : '';
     };
 
     const cleanCampaignName = (name) => {
@@ -312,7 +289,7 @@ const ReportsManager = () => {
                 }
 
                 try {
-                    const brandsResponse = await fetch(`${API_BASE_URL}/api/brands`);
+                    const brandsResponse = await fetch(`${API_BASE_URL}/api/brand-management`);
                     if (brandsResponse.ok) {
                         const brandsResult = await brandsResponse.json();
                         if (brandsResult.status === 'success') {
@@ -1093,11 +1070,25 @@ const ReportsManager = () => {
 
     const filterReports = (reports) => {
         if (!searchTerm) return reports;
-        return reports.filter(report =>
-            (report.campaign_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (report.brand || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (report.agency || '').toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        return reports.filter(report => {
+            const matchedMeta = findMatchingMetadata(report);
+            const dbMeta = report.agency_metadata;
+            const manualMeta = manualMetadata[report.id];
+            const placementId = String(
+                report.cmi_placement_id ||
+                report.cmi_metadata?.cmi_placement_id ||
+                matchedMeta?.cmi_placement_id ||
+                dbMeta?.cmi_placement_id ||
+                manualMeta?.cmi_placement_id ||
+                ''
+            );
+            return (
+                matchesSearchTerm(report.campaign_name, searchTerm) ||
+                matchesSearchTerm(report.brand, searchTerm) ||
+                matchesSearchTerm(report.agency, searchTerm) ||
+                matchesSearchTerm(placementId, searchTerm)
+            );
+        });
     };
 
     const getCurrentWeekReports = useMemo(() => {
@@ -1192,8 +1183,14 @@ const ReportsManager = () => {
                 ids.add(String(placementId));
             }
         });
+        Object.values(attachedAGGs).flat().forEach(agg => {
+            if (agg.cmi_placement_id) ids.add(String(agg.cmi_placement_id));
+        });
+        standaloneAGGs.forEach(agg => {
+            if (agg.cmi_placement_id) ids.add(String(agg.cmi_placement_id));
+        });
         return ids;
-    }, [getCurrentWeekReports, manualMetadata]);
+    }, [getCurrentWeekReports, manualMetadata, attachedAGGs, standaloneAGGs]);
 
     const campaignsWithExpectedStatus = useMemo(() => {
         return new Set(cmiExpectedNoData.allExpectedPlacementIds || []);
@@ -1247,8 +1244,19 @@ const ReportsManager = () => {
             });
         };
 
-        const pldAndAgg = filterMatched(filterMoved(cmiExpectedNoData.pldAndAgg || []));
-        const aggOnly = filterMatched(filterMoved(cmiExpectedNoData.aggOnly || []));
+        const filterSearch = (reports) => {
+            if (!searchTerm) return reports;
+            return reports.filter(report =>
+                matchesSearchTerm(report.brand, searchTerm) ||
+                matchesSearchTerm(report.cmi_placement_id, searchTerm) ||
+                matchesSearchTerm(report.contract_notes, searchTerm) ||
+                matchesSearchTerm(report.contract_metric, searchTerm) ||
+                matchesSearchTerm(report.placement_description, searchTerm)
+            );
+        };
+
+        const pldAndAgg = filterSearch(filterMatched(filterMoved(cmiExpectedNoData.pldAndAgg || [])));
+        const aggOnly = filterSearch(filterMatched(filterMoved(cmiExpectedNoData.aggOnly || [])));
 
         const sortByBrand = (a, b) => {
             const brandA = (a.brand || '').toLowerCase();
@@ -1260,7 +1268,7 @@ const ReportsManager = () => {
         aggOnly.sort(sortByBrand);
 
         return { pldAndAgg, aggOnly };
-    }, [cmiExpectedNoData, dueThisWeekPlacementIds, movedReportIds]);
+    }, [cmiExpectedNoData, dueThisWeekPlacementIds, movedReportIds, searchTerm]);
 
     const getPastReports = useMemo(() => {
         const expandedReports = [];
@@ -1341,13 +1349,12 @@ const ReportsManager = () => {
 
     const getFilteredFutureReports = useMemo(() => {
         if (!searchTerm) return futureReports;
-        const term = searchTerm.toLowerCase();
         return futureReports.filter(r =>
-            (r.brand_name || '').toLowerCase().includes(term) ||
-            (r.vehicle_name || '').toLowerCase().includes(term) ||
-            (r.placement_description || '').toLowerCase().includes(term) ||
-            (r.cmi_placement_id || '').toLowerCase().includes(term) ||
-            (r.contract_notes || '').toLowerCase().includes(term)
+            matchesSearchTerm(r.brand_name, searchTerm) ||
+            matchesSearchTerm(r.vehicle_name, searchTerm) ||
+            matchesSearchTerm(r.placement_description, searchTerm) ||
+            matchesSearchTerm(r.cmi_placement_id, searchTerm) ||
+            matchesSearchTerm(r.contract_notes, searchTerm)
         );
     }, [futureReports, searchTerm]);
 
@@ -1545,6 +1552,8 @@ const ReportsManager = () => {
                 return generatePHMJSON(report, specificWeek);
             case 'omd':
                 return generateOMDJSON(report, specificWeek);
+            case 'incyte':
+                return generateIncyteJSON(report, specificWeek);
             default:
                 return generateDefaultJSON(report, specificWeek);
         }
@@ -1899,6 +1908,21 @@ const ReportsManager = () => {
         };
     };
 
+    const generateIncyteJSON = (report, specificWeek = null) => {
+        const currentTimeframe = getCurrentWeekTimeframe();
+        const meta = { ...(report.agency_metadata || {}), ...(manualMetadata[report.id] || {}) };
+
+        return {
+            "start_date": formatISODateTime(currentTimeframe.start),
+            "end_date": formatISODateTime(currentTimeframe.end, true),
+            "vendor_name": meta.vendor_name || '',
+            "brand_name": meta.brand_name || report.brand || '',
+            "disease_state": meta.disease_state || '',
+            "campaign_name": meta.campaign_name || '',
+            "custom_program_flag": meta.custom_program_flag || 'FALSE'
+        };
+    };
+
     const generateBatchCMIJSON = () => {
         const currentTimeframe = getCurrentWeekTimeframe();
         const cmiReports = getCurrentWeekReports.filter(r => r.agency === 'CMI' && !r.is_no_data_report && !notNeededReports[r.id]);
@@ -2005,11 +2029,22 @@ const ReportsManager = () => {
         const pldAndAggReports = getNoDataReportsByType.pldAndAgg || [];
         const aggOnlyReports = getNoDataReportsByType.aggOnly || [];
 
+        const reportingPlacementIds = new Set();
+        Object.values(campaigns).forEach(c => {
+            if (c.cmi_placement_id) reportingPlacementIds.add(String(c.cmi_placement_id));
+        });
+        Object.values(aggregate).forEach(a => {
+            if (a.cmi_placement_id) reportingPlacementIds.add(String(a.cmi_placement_id));
+        });
+
         pldAndAggReports.forEach(report => {
-            const contractInfo = getContractInfo(report.cmi_placement_id);
-            const name = cleanName(report.contract_notes || report.brand || `${report.cmi_placement_id || ''}`);
-            const baseEntry = {
-                cmi_placement_id: report.cmi_placement_id || '',
+            const placementId = report.cmi_placement_id || '';
+            if (placementId && reportingPlacementIds.has(String(placementId))) return;
+
+            const contractInfo = getContractInfo(placementId);
+            const name = cleanName(report.contract_notes || report.brand || `${placementId}`);
+            const entry = {
+                cmi_placement_id: placementId,
                 client_placement_id: report.client_placement_id || '',
                 brand_name: report.brand || contractInfo?.brand || '',
                 vehicle_name: report.vehicle || contractInfo?.vehicle || '',
@@ -2022,23 +2057,23 @@ const ReportsManager = () => {
                 creative_code: contractInfo?.creative_code || ''
             };
 
-            pldNoData[name] = baseEntry;
-
             const dataType = (contractInfo?.data_type || '').toUpperCase();
             if (dataType.includes('AGG')) {
-                aggNoData[`${name} AGG`] = {
-                    ...baseEntry,
-                    metric: report.contract_metric || contractInfo?.metric || '',
-                    frequency: contractInfo?.frequency || report.frequency || 'Weekly'
-                };
+                entry.metric = report.contract_metric || contractInfo?.metric || '';
+                entry.frequency = contractInfo?.frequency || report.frequency || 'Weekly';
             }
+
+            pldNoData[name] = entry;
         });
 
         aggOnlyReports.forEach(report => {
-            const contractInfo = getContractInfo(report.cmi_placement_id);
-            const name = cleanName(report.contract_notes || report.brand || `${report.cmi_placement_id || ''}`);
+            const placementId = report.cmi_placement_id || '';
+            if (placementId && reportingPlacementIds.has(String(placementId))) return;
+
+            const contractInfo = getContractInfo(placementId);
+            const name = cleanName(report.contract_notes || report.brand || `${placementId}`);
             aggNoData[name] = {
-                cmi_placement_id: report.cmi_placement_id || '',
+                cmi_placement_id: placementId,
                 client_placement_id: report.client_placement_id || '',
                 brand_name: report.brand || contractInfo?.brand || '',
                 vehicle_name: report.vehicle || contractInfo?.vehicle || '',
@@ -2200,6 +2235,14 @@ const ReportsManager = () => {
                     contract_category_identifier: meta.contract_category_identifier || '',
                     overall_guarantee_count: meta.overall_guarantee_count || '',
                     product_name_guarantee_counts: meta.product_name_guarantee_counts || ''
+                };
+            } else if (agencyLower === 'incyte') {
+                campaigns[campaignName] = {
+                    vendor_name: meta.vendor_name || '',
+                    brand_name: meta.brand_name || report.brand || '',
+                    disease_state: meta.disease_state || '',
+                    campaign_name: meta.campaign_name || '',
+                    custom_program_flag: meta.custom_program_flag || 'FALSE'
                 };
             } else if (agencyLower === 'bi' || agencyLower === 'boehringer') {
                 const monthMatch = campaignName.match(/(January|February|March|April|May|June|July|August|September|October|November|December)/i);
@@ -2607,6 +2650,14 @@ const ReportsManager = () => {
                     cost: editFormData.cost,
                     ads: editFormData.ads
                 };
+            } else if (agencyLower === 'incyte') {
+                agencyMeta = {
+                    vendor_name: editFormData.vendor_name,
+                    brand_name: editFormData.brand_name,
+                    disease_state: editFormData.disease_state,
+                    campaign_name: editFormData.campaign_name,
+                    custom_program_flag: editFormData.custom_program_flag
+                };
             }
 
             try {
@@ -2770,7 +2821,7 @@ const ReportsManager = () => {
 
     const renderNoDataReportRow = (report, rowIndex, isPLDAGG = false) => {
         const placementId = report.cmi_placement_id || '';
-        const displayName = `${report.brand || 'Unknown'}${placementId ? ` - ${placementId}` : ''}`;
+        const brandName = report.brand || 'Unknown';
         const frequency = report.frequency || '';
         const metric = report.contract_metric || '';
         const notes = report.contract_notes || '';
@@ -2782,10 +2833,13 @@ const ReportsManager = () => {
             <tr key={uniqueKey} className={`report-row no-data-row ${rowIndex % 2 === 0 ? 'even-row' : 'odd-row'} ${hasContractMatch ? 'has-contract' : 'no-contract'} ${isMonthly ? 'monthly-agg-row' : ''}`}>
                 <td className="campaign-column">
                     <div className="no-data-info">
-                        <span className="no-data-brand" title={displayName}>
-                            {displayName}
+                        <span className="no-data-brand" title={brandName}>
+                            {brandName}
                         </span>
                     </div>
+                </td>
+                <td className="no-data-placement-id-column">
+                    {placementId && <span className="placement-id-pill">{placementId}</span>}
                 </td>
                 <td className="no-data-frequency-column">
                     {frequency && <span className={`frequency-badge frequency-${frequency.toLowerCase()}`}>{frequency}</span>}
@@ -2914,6 +2968,11 @@ const ReportsManager = () => {
                                     Expected
                                 </span>
                             )}
+                            {isCMI && placementId && (
+                                <span className="placement-id-pill" title="CMI Placement ID">
+                                    {placementId}
+                                </span>
+                            )}
                             {isMissingPlacementId && (
                                 <span className="missing-placement-badge" title="Click to enter CMI Placement ID">
                                     No ID
@@ -2990,6 +3049,7 @@ const ReportsManager = () => {
                                     <span className="attached-agg-indicator">└─</span>
                                     {isMonthlyAgg && <span className="standalone-agg-badge monthly-agg-badge" style={{marginRight: '6px'}}>Monthly</span>}
                                     {notes || <span className="no-notes">-</span>}
+                                    {agg.cmi_placement_id && <span className="placement-id-pill agg-placement-id-pill">{agg.cmi_placement_id}</span>}
                                     {hasGcmIds && <span className="gcm-indicator" title="Has GCM IDs">📎</span>}
                                 </div>
                             </td>
@@ -3312,7 +3372,8 @@ const ReportsManager = () => {
                                             <table className="reports-table no-data-table">
                                                 <thead>
                                                     <tr>
-                                                        <th className="campaign-header">Brand - Placement ID</th>
+                                                        <th className="campaign-header">Brand</th>
+                                                        <th className="placement-id-header">Placement ID</th>
                                                         <th className="frequency-header">Frequency</th>
                                                         <th className="metric-header">Metric</th>
                                                         <th className="notes-header">Notes</th>
@@ -3343,7 +3404,8 @@ const ReportsManager = () => {
                                             <table className="reports-table no-data-table">
                                                 <thead>
                                                     <tr>
-                                                        <th className="campaign-header">Brand - Placement ID</th>
+                                                        <th className="campaign-header">Brand</th>
+                                                        <th className="placement-id-header">Placement ID</th>
                                                         <th className="frequency-header">Frequency</th>
                                                         <th className="metric-header">Metric</th>
                                                         <th className="notes-header">Notes</th>
@@ -4088,6 +4150,33 @@ const ReportsManager = () => {
                                             <div className="edit-form-field">
                                                 <label>Ads</label>
                                                 <input type="number" value={editFormData.ads || 1} onChange={(e) => updateEditFormField('ads', Number(e.target.value))} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                if (agencyLower === 'incyte') {
+                                    return (
+                                        <div className="edit-form-grid">
+                                            <div className="edit-form-field">
+                                                <label>Vendor Name</label>
+                                                <input type="text" value={editFormData.vendor_name || ''} onChange={(e) => updateEditFormField('vendor_name', e.target.value)} placeholder="JCAD or Matrix Medical" />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Brand Name</label>
+                                                <input type="text" value={editFormData.brand_name || ''} onChange={(e) => updateEditFormField('brand_name', e.target.value)} />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Disease State</label>
+                                                <input type="text" value={editFormData.disease_state || ''} onChange={(e) => updateEditFormField('disease_state', e.target.value)} placeholder="AD, VIT, HS, MPN" />
+                                            </div>
+                                            <div className="edit-form-field full-width">
+                                                <label>Campaign Name</label>
+                                                <input type="text" value={editFormData.campaign_name || ''} onChange={(e) => updateEditFormField('campaign_name', e.target.value)} placeholder="2026_ICYT_OPZ_AD_HCP" />
+                                            </div>
+                                            <div className="edit-form-field">
+                                                <label>Custom Program Flag</label>
+                                                <input type="text" value={editFormData.custom_program_flag || ''} onChange={(e) => updateEditFormField('custom_program_flag', e.target.value)} placeholder="TRUE or FALSE" />
                                             </div>
                                         </div>
                                     );

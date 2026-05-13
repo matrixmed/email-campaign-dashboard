@@ -1,3 +1,93 @@
+.le-shell {
+    width: 100%;
+}
+
+.le-subtabs-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #444;
+}
+
+.le-subtabs-controls {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding-bottom: 8px;
+}
+
+.le-subtabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.le-subtabs::-webkit-scrollbar {
+    display: none;
+}
+
+.le-subtab {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    font-family: var(--font-body, 'Rubik', sans-serif);
+}
+
+.le-subtab:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.le-subtab.active {
+    color: #0ff;
+    background-color: rgba(0, 255, 255, 0.1);
+    border-bottom: 2px solid #0ff;
+}
+
+body.light .le-subtab {
+    color: #888;
+}
+
+body.light .le-subtab:hover {
+    color: #555;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+body.light .le-subtab.active {
+    color: #0077ff;
+    background-color: rgba(0, 119, 255, 0.08);
+    border-bottom-color: #0077ff;
+}
+
+body.light .le-subtabs {
+    border-bottom-color: #e0e0e0;
+}
+
+.le-content {
+    width: 100%;
+}
+
+.iqvia-content-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
 .list-analysis-container {
     background-color: var(--color-bg-card, #222);
     border-radius: 8px;

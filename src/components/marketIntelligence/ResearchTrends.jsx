@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const AREA_COLORS = {
   dermatology: { primary: '#00857a', bg: 'rgba(0, 133, 122, 0.15)' },
@@ -27,6 +31,8 @@ const ResearchTrends = ({ lastUpdated }) => {
 
   const [pubmedData, setPubmedData] = useState(null);
   const [pubmedLoading, setPubmedLoading] = useState(true);
+  const [meshData, setMeshData] = useState(null);
+  const [meshLoading, setMeshLoading] = useState(true);
   const [therapeuticArea, setTherapeuticArea] = useState('all');
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
   const areaRef = useRef(null);
@@ -38,7 +44,9 @@ const ResearchTrends = ({ lastUpdated }) => {
   const [redditSub, setRedditSub] = useState('all');
   const [subDropdownOpen, setSubDropdownOpen] = useState(false);
   const subRef = useRef(null);
-  const [redditDisplayCount, setRedditDisplayCount] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => { setCurrentPage(1); }, [subTab, pubmedPill, redditPill, therapeuticArea, redditSub]);
 
   const [selectedPost, setSelectedPost] = useState(null);
   const [comments, setComments] = useState(null);
@@ -66,6 +74,21 @@ const ResearchTrends = ({ lastUpdated }) => {
       setPubmedLoading(false);
     };
     fetchPubmed();
+  }, [therapeuticArea]);
+
+  useEffect(() => {
+    const fetchMesh = async () => {
+      setMeshLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (therapeuticArea !== 'all') params.append('therapeutic_area', therapeuticArea);
+        const res = await fetch(`${API_BASE_URL}/api/market-intelligence/pubmed-mesh-trending?${params}`);
+        const json = await res.json();
+        if (json.status === 'success') setMeshData(json);
+      } catch (err) {}
+      setMeshLoading(false);
+    };
+    fetchMesh();
   }, [therapeuticArea]);
 
   useEffect(() => {
@@ -146,8 +169,62 @@ const ResearchTrends = ({ lastUpdated }) => {
 
   const subreddits = redditData?.subreddits || [];
   const allPosts = redditData?.posts || [];
-  const visiblePosts = allPosts.slice(0, redditDisplayCount);
-  const postsHasMore = redditDisplayCount < allPosts.length;
+
+  const meshTerms = meshData?.terms || [];
+  const guidelinesRows = Object.values(yearlyByTerm).filter(r => r.area === 'guidelines' || r.area === 'heor');
+  const volumeRows = Object.values(yearlyByTerm);
+  const topicsRows = topicsData?.topics || [];
+
+  let activeRows = [];
+  if (subTab === 'pubmed') {
+    if (pubmedPill === 'trending') activeRows = meshTerms;
+    else if (pubmedPill === 'guidelines') activeRows = guidelinesRows;
+    else if (pubmedPill === 'growth') activeRows = latestGrowth;
+    else if (pubmedPill === 'volume') activeRows = volumeRows;
+  } else if (subTab === 'reddit') {
+    if (redditPill === 'trending') activeRows = topicsRows;
+    else if (redditPill === 'posts' && !selectedPost) activeRows = allPosts;
+  }
+  const totalPages = Math.max(1, Math.ceil(activeRows.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const meshVisible = meshTerms.slice(pageStart, pageStart + PER_PAGE);
+  const guidelinesVisible = guidelinesRows.slice(pageStart, pageStart + PER_PAGE);
+  const growthVisible = latestGrowth.slice(pageStart, pageStart + PER_PAGE);
+  const volumeVisible = volumeRows.slice(pageStart, pageStart + PER_PAGE);
+  const topicsVisible = topicsRows.slice(pageStart, pageStart + PER_PAGE);
+  const postsVisible = allPosts.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    if (subTab === 'pubmed') {
+      if (pubmedPill === 'trending') {
+        exportTableCSV('pubmed_trending_topics',
+          ['MeSH Topic', 'Therapeutic Area', 'Recent Articles'],
+          meshTerms.map(t => [t.search_term || '', t.therapeutic_area || '', t.publication_count || 0]));
+      } else if (pubmedPill === 'guidelines') {
+        exportTableCSV('pubmed_guidelines',
+          ['Topic', 'Area', ...years.map(String)],
+          guidelinesRows.map(r => [r.term || '', r.area || '', ...years.map(y => r.years[y] || '')]));
+      } else if (pubmedPill === 'growth') {
+        exportTableCSV('pubmed_growth',
+          ['Topic', 'Therapeutic Area', 'Growth %', 'Previous Year', 'Current Year'],
+          latestGrowth.map(g => [g.search_term || '', g.therapeutic_area || '', g.growth_pct || 0, g.prev_total || 0, g.current_total || 0]));
+      } else if (pubmedPill === 'volume') {
+        exportTableCSV('pubmed_volume',
+          ['Topic', 'Area', ...years.map(String)],
+          volumeRows.map(r => [r.term || '', r.area || '', ...years.map(y => r.years[y] || '')]));
+      }
+    } else if (subTab === 'reddit') {
+      if (redditPill === 'trending') {
+        exportTableCSV('reddit_trending_topics',
+          ['Topic', 'Posts', 'Total Score', 'Total Comments', 'Avg Score'],
+          topicsRows.map(t => [t.topic || '', t.posts || 0, t.total_score || 0, t.total_comments || 0, t.posts > 0 ? Math.round(t.total_score / t.posts) : 0]));
+      } else if (redditPill === 'posts') {
+        exportTableCSV('reddit_posts',
+          ['Subreddit', 'Title', 'Score', 'Comments', 'Posted'],
+          allPosts.map(p => [`r/${p.subreddit || ''}`, p.title || '', p.score || 0, p.num_comments || 0, p.created_utc || '']));
+      }
+    }
+  };
 
   return (
     <div className="mi-tab-content">
@@ -199,12 +276,12 @@ const ResearchTrends = ({ lastUpdated }) => {
               {subDropdownOpen && (
                 <div className="custom-dropdown-menu" style={{maxHeight: 300, overflowY: 'auto', width: 220}}>
                   <div className={`custom-dropdown-option ${redditSub === 'all' ? 'selected' : ''}`}
-                    onClick={() => { setRedditSub('all'); setSubDropdownOpen(false); setRedditDisplayCount(100); }}>
+                    onClick={() => { setRedditSub('all'); setSubDropdownOpen(false);}}>
                     <span>All Subreddits</span>
                   </div>
                   {subreddits.map(s => (
                     <div key={s.subreddit} className={`custom-dropdown-option ${redditSub === s.subreddit ? 'selected' : ''}`}
-                      onClick={() => { setRedditSub(s.subreddit); setSubDropdownOpen(false); setRedditDisplayCount(100); }}>
+                      onClick={() => { setRedditSub(s.subreddit); setSubDropdownOpen(false);}}>
                       <span>r/{s.subreddit} ({s.post_count})</span>
                     </div>
                   ))}
@@ -217,12 +294,73 @@ const ResearchTrends = ({ lastUpdated }) => {
 
       {subTab === 'pubmed' && (
         <>
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 0', marginBottom: 8}}>
+          <div style={{display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: '10px 0', marginBottom: 8}}>
+            <button style={pillStyle(pubmedPill === 'trending')} onClick={() => setPubmedPill('trending')}>Trending Topics</button>
             <button style={pillStyle(pubmedPill === 'growth')} onClick={() => setPubmedPill('growth')}>YoY Growth</button>
             <button style={pillStyle(pubmedPill === 'volume')} onClick={() => setPubmedPill('volume')}>Volume by Year</button>
+            <button style={pillStyle(pubmedPill === 'guidelines')} onClick={() => setPubmedPill('guidelines')}>Guidelines</button>
+            {activeRows.length > 0 && (
+              <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExport}>Export CSV</button>
+            )}
           </div>
 
-          {pubmedLoading ? (
+          {pubmedPill === 'trending' && (
+            meshLoading ? (
+              <div className="mi-loading"><div className="loading-spinner"></div><p>Discovering trending MeSH topics...</p></div>
+            ) : (
+              <div className="table-section">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>MeSH Topic</th>
+                      <th>Therapeutic Area</th>
+                      <th>Recent Articles</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meshVisible.map((t, i) => (
+                      <tr key={i}>
+                        <td className="mi-bold">{t.search_term}</td>
+                        <td><span className="mi-area-tag" style={getAreaStyle(t.therapeutic_area)}>{t.therapeutic_area}</span></td>
+                        <td>{t.publication_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {pubmedPill === 'guidelines' && (
+            pubmedLoading ? (
+              <div className="mi-loading"><div className="loading-spinner"></div></div>
+            ) : (
+              <div className="table-section">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Guideline Topic</th>
+                      <th>Area</th>
+                      {years.map(y => <th key={y}>{y}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {guidelinesVisible.map((row, i) => (
+                      <tr key={i}>
+                        <td className="mi-bold">{row.term}</td>
+                        <td><span className="mi-area-tag" style={{background: 'rgba(251,191,36,0.15)', color: '#fbbf24'}}>{row.area}</span></td>
+                        {years.map(y => (
+                          <td key={y}>{row.years[y]?.toLocaleString() || '-'}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {pubmedLoading && (pubmedPill === 'growth' || pubmedPill === 'volume') ? (
             <div className="mi-loading"><div className="loading-spinner"></div><p>Loading PubMed data...</p></div>
           ) : pubmedPill === 'growth' ? (
             <div className="table-section">
@@ -237,7 +375,7 @@ const ResearchTrends = ({ lastUpdated }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {latestGrowth.map((g, i) => (
+                  {growthVisible.map((g, i) => (
                     <tr key={i}>
                       <td className="mi-bold">{g.search_term}</td>
                       <td><span className="mi-area-tag" style={getAreaStyle(g.therapeutic_area)}>{g.therapeutic_area}</span></td>
@@ -260,7 +398,7 @@ const ResearchTrends = ({ lastUpdated }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.values(yearlyByTerm).map((row, i) => (
+                  {volumeVisible.map((row, i) => (
                     <tr key={i}>
                       <td className="mi-bold">{row.term}</td>
                       <td><span className="mi-area-tag" style={getAreaStyle(row.area)}>{row.area}</span></td>
@@ -278,9 +416,12 @@ const ResearchTrends = ({ lastUpdated }) => {
 
       {subTab === 'reddit' && (
         <>
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 0', marginBottom: 8}}>
+          <div style={{display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: '10px 0', marginBottom: 8}}>
             <button style={pillStyle(redditPill === 'trending')} onClick={() => { setRedditPill('trending'); setSelectedPost(null); }}>Trending Topics</button>
             <button style={pillStyle(redditPill === 'posts')} onClick={() => { setRedditPill('posts'); setSelectedPost(null); }}>Posts</button>
+            {!selectedPost && activeRows.length > 0 && (
+              <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExport}>Export CSV</button>
+            )}
           </div>
 
           {redditPill === 'trending' && (
@@ -300,7 +441,7 @@ const ResearchTrends = ({ lastUpdated }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {topicsData?.topics?.map((t, i) => (
+                    {topicsVisible.map((t, i) => (
                       <tr key={i}>
                         <td className="mi-bold">{t.topic}</td>
                         <td>{t.posts.toLocaleString()}</td>
@@ -325,48 +466,37 @@ const ResearchTrends = ({ lastUpdated }) => {
           )}
 
           {redditPill === 'posts' && !selectedPost && (
-            <>
-              {redditLoading ? (
-                <div className="mi-loading"><div className="loading-spinner"></div><p>Loading posts...</p></div>
-              ) : (
-                <>
-                  <div className="table-section">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={{width: 100}}>Subreddit</th>
-                          <th>Title</th>
-                          <th style={{width: 70}}>Score</th>
-                          <th style={{width: 90}}>Comments</th>
-                          <th style={{width: 80}}>Posted</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visiblePosts.map((p, i) => (
-                          <tr key={i} className="clickable-row" onClick={() => fetchComments(p.post_id)}>
-                            <td style={{color: '#0ff', fontSize: 12}}>r/{p.subreddit}</td>
-                            <td style={{whiteSpace: 'normal', lineHeight: 1.4}}>
-                              <span className="mi-bold">{p.title}</span>
-                              {p.author_flair && <span style={{marginLeft: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 4}}>{p.author_flair}</span>}
-                            </td>
-                            <td style={{fontWeight: 600, color: p.score > 100 ? '#4ade80' : '#ccc'}}>{p.score}</td>
-                            <td>{p.num_comments}</td>
-                            <td style={{color: '#8a8a8a', fontSize: 12}}>{timeAgo(p.created_utc)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {postsHasMore && (
-                    <div className="load-more-container">
-                      <button className="btn-load-more" onClick={() => setRedditDisplayCount(c => c + 200)}>
-                        Load More ({visiblePosts.length} of {allPosts.length})
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
+            redditLoading ? (
+              <div className="mi-loading"><div className="loading-spinner"></div><p>Loading posts...</p></div>
+            ) : (
+              <div className="table-section">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{width: 100}}>Subreddit</th>
+                      <th>Title</th>
+                      <th style={{width: 70}}>Score</th>
+                      <th style={{width: 90}}>Comments</th>
+                      <th style={{width: 80}}>Posted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {postsVisible.map((p, i) => (
+                      <tr key={i} className="clickable-row" onClick={() => fetchComments(p.post_id)}>
+                        <td style={{color: '#0ff', fontSize: 12}}>r/{p.subreddit}</td>
+                        <td style={{whiteSpace: 'normal', lineHeight: 1.4}}>
+                          <span className="mi-bold">{p.title}</span>
+                          {p.author_flair && <span style={{marginLeft: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 4}}>{p.author_flair}</span>}
+                        </td>
+                        <td style={{fontWeight: 600, color: p.score > 100 ? '#4ade80' : '#ccc'}}>{p.score}</td>
+                        <td>{p.num_comments}</td>
+                        <td style={{color: '#8a8a8a', fontSize: 12}}>{timeAgo(p.created_utc)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
 
           {redditPill === 'posts' && selectedPost && (
@@ -415,6 +545,14 @@ const ResearchTrends = ({ lastUpdated }) => {
             </>
           )}
         </>
+      )}
+
+      {!selectedPost && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       )}
     </div>
   );

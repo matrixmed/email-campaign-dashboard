@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '../../styles/CMIContractValues.css';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const CMIContractValues = () => {
   const [contracts, setContracts] = useState([]);
@@ -248,9 +249,8 @@ const CMIContractValues = () => {
 
   const filteredContracts = contracts.filter(contract => {
     if (!filterText) return true;
-    const searchText = filterText.toLowerCase();
     return Object.values(contract).some(val =>
-      String(val).toLowerCase().includes(searchText)
+      matchesSearchTerm(String(val), filterText)
     );
   });
 

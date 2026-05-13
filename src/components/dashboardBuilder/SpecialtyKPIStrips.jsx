@@ -468,14 +468,19 @@ const SpecialtyKPIStrips = ({
                 alignItems: 'flex-start',
                 marginBottom: '8px'
               }}>
-                <div style={{ 
+                <div style={{
                   fontSize: (() => {
-                    if (name.length > 35) {
-                      const reduction = Math.floor((name.length - 35) / 5);
-                      const baseSize = isMultiTemplate(id) ? 7 : 10;
-                      return Math.max(baseSize - 2, baseSize - reduction);
-                    }
-                    return isMultiTemplate(id) ? Math.max(10, Math.min(11, position.width / 40)) : Math.max(10, Math.min(12, position.width / 40));
+                    const multi = isMultiTemplate(id);
+                    const pillWidth = Math.floor((position.width - 16) / 2);
+                    const padding = multi ? 12 : 20;
+                    const sharePillReserve = multi ? 62 : 78;
+                    const nameWidth = Math.max(36, pillWidth - padding - sharePillReserve - 4);
+                    const charWidth = 0.55;
+                    const targetLines = 2;
+                    const fitSize = (nameWidth * targetLines) / (Math.max(name.length, 1) * charWidth);
+                    const baseMax = multi ? 11 : 12;
+                    const baseMin = multi ? 8 : 9;
+                    return Math.max(baseMin, Math.min(baseMax, Math.floor(fitSize)));
                   })(),
                   fontWeight: '700',
                   color: MATRIX_COLORS.darkGray || '#2c3e50',

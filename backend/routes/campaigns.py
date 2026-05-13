@@ -1,14 +1,18 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-from models import CampaignReportingMetadata, BrandEditorAgency, CMIContractValue, GCMPlacementLookup
+from sqlalchemy import create_engine, text
+from models import CampaignReportingMetadata, BrandEditorAgency, CMIContractValue, GCMPlacementLookup, UserProfile, UniversalProfile
 from werkzeug.utils import secure_filename
 import os
 import json
 import re
+import threading
+import time
+import traceback
 from datetime import datetime
 import openpyxl
 import tempfile
+from sqlalchemy.exc import OperationalError
 
 campaigns_bp = Blueprint('campaigns', __name__)
 
@@ -27,7 +31,8 @@ COLUMN_MAPPINGS = {
     'contract_number': ['contractconfirmationnumber', 'contract_number'],
     'buying_channel': ['buying_channel'],
     'creative_code': ['creative_code'],
-    'media_tactic_id': ['media_tactic_id', 'mediatacticid', 'Media_Tactic_ID']
+    'media_tactic_id': ['media_tactic_id', 'mediatacticid', 'Media_Tactic_ID'],
+    'npi': ['npi', 'NPI', 'NPI Number', 'NPI #', 'NPI_Number', 'NPINumber', 'National Provider Identifier']
 }
 
 PHARMA_COMPANY_MAP = {
@@ -154,6 +159,157 @@ def extract_target_list_data(file_content, filename):
         return extracted
     except Exception as e:
         return {'error': str(e)}
+
+def _normalize_npi(val):
+    if val is None:
+        return None
+    if isinstance(val, float):
+        if val != val:
+            return None
+        try:
+            val = str(int(val))
+        except (ValueError, OverflowError):
+            return None
+    digits = re.sub(r'\D', '', str(val))
+    return digits if len(digits) == 10 else None
+
+def _find_npi_col_index(headers):
+    candidates = {'npi', 'npinumber', 'npi#', 'npiid', 'nationalproviderid', 'nationalprovideridentifier'}
+    for idx, h in enumerate(headers):
+        if not h:
+            continue
+        cleaned = re.sub(r'[\s_#\-]+', '', str(h)).lower()
+        if cleaned in candidates:
+            return idx
+    return None
+
+def extract_npis_from_target_list(file_content, filename):
+    try:
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}') as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
+
+        npis = set()
+        try:
+            if ext == 'xls':
+                import xlrd
+                wb = xlrd.open_workbook(tmp_path)
+                sheet = wb.sheet_by_index(0)
+                if sheet.nrows < 2:
+                    return []
+                headers = [sheet.cell_value(0, c) for c in range(sheet.ncols)]
+                npi_col = _find_npi_col_index(headers)
+                if npi_col is None:
+                    return []
+                for r in range(1, sheet.nrows):
+                    npi = _normalize_npi(sheet.cell_value(r, npi_col))
+                    if npi:
+                        npis.add(npi)
+            else:
+                wb = openpyxl.load_workbook(tmp_path, data_only=True, read_only=True)
+                sheet = wb.active
+                row_iter = sheet.iter_rows(values_only=True)
+                try:
+                    headers = list(next(row_iter))
+                except StopIteration:
+                    wb.close()
+                    return []
+                npi_col = _find_npi_col_index(headers)
+                if npi_col is None:
+                    wb.close()
+                    return []
+                for row in row_iter:
+                    if npi_col < len(row):
+                        npi = _normalize_npi(row[npi_col])
+                        if npi:
+                            npis.add(npi)
+                wb.close()
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+        return list(npis)
+    except Exception:
+        traceback.print_exc()
+        return []
+
+def _merge_target_lists(existing, entry):
+    if isinstance(existing, str):
+        try:
+            existing = json.loads(existing)
+        except Exception:
+            existing = []
+    if not isinstance(existing, list):
+        existing = []
+    cleaned = [e for e in existing if isinstance(e, dict) and e.get('campaign_id') != entry['campaign_id']]
+    cleaned.append(entry)
+    return cleaned
+
+def _backfill_chunk(model, chunk, entry, max_retries=4):
+    for attempt in range(max_retries + 1):
+        session = get_session()
+        try:
+            rows = session.query(model.id, model.target_lists).filter(
+                model.npi.in_(chunk)
+            ).order_by(model.id).all()
+            for row_id, existing in rows:
+                merged = _merge_target_lists(existing, entry)
+                session.query(model).filter(model.id == row_id).update(
+                    {model.target_lists: merged}, synchronize_session=False
+                )
+            session.commit()
+            return len(rows)
+        except OperationalError as e:
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            if 'deadlock' in str(e).lower() and attempt < max_retries:
+                time.sleep(0.4 * (2 ** attempt))
+                continue
+            traceback.print_exc()
+            return 0
+        except Exception:
+            traceback.print_exc()
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            return 0
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
+    return 0
+
+def _attach_target_list_to_profiles(npis, campaign_id, campaign_name, target_list_id):
+    if not npis:
+        return
+    entry = {
+        'campaign_id': str(campaign_id),
+        'campaign_name': campaign_name or str(campaign_id),
+        'target_list_id': target_list_id or None,
+        'attached_at': datetime.utcnow().isoformat()
+    }
+    BATCH = 500
+    npi_list = list(npis)
+    universal_hits = 0
+    user_hits = 0
+
+    for i in range(0, len(npi_list), BATCH):
+        chunk = npi_list[i:i + BATCH]
+        universal_hits += _backfill_chunk(UniversalProfile, chunk, entry)
+
+    for i in range(0, len(npi_list), BATCH):
+        chunk = npi_list[i:i + BATCH]
+        user_hits += _backfill_chunk(UserProfile, chunk, entry)
+
+    print(f"[target_lists] campaign={campaign_id} npis={len(npi_list)} matched universal={universal_hits} user={user_hits}")
 
 def extract_month_from_campaign_name(campaign_name):
     months = {
@@ -368,12 +524,14 @@ def upload_campaign_metadata(campaign_id):
         tags_data = None
         creative_codes_from_images = []
         ad_count = 0
+        target_list_npis = []
 
         if 'target_list' in request.files:
             file = request.files['target_list']
             if file and allowed_file(file.filename, 'excel'):
                 file_content = file.read()
                 extracted_data.update(extract_target_list_data(file_content, file.filename))
+                target_list_npis = extract_npis_from_target_list(file_content, file.filename)
 
         if 'ad_images' in request.files:
             files = request.files.getlist('ad_images')
@@ -464,11 +622,19 @@ def upload_campaign_metadata(campaign_id):
         session.commit()
         session.close()
 
+        if target_list_npis:
+            threading.Thread(
+                target=_attach_target_list_to_profiles,
+                args=(target_list_npis, campaign_id, campaign_name, extracted_data.get('target_list_id') or ''),
+                daemon=True,
+            ).start()
+
         response_data = {
             'status': 'success',
             'message': 'Metadata extracted successfully',
             'campaign_id': campaign_id,
             'cmi_validated': extracted_data.get('cmi_validated', False),
+            'target_list_npis_queued': len(target_list_npis),
             'extracted': {
                 'client_id': extracted_data.get('client_id', False),
                 'cmi_placement_id': extracted_data.get('cmi_placement_id'),
@@ -658,7 +824,6 @@ def get_all_campaign_metadata():
             'message': str(e)
         }), 500
 
-
 @campaigns_bp.route('/gcm/upload', methods=['POST'])
 def upload_gcm_tags():
     try:
@@ -836,7 +1001,6 @@ def upload_gcm_tags():
             'message': str(e)
         }), 500
 
-
 @campaigns_bp.route('/gcm/placements', methods=['GET'])
 def get_gcm_placements():
     try:
@@ -900,3 +1064,149 @@ def get_gcm_brands():
             'status': 'error',
             'message': str(e)
         }), 500
+
+def _compute_metrics(sent, bounces, unique_opens, total_opens, unique_clicks, total_clicks):
+    delivered = max(0, sent - bounces)
+    delivery_rate = round((delivered / sent) * 100, 2) if sent > 0 else 0.0
+    unique_open_rate = round((unique_opens / delivered) * 100, 2) if delivered > 0 else 0.0
+    total_open_rate = round((total_opens / delivered) * 100, 2) if delivered > 0 else 0.0
+    unique_click_rate = round((unique_clicks / unique_opens) * 100, 2) if unique_opens > 0 else 0.0
+    total_click_rate = round((total_clicks / total_opens) * 100, 2) if total_opens > 0 else 0.0
+    return {
+        'sent': sent,
+        'delivered': delivered,
+        'bounces': bounces,
+        'unique_opens': unique_opens,
+        'total_opens': total_opens,
+        'unique_clicks': unique_clicks,
+        'total_clicks': total_clicks,
+        'delivery_rate': delivery_rate,
+        'unique_open_rate': unique_open_rate,
+        'total_open_rate': total_open_rate,
+        'unique_click_rate': unique_click_rate,
+        'total_click_rate': total_click_rate,
+    }
+
+
+def _target_filter_jsonb(name):
+    return json.dumps([{'campaign_name': name}])
+
+
+def _target_filter_jsonb_alt(name):
+    return json.dumps([{'campaign_id': name}])
+
+
+@campaigns_bp.route('/<path:campaign_id>/target-list-info', methods=['GET'])
+def target_list_info(campaign_id):
+    session = get_session()
+    try:
+        session.execute(text("SET LOCAL work_mem = '64MB'"))
+        session.execute(text("SET LOCAL effective_cache_size = '512MB'"))
+        f1 = _target_filter_jsonb(campaign_id)
+        f2 = _target_filter_jsonb_alt(campaign_id)
+        target_npi_sql = text("""
+            SELECT COUNT(DISTINCT npi) AS c FROM (
+                SELECT npi FROM universal_profiles
+                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                UNION
+                SELECT npi FROM user_profiles
+                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+            ) s
+        """)
+        target_npi_count = session.execute(target_npi_sql, {'f1': f1, 'f2': f2}).scalar() or 0
+        target_email_sql = text("""
+            SELECT COUNT(DISTINCT u.npi) AS c
+            FROM user_profiles u
+            WHERE u.email IS NOT NULL AND u.email <> '' AND u.npi IS NOT NULL AND u.npi <> ''
+              AND u.npi IN (
+                SELECT npi FROM universal_profiles
+                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                UNION
+                SELECT npi FROM user_profiles
+                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+              )
+        """)
+        target_email_count = session.execute(target_email_sql, {'f1': f1, 'f2': f2}).scalar() or 0
+        return jsonify({
+            'has_target_list': target_npi_count > 0,
+            'target_npi_count': int(target_npi_count),
+            'target_email_count': int(target_email_count),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+@campaigns_bp.route('/<path:campaign_id>/target-list-breakdown', methods=['GET'])
+def target_list_breakdown(campaign_id):
+    session = get_session()
+    try:
+        session.execute(text("SET LOCAL work_mem = '64MB'"))
+        session.execute(text("SET LOCAL effective_cache_size = '512MB'"))
+        f1 = _target_filter_jsonb(campaign_id)
+        f2 = _target_filter_jsonb_alt(campaign_id)
+        name_dep = campaign_id + ' - Deployment%'
+        id_rows = session.execute(text("""
+            SELECT DISTINCT campaign_id FROM campaign_interactions
+            WHERE campaign_name = :name OR campaign_id = :name OR campaign_name LIKE :name_dep
+        """), {'name': campaign_id, 'name_dep': name_dep}).fetchall()
+        campaign_ids = [r[0] for r in id_rows if r[0]]
+        if not campaign_ids:
+            empty = _compute_metrics(0, 0, 0, 0, 0, 0)
+            return jsonify({'campaign_id': campaign_id, 'target_list': empty, 'rest_of_audience': empty})
+        sql = text("""
+            WITH target_emails AS (
+                SELECT DISTINCT LOWER(TRIM(u.email)) AS email
+                FROM user_profiles u
+                WHERE u.email IS NOT NULL AND u.email <> '' AND u.npi IS NOT NULL AND u.npi <> ''
+                  AND u.npi IN (
+                    SELECT npi FROM universal_profiles
+                    WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                      AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                    UNION
+                    SELECT npi FROM user_profiles
+                    WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                      AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                  )
+            ),
+            events AS (
+                SELECT LOWER(TRIM(email)) AS email, event_type
+                FROM campaign_interactions
+                WHERE campaign_id = ANY(:cids)
+            )
+            SELECT
+                CASE WHEN e.email IN (SELECT email FROM target_emails) THEN 'target' ELSE 'rest' END AS cohort,
+                COUNT(DISTINCT e.email) FILTER (WHERE event_type='sent') AS sent,
+                COUNT(*) FILTER (WHERE event_type='bounce') AS bounces,
+                COUNT(DISTINCT e.email) FILTER (WHERE event_type='open') AS unique_opens,
+                COUNT(*) FILTER (WHERE event_type='open') AS total_opens,
+                COUNT(DISTINCT e.email) FILTER (WHERE event_type='click') AS unique_clicks,
+                COUNT(*) FILTER (WHERE event_type='click') AS total_clicks
+            FROM events e
+            GROUP BY cohort
+        """)
+        rows = session.execute(sql, {'cids': campaign_ids, 'f1': f1, 'f2': f2}).fetchall()
+        cohorts = {'target': None, 'rest': None}
+        for r in rows:
+            cohorts[r[0]] = _compute_metrics(
+                sent=int(r[1] or 0),
+                bounces=int(r[2] or 0),
+                unique_opens=int(r[3] or 0),
+                total_opens=int(r[4] or 0),
+                unique_clicks=int(r[5] or 0),
+                total_clicks=int(r[6] or 0),
+            )
+        empty = _compute_metrics(0, 0, 0, 0, 0, 0)
+        return jsonify({
+            'campaign_id': campaign_id,
+            'target_list': cohorts['target'] or empty,
+            'rest_of_audience': cohorts['rest'] or empty,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()

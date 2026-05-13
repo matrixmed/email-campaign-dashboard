@@ -113,7 +113,9 @@ const ComponentSidebar = ({
   hasSocialTable = false,
   onAddSocialPosts,
   socialPostOverlayEnabled = false,
-  onSocialPostOverlayToggle
+  onSocialPostOverlayToggle,
+  showDate = false,
+  onShowDateToggle
 }) => {
   const effectiveCampaignName = selectedCampaign?.campaign_name
     || (selectedMultiCampaigns && selectedMultiCampaigns.length > 0 ? selectedMultiCampaigns[0]?.campaign_name : null);
@@ -962,11 +964,11 @@ const ComponentSidebar = ({
   };
 
   const filteredMetrics = AVAILABLE_METRICS.filter(metric =>
-    metric.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesSearchTerm(metric, searchTerm)
   );
 
   const filteredDashboards = savedDashboards.filter(dashboard =>
-    dashboard.title.toLowerCase().includes(archiveSearchTerm.toLowerCase())
+    matchesSearchTerm(dashboard.title, archiveSearchTerm)
   );
 
   if (!isOpen) {
@@ -2849,6 +2851,32 @@ const ComponentSidebar = ({
                   </div>
                 </label>
               </div>
+
+              {selectedMultiCampaigns && selectedMultiCampaigns.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={showDate}
+                      onChange={onShowDateToggle}
+                      style={{ margin: 0 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: 'white', fontWeight: '600', marginBottom: '4px' }}>
+                        Show Date
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {!(currentTemplate?.includes?.('hot-topics') || currentTemplate?.includes?.('expert-perspectives') || (typeof currentTemplate === 'object' && (currentTemplate?.id?.includes('hot-topics') || currentTemplate?.id?.includes('expert-perspectives')))) && (<>
               <div style={{ marginBottom: '24px' }}>

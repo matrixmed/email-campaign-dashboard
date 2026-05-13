@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const DrugSpending = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('drugs');
-  const [displayCount, setDisplayCount] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,7 +27,7 @@ const DrugSpending = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     fetchData();
   }, []);
 
-  useEffect(() => { setDisplayCount(100); }, [subTab, searchTerm]);
+  useEffect(() => { setCurrentPage(1); }, [subTab, searchTerm]);
 
   const formatCurrency = (num) => {
     if (!num) return '$0';
@@ -45,20 +50,40 @@ const DrugSpending = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     );
   }
 
-  const filteredDrugs = data.drugs?.filter(d => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return d.brand_name?.toLowerCase().includes(term) || d.generic_name?.toLowerCase().includes(term) || d.manufacturer?.toLowerCase().includes(term);
-  }) || [];
+  const filteredDrugs = data.drugs?.filter(d =>
+    matchesSearchTerm(d.brand_name, searchTerm) ||
+    matchesSearchTerm(d.generic_name, searchTerm) ||
+    matchesSearchTerm(d.manufacturer, searchTerm)
+  ) || [];
 
-  const filteredMfrs = data.by_manufacturer?.filter(m => {
-    if (!searchTerm) return true;
-    return m.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase());
-  }) || [];
+  const filteredMfrs = data.by_manufacturer?.filter(m =>
+    matchesSearchTerm(m.manufacturer, searchTerm)
+  ) || [];
 
   const currentData = subTab === 'drugs' ? filteredDrugs : filteredMfrs;
-  const visible = currentData.slice(0, displayCount);
-  const hasMore = displayCount < currentData.length;
+  const totalPages = Math.max(1, Math.ceil(currentData.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const visible = currentData.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    if (subTab === 'drugs') {
+      const headers = ['Brand', 'Generic', 'Manufacturer', 'Total Spending', 'Claims', 'Beneficiaries', 'Avg/Claim'];
+      const rows = filteredDrugs.map(d => [
+        d.brand_name || '',
+        d.generic_name || '',
+        d.manufacturer || '',
+        d.total_spending || 0,
+        d.total_claims || 0,
+        d.total_beneficiaries || 0,
+        d.avg_spending_per_claim || 0,
+      ]);
+      exportTableCSV('drug_spending_drugs', headers, rows);
+    } else {
+      const headers = ['Manufacturer', 'Total Drug Spending', 'Drug Count'];
+      const rows = filteredMfrs.map(m => [m.manufacturer || '', m.total || 0, m.drug_count || 0]);
+      exportTableCSV('drug_spending_manufacturers', headers, rows);
+    }
+  };
 
   return (
     <div className="mi-tab-content">
@@ -74,6 +99,9 @@ const DrugSpending = ({ searchTerm, onSelectCompany, lastUpdated }) => {
         <button className={`mi-subtab ${subTab === 'manufacturers' ? 'active' : ''}`} onClick={() => setSubTab('manufacturers')}>
           By Manufacturer ({filteredMfrs.length})
         </button>
+        {currentData.length > 0 && (
+          <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExport}>Export CSV</button>
+        )}
       </div>
 
       {subTab === 'drugs' && (
@@ -130,13 +158,11 @@ const DrugSpending = ({ searchTerm, onSelectCompany, lastUpdated }) => {
         </div>
       )}
 
-      {hasMore && (
-        <div className="load-more-container">
-          <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 100)}>
-            Load More ({visible.length} of {currentData.length})
-          </button>
-        </div>
-      )}
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

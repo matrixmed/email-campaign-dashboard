@@ -346,14 +346,16 @@ const CompanyModal = ({ companyName, onClose }) => {
                   </thead>
                   <tbody>
                     {kols?.items?.map((k, i) => {
-                      const inAudience = kols.matched?.some(m => m.npi === k.npi);
+                      const matchedRow = kols.matched?.find(m => m.npi === k.npi);
+                      const inAudience = !!matchedRow;
+                      const sourceLabel = matchedRow?.source || (inAudience ? 'Yes' : null);
                       return (
                         <tr key={i} style={inAudience ? {background: 'rgba(0, 255, 255, 0.03)'} : {}}>
                           <td style={{padding: '10px 12px', color: '#ccc', borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{k.npi}</td>
                           <td style={{padding: '10px 12px', color: '#fff', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{k.physician_name}</td>
                           <td style={{padding: '10px 12px', color: '#ccc', borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{cleanSpecialty(k.specialty)}</td>
                           <td style={{padding: '10px 12px', color: '#ccc', borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{formatCurrency(k.total_payments)}</td>
-                          <td style={{padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{inAudience ? <span style={{color: '#0ff', fontWeight: 600}}>Yes</span> : <span style={{color: '#555'}}>No</span>}</td>
+                          <td style={{padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)'}}>{inAudience ? <span style={{color: '#0ff', fontWeight: 600}}>{sourceLabel}</span> : <span style={{color: '#555'}}>No</span>}</td>
                         </tr>
                       );
                     })}

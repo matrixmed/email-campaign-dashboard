@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const ExchangeScorecard = ({ searchTerm, startDate = null, endDate = null }) => {
   const [data, setData] = useState([]);
@@ -45,7 +46,7 @@ const ExchangeScorecard = ({ searchTerm, startDate = null, endDate = null }) => 
   };
 
   const filteredData = searchTerm
-    ? data.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    ? data.filter(item => matchesSearchTerm(item.name, searchTerm))
     : data;
 
   if (loading) {

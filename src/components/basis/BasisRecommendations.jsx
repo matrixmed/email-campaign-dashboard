@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const BasisRecommendations = ({ searchTerm }) => {
   const [recommendations, setRecommendations] = useState([]);
@@ -56,16 +57,12 @@ const BasisRecommendations = ({ searchTerm }) => {
     return num.toLocaleString();
   };
 
-  const filteredRecs = recommendations.filter(rec => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      rec.title?.toLowerCase().includes(term) ||
-      rec.exchange?.toLowerCase().includes(term) ||
-      rec.domain?.toLowerCase().includes(term) ||
-      rec.campaign_name?.toLowerCase().includes(term)
-    );
-  });
+  const filteredRecs = recommendations.filter(rec =>
+    matchesSearchTerm(rec.title, searchTerm) ||
+    matchesSearchTerm(rec.exchange, searchTerm) ||
+    matchesSearchTerm(rec.domain, searchTerm) ||
+    matchesSearchTerm(rec.campaign_name, searchTerm)
+  );
 
   return (
     <div className="basis-recommendations">

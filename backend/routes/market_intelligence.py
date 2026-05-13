@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
 from db_pool import get_db_connection as get_connection
+from routes.source_classification import classify_source_sql_expr
 
 market_intelligence_bp = Blueprint('market_intelligence', __name__)
 
@@ -225,9 +226,11 @@ def get_manufacturer_detail(manufacturer_name):
                 elif hasattr(v, '__float__'):
                     h[k] = float(v)
 
-        cur.execute("""
+        source_expr = classify_source_sql_expr('up')
+        cur.execute(f"""
             SELECT op.npi, op.physician_name, op.specialty,
-                   op.total_payments, op.payment_count
+                   op.total_payments, op.payment_count,
+                   ({source_expr}) AS source
             FROM open_payments_summary op
             INNER JOIN user_profiles up ON op.npi = up.npi
             WHERE op.manufacturer_name = %(manufacturer)s
@@ -266,15 +269,31 @@ def export_manufacturer_kols(manufacturer_name):
         cur = conn.cursor()
 
         cur.execute("""
+            SELECT alias FROM company_aliases
+            WHERE canonical_name = (
+                SELECT canonical_name FROM company_aliases WHERE alias ILIKE %(name)s LIMIT 1
+            )
+        """, {'name': f"%{manufacturer_name}%"})
+        alias_rows = cur.fetchall()
+        aliases = [r[0] for r in alias_rows] if alias_rows else [manufacturer_name]
+        alias_params = {f'a{i}': f"%{a}%" for i, a in enumerate(aliases)}
+        ilike_cond = " OR ".join([f"op.manufacturer_name ILIKE %({f'a{i}'})s" for i in range(len(aliases))])
+
+        source_expr = classify_source_sql_expr('up')
+        cur.execute(f"""
             SELECT op.npi, op.physician_name, op.specialty,
                    op.total_payments, op.payment_count, op.avg_payment,
                    op.max_payment, op.program_year,
-                   CASE WHEN up.npi IS NOT NULL THEN 'Yes' ELSE 'No' END as in_audience
+                   CASE WHEN up.npi IS NOT NULL THEN 'Yes' ELSE 'No' END as in_audience,
+                   CASE WHEN up.npi IS NOT NULL THEN ({source_expr}) ELSE NULL END as source,
+                   CASE WHEN up.npi IS NOT NULL THEN
+                        CASE WHEN up.is_active THEN 'Active' ELSE 'Inactive' END
+                   ELSE NULL END as status
             FROM open_payments_summary op
             LEFT JOIN user_profiles up ON op.npi = up.npi AND up.npi IS NOT NULL AND up.npi != ''
-            WHERE op.manufacturer_name = %(manufacturer)s
+            WHERE ({ilike_cond})
             ORDER BY op.total_payments DESC
-        """, {'manufacturer': manufacturer_name})
+        """, alias_params)
 
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
@@ -420,6 +439,266 @@ def get_patent_expirations():
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@market_intelligence_bp.route('/conferences', methods=['GET'])
+def get_conferences():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT name, abbreviation, therapeutic_area, start_date, end_date,
+                   location, abstract_deadline, abstract_release_date,
+                   pitch_window_start, pitch_window_end, website, year, notes
+            FROM conferences
+            ORDER BY start_date ASC
+        """)
+
+        columns = [desc[0] for desc in cur.description]
+        confs = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for c in confs:
+            for k, v in c.items():
+                if hasattr(v, 'isoformat'):
+                    c[k] = v.isoformat()
+
+        from datetime import date as d, timedelta
+        today = d.today()
+        upcoming = [c for c in confs if c.get('start_date') and c['start_date'] >= today.isoformat()]
+        in_pitch_window = [c for c in confs if c.get('pitch_window_start') and c.get('pitch_window_end')
+                           and c['pitch_window_start'] <= today.isoformat() <= c['pitch_window_end']]
+        past = [c for c in confs if c.get('end_date') and c['end_date'] < today.isoformat()]
+
+        for c in upcoming:
+            area = c.get('therapeutic_area')
+            start = c.get('start_date')
+            if area and start:
+                window_start = (d.fromisoformat(start) - timedelta(days=60)).isoformat()
+                window_end = (d.fromisoformat(start) + timedelta(days=30)).isoformat()
+                cur.execute("""
+                    SELECT sponsor_name, COUNT(*) as trial_count
+                    FROM clinical_trials
+                    WHERE therapeutic_area = %(area)s
+                    AND sponsor_class = 'INDUSTRY'
+                    AND primary_completion_date BETWEEN %(ws)s AND %(we)s
+                    GROUP BY sponsor_name
+                    ORDER BY trial_count DESC
+                    LIMIT 10
+                """, {'area': area, 'ws': window_start, 'we': window_end})
+                sponsors = [{'sponsor': r[0], 'trials': r[1]} for r in cur.fetchall()]
+                c['active_sponsors'] = sponsors
+                c['active_sponsor_count'] = len(sponsors)
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'conferences': confs,
+            'upcoming': upcoming,
+            'in_pitch_window': in_pitch_window,
+            'past': past,
+            'total': len(confs)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@market_intelligence_bp.route('/pubmed-mesh-trending', methods=['GET'])
+def get_pubmed_mesh_trending():
+    therapeutic_area = request.args.get('therapeutic_area')
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        filters = ["therapeutic_area LIKE '%%_mesh'"]
+        params = {}
+
+        if therapeutic_area and therapeutic_area != 'all':
+            filters.append("therapeutic_area = %(area)s")
+            params['area'] = f"{therapeutic_area}_mesh"
+
+        where = "WHERE " + " AND ".join(filters)
+
+        cur.execute(f"""
+            SELECT search_term, therapeutic_area, publication_count
+            FROM pubmed_trends
+            {where}
+            ORDER BY publication_count DESC
+        """, params)
+
+        columns = [desc[0] for desc in cur.description]
+        terms = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for t in terms:
+            t['therapeutic_area'] = t['therapeutic_area'].replace('_mesh', '')
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'terms': terms,
+            'total': len(terms)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@market_intelligence_bp.route('/fda-safety-alerts', methods=['GET'])
+def get_fda_safety_alerts():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT report_date, brand_name, generic_name, reason,
+                   classification, status, recalling_firm, therapeutic_area
+            FROM fda_safety_alerts
+            ORDER BY report_date DESC
+            LIMIT 500
+        """)
+
+        columns = [desc[0] for desc in cur.description]
+        alerts = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        for a in alerts:
+            for k, v in a.items():
+                if hasattr(v, 'isoformat'):
+                    a[k] = v.isoformat()
+
+        our_areas = [a for a in alerts if a.get('therapeutic_area')]
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'alerts': alerts,
+            'in_our_areas': our_areas,
+            'total': len(alerts)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@market_intelligence_bp.route('/content-triggers', methods=['GET'])
+def get_content_triggers():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        triggers = []
+
+        cur.execute("""
+            SELECT approval_date, brand_name, generic_name, sponsor_name,
+                   submission_type, therapeutic_area, submission_description
+            FROM fda_approvals
+            WHERE approval_date >= CURRENT_DATE - interval '90 days'
+            AND therapeutic_area IN ('oncology', 'dermatology', 'neuroscience')
+            ORDER BY approval_date DESC
+        """)
+        for row in cur.fetchall():
+            triggers.append({
+                'type': 'fda_approval',
+                'date': row[0].isoformat() if row[0] else None,
+                'title': f"{'New Approval' if row[4] == 'ORIG' else 'New Indication'}: {row[1] or row[2]}",
+                'detail': f"{row[5]} - {row[6] or ''}" if row[5] else row[6] or '',
+                'company': row[3],
+                'area': row[5],
+            })
+
+        cur.execute("""
+            SELECT target_date, drug_name, company_name, therapeutic_area
+            FROM pdufa_dates
+            WHERE target_date BETWEEN CURRENT_DATE AND CURRENT_DATE + interval '90 days'
+            AND status = 'pending'
+            ORDER BY target_date ASC
+        """)
+        for row in cur.fetchall():
+            triggers.append({
+                'type': 'pdufa',
+                'date': row[0].isoformat() if row[0] else None,
+                'title': f"PDUFA Decision: {row[1]}",
+                'detail': row[3] or '',
+                'company': row[2],
+                'area': row[3],
+            })
+
+        cur.execute("""
+            SELECT drug_name, active_ingredient, applicant, patent_expiration_date
+            FROM patent_expirations
+            WHERE patent_expiration_date BETWEEN CURRENT_DATE AND CURRENT_DATE + interval '180 days'
+            AND drug_name IS NOT NULL AND drug_name != ''
+            ORDER BY patent_expiration_date ASC
+            LIMIT 20
+        """)
+        for row in cur.fetchall():
+            triggers.append({
+                'type': 'patent_cliff',
+                'date': row[3].isoformat() if row[3] else None,
+                'title': f"Patent Expiring: {row[0]} ({row[1]})",
+                'detail': f"Applicant: {row[2]}",
+                'company': row[2],
+                'area': None,
+            })
+
+        cur.execute("""
+            WITH yearly AS (
+                SELECT search_term, therapeutic_area, year, SUM(publication_count) as total
+                FROM pubmed_trends WHERE month = 0
+                GROUP BY search_term, therapeutic_area, year
+            ),
+            growth AS (
+                SELECT a.search_term, a.therapeutic_area,
+                       a.total as current_total, b.total as prev_total,
+                       CASE WHEN b.total > 0
+                           THEN ROUND(((a.total - b.total)::numeric / b.total) * 100, 1)
+                           ELSE NULL END as growth_pct
+                FROM yearly a JOIN yearly b ON a.search_term = b.search_term AND a.year = b.year + 1
+                WHERE a.year = (SELECT MAX(year) FROM pubmed_trends WHERE month = 0)
+                AND b.total > 10
+            )
+            SELECT search_term, therapeutic_area, growth_pct, current_total
+            FROM growth WHERE growth_pct >= 30
+            ORDER BY growth_pct DESC LIMIT 15
+        """)
+        for row in cur.fetchall():
+            triggers.append({
+                'type': 'research_momentum',
+                'date': None,
+                'title': f"Research Surge: {row[0]}",
+                'detail': f"+{row[2]}% YoY ({row[3]} publications)",
+                'company': None,
+                'area': row[1],
+            })
+
+        cur.execute("""
+            SELECT name, abbreviation, therapeutic_area, start_date, pitch_window_start, pitch_window_end
+            FROM conferences
+            WHERE pitch_window_start <= CURRENT_DATE AND start_date >= CURRENT_DATE
+            ORDER BY start_date ASC
+        """)
+        for row in cur.fetchall():
+            triggers.append({
+                'type': 'conference',
+                'date': row[3].isoformat() if row[3] else None,
+                'title': f"Conference Coming: {row[1]} - {row[0]}",
+                'detail': f"{row[2]} | Pitch window open",
+                'company': None,
+                'area': row[2],
+            })
+
+        triggers.sort(key=lambda x: x.get('date') or '9999', reverse=False)
+
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'triggers': triggers,
+            'total': len(triggers)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 @market_intelligence_bp.route('/drug-spending', methods=['GET'])
 def get_drug_spending():
@@ -938,7 +1217,7 @@ def get_company_profile(company_name):
                    enrollment_count, primary_completion_date, therapeutic_area
             FROM clinical_trials
             WHERE ({ilike_any('sponsor_name')}) AND sponsor_class = 'INDUSTRY'
-            ORDER BY primary_completion_date ASC NULLS LAST
+            ORDER BY primary_completion_date DESC NULLS LAST
         """, alias_params)
         trial_cols = [d[0] for d in cur.description]
         trials = [dict(zip(trial_cols, r)) for r in cur.fetchall()]
@@ -963,9 +1242,11 @@ def get_company_profile(company_name):
         kol_cols = [d[0] for d in cur.description]
         kols = [dict(zip(kol_cols, r)) for r in cur.fetchall()]
 
+        source_expr = classify_source_sql_expr('up')
         cur.execute(f"""
             SELECT op.npi, op.physician_name, op.specialty,
-                   op.total_payments, op.payment_count
+                   op.total_payments, op.payment_count,
+                   ({source_expr}) AS source
             FROM open_payments_summary op
             INNER JOIN user_profiles up ON op.npi = up.npi
             WHERE ({ilike_any('op.manufacturer_name')})

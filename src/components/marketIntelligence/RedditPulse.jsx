@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const RedditPulse = ({ searchTerm }) => {
   const [data, setData] = useState(null);
@@ -66,9 +67,7 @@ const RedditPulse = ({ searchTerm }) => {
 
   const filtered = allPosts.filter(p => {
     if (subTab !== 'all' && p.subreddit !== subTab) return false;
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return p.title?.toLowerCase().includes(term) || p.body?.toLowerCase().includes(term);
+    return matchesSearchTerm(p.title, searchTerm) || matchesSearchTerm(p.body, searchTerm);
   });
 
   return (

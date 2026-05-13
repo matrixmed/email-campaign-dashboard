@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AudienceQueryBuilder from '../components/audience/AudienceQueryBuilder';
 import NPIQuickLookup from '../components/listanalysis/NPIQuickLookup';
+import SpecialtyLookup from '../components/listanalysis/SpecialtyLookup';
 import ListEfficiencyAnalysis from '../components/listanalysis/ListEfficiencyAnalysis';
 import DMABreakdown from '../components/listanalysis/DMABreakdown';
 import EngagementPatterns from '../components/audience/EngagementPatterns';
@@ -10,6 +11,7 @@ import ShadowEngagers from '../components/audience/ShadowEngagers';
 import HCPTargeting from '../components/audience/HCPTargeting';
 import PrintListDisplay from '../components/audience/PrintListDisplay';
 import DigitalListDisplay from '../components/audience/DigitalListDisplay';
+import SubscriberIntake from '../components/audience/SubscriberIntake';
 import '../styles/AnalyticsHub.css';
 
 const AudienceAnalyticsPage = () => {
@@ -21,6 +23,8 @@ const AudienceAnalyticsPage = () => {
   const [targetingSearch, setTargetingSearch] = useState('');
   const [printListSearch, setPrintListSearch] = useState('');
   const [digitalListSearch, setDigitalListSearch] = useState('');
+  const [subscriberIntakeSearch, setSubscriberIntakeSearch] = useState('');
+  const [listEfficiencySearch, setListEfficiencySearch] = useState('');
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
@@ -88,6 +92,28 @@ const AudienceAnalyticsPage = () => {
             />
           </div>
         )}
+        {activeTab === 'subscriber-intake' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={subscriberIntakeSearch}
+              onChange={(e) => setSubscriberIntakeSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
+        {activeTab === 'list-analysis' && (
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search"
+              value={listEfficiencySearch}
+              onChange={(e) => setListEfficiencySearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        )}
       </div>
 
       <div className="analytics-tabs">
@@ -109,7 +135,12 @@ const AudienceAnalyticsPage = () => {
         >
           <span>NPI Lookup</span>
         </button>
-        {/* DISABLED - not verified yet
+        <button
+          className={`tab-button ${activeTab === 'specialty-lookup' ? 'active' : ''}`}
+          onClick={() => handleTabClick('specialty-lookup')}
+        >
+          <span>Specialty Lookup</span>
+        </button>
         <button
           className={`tab-button ${activeTab === 'hcp-targeting' ? 'active' : ''}`}
           onClick={() => handleTabClick('hcp-targeting')}
@@ -128,19 +159,32 @@ const AudienceAnalyticsPage = () => {
         >
           <span>Digital Lists</span>
         </button>
-        */}
+        <button
+          className={`tab-button ${activeTab === 'subscriber-intake' ? 'active' : ''}`}
+          onClick={() => handleTabClick('subscriber-intake')}
+        >
+          <span>Subscriber Intake</span>
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'ncoa-upload' ? 'active' : ''}`}
+          onClick={() => handleTabClick('ncoa-upload')}
+        >
+          <span>NCOA Upload</span>
+        </button>
         <button
           className={`tab-button ${activeTab === 'list-analysis' ? 'active' : ''}`}
           onClick={() => handleTabClick('list-analysis')}
         >
-          <span>IQVIA List Efficiency</span>
+          <span>List Efficiency</span>
         </button>
+        {/* DISABLED - not verified yet
         <button
           className={`tab-button ${activeTab === 'dma-breakdown' ? 'active' : ''}`}
           onClick={() => handleTabClick('dma-breakdown')}
         >
           <span>DMA Breakdown</span>
         </button>
+        */}
         <button
           className={`tab-button ${activeTab === 'shadow-engagers' ? 'active' : ''}`}
           onClick={() => handleTabClick('shadow-engagers')}
@@ -160,12 +204,6 @@ const AudienceAnalyticsPage = () => {
         >
           <span>Print Management</span>
         </button>
-        <button
-          className={`tab-button ${activeTab === 'ncoa-upload' ? 'active' : ''}`}
-          onClick={() => handleTabClick('ncoa-upload')}
-        >
-          <span>NCOA Upload</span>
-        </button>
         */}
       </div>
 
@@ -175,12 +213,17 @@ const AudienceAnalyticsPage = () => {
       {activeTab === 'npi-lookup' && (
         <NPIQuickLookup />
       )}
-      {activeTab === 'list-analysis' && (
-        <ListEfficiencyAnalysis />
+      {activeTab === 'specialty-lookup' && (
+        <SpecialtyLookup />
       )}
+      {activeTab === 'list-analysis' && (
+        <ListEfficiencyAnalysis externalSearch={listEfficiencySearch} />
+      )}
+      {/* DISABLED - not verified yet
       {activeTab === 'dma-breakdown' && (
         <DMABreakdown />
       )}
+      */}
       {activeTab === 'hcp-targeting' && (
         <HCPTargeting externalSearch={targetingSearch} />
       )}
@@ -193,15 +236,18 @@ const AudienceAnalyticsPage = () => {
       {activeTab === 'digital-lists' && (
         <DigitalListDisplay externalSearch={digitalListSearch} />
       )}
+      {activeTab === 'subscriber-intake' && (
+        <SubscriberIntake externalSearch={subscriberIntakeSearch} />
+      )}
+      {activeTab === 'ncoa-upload' && (
+        <NCOAUpload />
+      )}
       {/* DISABLED - not verified yet
       {activeTab === 'engagement-patterns' && (
         <EngagementPatterns />
       )}
       {activeTab === 'print-management' && (
         <PrintListManagement externalSearch={printSearch} />
-      )}
-      {activeTab === 'ncoa-upload' && (
-        <NCOAUpload />
       )}
       */}
     </div>

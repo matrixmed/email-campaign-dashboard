@@ -4,6 +4,7 @@ import '../../styles/SectionHeaders.css';
 import { API_BASE_URL } from '../../config/api';
 import { classifyCampaign, getDiseaseFromCampaign } from '../../utils/campaignClassifier';
 import { getIndustry } from '../../utils/industryKeywords';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const INITIAL_SHOW = 5;
 const LOAD_MORE = 10;
@@ -167,8 +168,23 @@ const CampaignBenchmarks = ({ onClearCache }) => {
   };
 
   const fetchBenchmarkData = async () => {
+    if (!selectedCampaign) return;
     setLoading(true);
     setHasRun(true);
+    setBenchmarkData(null);
+
+    let peerMarkets = null;
+    let selectedIndustry = null;
+    if (analyzeBy === 'market') {
+      peerMarkets = {};
+      campaigns.forEach(c => {
+        if (!c?.campaign_name) return;
+        const m = getIndustry(c.campaign_name, brandIndustryMap);
+        if (m) peerMarkets[c.campaign_name] = m;
+      });
+      selectedIndustry = getIndustry(selectedCampaign.campaign_name, brandIndustryMap);
+    }
+
     try {
       const response = await fetch(`${API_BASE}/analytics/campaign-benchmarks`, {
         method: 'POST',
@@ -179,19 +195,27 @@ const CampaignBenchmarks = ({ onClearCache }) => {
           filters: {
             analyze_by: analyzeBy,
             filter_by_disease: filterByDisease
-          }
+          },
+          selected_industry: selectedIndustry,
+          peer_markets: peerMarkets
         })
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || `Server returned ${response.status}`);
+      }
       const data = await response.json();
+      if (data?.error) throw new Error(data.error);
       setBenchmarkData(data);
     } catch (error) {
+      setBenchmarkData({ error: error.message || 'Failed to load benchmarks' });
     } finally {
       setLoading(false);
     }
   };
 
   const filteredCampaigns = campaigns.filter(campaign =>
-    campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+    matchesSearchTerm(campaign.campaign_name, campaignSearchTerm)
   );
 
   const renderPerformanceScore = () => {
@@ -554,7 +578,19 @@ const CampaignBenchmarks = ({ onClearCache }) => {
         </div>
       </div>
 
-      {hasRun && (
+      {hasRun && benchmarkData?.error && (
+        <div className="cb-overview-empty" style={{ marginTop: 16 }}>
+          {benchmarkData.error}
+        </div>
+      )}
+
+      {hasRun && benchmarkData && !benchmarkData.error && benchmarkData.similar_count === 0 && (
+        <div className="cb-overview-empty" style={{ marginTop: 16 }}>
+          {benchmarkData.warning || `No peer campaigns found${benchmarkData.classification?.industry ? ` in market '${benchmarkData.classification.industry}'` : ''}.`}
+        </div>
+      )}
+
+      {hasRun && benchmarkData && !benchmarkData.error && benchmarkData.similar_count > 0 && (
         <>
           <div className="viz-tabs">
             <button

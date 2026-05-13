@@ -3,6 +3,11 @@ import { API_BASE_URL } from '../../config/api';
 import '../../styles/CampaignPerformancePage.css';
 import '../../styles/AudienceQueryBuilder.css';
 import '../../styles/ShadowEngagers.css';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const ShadowEngagers = ({ externalSearch = '' }) => {
   const [data, setData] = useState(null);
@@ -10,8 +15,7 @@ const ShadowEngagers = ({ externalSearch = '' }) => {
   const [error, setError] = useState(null);
   const [sortField, setSortField] = useState('confidence_pct');
   const [sortDir, setSortDir] = useState('desc');
-  const [displayCount, setDisplayCount] = useState(50);
-  const [isFullyExpanded, setIsFullyExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchData();
@@ -40,12 +44,11 @@ const ShadowEngagers = ({ externalSearch = '' }) => {
     let rows = [...data.engagers];
 
     if (externalSearch.trim()) {
-      const term = externalSearch.toLowerCase();
       rows = rows.filter(r =>
-        (r.email && r.email.toLowerCase().includes(term)) ||
-        (r.first_name && r.first_name.toLowerCase().includes(term)) ||
-        (r.last_name && r.last_name.toLowerCase().includes(term)) ||
-        (r.specialty && r.specialty.toLowerCase().includes(term))
+        matchesSearchTerm(r.email, externalSearch) ||
+        matchesSearchTerm(r.first_name, externalSearch) ||
+        matchesSearchTerm(r.last_name, externalSearch) ||
+        matchesSearchTerm(r.specialty, externalSearch)
       );
     }
 
@@ -140,8 +143,25 @@ const ShadowEngagers = ({ externalSearch = '' }) => {
     );
   }
 
-  const visibleData = isFullyExpanded ? filtered.slice(0, 1000) : filtered.slice(0, displayCount);
-  const hasMore = filtered.length > displayCount;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const visibleData = filtered.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    const headers = ['Email', 'First Name', 'Last Name', 'Specialty', 'Confidence %', 'Classification', 'Clicks w/o Open', 'Campaigns w/ Opens', 'Total Clicks'];
+    const rows = filtered.map(r => [
+      r.email || '',
+      r.first_name || '',
+      r.last_name || '',
+      r.specialty || '',
+      r.confidence_pct || 0,
+      r.classification || '',
+      r.campaigns_clicked_no_open || 0,
+      r.campaigns_with_opens || 0,
+      r.total_clean_clicks_no_open || 0,
+    ]);
+    exportTableCSV('shadow_engagers', headers, rows);
+  };
 
   return (
     <div className="shadow-engagers">
@@ -177,18 +197,8 @@ const ShadowEngagers = ({ externalSearch = '' }) => {
           <span>Last updated: {formatLastUpdated(data.last_updated)}</span>
         </div>
         <span className="shadow-result-count">{filtered.length.toLocaleString()} results</span>
-        {filtered.length > 10 && (
-          <button
-            type="button"
-            className="btn-export"
-            onClick={() => {
-              setIsFullyExpanded(prev => !prev);
-              if (!isFullyExpanded) setDisplayCount(filtered.length);
-              else setDisplayCount(50);
-            }}
-          >
-            {isFullyExpanded ? 'Collapse' : `Expand All${filtered.length > 1000 ? ' (Max 1,000)' : ''}`}
-          </button>
+        {filtered.length > 0 && (
+          <button className="export-button" onClick={handleExport}>Export CSV</button>
         )}
       </div>
 
@@ -250,16 +260,11 @@ const ShadowEngagers = ({ externalSearch = '' }) => {
         </table>
       </div>
 
-      {hasMore && !isFullyExpanded && (
-        <div className="load-more-container">
-          <button
-            className="btn-load-more"
-            onClick={() => setDisplayCount(c => c + 50)}
-          >
-            Load More ({visibleData.length} of {filtered.length})
-          </button>
-        </div>
-      )}
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

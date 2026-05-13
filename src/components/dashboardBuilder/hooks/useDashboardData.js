@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { matchesSearchTerm } from '../../../utils/searchUtils';
 
 const DASHBOARD_METRICS_URL = "https://emaildash.blob.core.windows.net/json-data/dashboard_metrics.json?sp=r&st=2025-06-09T18:55:36Z&se=2027-06-17T02:55:36Z&spr=https&sv=2024-11-04&sr=b&sig=9o5%2B%2BHmlqiFuAQmw9bGl0D2485Z8xTy0XXsb10S2aCI%3D";
 
@@ -313,12 +314,10 @@ const useDashboardData = () => {
   const searchCampaigns = useMemo(() => {
     return (searchTerm) => {
       if (!searchTerm.trim()) return campaigns;
-      
-      const term = searchTerm.toLowerCase();
-      return campaigns.filter(campaign => 
-        campaign.campaign_name?.toLowerCase().includes(term) ||
-        campaign.content_type?.toLowerCase().includes(term) ||
-        campaign.disease_state?.toLowerCase().includes(term)
+      return campaigns.filter(campaign =>
+        matchesSearchTerm(campaign.campaign_name, searchTerm) ||
+        matchesSearchTerm(campaign.content_type, searchTerm) ||
+        matchesSearchTerm(campaign.disease_state, searchTerm)
       );
     };
   }, [campaigns]);

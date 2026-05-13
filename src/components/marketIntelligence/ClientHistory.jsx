@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const ClientHistory = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
@@ -24,13 +25,11 @@ const ClientHistory = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Loading client data...</p></div>;
   }
 
-  const filtered = data?.clients?.filter(c => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return c.company?.toLowerCase().includes(term) ||
-           c.brands?.some(b => b.toLowerCase().includes(term)) ||
-           c.agencies?.some(a => a.toLowerCase().includes(term));
-  }) || [];
+  const filtered = data?.clients?.filter(c =>
+    matchesSearchTerm(c.company, searchTerm) ||
+    c.brands?.some(b => matchesSearchTerm(b, searchTerm)) ||
+    c.agencies?.some(a => matchesSearchTerm(a, searchTerm))
+  ) || [];
 
   return (
     <div className="mi-tab-content">

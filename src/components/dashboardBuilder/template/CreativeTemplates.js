@@ -1,5 +1,5 @@
 import { getThemeColors, TABLE_TYPES } from './LayoutTemplates';
-import { addMatrixLogo, generateTableForType, sanitizeTitle, detectMonthOnlyDifference, getTopSpecialties } from './TemplateLibrary';
+import { addMatrixLogo, generateTableForType, sanitizeTitle, dedupCampaignNames, getTopSpecialties, formatSendDate } from './TemplateLibrary';
 
 const buildAudienceBreakdown = (specialtyPerformance, mergeSubspecialties, position) => {
   if (!specialtyPerformance) return null;
@@ -10,7 +10,7 @@ const buildAudienceBreakdown = (specialtyPerformance, mergeSubspecialties, posit
     specialties: mergeSubspecialties
       ? getTopSpecialties(specialtyPerformance, true)
       : Object.entries(specialtyPerformance)
-          .filter(([name, data]) => data.audience_total >= 100 && !name.toLowerCase().includes('unknown') && !name.toLowerCase().includes('staff') && data.unique_open_rate > 0)
+          .filter(([name, data]) => data.audience_total >= 5 && !name.toLowerCase().includes('unknown') && !name.toLowerCase().includes('staff') && data.unique_open_rate > 0)
           .sort((a, b) => b[1].audience_percentage - a[1].audience_percentage)
           .slice(0, 4),
     position,
@@ -44,7 +44,7 @@ const buildAggregatedAudience = (campaigns, mergeSubspecialties, position) => {
     specialties: mergeSubspecialties
       ? getTopSpecialties(aggregated, true)
       : Object.entries(aggregated)
-          .filter(([name, data]) => data.audience_total >= 100 && !name.toLowerCase().includes('unknown') && !name.toLowerCase().includes('staff') && data.unique_open_rate > 0)
+          .filter(([name, data]) => data.audience_total >= 5 && !name.toLowerCase().includes('unknown') && !name.toLowerCase().includes('staff') && data.unique_open_rate > 0)
           .sort((a, b) => b[1].audience_percentage - a[1].audience_percentage)
           .slice(0, 4),
     position,
@@ -108,12 +108,15 @@ export const generateHotTopicsSingle = (campaign, theme, mergeSubspecialties = f
   return components;
 };
 
-export const generateHotTopicsMulti = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}) => {
+export const generateHotTopicsMulti = (campaignsInput, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
+  const campaigns = [...campaignsInput].sort(
+    (a, b) => String(a.send_date || '').localeCompare(String(b.send_date || ''))
+  );
   const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
-  const dedup = detectMonthOnlyDifference(campaignNames);
+  const dedup = dedupCampaignNames(campaignNames);
   let titleText;
   if (dedup.isMonthOnly) {
     titleText = sanitizeTitle(dedup.baseName);
@@ -169,18 +172,24 @@ export const generateHotTopicsMulti = (campaigns, theme, mergeSubspecialties = f
     const cNameLower = (campaign.campaign_name || '').toLowerCase();
     const cSkipDouble = cNameLower.includes('expert perspectives') || cNameLower.includes('custom email');
     const bannerValue = cSkipDouble ? totalOpens : totalOpens * 2;
-    const label = dedup.isMonthOnly ? dedup.months[index] : (campaign.campaign_name || 'Unknown');
-    return [
-      label,
+    const label = dedup.labels[index] || campaign.campaign_name || 'Unknown';
+    const row = [label];
+    if (showDate) row.push(formatSendDate(campaign.send_date));
+    row.push(
       (campaign.volume_metrics?.delivered || 0).toLocaleString(),
       (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
       `${(campaign.core_metrics?.unique_open_rate || 0).toFixed(1)}%`,
       bannerValue.toLocaleString(),
       `${(campaign.core_metrics?.total_click_rate || 0).toFixed(1)}%`
-    ];
+    );
+    return row;
   });
 
   const compTableHeight = Math.max(Math.min(171, 45 + campaigns.length * 28), 392 - 207) - 15;
+
+  const htHeaders = [dedup.headerLabel === 'Campaign Month' ? 'Month' : 'Campaign'];
+  if (showDate) htHeaders.push('Send Date');
+  htHeaders.push('Delivered', 'Unique Opens', 'Open Rate', 'Banner Imp', 'CTR');
 
   components.push({
     id: 'campaign-comparison-table',
@@ -188,10 +197,7 @@ export const generateHotTopicsMulti = (campaigns, theme, mergeSubspecialties = f
     title: '',
     config: {
       customData: comparisonRows,
-      headers: [
-        dedup.isMonthOnly ? 'Month' : 'Campaign',
-        'Delivered', 'Unique Opens', 'Open Rate', 'Banner Imp', 'CTR'
-      ]
+      headers: htHeaders
     },
     position: { x: 287, y: 207, width: 702, height: compTableHeight },
     style: {
@@ -272,12 +278,15 @@ export const generateExpertPerspectivesSingle = (campaign, theme, mergeSubspecia
   return components;
 };
 
-export const generateExpertPerspectivesMulti = (campaigns, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}) => {
+export const generateExpertPerspectivesMulti = (campaignsInput, theme, mergeSubspecialties = false, costComparisonMode = 'none', showTotalSends = false, selectedTableTypes = {}, showDate = false) => {
   const components = [];
   const themeColors = getThemeColors(theme);
 
+  const campaigns = [...campaignsInput].sort(
+    (a, b) => String(a.send_date || '').localeCompare(String(b.send_date || ''))
+  );
   const campaignNames = campaigns.map(c => c.campaign_name || 'Unknown');
-  const dedup = detectMonthOnlyDifference(campaignNames);
+  const dedup = dedupCampaignNames(campaignNames);
   let titleText;
   if (dedup.isMonthOnly) {
     titleText = sanitizeTitle(dedup.baseName);
@@ -331,18 +340,24 @@ export const generateExpertPerspectivesMulti = (campaigns, theme, mergeSubspecia
   const comparisonRows = campaigns.map((campaign, index) => {
     const totalOpens = campaign.volume_metrics?.total_opens || 0;
     const bannerValue = totalOpens;
-    const label = dedup.isMonthOnly ? dedup.months[index] : (campaign.campaign_name || 'Unknown');
-    return [
-      label,
+    const label = dedup.labels[index] || campaign.campaign_name || 'Unknown';
+    const row = [label];
+    if (showDate) row.push(formatSendDate(campaign.send_date));
+    row.push(
       (campaign.volume_metrics?.delivered || 0).toLocaleString(),
       (campaign.volume_metrics?.unique_opens || 0).toLocaleString(),
       `${(campaign.core_metrics?.unique_open_rate || 0).toFixed(1)}%`,
       bannerValue.toLocaleString(),
       `${(campaign.core_metrics?.total_click_rate || 0).toFixed(1)}%`
-    ];
+    );
+    return row;
   });
 
   const compTableHeight = Math.max(Math.min(178, 45 + campaigns.length * 28), 408 - 208) - 15;
+
+  const epHeaders = [dedup.headerLabel === 'Campaign Month' ? 'Month' : 'Campaign'];
+  if (showDate) epHeaders.push('Send Date');
+  epHeaders.push('Delivered', 'Unique Opens', 'Open Rate', 'eNL Banner Imp', 'CTR');
 
   components.push({
     id: 'campaign-comparison-table',
@@ -350,10 +365,7 @@ export const generateExpertPerspectivesMulti = (campaigns, theme, mergeSubspecia
     title: '',
     config: {
       customData: comparisonRows,
-      headers: [
-        dedup.isMonthOnly ? 'Month' : 'Campaign',
-        'Delivered', 'Unique Opens', 'Open Rate', 'eNL Banner Imp', 'CTR'
-      ]
+      headers: epHeaders
     },
     position: { x: 24, y: 208, width: 706, height: compTableHeight },
     style: {

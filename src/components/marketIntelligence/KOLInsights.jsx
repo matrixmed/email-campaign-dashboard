@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const cleanSpecialty = (raw) => {
   if (!raw) return '';
@@ -15,19 +20,9 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [selectedManufacturer, setSelectedManufacturer] = useState(null);
   const [manufacturerDetail, setManufacturerDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [showTopN, setShowTopN] = useState(50);
-  const [showTopNOpen, setShowTopNOpen] = useState(false);
-  const topNRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (topNRef.current && !topNRef.current.contains(event.target)) {
-        setShowTopNOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useEffect(() => { setCurrentPage(1); }, [subTab, selectedManufacturer, searchTerm]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,7 +52,7 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     setDetailLoading(false);
   }, []);
 
-  const handleExport = () => {
+  const handleDetailExport = () => {
     if (!selectedManufacturer) return;
     window.open(`${API_BASE_URL}/api/market-intelligence/open-payments/manufacturer/${encodeURIComponent(selectedManufacturer)}/export`, '_blank');
   };
@@ -81,12 +76,37 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     );
   }
 
-  const filteredManufacturers = data.manufacturers?.filter(m => {
-    if (!searchTerm) return true;
-    return m.manufacturer_name?.toLowerCase().includes(searchTerm.toLowerCase());
-  }) || [];
+  const filteredManufacturers = data.manufacturers?.filter(m =>
+    matchesSearchTerm(m.manufacturer_name, searchTerm)
+  ) || [];
 
   const filteredSpecialties = data.specialties || [];
+
+  const detailHcps = manufacturerDetail?.hcps || [];
+
+  let pagedSource = [];
+  if (subTab === 'manufacturers') pagedSource = filteredManufacturers;
+  else if (subTab === 'specialties') pagedSource = filteredSpecialties;
+  else if (subTab === 'detail') pagedSource = detailHcps;
+  const totalPages = Math.max(1, Math.ceil(pagedSource.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const visibleManufacturers = filteredManufacturers.slice(pageStart, pageStart + PER_PAGE);
+  const visibleSpecialties = filteredSpecialties.slice(pageStart, pageStart + PER_PAGE);
+  const visibleDetailHcps = detailHcps.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExportCurrent = () => {
+    if (subTab === 'manufacturers') {
+      const headers = ['Manufacturer', 'HCPs Paid', 'Total Spend'];
+      const rows = filteredManufacturers.map(m => [m.manufacturer_name || '', m.hcp_count || 0, m.total_spend || 0]);
+      exportTableCSV('kol_manufacturers', headers, rows);
+    } else if (subTab === 'specialties') {
+      const headers = ['Specialty', 'HCP Count', 'Total Spend'];
+      const rows = filteredSpecialties.map(s => [cleanSpecialty(s.specialty), s.hcp_count || 0, s.total_spend || 0]);
+      exportTableCSV('kol_specialties', headers, rows);
+    } else if (subTab === 'detail') {
+      handleDetailExport();
+    }
+  };
 
   return (
     <div className="mi-tab-content">
@@ -94,10 +114,7 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
         <h3>KOL Insights</h3>
         {subTab !== 'detail' && <LastUpdatedTag date={lastUpdated} />}
         {subTab === 'detail' && selectedManufacturer && (
-          <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
-            <span style={{color: '#0ff', fontWeight: 700, fontSize: 14}}>{manufacturerDetail?.total_in_audience?.toLocaleString() || 0} in our audience</span>
-            <button className="mi-export-btn" onClick={handleExport}>Export All KOLs</button>
-          </div>
+          <span style={{color: '#0ff', fontWeight: 700, fontSize: 14}}>{manufacturerDetail?.total_in_audience?.toLocaleString() || 0} in our audience</span>
         )}
       </div>
 
@@ -115,28 +132,10 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
             {selectedManufacturer}
           </button>
         )}
-        {subTab === 'detail' && (
-          <div className="filter-control" ref={topNRef} style={{marginLeft: 'auto'}}>
-            <label>Show:</label>
-            <div className="custom-dropdown">
-              <button className="custom-dropdown-trigger" onClick={() => setShowTopNOpen(!showTopNOpen)}>
-                <span className="dropdown-value">Top {showTopN}</span>
-                <svg className={`dropdown-arrow ${showTopNOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12">
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-              {showTopNOpen && (
-                <div className="custom-dropdown-menu">
-                  {[25, 50, 100, 250].map(n => (
-                    <div key={n} className={`custom-dropdown-option ${showTopN === n ? 'selected' : ''}`}
-                      onClick={() => { setShowTopN(n); setShowTopNOpen(false); }}>
-                      <span>Top {n}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+        {pagedSource.length > 0 && (
+          <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExportCurrent}>
+            {subTab === 'detail' ? 'Export All KOLs' : 'Export CSV'}
+          </button>
         )}
       </div>
 
@@ -151,7 +150,7 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredManufacturers.map((m, i) => (
+              {visibleManufacturers.map((m, i) => (
                 <tr key={i} className="clickable-row" onClick={() => fetchManufacturerDetail(m.manufacturer_name)}>
                   <td className="mi-bold mi-company-link" onClick={(e) => { e.stopPropagation(); onSelectCompany(m.manufacturer_name); }}>{m.manufacturer_name}</td>
                   <td>{m.hcp_count?.toLocaleString()}</td>
@@ -174,7 +173,7 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredSpecialties.map((s, i) => (
+              {visibleSpecialties.map((s, i) => (
                 <tr key={i}>
                   <td>{cleanSpecialty(s.specialty)}</td>
                   <td>{s.hcp_count?.toLocaleString()}</td>
@@ -191,6 +190,7 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
       )}
 
       {subTab === 'detail' && manufacturerDetail && !detailLoading && (
+        <>
         <div className="table-section">
           <table>
             <thead>
@@ -204,8 +204,10 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {manufacturerDetail.hcps?.slice(0, showTopN).map((h, i) => {
-                const inAudience = manufacturerDetail.matched_to_audience?.some(m => m.npi === h.npi);
+              {visibleDetailHcps.map((h, i) => {
+                const matchedRow = manufacturerDetail.matched_to_audience?.find(m => m.npi === h.npi);
+                const inAudience = !!matchedRow;
+                const sourceLabel = matchedRow?.source || (inAudience ? 'Yes' : null);
                 return (
                   <tr key={i} className={inAudience ? 'row-in-audience' : ''}>
                     <td>{h.npi}</td>
@@ -213,14 +215,21 @@ const KOLInsights = ({ searchTerm, onSelectCompany, lastUpdated }) => {
                     <td>{cleanSpecialty(h.specialty)}</td>
                     <td>{formatCurrency(h.total_payments)}</td>
                     <td>{formatCurrency(h.avg_payment)}</td>
-                    <td>{inAudience ? <span className="mi-audience-match">Yes</span> : <span className="mi-dim">No</span>}</td>
+                    <td>{inAudience ? <span className="mi-audience-match">{sourceLabel}</span> : <span className="mi-dim">No</span>}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        </>
       )}
+
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

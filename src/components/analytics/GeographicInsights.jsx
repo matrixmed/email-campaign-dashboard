@@ -3,13 +3,15 @@ import '../../styles/GeographicInsights.css';
 import { API_BASE_URL } from '../../config/api';
 import USStateMap from './USStateMap';
 import html2canvas from 'html2canvas';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
-const GeographicInsights = () => {
+const GeographicInsights = ({ onClearCache } = {}) => {
   const [loading, setLoading] = useState(true);
   const [mainGeoData, setMainGeoData] = useState(null);
   const [mainDataLoaded, setMainDataLoaded] = useState(false);
   const [mainDataError, setMainDataError] = useState(null);
   const [customMapData, setCustomMapData] = useState(null);
+  const [customMapError, setCustomMapError] = useState(null);
   const [activeMainTab, setActiveMainTab] = useState('audience-vs-npis');
   const [customMapLoading, setCustomMapLoading] = useState(false);
   const exportRef = useRef(null);
@@ -116,7 +118,7 @@ const GeographicInsights = () => {
 
   const handleSelectAllSpecialties = () => {
     const filtered = specialties.filter(spec =>
-      spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+      matchesSearchTerm(spec, specialtySearchTerm)
     );
     setSelectedSpecialties(filtered);
   };
@@ -127,7 +129,7 @@ const GeographicInsights = () => {
 
   const handleSelectAllCampaigns = () => {
     const filtered = campaigns.filter(campaign =>
-      campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+      matchesSearchTerm(campaign.campaign_name, campaignSearchTerm)
     );
     setSelectedCampaigns(filtered.map(c => c.campaign_name));
   };
@@ -138,10 +140,15 @@ const GeographicInsights = () => {
 
   const generateCustomMap = async () => {
     setCustomMapLoading(true);
+    setCustomMapError(null);
+    setCustomMapData(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90_000);
     try {
       const response = await fetch(`${API_BASE}/analytics/geographic-custom`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           specialties: selectedSpecialties,
           campaigns: selectedCampaigns,
@@ -150,10 +157,21 @@ const GeographicInsights = () => {
           granularity: customMapGranularity
         })
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || `Server returned ${response.status}`);
+      }
       const data = await response.json();
+      if (data?.error) throw new Error(data.error);
       setCustomMapData(data);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        setCustomMapError('Query timed out after 90 seconds. Try narrowing filters.');
+      } else {
+        setCustomMapError(error.message || 'Failed to load custom map');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setCustomMapLoading(false);
     }
   };
@@ -176,11 +194,11 @@ const GeographicInsights = () => {
   };
 
   const filteredSpecialties = specialties.filter(spec =>
-    spec.toLowerCase().includes(specialtySearchTerm.toLowerCase())
+    matchesSearchTerm(spec, specialtySearchTerm)
   );
 
   const filteredCampaigns = campaigns.filter(campaign =>
-    campaign.campaign_name.toLowerCase().includes(campaignSearchTerm.toLowerCase())
+    matchesSearchTerm(campaign.campaign_name, campaignSearchTerm)
   );
 
   const prepareAudienceMapData = () => {
@@ -537,10 +555,10 @@ const GeographicInsights = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div>
             <h4 style={{ color: '#fff', fontFamily: 'Lora, serif', fontSize: '24px', marginBottom: '8px' }}>
-              Audience vs Total Market
+              Owned + Licensed vs Total Market
             </h4>
             <p style={{ fontSize: '14px', color: '#888', margin: 0 }}>
-              Audience: <span style={{ color: '#0ff', fontWeight: 'bold' }}>{totalAudience.toLocaleString()}</span> users |
+              Owned + Licensed: <span style={{ color: '#0ff', fontWeight: 'bold' }}>{totalAudience.toLocaleString()}</span> users |
               Total Market: <span style={{ color: '#ff8800', fontWeight: 'bold' }}>{totalNPIs.toLocaleString()}</span> NPIs
             </p>
           </div>
@@ -1163,6 +1181,18 @@ const GeographicInsights = () => {
             )}
           </div>
 
+        {customMapError && (
+          <div className="no-data" style={{ textAlign: 'center', padding: '24px' }}>
+            <p style={{ color: '#ff6b6b', marginBottom: '12px' }}>{customMapError}</p>
+            <button
+              onClick={generateCustomMap}
+              style={{ padding: '8px 16px', background: '#0ff', color: '#000', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {customMapData && renderCustomMap()}
       </div>
     );
@@ -1424,7 +1454,7 @@ const GeographicInsights = () => {
             className={`viz-tab ${activeMainTab === 'audience-vs-npis' ? 'active' : ''}`}
             onClick={() => handleTabChange('audience-vs-npis')}
           >
-            Audience vs Market
+            Owned/Licensed vs Market
           </button>
           <button
             className={`viz-tab ${activeMainTab === 'metro-urban-rural' ? 'active' : ''}`}

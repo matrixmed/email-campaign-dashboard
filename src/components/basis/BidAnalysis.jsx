@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const BidAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
   const [exchangeData, setExchangeData] = useState([]);
@@ -48,7 +49,7 @@ const BidAnalysis = ({ searchTerm, startDate = null, endDate = null }) => {
   };
 
   const filteredData = searchTerm
-    ? exchangeData.filter(item => item.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    ? exchangeData.filter(item => matchesSearchTerm(item.name, searchTerm))
     : exchangeData;
 
   const sortedByWinRate = [...filteredData]

@@ -1401,12 +1401,16 @@ def export_list(list_name):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("""
-            SELECT npi, first_name, last_name, degree, email, specialty, company, title,
-                   address_1, address_2, city, state, zipcode, country,
-                   subscribed_lists, is_comp, subscribe_date, source, notes
-            FROM print_list_subscribers
-            WHERE subscribed_lists LIKE %s AND is_subscribed = TRUE
-            ORDER BY last_name, first_name
+            SELECT pls.npi, pls.first_name, pls.last_name, pls.degree, pls.email, pls.specialty,
+                   pls.company, pls.title, pls.address_1, pls.address_2, pls.city, pls.state,
+                   pls.zipcode, pls.country, pls.subscribed_lists, pls.is_comp,
+                   pls.subscribe_date, pls.source, pls.notes
+            FROM print_list_subscribers pls
+            LEFT JOIN universal_profiles up ON up.npi = pls.npi AND pls.npi IS NOT NULL AND pls.npi != ''
+            WHERE pls.subscribed_lists LIKE %s
+              AND pls.is_subscribed = TRUE
+              AND (up.is_active IS NULL OR up.is_active = TRUE)
+            ORDER BY pls.last_name, pls.first_name
         """, (f'%{list_name}%',))
         rows = cur.fetchall()
         cur.close()

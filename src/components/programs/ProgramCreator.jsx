@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
+import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const STEPS = [
   { key: 'info', label: 'Program Info' },
@@ -168,8 +169,7 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
   const countType = (type) => countTypeIn(activeSelections, type);
 
   const sortedEmails = useMemo(() => {
-    const q = search.toLowerCase();
-    let list = (allData.emailCampaigns || []).filter(c => !q || c.Campaign?.toLowerCase().includes(q));
+    let list = (allData.emailCampaigns || []).filter(c => matchesSearchTerm(c.Campaign, search));
     list = list.map(c => ({ ...c, _score: name ? scoreMatch(c.Campaign, name) : 0 }));
     list.sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
@@ -181,12 +181,12 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
   const basisGrouped = useMemo(() => {
     const brands = allData.basisBrands || [];
     const camps = allData.basisCampaigns || [];
-    const q = search.toLowerCase();
+    const hasSearch = !!search.trim();
 
     return brands.map(brand => {
       const allCampaigns = camps.filter(c => c.brand === brand.name);
-      const filteredCampaigns = q ? allCampaigns.filter(c => (c.name || '').toLowerCase().includes(q)) : allCampaigns;
-      const brandMatch = !q || brand.name.toLowerCase().includes(q);
+      const filteredCampaigns = hasSearch ? allCampaigns.filter(c => matchesSearchTerm(c.name, search)) : allCampaigns;
+      const brandMatch = matchesSearchTerm(brand.name, search);
       const _score = name ? scoreMatch(brand.name + ' ' + allCampaigns.map(c => c.name).join(' '), name) : 0;
       return {
         name: brand.name,
@@ -235,19 +235,17 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
     const pl = allData.youtubeData?.playlists?.[playlistId];
     if (!pl) return [];
     const videos = allData.youtubeData?.videos || {};
-    const q = search.toLowerCase();
     return (pl.videoIds || []).map(vid => {
       const v = videos[vid];
       if (!v) return null;
       return { id: vid, title: v.title, views: v.current?.views || 0, publishedAt: v.publishedAt };
     }).filter(Boolean)
-    .filter(v => !q || v.title?.toLowerCase().includes(q))
+    .filter(v => matchesSearchTerm(v.title, search))
     .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
   }, [allData.youtubeData, search]);
 
   const filteredYtVideos = useMemo(() => {
-    const q = search.toLowerCase();
-    let list = ytVideos.filter(v => !q || v.title?.toLowerCase().includes(q));
+    let list = ytVideos.filter(v => matchesSearchTerm(v.title, search));
     list = list.map(v => ({ ...v, _score: name ? scoreMatch(v.title, name) : 0 }));
     list.sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
@@ -283,7 +281,6 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
   }, [allData.facebookData, allData.instagramData, allData.linkedinData]);
 
   const getSocialPosts = useCallback((channelKey, platform) => {
-    const q = search.toLowerCase();
     let posts;
     if (platform === 'facebook') {
       posts = (allData.facebookData?.companies?.[channelKey]?.posts || []).map(p => ({
@@ -310,8 +307,8 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
         createdAt: p.created_at,
       }));
     }
-    if (q) {
-      posts = posts.filter(p => p.text?.toLowerCase().includes(q) || String(p.id).toLowerCase().includes(q));
+    if (search.trim()) {
+      posts = posts.filter(p => matchesSearchTerm(p.text, search) || matchesSearchTerm(String(p.id), search));
     }
     posts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     return posts;
@@ -325,11 +322,11 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
       if (!groups[pub]) groups[pub] = [];
       groups[pub].push(issue);
     });
-    const q = search.toLowerCase();
+    const hasSearch = !!search.trim();
     return Object.entries(groups)
       .map(([publication, issues]) => {
-        const filteredIssues = q
-          ? issues.filter(i => (i.issue_name || '').toLowerCase().includes(q) || (i.issue_number || '').toString().toLowerCase().includes(q))
+        const filteredIssues = hasSearch
+          ? issues.filter(i => matchesSearchTerm(i.issue_name, search) || matchesSearchTerm(String(i.issue_number ?? ''), search))
           : issues;
         return { publication, issues, filteredIssues };
       })
@@ -351,11 +348,11 @@ const ProgramCreator = ({ allData, onSave, onClose, editingProgram }) => {
       if (!groups[prop]) groups[prop] = [];
       groups[prop].push(u);
     });
-    const q = search.toLowerCase();
+    const hasSearch = !!search.trim();
     return Object.entries(groups)
       .map(([property, urlList]) => {
-        const filteredUrls = q
-          ? urlList.filter(u => (u.url || '').toLowerCase().includes(q) || (u.title || '').toLowerCase().includes(q))
+        const filteredUrls = hasSearch
+          ? urlList.filter(u => matchesSearchTerm(u.url, search) || matchesSearchTerm(u.title, search))
           : urlList;
         return { property, urls: urlList, filteredUrls };
       })

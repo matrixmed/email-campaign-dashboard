@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import LastUpdatedTag from './LastUpdatedTag';
+import { matchesSearchTerm } from '../../utils/searchUtils';
+import TablePagination from '../common/TablePagination';
+import exportTableCSV from '../../utils/exportTableCSV';
+
+const PER_PAGE = 100;
 
 const AREA_COLORS = {
   dermatology: { primary: '#00857a', bg: 'rgba(0, 133, 122, 0.15)' },
@@ -12,7 +17,7 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('sponsors');
-  const [displayCount, setDisplayCount] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -27,17 +32,16 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { setDisplayCount(100); }, [subTab, searchTerm]);
+  useEffect(() => { setCurrentPage(1); }, [subTab, searchTerm]);
 
   const getAreaStyle = (area) => {
     const c = AREA_COLORS[area];
     return c ? { background: c.bg, color: c.primary } : {};
   };
 
-  const filteredSponsors = data?.top_sponsors?.filter(s => {
-    if (!searchTerm) return true;
-    return s.sponsor_name?.toLowerCase().includes(searchTerm.toLowerCase());
-  }) || [];
+  const filteredSponsors = data?.top_sponsors?.filter(s =>
+    matchesSearchTerm(s.sponsor_name, searchTerm)
+  ) || [];
 
   const filteredTrials = data?.trials?.filter(t => {
     if (!t.primary_completion_date) return false;
@@ -46,13 +50,34 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
     const future = new Date();
     future.setMonth(future.getMonth() + 18);
     if (comp < now || comp > future) return false;
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return t.sponsor_name?.toLowerCase().includes(term) || t.title?.toLowerCase().includes(term) || t.conditions?.toLowerCase().includes(term);
+    return matchesSearchTerm(t.sponsor_name, searchTerm) ||
+           matchesSearchTerm(t.title, searchTerm) ||
+           matchesSearchTerm(t.conditions, searchTerm);
   }) || [];
 
-  const trialsVisible = filteredTrials.slice(0, displayCount);
-  const trialsHasMore = displayCount < filteredTrials.length;
+  const activeData = subTab === 'sponsors' ? filteredSponsors : filteredTrials;
+  const totalPages = Math.max(1, Math.ceil(activeData.length / PER_PAGE));
+  const pageStart = (currentPage - 1) * PER_PAGE;
+  const sponsorsVisible = filteredSponsors.slice(pageStart, pageStart + PER_PAGE);
+  const trialsVisible = filteredTrials.slice(pageStart, pageStart + PER_PAGE);
+
+  const handleExport = () => {
+    if (subTab === 'sponsors') {
+      const headers = ['Sponsor', 'Total Trials', 'Completing in 18mo'];
+      const rows = filteredSponsors.map(s => [s.sponsor_name || '', s.trial_count || 0, s.upcoming_count || 0]);
+      exportTableCSV('clinical_trials_top_sponsors', headers, rows);
+    } else {
+      const headers = ['Completion Date', 'Sponsor', 'Title', 'Therapeutic Area', 'Conditions'];
+      const rows = filteredTrials.map(t => [
+        t.primary_completion_date || '',
+        t.sponsor_name || '',
+        t.title || '',
+        t.therapeutic_area || '',
+        t.conditions || '',
+      ]);
+      exportTableCSV('clinical_trials_completing', headers, rows);
+    }
+  };
 
   if (loading) {
     return <div className="mi-loading"><div className="loading-spinner"></div><p>Loading clinical trials...</p></div>;
@@ -72,6 +97,9 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
         <button className={`mi-subtab ${subTab === 'completing' ? 'active' : ''}`} onClick={() => setSubTab('completing')}>
           Trials Completing ({filteredTrials.length})
         </button>
+        {activeData.length > 0 && (
+          <button className="export-button" style={{ marginLeft: 'auto' }} onClick={handleExport}>Export CSV</button>
+        )}
       </div>
 
       {subTab === 'sponsors' && (
@@ -85,7 +113,7 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredSponsors.map((s, i) => (
+              {sponsorsVisible.map((s, i) => (
                 <tr key={i}>
                   <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(s.sponsor_name)}>{s.sponsor_name}</td>
                   <td>{s.trial_count}</td>
@@ -98,38 +126,35 @@ const PharmaPipeline = ({ searchTerm, onSelectCompany, lastUpdated }) => {
       )}
 
       {subTab === 'completing' && (
-        <>
-          <div className="table-section">
-            <table>
-              <thead>
-                <tr>
-                  <th style={{width: 110}}>Completion</th>
-                  <th style={{width: 200}}>Sponsor</th>
-                  <th>Title</th>
-                  <th style={{width: 110}}>Area</th>
+        <div className="table-section">
+          <table>
+            <thead>
+              <tr>
+                <th style={{width: 110}}>Completion</th>
+                <th style={{width: 200}}>Sponsor</th>
+                <th>Title</th>
+                <th style={{width: 110}}>Area</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trialsVisible.map((t, i) => (
+                <tr key={i}>
+                  <td style={{whiteSpace: 'nowrap'}}>{t.primary_completion_date}</td>
+                  <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(t.sponsor_name)}>{t.sponsor_name}</td>
+                  <td style={{whiteSpace: 'normal', lineHeight: 1.4}}>{t.title}</td>
+                  <td><span className="mi-area-tag" style={getAreaStyle(t.therapeutic_area)}>{t.therapeutic_area}</span></td>
                 </tr>
-              </thead>
-              <tbody>
-                {trialsVisible.map((t, i) => (
-                  <tr key={i}>
-                    <td style={{whiteSpace: 'nowrap'}}>{t.primary_completion_date}</td>
-                    <td className="mi-bold mi-company-link" onClick={() => onSelectCompany(t.sponsor_name)}>{t.sponsor_name}</td>
-                    <td style={{whiteSpace: 'normal', lineHeight: 1.4}}>{t.title}</td>
-                    <td><span className="mi-area-tag" style={getAreaStyle(t.therapeutic_area)}>{t.therapeutic_area}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {trialsHasMore && (
-            <div className="load-more-container">
-              <button className="btn-load-more" onClick={() => setDisplayCount(c => c + 100)}>
-                Load More ({trialsVisible.length} of {filteredTrials.length})
-              </button>
-            </div>
-          )}
-        </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

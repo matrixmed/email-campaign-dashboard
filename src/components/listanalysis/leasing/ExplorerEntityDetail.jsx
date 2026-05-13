@@ -128,19 +128,28 @@ const ExplorerEntityDetail = ({ entityType, entityName, onClose, onSelectEntity 
                                                 <div key={type} className="explorer-overlap-group">
                                                     <div className="explorer-overlap-group-label">{OVERLAP_TYPE_LABELS[type] || type}</div>
                                                     <div className="explorer-overlap-list">
-                                                        {items.map((o, i) => (
-                                                            <button
-                                                                key={i}
-                                                                className="explorer-overlap-row"
-                                                                onClick={() => onSelectEntity(o.type, o.name)}
-                                                            >
-                                                                <span className="explorer-overlap-name">{o.name}</span>
-                                                                <span className="explorer-overlap-meta">
-                                                                    <strong>{o.overlap.toLocaleString()}</strong>
-                                                                    <span className="explorer-overlap-pct">{(o.pct_of_target * 100).toFixed(0)}%</span>
-                                                                </span>
-                                                            </button>
-                                                        ))}
+                                                        {items.map((o, i) => {
+                                                            const pctHere = (o.pct_of_target || 0) * 100;
+                                                            const pctThere = o.their_size ? (o.overlap / o.their_size) * 100 : 0;
+                                                            return (
+                                                                <button
+                                                                    key={i}
+                                                                    className="explorer-overlap-row"
+                                                                    onClick={() => onSelectEntity(o.type, o.name)}
+                                                                    title={`${o.overlap.toLocaleString()} overlap · ${pctHere.toFixed(0)}% of this entity · ${pctThere.toFixed(0)}% of ${o.name} (${(o.their_size || 0).toLocaleString()})`}
+                                                                >
+                                                                    <span className="explorer-overlap-name">{o.name}</span>
+                                                                    <span className="explorer-overlap-meta">
+                                                                        <strong>{o.overlap.toLocaleString()}</strong>
+                                                                        <span className="explorer-overlap-pct">
+                                                                            <span style={{ color: '#888' }}>{pctHere.toFixed(0)}%</span>
+                                                                            <span style={{ color: '#555', margin: '0 3px' }}>↔</span>
+                                                                            <span style={{ color: '#0ff' }}>{pctThere.toFixed(0)}%</span>
+                                                                        </span>
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )

@@ -7,9 +7,9 @@ from psycopg2.extras import RealDictCursor, Json
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from db_pool import get_db_connection
-from backend.scripts.subscriber_cleaner import clean_subscriber_row, detect_source_type, revalidate_cleaned
-from backend.scripts.subscriber_matcher import match_subscribers
-from backend.scripts.subscriber_router import route, BUCKET_PRINT, BUCKET_DIGITAL, BUCKET_REVIEW, ACTION_ADD, ACTION_ALREADY_ON
+from scripts.subscriber_cleaner import clean_subscriber_row, detect_source_type, revalidate_cleaned
+from scripts.subscriber_matcher import match_subscribers
+from scripts.subscriber_router import route, BUCKET_PRINT, BUCKET_DIGITAL, BUCKET_REVIEW, ACTION_ADD, ACTION_ALREADY_ON
 from routes.list_analysis import read_file_to_dataframe
 
 subscriber_intake_bp = Blueprint('subscriber_intake', __name__)

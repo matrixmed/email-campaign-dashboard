@@ -19,7 +19,6 @@ rename_campaigns.py
 src/components/listanalysis/Print Lists
 src/components/printManagement/ncoa
 backend/Lists
-backend/scripts
 
 # misc
 .DS_Store

@@ -1,5 +1,9 @@
 from flask import Blueprint, request, jsonify
 from models import UniversalProfile, UserProfile, get_session
+
+INDIVIDUAL_ONLY_SQL = "(entity_type IS NULL OR entity_type <> '2')"
+def _individual_only_filter(query):
+    return query.filter((UniversalProfile.entity_type.is_(None)) | (UniversalProfile.entity_type != '2'))
 from routes.source_classification import classify_source, classify_source_sql_expr
 import csv
 import io
@@ -29,9 +33,9 @@ def bulk_npi_lookup():
 
         session = get_session()
         try:
-            profiles = session.query(UniversalProfile).filter(
+            profiles = _individual_only_filter(session.query(UniversalProfile).filter(
                 UniversalProfile.npi.in_(cleaned_npis)
-            ).all()
+            )).all()
 
             results = []
             for profile in profiles:
@@ -119,9 +123,9 @@ def csv_npi_lookup():
 
         session = get_session()
         try:
-            profiles = session.query(UniversalProfile).filter(
+            profiles = _individual_only_filter(session.query(UniversalProfile).filter(
                 UniversalProfile.npi.in_(npis)
-            ).all()
+            )).all()
 
             profile_dict = {p.npi: p for p in profiles}
 
@@ -192,10 +196,10 @@ def get_stats():
     try:
         session = get_session()
         try:
-            total_count = session.query(UniversalProfile).count()
-            active_count = session.query(UniversalProfile).filter(UniversalProfile.is_active == True).count()
+            total_count = _individual_only_filter(session.query(UniversalProfile)).count()
+            active_count = _individual_only_filter(session.query(UniversalProfile).filter(UniversalProfile.is_active == True)).count()
 
-            last_sync = session.query(UniversalProfile).order_by(
+            last_sync = _individual_only_filter(session.query(UniversalProfile)).order_by(
                 UniversalProfile.last_synced_at.desc()
             ).first()
 
@@ -278,6 +282,7 @@ def quick_npi_lookup():
                 FROM user_profiles up
                 LEFT JOIN universal_profiles univ ON up.npi = univ.npi
                 WHERE up.npi IS NOT NULL AND up.npi != '' AND up.npi IN ({placeholders})
+                  AND (univ.entity_type IS NULL OR univ.entity_type <> '2')
             """)
 
             user_results = session.execute(user_query, params).fetchall()
@@ -320,9 +325,9 @@ def quick_npi_lookup():
             remaining_npis = [npi for npi in cleaned_npis if npi not in found_npis]
 
             if remaining_npis:
-                universal_profiles = session.query(UniversalProfile).filter(
+                universal_profiles = _individual_only_filter(session.query(UniversalProfile).filter(
                     UniversalProfile.npi.in_(remaining_npis)
-                ).all()
+                )).all()
 
                 for profile in universal_profiles:
                     if profile.npi not in found_npis:
@@ -425,9 +430,9 @@ def debug_npi(npi):
                 'zipcode': user_result[8]
             }
 
-        universal_profile = session.query(UniversalProfile).filter(
+        universal_profile = _individual_only_filter(session.query(UniversalProfile).filter(
             UniversalProfile.npi == cleaned_npi
-        ).first()
+        )).first()
 
         universal_data = None
         if universal_profile:
@@ -504,6 +509,7 @@ def specialty_lookup():
                 LEFT JOIN universal_profiles univ ON up.npi = univ.npi
                 WHERE up.specialty IN ({placeholders})
                   AND up.npi IS NOT NULL AND up.npi != ''
+                  AND (univ.entity_type IS NULL OR univ.entity_type <> '2')
             """)
             audience_rows = session.execute(audience_q, params).fetchall()
 
@@ -552,6 +558,7 @@ def specialty_lookup():
                 universal_query = session.query(UniversalProfile).filter(
                     UniversalProfile.primary_specialty.in_(specialties)
                 )
+            universal_query = _individual_only_filter(universal_query)
             if hide_inactive:
                 universal_query = universal_query.filter(
                     (UniversalProfile.provider_status == 'Active') | (UniversalProfile.provider_status.is_(None))
@@ -626,12 +633,13 @@ def specialty_counts():
 
             source_expr = classify_source_sql_expr('up')
 
-            universal_sql = text("""
+            universal_sql = text(f"""
                 SELECT primary_taxonomy_code AS code,
                        (provider_status IS NULL OR provider_status = 'Active') AS active_flag,
                        COUNT(*) AS cnt
                 FROM universal_profiles
                 WHERE primary_taxonomy_code IS NOT NULL AND primary_taxonomy_code != ''
+                  AND {INDIVIDUAL_ONLY_SQL}
                 GROUP BY primary_taxonomy_code, active_flag
             """)
 

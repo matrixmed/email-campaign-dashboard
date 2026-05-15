@@ -27,6 +27,21 @@ const formatAddress = (address1, address2) => {
   return parts.join(', ');
 };
 
+const splitAddress = (raw) => {
+  const s = (raw || '').trim();
+  if (!s) return ['', ''];
+  const m = s.match(/^(.*?)[\s,]+(ste\.?|suite|apt\.?|apartment|unit|#|bldg\.?|building|fl\.?|floor|rm\.?|room|ph|penthouse|lobby|mailstop|ms|po box)\b\s*(.*)$/i);
+  if (m) return [m[1].trim().replace(/[,;]$/, ''), `${m[2]} ${m[3]}`.trim()];
+  return [s, ''];
+};
+
+const resolveAddress = (profile) => {
+  const a1 = (profile.address || '').trim();
+  const a2 = (profile.address_2 || '').trim();
+  if (a2) return [a1, a2];
+  return splitAddress(a1);
+};
+
 const isTaxonomyCode = (value) => {
   return value && /^\d{3}[A-Z0-9]{6}X$/.test(value);
 };
@@ -264,7 +279,7 @@ const SpecialtyLookup = () => {
     };
 
     const headers = [
-      'NPI', 'First Name', 'Last Name', 'Specialty', 'Address', 'City',
+      'NPI', 'First Name', 'Last Name', 'Organization', 'Specialty', 'Address', 'Address 2', 'City',
       'State', 'Zipcode', 'Flag', 'Source', 'Status'
     ];
     const csvRows = [headers.map(h => escapeCSV(h)).join(',')];
@@ -274,12 +289,15 @@ const SpecialtyLookup = () => {
       const status = profile.source === 'Market'
         ? ''
         : (profile.audience_active === false ? 'Inactive' : (profile.audience_active ? 'Active' : ''));
+      const [addr1, addr2] = resolveAddress(profile);
       const row = [
         profile.npi || '',
         formatName(profile.first_name),
         formatName(profile.last_name),
+        profile.organization_name || '',
         getSpecialty(profile),
-        formatAddress(profile.address, profile.address_2),
+        addr1,
+        addr2,
         formatName(profile.city),
         profile.state || '',
         formatZipcode(profile.zipcode),
@@ -471,8 +489,10 @@ const SpecialtyLookup = () => {
                           <th>NPI</th>
                           <th>First Name</th>
                           <th>Last Name</th>
+                          <th>Organization</th>
                           <th>Specialty</th>
                           <th>Address</th>
+                          <th>Address 2</th>
                           <th>City</th>
                           <th>State</th>
                           <th>Zipcode</th>
@@ -492,8 +512,19 @@ const SpecialtyLookup = () => {
                               <td className="npi-cell">{profile.npi}</td>
                               <td>{formatName(profile.first_name)}</td>
                               <td>{formatName(profile.last_name)}</td>
+                              <td style={{ fontSize: '0.85rem', color: profile.organization_name ? undefined : '#666' }}>
+                                {profile.organization_name || (profile.first_name || profile.last_name ? '' : '—')}
+                              </td>
                               <td>{getSpecialty(profile) || 'N/A'}</td>
-                              <td>{formatAddress(profile.address, profile.address_2)}</td>
+                              {(() => {
+                                const [a1, a2] = resolveAddress(profile);
+                                return (
+                                  <>
+                                    <td>{a1 || ''}</td>
+                                    <td style={{ color: a2 ? undefined : '#666' }}>{a2 || ''}</td>
+                                  </>
+                                );
+                              })()}
                               <td>{formatName(profile.city)}</td>
                               <td>{profile.state}</td>
                               <td>{formatZipcode(profile.zipcode)}</td>

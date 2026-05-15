@@ -259,6 +259,7 @@ def print_lists_overview():
                 SELECT val::text AS list_name, COUNT(DISTINCT npi) AS cnt
                 FROM universal_profiles, jsonb_array_elements(print_lists_subscribed) AS val
                 WHERE print_lists_subscribed ?| %s AND is_active = TRUE
+                  AND (entity_type IS NULL OR entity_type <> '2')
                 GROUP BY val::text
                 UNION ALL
                 SELECT val::text AS list_name, COUNT(*) AS cnt
@@ -279,12 +280,14 @@ def print_lists_overview():
         cur.execute("""
             SELECT
                 (SELECT COUNT(*) FROM universal_profiles
-                  WHERE print_lists_subscribed ?| %s AND is_active = TRUE)
+                  WHERE print_lists_subscribed ?| %s AND is_active = TRUE
+                    AND (entity_type IS NULL OR entity_type <> '2'))
               + (SELECT COUNT(*) FROM print_only_contacts
                   WHERE print_lists_subscribed ?| %s AND is_active = TRUE)
                 AS total_subscribed,
                 (SELECT COUNT(*) FROM universal_profiles up
                   WHERE print_lists_subscribed ?| %s AND is_active = TRUE
+                    AND (up.entity_type IS NULL OR up.entity_type <> '2')
                   AND EXISTS (SELECT 1 FROM user_profiles u WHERE u.npi = up.npi AND u.is_active = TRUE))
                 AS total_in_audience
         """, [SUBSCRIBED_LIST_NAMES, SUBSCRIBED_LIST_NAMES, SUBSCRIBED_LIST_NAMES])
@@ -315,6 +318,7 @@ def print_lists_unsubscribed_counts():
             FROM universal_profiles, jsonb_array_elements(print_lists_unsubscribed) AS val
             WHERE print_lists_unsubscribed != '[]'::jsonb
               AND jsonb_typeof(print_lists_unsubscribed) = 'array'
+              AND (entity_type IS NULL OR entity_type <> '2')
             GROUP BY val::text
             ORDER BY count DESC
         """)
@@ -382,6 +386,17 @@ def print_list_members():
     u_search, u_params = _build_print_search('u', search_tokens)
     poc_search, poc_params = _build_print_search('p', search_tokens)
 
+    broaden = bool(search_tokens)
+
+    def _list_filter(alias):
+        if broaden:
+            return f"jsonb_array_length(COALESCE({alias}.{column}, '[]'::jsonb)) > 0", []
+        return f"{alias}.{column} ?| %s", [list_names]
+
+    up_lf_sql, up_lf_params = _list_filter('up')
+    u_lf_sql, u_lf_params = _list_filter('u')
+    p_lf_sql, p_lf_params = _list_filter('p')
+
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -426,7 +441,8 @@ def print_list_members():
                     u.inactive_reason, u.inactive_source, u.inactive_at
                  FROM universal_profiles up
                  {up_join}
-                 WHERE up.{column} ?| %s
+                 WHERE {up_lf_sql}
+                   AND (up.entity_type IS NULL OR up.entity_type <> '2')
                  {up_active_filter}
                  {up_search}
                  ORDER BY up.npi)
@@ -452,7 +468,7 @@ def print_list_members():
                     {_flag_col('u', 'source')} AS address_flag_source,
                     u.inactive_reason, u.inactive_source, u.inactive_at
                  FROM user_profiles u
-                 WHERE u.{column} ?| %s
+                 WHERE {u_lf_sql}
                  {u_active_filter}
                  AND (u.npi IS NULL OR u.npi = '' OR NOT EXISTS (
                     SELECT 1 FROM universal_profiles up WHERE up.npi = u.npi {not_exists_active}))
@@ -479,7 +495,7 @@ def print_list_members():
                     {_flag_col('p', 'source')} AS address_flag_source,
                     NULL AS inactive_reason, NULL AS inactive_source, NULL::timestamp AS inactive_at
                  FROM print_only_contacts p
-                 WHERE p.{column} ?| %s
+                 WHERE {p_lf_sql}
                  {poc_active_filter}
                  {poc_search})
             ) combined
@@ -487,9 +503,9 @@ def print_list_members():
             {limit_clause}
         """
         cur.execute(members_sql,
-                    [list_names] + up_params +
-                    [list_names] + u_params +
-                    [list_names] + poc_params)
+                    up_lf_params + up_params +
+                    u_lf_params + u_params +
+                    p_lf_params + poc_params)
         members = cur.fetchall()
 
         if all_mode:
@@ -499,20 +515,24 @@ def print_list_members():
             cur.execute(f"""
                 SELECT
                     (SELECT COUNT(*) FROM universal_profiles up
-                     WHERE up.{column} ?| %s {up_active_filter} {up_search}) AS up_total,
+                     WHERE {up_lf_sql}
+                       AND (up.entity_type IS NULL OR up.entity_type <> '2')
+                       {up_active_filter} {up_search}) AS up_total,
                     (SELECT COUNT(*) FROM universal_profiles up
-                     WHERE up.{column} ?| %s {up_active_filter} {up_search}
+                     WHERE {up_lf_sql}
+                       AND (up.entity_type IS NULL OR up.entity_type <> '2')
+                       {up_active_filter} {up_search}
                      AND EXISTS (SELECT 1 FROM user_profiles u WHERE u.npi = up.npi AND u.is_active = TRUE)) AS up_in_audience,
                     (SELECT COUNT(*) FROM user_profiles u
-                     WHERE u.{column} ?| %s {u_active_filter} {u_search}
+                     WHERE {u_lf_sql} {u_active_filter} {u_search}
                      AND (u.npi IS NULL OR u.npi = '' OR NOT EXISTS (
                         SELECT 1 FROM universal_profiles up WHERE up.npi = u.npi {not_exists_active}))) AS u_only,
                     (SELECT COUNT(*) FROM print_only_contacts p
-                     WHERE p.{column} ?| %s {poc_active_filter} {poc_search}) AS poc_total
-            """, [list_names] + up_params +
-                 [list_names] + up_params +
-                 [list_names] + u_params +
-                 [list_names] + poc_params)
+                     WHERE {p_lf_sql} {poc_active_filter} {poc_search}) AS poc_total
+            """, up_lf_params + up_params +
+                 up_lf_params + up_params +
+                 u_lf_params + u_params +
+                 p_lf_params + poc_params)
             cnt = cur.fetchone()
             total = (cnt['up_total'] or 0) + (cnt['u_only'] or 0) + (cnt['poc_total'] or 0)
             audience_count = (cnt['up_in_audience'] or 0) + (cnt['u_only'] or 0)
@@ -629,14 +649,18 @@ def digital_list_members():
         source_expr = classify_source_sql_expr('u')
         cur.execute(f"""
             SELECT
+                u.id AS source_id,
+                'user_profiles' AS source_table,
                 u.email,
                 u.first_name,
                 u.last_name,
                 u.npi,
                 u.specialty,
                 u.degree,
+                u.address,
                 u.city,
                 u.state,
+                u.zipcode,
                 u.digital_lists_subscribed,
                 u.ac_tags,
                 u.ac_segments,
@@ -645,6 +669,7 @@ def digital_list_members():
             FROM user_profiles u
             WHERE u.digital_lists_subscribed ?| %s
               AND u.is_active = TRUE
+              AND NOT EXISTS (SELECT 1 FROM universal_profiles up WHERE up.npi = u.npi AND up.entity_type = '2')
               {search_clause}
             ORDER BY u.last_name, u.first_name
             LIMIT {per_page} OFFSET {offset}
@@ -657,6 +682,7 @@ def digital_list_members():
             WHERE u.digital_lists_subscribed ?| %s
               AND u.is_active = TRUE
               AND u.email IS NOT NULL AND u.email <> ''
+              AND NOT EXISTS (SELECT 1 FROM universal_profiles up WHERE up.npi = u.npi AND up.entity_type = '2')
               {search_clause}
         """, [list_names] + search_params)
         total = cur.fetchone()['c']
@@ -712,7 +738,9 @@ def audience():
         source_expr = classify_source_sql_expr('up')
         search_clause, status_clause, params = build_clauses('up')
         cur.execute(f"""
-            SELECT up.email, up.first_name, up.last_name, up.npi, up.specialty, up.degree, up.city, up.state,
+            SELECT up.id AS source_id, 'user_profiles' AS source_table,
+                   up.email, up.first_name, up.last_name, up.npi, up.specialty, up.degree,
+                   up.address, up.city, up.state, up.zipcode,
                    up.digital_lists_subscribed, up.digital_lists_unsubscribed,
                    up.ac_tags, up.ac_segments,
                    up.is_active, up.inactive_reason, up.inactive_source, up.inactive_at,
@@ -821,8 +849,9 @@ def tag_members():
         cur = conn.cursor(cursor_factory=RealDictCursor)
         source_expr = classify_source_sql_expr('u')
         cur.execute(f"""
-            SELECT u.email, u.first_name, u.last_name, u.npi, u.specialty, u.degree,
-                   u.city, u.state,
+            SELECT u.id AS source_id, 'user_profiles' AS source_table,
+                   u.email, u.first_name, u.last_name, u.npi, u.specialty, u.degree,
+                   u.address, u.city, u.state, u.zipcode,
                    u.digital_lists_subscribed, u.ac_tags, u.ac_segments,
                    u.is_active,
                    ({source_expr}) AS source
@@ -918,8 +947,9 @@ def segment_members():
         cur = conn.cursor(cursor_factory=RealDictCursor)
         source_expr = classify_source_sql_expr('u')
         cur.execute(f"""
-            SELECT u.email, u.first_name, u.last_name, u.npi, u.specialty, u.degree,
-                   u.city, u.state,
+            SELECT u.id AS source_id, 'user_profiles' AS source_table,
+                   u.email, u.first_name, u.last_name, u.npi, u.specialty, u.degree,
+                   u.address, u.city, u.state, u.zipcode,
                    u.digital_lists_subscribed, u.ac_tags, u.ac_segments,
                    u.is_active,
                    ({source_expr}) AS source
@@ -1624,6 +1654,165 @@ def print_lists_resubscribe():
         conn.commit()
         cur.close()
         return jsonify({'status': 'ok', 'table': table, 'id': row['id'], 'lists_added': lists_to_add})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@list_management_bp.route('/print-lists/update-address', methods=['POST'])
+def print_lists_update_address():
+    data = request.json or {}
+    source_table = data.get('source_table') or data.get('table')
+    source_id = data.get('source_id') or data.get('id')
+    npi = (data.get('npi') or '').strip()
+    addr1 = (data.get('address_1') or '').strip()
+    addr2 = (data.get('address_2') or '').strip()
+    city = (data.get('city') or '').strip()
+    state = (data.get('state') or '').strip().upper()
+    zipcode = (data.get('zipcode') or '').strip()
+
+    if source_table not in ALLOWED_TABLES:
+        return jsonify({'error': 'invalid source_table'}), 400
+    if not source_id:
+        return jsonify({'error': 'source_id required'}), 400
+    if not addr1 or not city or not state:
+        return jsonify({'error': 'address_1, city, and state are required'}), 400
+
+    full_addr = (addr1 + (' ' + addr2 if addr2 else '')).strip()
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        touched = {'universal_profiles': 0, 'user_profiles': 0, 'print_only_contacts': 0}
+
+        if source_table == 'universal_profiles':
+            cur.execute("""
+                UPDATE universal_profiles
+                SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                        'event', 'address_update', 'kind', 'manual',
+                        'practice_address_1', practice_address_1, 'practice_address_2', practice_address_2,
+                        'practice_city', practice_city, 'practice_state', practice_state, 'practice_zipcode', practice_zipcode,
+                        'mailing_address_1', mailing_address_1, 'mailing_address_2', mailing_address_2,
+                        'mailing_city', mailing_city, 'mailing_state', mailing_state, 'mailing_zipcode', mailing_zipcode,
+                        'source', 'manual_edit', 'changed_at', NOW()::text
+                    )),
+                    old_practice_address_1 = practice_address_1, old_practice_address_2 = practice_address_2,
+                    old_practice_city = practice_city, old_practice_state = practice_state, old_practice_zipcode = practice_zipcode,
+                    practice_address_1 = %s, practice_address_2 = %s, practice_city = %s, practice_state = %s, practice_zipcode = %s,
+                    old_mailing_address_1 = mailing_address_1, old_mailing_address_2 = mailing_address_2,
+                    old_mailing_city = mailing_city, old_mailing_state = mailing_state, old_mailing_zipcode = mailing_zipcode,
+                    mailing_address_1 = %s, mailing_address_2 = %s, mailing_city = %s, mailing_state = %s, mailing_zipcode = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (addr1, addr2 or None, city, state, zipcode,
+                  addr1, addr2 or None, city, state, zipcode,
+                  source_id))
+            touched['universal_profiles'] += cur.rowcount
+            if not npi:
+                cur.execute("SELECT npi FROM universal_profiles WHERE id = %s", (source_id,))
+                r = cur.fetchone()
+                if r and r.get('npi'):
+                    npi = r['npi']
+        elif source_table == 'user_profiles':
+            cur.execute("""
+                UPDATE user_profiles
+                SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                        'event', 'address_update',
+                        'address', address, 'city', city, 'state', state, 'zipcode', zipcode,
+                        'source', 'manual_edit', 'changed_at', NOW()::text
+                    )),
+                    address = %s, city = %s, state = %s, zipcode = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (full_addr, city, state, zipcode, source_id))
+            touched['user_profiles'] += cur.rowcount
+            if not npi:
+                cur.execute("SELECT npi FROM user_profiles WHERE id = %s", (source_id,))
+                r = cur.fetchone()
+                if r and r.get('npi'):
+                    npi = r['npi']
+        else:
+            cur.execute("""
+                UPDATE print_only_contacts
+                SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                        'event', 'address_update',
+                        'address', address, 'city', city, 'state', state, 'zipcode', zipcode,
+                        'source', 'manual_edit', 'changed_at', NOW()::text
+                    )),
+                    address = %s, city = %s, state = %s, zipcode = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (full_addr, city, state, zipcode, source_id))
+            touched['print_only_contacts'] += cur.rowcount
+            if not npi:
+                cur.execute("SELECT npi FROM print_only_contacts WHERE id = %s", (source_id,))
+                r = cur.fetchone()
+                if r and r.get('npi'):
+                    npi = r['npi']
+
+        if npi:
+            if source_table != 'user_profiles':
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                            'event', 'address_update',
+                            'address', address, 'city', city, 'state', state, 'zipcode', zipcode,
+                            'source', 'manual_edit_cascade', 'changed_at', NOW()::text
+                        )),
+                        address = %s, city = %s, state = %s, zipcode = %s, updated_at = NOW()
+                    WHERE npi = %s
+                """, (full_addr, city, state, zipcode, npi))
+                touched['user_profiles'] += cur.rowcount
+
+            if source_table != 'universal_profiles':
+                cur.execute("""
+                    UPDATE universal_profiles
+                    SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                            'event', 'address_update', 'kind', 'mailing',
+                            'mailing_address_1', mailing_address_1, 'mailing_address_2', mailing_address_2,
+                            'mailing_city', mailing_city, 'mailing_state', mailing_state, 'mailing_zipcode', mailing_zipcode,
+                            'source', 'manual_edit_cascade', 'changed_at', NOW()::text
+                        )),
+                        old_mailing_address_1 = mailing_address_1, old_mailing_address_2 = mailing_address_2,
+                        old_mailing_city = mailing_city, old_mailing_state = mailing_state, old_mailing_zipcode = mailing_zipcode,
+                        mailing_address_1 = %s, mailing_address_2 = %s, mailing_city = %s, mailing_state = %s, mailing_zipcode = %s,
+                        old_practice_address_1 = practice_address_1, old_practice_address_2 = practice_address_2,
+                        old_practice_city = practice_city, old_practice_state = practice_state, old_practice_zipcode = practice_zipcode,
+                        practice_address_1 = %s, practice_address_2 = %s, practice_city = %s, practice_state = %s, practice_zipcode = %s,
+                        updated_at = NOW()
+                    WHERE npi = %s
+                """, (addr1, addr2 or None, city, state, zipcode,
+                      addr1, addr2 or None, city, state, zipcode,
+                      npi))
+                touched['universal_profiles'] += cur.rowcount
+
+            if source_table != 'print_only_contacts':
+                cur.execute("""
+                    UPDATE print_only_contacts
+                    SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                            'event', 'address_update',
+                            'address', address, 'city', city, 'state', state, 'zipcode', zipcode,
+                            'source', 'manual_edit_cascade', 'changed_at', NOW()::text
+                        )),
+                        address = %s, city = %s, state = %s, zipcode = %s, updated_at = NOW()
+                    WHERE npi = %s
+                """, (full_addr, city, state, zipcode, npi))
+                touched['print_only_contacts'] += cur.rowcount
+
+        _activity_log(cur, npi or None, 'manual_address_update',
+                      f"{source_table}#{source_id} -> {full_addr}, {city}, {state} {zipcode}")
+
+        conn.commit()
+        cur.close()
+        return jsonify({
+            'status': 'ok',
+            'source_table': source_table,
+            'source_id': source_id,
+            'npi': npi or None,
+            'updated': touched,
+        })
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

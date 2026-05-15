@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../../config/api';
 import MultiSelectDropdown from '../common/MultiSelectDropdown';
 import TablePagination from '../common/TablePagination';
 import HCPProfileModal from './HCPProfileModal';
+import PrintListEditAddressModal from './PrintListEditAddressModal';
 import '../../styles/ReportsManager.css';
 import '../../styles/AudienceQueryBuilder.css';
 import '../../styles/NPIQuickLookup.css';
@@ -36,6 +37,8 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
   const [sortDir, setSortDir] = useState('asc');
   const [modalRow, setModalRow] = useState(null);
   const [modalIndex, setModalIndex] = useState(-1);
+  const [editMode, setEditMode] = useState(false);
+  const [editAddrTarget, setEditAddrTarget] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -138,16 +141,27 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
   };
 
   const exportCSV = useCallback(() => {
-    const base = ['Email', 'First Name', 'Last Name', 'NPI', 'Specialty', 'Degree', 'City', 'State', 'Source', 'Active'];
+    const base = ['Email', 'First Name', 'Last Name', 'NPI', 'Specialty', 'Degree', 'Address Line 1', 'Address Line 2', 'City', 'State', 'Zip', 'Source', 'Active'];
     const withReason = activeTab === 'audience' ? [...base, 'Inactive Reason', 'Inactive At'] : base;
     const headers = activeTab === 'audience'
       ? [...withReason, 'Digital Lists', 'Tags', 'Segments']
       : [...base, 'Digital Lists', 'Tags', 'Segments'];
 
+    const splitAddress = (raw) => {
+      const s = (raw || '').trim();
+      if (!s) return ['', ''];
+      const m = s.match(/^(.*?)[\s,]+(ste\.?|suite|apt\.?|apartment|unit|#|bldg\.?|building|fl\.?|floor|rm\.?|room)\b\s*(.*)$/i);
+      if (m) return [m[1].trim(), `${m[2]} ${m[3]}`.trim()];
+      return [s, ''];
+    };
+
     const rows = sortedMembers.map(m => {
+      const [line1, line2] = splitAddress(m.address);
       const fields = [
         m.email || '', m.first_name || '', m.last_name || '', m.npi || '',
-        m.specialty || '', m.degree || '', m.city || '', m.state || '',
+        m.specialty || '', m.degree || '',
+        line1, line2,
+        m.city || '', m.state || '', m.zipcode || '',
         m.source || '',
         m.is_active ? 'Yes' : 'No',
       ];
@@ -332,6 +346,23 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
       </div>
 
       <div className="shadow-table-controls" style={{ background: 'var(--color-bg-card, #2a2a2d)', border: '1px solid var(--color-border, #333336)', borderRadius: '4px', padding: '8px 12px', marginBottom: '4px', marginTop: '8px' }}>
+        <button
+          onClick={() => setEditMode(m => !m)}
+          title={editMode ? 'Exit edit mode' : 'Enable edit mode'}
+          style={{
+            background: editMode ? 'rgba(0,255,255,0.1)' : 'transparent',
+            border: `1px solid ${editMode ? '#0ff' : '#333336'}`,
+            color: editMode ? '#0ff' : '#b8b8b8',
+            borderRadius: 4,
+            padding: '4px 10px',
+            cursor: 'pointer',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            marginRight: 12,
+          }}
+        >
+          ✎ {editMode ? 'Editing' : 'Edit'}
+        </button>
         <span className="shadow-result-count">{total.toLocaleString()} contacts</span>
         {sortedMembers.length > 0 && (
           <button className="export-button" onClick={exportCSV}>Export CSV</button>
@@ -364,11 +395,12 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
                     {label} {sortField === key ? (sortDir === 'asc' ? '\u25B2' : '\u25BC') : ''}
                   </th>
                 ))}
+                {editMode && <th style={{ width: 40 }}></th>}
               </tr>
             </thead>
             <tbody>
               {sortedMembers.length === 0 ? (
-                <tr><td colSpan={activeTab === 'audience' ? 9 : 8} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No records found</td></tr>
+                <tr><td colSpan={(activeTab === 'audience' ? 9 : 8) + (editMode ? 1 : 0)} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No records found</td></tr>
               ) : (
                 sortedMembers.map((m, i) => (
                   <tr key={m.email || i} style={{ opacity: m.is_active === false ? 0.6 : 1, cursor: 'pointer' }} onClick={() => openProfileModal(m, i)}>
@@ -395,6 +427,15 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
                         )}
                       </td>
                     )}
+                    {editMode && (
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditAddrTarget(m); }}
+                          title="Edit address"
+                          style={{ background: 'transparent', border: '1px solid #333336', color: '#0ff', borderRadius: 4, width: 26, height: 26, cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1 }}
+                        >✎</button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -418,6 +459,14 @@ const DigitalListDisplay = ({ externalSearch = '' }) => {
           onPrev={() => navigateProfileModal(-1)}
           onNext={() => navigateProfileModal(1)}
           onClose={closeProfileModal}
+        />
+      )}
+
+      {editAddrTarget && (
+        <PrintListEditAddressModal
+          row={editAddrTarget}
+          onClose={() => setEditAddrTarget(null)}
+          onSaved={() => { setEditAddrTarget(null); fetchMembers(activeTab, page, externalSearch); }}
         />
       )}
     </div>

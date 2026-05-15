@@ -7,6 +7,7 @@ import PrintListAddModal from './PrintListAddModal';
 import PrintListUnsubscribeModal from './PrintListUnsubscribeModal';
 import PrintListBlacklistModal from './PrintListBlacklistModal';
 import PrintListBlacklistTab from './PrintListBlacklistTab';
+import PrintListEditAddressModal from './PrintListEditAddressModal';
 import HCPProfileModal from './HCPProfileModal';
 import '../../styles/ReportsManager.css';
 import '../../styles/AudienceQueryBuilder.css';
@@ -17,6 +18,21 @@ const resolveSpecialty = (m) => {
   const code = m.primary_taxonomy_code || m.primary_specialty;
   if (code) return getSpecialtyFromTaxonomy(code) || code;
   return m.company || '';
+};
+
+const splitAddress = (raw) => {
+  const s = (raw || '').trim();
+  if (!s) return ['', ''];
+  const m = s.match(/^(.*?)[\s,]+(ste\.?|suite|apt\.?|apartment|unit|#|bldg\.?|building|fl\.?|floor|rm\.?|room|ph|penthouse|lobby|mailstop|ms|po box)\b\s*(.*)$/i);
+  if (m) return [m[1].trim().replace(/[,;]$/, ''), `${m[2]} ${m[3]}`.trim()];
+  return [s, ''];
+};
+
+const resolveAddress = (m) => {
+  const a1 = (m.practice_address_1 || '').trim();
+  const a2 = (m.practice_address_2 || '').trim();
+  if (a2) return [a1, a2];
+  return splitAddress(a1);
 };
 
 const summarizeFlags = (m) => {
@@ -121,6 +137,7 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
   const [exporting, setExporting] = useState(false);
   const [modalRow, setModalRow] = useState(null);
   const [modalIndex, setModalIndex] = useState(-1);
+  const [editAddrTarget, setEditAddrTarget] = useState(null);
 
   const [debouncedSearch, setDebouncedSearch] = useState(externalSearch);
   useEffect(() => {
@@ -266,15 +283,17 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
       const data = await res.json();
       const all = data.members || [];
 
-      const headers = ['NPI', 'First Name', 'Last Name', 'Specialty', 'Address', 'City', 'State', 'Zip', 'In Audience', 'Source', 'Email',
+      const headers = ['NPI', 'First Name', 'Last Name', 'Specialty', 'Address Line 1', 'Address Line 2', 'City', 'State', 'Zip', 'In Audience', 'Source', 'Email',
         'Flags', 'Provider Status', 'Provider Status Source',
         ...(activeType === 'unsubscribed' ? ['Reason'] : [])
       ];
       const rows = all.map(m => {
         const flagSummary = summarizeFlags(m).map(f => f.label).join(' | ');
+        const [addr1, addr2] = resolveAddress(m);
         return [
           m.npi || '', m.first_name || '', m.last_name || '', resolveSpecialty(m),
-          [m.practice_address_1, m.practice_address_2].filter(Boolean).join(' '),
+          addr1,
+          addr2,
           m.practice_city || '', m.practice_state || '', m.practice_zipcode || '',
           m.in_audience ? 'Yes' : 'No',
           m.in_audience ? (m.audience_source || 'Owned') : '',
@@ -452,6 +471,7 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
                       ['npi', 'NPI'],
                       ['primary_specialty', 'Specialty'],
                       ['practice_address_1', 'Address'],
+                      ['practice_address_2', 'Address 2'],
                       ['practice_city', 'City'],
                       ['practice_state', 'State'],
                       ['in_audience', 'In Audience'],
@@ -467,7 +487,7 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
                 </thead>
                 <tbody>
                   {sortedMembers.length === 0 ? (
-                    <tr><td colSpan={(activeType === 'unsubscribed' ? 9 : 8) + (editMode ? 1 : 0)} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
+                    <tr><td colSpan={(activeType === 'unsubscribed' ? 10 : 9) + (editMode ? 1 : 0)} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
                       {membersLoading ? 'Loading…' : 'No records found'}
                     </td></tr>
                   ) : (
@@ -476,7 +496,15 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
                         <td>{[m.first_name, m.last_name].filter(Boolean).join(' ') || '—'}</td>
                         <td style={{ fontFamily: "'Courier New', monospace", fontSize: '0.8rem' }}>{m.npi || '—'}</td>
                         <td>{resolveSpecialty(m) || '—'}</td>
-                        <td style={{ fontSize: '0.8rem' }}>{[m.practice_address_1, m.practice_address_2].filter(Boolean).join(', ') || '—'}</td>
+                        {(() => {
+                          const [a1, a2] = resolveAddress(m);
+                          return (
+                            <>
+                              <td style={{ fontSize: '0.8rem' }}>{a1 || '—'}</td>
+                              <td style={{ fontSize: '0.8rem', color: a2 ? undefined : '#555' }}>{a2 || ''}</td>
+                            </>
+                          );
+                        })()}
                         <td>{m.practice_city || '—'}</td>
                         <td>{m.practice_state || '—'}</td>
                         <td>
@@ -501,7 +529,12 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
                           <td style={{ color: '#aaa' }}>{m.unsubscribe_reason || '—'}</td>
                         )}
                         {editMode && (
-                          <td style={{ textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditAddrTarget(m); }}
+                              title="Edit address"
+                              style={{ background: 'transparent', border: '1px solid #333336', color: '#0ff', borderRadius: 4, width: 26, height: 26, cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1, marginRight: 4 }}
+                            >✎</button>
                             {activeType === 'subscribed' ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setUnsubTarget(buildRowForModal(m)); }}
@@ -572,6 +605,14 @@ const PrintListDisplay = ({ externalSearch = '' }) => {
           onPrev={() => navigateProfileModal(-1)}
           onNext={() => navigateProfileModal(1)}
           onClose={closeProfileModal}
+        />
+      )}
+
+      {editAddrTarget && (
+        <PrintListEditAddressModal
+          row={editAddrTarget}
+          onClose={() => setEditAddrTarget(null)}
+          onSaved={refreshAll}
         />
       )}
     </div>

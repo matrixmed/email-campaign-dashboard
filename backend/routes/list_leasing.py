@@ -130,6 +130,7 @@ def load_universe(cursor, universe_spec, specialty_filter=None):
             SELECT npi, primary_specialty
             FROM universal_profiles
             WHERE is_active = TRUE AND npi IS NOT NULL AND npi <> ''
+              AND (entity_type IS NULL OR entity_type <> '2')
             """
         )
     else:
@@ -140,6 +141,7 @@ def load_universe(cursor, universe_spec, specialty_filter=None):
             WHERE primary_taxonomy_code LIKE %s
               AND is_active = TRUE
               AND npi IS NOT NULL AND npi <> ''
+              AND (entity_type IS NULL OR entity_type <> '2')
             """,
             (DERM_TAXONOMY_PREFIX + '%',),
         )
@@ -194,6 +196,7 @@ def _campaigns_in_window(cursor, months):
                  jsonb_array_elements(COALESCE(up.target_lists::jsonb, '[]'::jsonb)) tl
             WHERE (tl->>'attached_at') IS NOT NULL
               AND (tl->>'attached_at')::timestamp >= %s
+              AND (up.entity_type IS NULL OR up.entity_type <> '2')
             """,
             (cutoff,),
         )
@@ -205,6 +208,7 @@ def _campaigns_in_window(cursor, months):
                             (tl->>'attached_at') AS attached_at
             FROM universal_profiles up,
                  jsonb_array_elements(COALESCE(up.target_lists::jsonb, '[]'::jsonb)) tl
+            WHERE (up.entity_type IS NULL OR up.entity_type <> '2')
             """
         )
     return [dict(campaign_id=r[0], campaign_name=r[1], attached_at=r[2]) for r in cursor.fetchall()]
@@ -217,6 +221,7 @@ def _npis_for_campaign(cursor, campaign_id):
         FROM universal_profiles up
         WHERE up.target_lists::jsonb @> %s::jsonb
           AND up.npi IS NOT NULL AND up.npi <> ''
+          AND (up.entity_type IS NULL OR up.entity_type <> '2')
         """,
         (json.dumps([{'campaign_id': campaign_id}]),),
     )
@@ -467,6 +472,7 @@ def available_sources():
                      jsonb_array_elements(COALESCE(up.target_lists::jsonb, '[]'::jsonb)) tl
                 WHERE (tl->>'attached_at') IS NOT NULL
                   AND (tl->>'attached_at')::timestamp >= %s
+                  AND (up.entity_type IS NULL OR up.entity_type <> '2')
                 GROUP BY (tl->>'campaign_id'), (tl->>'campaign_name')
                 ORDER BY attached_at DESC NULLS LAST
                 """,
@@ -481,6 +487,7 @@ def available_sources():
                        COUNT(DISTINCT up.npi) AS npi_count
                 FROM universal_profiles up,
                      jsonb_array_elements(COALESCE(up.target_lists::jsonb, '[]'::jsonb)) tl
+                WHERE (up.entity_type IS NULL OR up.entity_type <> '2')
                 GROUP BY (tl->>'campaign_id'), (tl->>'campaign_name')
                 ORDER BY attached_at DESC NULLS LAST
                 """
@@ -965,6 +972,7 @@ def _build_entity_index(cursor, matrix, iqvia, hld, types=None, market_filter=No
             FROM universal_profiles up,
                  jsonb_array_elements(COALESCE(up.target_lists::jsonb, '[]'::jsonb)) tl
             WHERE up.npi IS NOT NULL AND up.npi <> ''
+              AND (up.entity_type IS NULL OR up.entity_type <> '2')
             """
         )
         for npi, taxonomy_code, tl in cursor.fetchall():
@@ -1112,6 +1120,7 @@ def entity_detail(entity_type, entity_name):
                     SELECT npi, first_name, last_name, primary_specialty, practice_state, practice_city, is_active
                     FROM universal_profiles
                     WHERE npi = ANY(%s)
+                      AND (entity_type IS NULL OR entity_type <> '2')
                     ORDER BY last_name NULLS LAST, first_name NULLS LAST
                     LIMIT %s
                     """,

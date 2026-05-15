@@ -2879,6 +2879,7 @@ const DocumentationPage = () => {
               <li><strong>Add Subscriber:</strong> Modal with NPI/name/address/list-checkbox form. NPI or name+address blur triggers a lookup against <code>universal_profiles</code> &rarr; <code>user_profiles</code> &rarr; <code>print_only_contacts</code>; on a hit, the form pre-fills and a banner says which table the lists will be appended to. On submit, lists are appended to the matched record&rsquo;s <code>print_lists_subscribed</code> JSONB; with no match a new <code>print_only_contacts</code> row is inserted. Blacklisted addresses are blocked at this step.</li>
               <li><strong>Unsubscribe (− button):</strong> Modal that lets you pick which lists to remove and a multi-select reason (Moved, Retired, Deceased, Business closed, No longer at this address, Address undeliverable, Not interested, Switched specialties, plus a free-text Other). Reasons are joined with &ldquo;; &rdquo; into <code>unsubscribe_reason</code>. List names move from the row&rsquo;s <code>print_lists_subscribed</code> JSONB into <code>print_lists_unsubscribed</code> JSONB. If the chosen reason implies an address problem (Moved / Business closed / No longer at address / Address undeliverable), an &ldquo;Also blacklist this address&rdquo; checkbox appears; checking it cascades-unsubscribes everyone else at that address.</li>
               <li><strong>Resubscribe (+ button on Unsubscribed tab):</strong> Confirms via <code>window.confirm</code>, then moves the currently-selected list names back from <code>print_lists_unsubscribed</code> to <code>print_lists_subscribed</code>. Blocked if the address is currently blacklisted.</li>
+              <li><strong>Edit Address (✎ button, edit mode):</strong> Opens a modal pre-filled with the row&rsquo;s address fields (address line 1/2, city, state, zip). On save, writes to the source table (<code>universal_profiles</code> practice + mailing, <code>user_profiles</code>, or <code>print_only_contacts</code>), appends the prior address to that row&rsquo;s <code>address_history</code> JSONB, and &mdash; if an NPI exists &mdash; cascades the same update across the other two tables (matching the NCOA upload propagation pattern). Logged to <code>print_list_activity_log</code> with action <code>manual_address_update</code>. Endpoint: <code>POST /api/list-management/print-lists/update-address</code>.</li>
               <li><strong>Add to Unsubscribed:</strong> The same Add modal has a Subscribe / Unsubscribe toggle at the top &mdash; switching to Unsubscribe mode lets you put someone directly on an unsubscribe list (e.g. a Hot Topics opt-out where the person was never &ldquo;subscribed&rdquo; to anything). Custom list names can be typed in (comma-separated) on top of the standard checkboxes.</li>
             </ul>
 
@@ -2918,6 +2919,18 @@ const DocumentationPage = () => {
             </ul>
             <p>
               NPPA overlaps with JCAD by design (it&rsquo;s a subset that&rsquo;s also called out on its own card).
+            </p>
+
+            <h4>Digital Lists &mdash; Edit Address</h4>
+            <p>
+              Digital Lists has its own <code>✎ Edit</code> mode toggle in the controls row (left of the contact count).
+              When edit mode is on, every row in Audience / Lists / Tags / Segments gets an extra <code>✎</code> button at
+              the far right. It opens the same modal as Print Lists and calls the same backend
+              endpoint <code>POST /api/list-management/print-lists/update-address</code>. The source table for digital rows
+              is always <code>user_profiles</code>; the cascade still hits <code>universal_profiles</code> and <code>print_only_contacts</code> if
+              the row has an NPI, so a single address edit propagates everywhere. The four members endpoints
+              (<code>/audience</code>, <code>/digital-lists/members</code>, <code>/tags/members</code>, <code>/segments/members</code>)
+              now return <code>source_id</code>, <code>source_table</code>, <code>address</code>, and <code>zipcode</code> so the modal can pre-fill correctly.
             </p>
           </div>
 

@@ -1082,6 +1082,21 @@ tr.overdue-row:hover {
   border-left: 3px solid #6b7280;
 }
 
+.orphaned-contracts-subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: -4px 0 12px 2px;
+  font-style: italic;
+}
+
+body.light .orphaned-contracts-subtitle {
+  color: #6b7280;
+}
+
+.orphaned-contract-row {
+  border-left: 3px solid #f59e0b;
+}
+
 body.light .no-data-brand {
   color: #1f2937;
 }

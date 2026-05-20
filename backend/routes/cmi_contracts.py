@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-from models import CMIContractValue
-from datetime import datetime
+from sqlalchemy import create_engine, text
+from models import CMIContractValue, CmiOrphanNoDataSubmission, Base
+from datetime import datetime, timedelta
 import os
 import csv
 from io import StringIO
@@ -13,6 +13,23 @@ def get_session():
     engine = create_engine(os.getenv('DATABASE_URL'))
     Session = sessionmaker(bind=engine)
     return Session()
+
+_orphan_table_ensured = False
+
+def ensure_orphan_table():
+    global _orphan_table_ensured
+    if _orphan_table_ensured:
+        return
+    engine = create_engine(os.getenv('DATABASE_URL'))
+    CmiOrphanNoDataSubmission.__table__.create(bind=engine, checkfirst=True)
+    _orphan_table_ensured = True
+
+def get_current_reporting_week_start():
+    today = datetime.now()
+    days_since_monday = today.weekday()
+    current_monday = today - timedelta(days=days_since_monday)
+    reporting_monday = current_monday - timedelta(days=7)
+    return reporting_monday.date()
 
 @cmi_contracts_bp.route('', methods=['GET'])
 def get_all_contracts():
@@ -254,6 +271,199 @@ def delete_contract(contract_id):
             'message': str(e)
         }), 500
 
+CONTRACT_TO_CMI_FIELD = {
+    'contract_number': 'contract_number',
+    'client': 'client_name',
+    'brand': 'brand_name',
+    'vehicle': 'vehicle_name',
+    'placement_description': 'placement_description',
+    'buy_component_type': 'ad_format',
+    'metric': 'contracted_metric',
+    'data_type': 'data_type',
+    'frequency': 'expected_data_frequency',
+}
+
+def _norm(v):
+    if v is None:
+        return ''
+    s = str(v).strip().lower()
+    if s.endswith('.0') and s[:-2].isdigit():
+        s = s[:-2]
+    return ''.join(ch for ch in s if ch.isalnum())
+
+def _effective_frequency(explicit, data_type):
+    if explicit and str(explicit).strip():
+        return str(explicit).strip()
+    if not data_type:
+        return None
+    dt = str(data_type).upper()
+    if 'PLD' in dt or 'HCP' in dt:
+        return 'Weekly'
+    if 'AGG' in dt:
+        return 'Monthly'
+    return None
+
+def _effective_metric(explicit):
+    if explicit and str(explicit).strip():
+        return str(explicit).strip()
+    return 'Opens_unique'
+
+@cmi_contracts_bp.route('/validation', methods=['GET'])
+def get_contracts_with_validation():
+    try:
+        year = request.args.get('year', type=int)
+        session = get_session()
+
+        query = session.query(CMIContractValue)
+        if year:
+            query = query.filter(CMIContractValue.year == year)
+        contracts = query.order_by(CMIContractValue.id.asc()).all()
+
+        contract_ids = [c.placement_id for c in contracts if c.placement_id]
+
+        cmi_rows = {}
+        if contract_ids:
+            placeholders = ','.join([f":p{i}" for i in range(len(contract_ids))])
+            params = {f"p{i}": pid for i, pid in enumerate(contract_ids)}
+            result = session.execute(text(f"""
+                SELECT cmi_placement_id, contract_number, client_name, brand_name,
+                       vehicle_name, placement_description, ad_format, media_tactic_id,
+                       expected_data_frequency, contracted_metric, tactic_name,
+                       buying_channel, is_amo, start_date, end_date, is_current,
+                       data_type
+                FROM cmi_metadata_schedule
+                WHERE cmi_placement_id IN ({placeholders})
+            """), params)
+            cols = result.keys()
+            for row in result:
+                d = dict(zip(cols, row))
+                cmi_rows[d['cmi_placement_id']] = d
+
+        result_contracts = []
+        for c in contracts:
+            cmi = cmi_rows.get(c.placement_id)
+            mismatches = {}
+            if cmi:
+                cmi_vehicle_composite = None
+                if cmi.get('vehicle_name') and cmi.get('tactic_name'):
+                    cmi_vehicle_composite = f"{cmi['vehicle_name']} - {cmi['tactic_name']}"
+                elif cmi.get('tactic_name'):
+                    cmi_vehicle_composite = cmi['tactic_name']
+                elif cmi.get('vehicle_name'):
+                    cmi_vehicle_composite = cmi['vehicle_name']
+
+                effective_data_type_cmi = cmi.get('data_type')
+                effective_data_type_ours = c.data_type or effective_data_type_cmi
+
+                for our_col, cmi_col in CONTRACT_TO_CMI_FIELD.items():
+                    our_val = getattr(c, our_col, None)
+                    if our_col == 'vehicle':
+                        cmi_val = cmi_vehicle_composite
+                    elif our_col == 'frequency':
+                        cmi_val = _effective_frequency(cmi.get(cmi_col), effective_data_type_cmi)
+                        our_val = _effective_frequency(our_val, effective_data_type_ours)
+                        if cmi_val is None:
+                            continue
+                    elif our_col == 'metric':
+                        cmi_val = _effective_metric(cmi.get(cmi_col))
+                        our_val = _effective_metric(our_val)
+                    else:
+                        cmi_val = cmi.get(cmi_col)
+                    if _norm(our_val) != _norm(cmi_val):
+                        mismatches[our_col] = {
+                            'ours': our_val if our_val not in (None, '') else None,
+                            'cmi': cmi_val if cmi_val not in (None, '') else None
+                        }
+
+            result_contracts.append({
+                'id': c.id,
+                'contract_number': c.contract_number,
+                'client': c.client,
+                'brand': c.brand,
+                'vehicle': c.vehicle,
+                'placement_id': c.placement_id,
+                'placement_description': c.placement_description,
+                'buy_component_type': c.buy_component_type,
+                'media_tactic_id': c.media_tactic_id,
+                'frequency': c.frequency,
+                'metric': c.metric,
+                'data_type': c.data_type,
+                'notes': c.notes,
+                'year': c.year,
+                'gcm_placement_ids': c.gcm_placement_ids,
+                'creative_code': c.creative_code,
+                'last_attached_campaign_name': c.last_attached_campaign_name,
+                'last_attached_campaign_brand': c.last_attached_campaign_brand,
+                'cmi_match_status': (
+                    'no_cmi_record' if cmi is None
+                    else ('full_match' if not mismatches else 'partial_mismatch')
+                ),
+                'cmi_mismatches': mismatches,
+                'cmi_is_current': cmi.get('is_current') if cmi else None
+            })
+
+        result = session.execute(text("""
+            SELECT cmi_placement_id, contract_number, client_name, brand_name,
+                   vehicle_name, tactic_name, placement_description, ad_format,
+                   media_tactic_id, expected_data_frequency, contracted_metric,
+                   start_date, end_date, buying_channel, data_type
+            FROM cmi_metadata_schedule
+            WHERE is_current = TRUE
+              AND cmi_placement_id NOT IN (
+                  SELECT placement_id FROM cmi_contract_values WHERE placement_id IS NOT NULL
+              )
+            ORDER BY brand_name, cmi_placement_id
+        """))
+        cols = result.keys()
+        cmi_only = []
+        for row in result:
+            d = dict(zip(cols, row))
+            if year and d.get('start_date') and d['start_date'].year != year and \
+               d.get('end_date') and d['end_date'].year != year:
+                continue
+            vehicle_composite = None
+            if d.get('vehicle_name') and d.get('tactic_name'):
+                vehicle_composite = f"{d['vehicle_name']} - {d['tactic_name']}"
+            elif d.get('tactic_name'):
+                vehicle_composite = d['tactic_name']
+            elif d.get('vehicle_name'):
+                vehicle_composite = d['vehicle_name']
+            cmi_only.append({
+                'placement_id': d['cmi_placement_id'],
+                'contract_number': d['contract_number'],
+                'client': d['client_name'],
+                'brand': d['brand_name'],
+                'vehicle': vehicle_composite,
+                'placement_description': d['placement_description'],
+                'buy_component_type': d['ad_format'],
+                'media_tactic_id': d['media_tactic_id'],
+                'frequency': _effective_frequency(d['expected_data_frequency'], d['data_type']),
+                'metric': _effective_metric(d['contracted_metric']),
+                'data_type': d['data_type'],
+            })
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'contracts': result_contracts,
+            'cmi_only': cmi_only,
+            'summary': {
+                'total': len(result_contracts),
+                'full_match': sum(1 for c in result_contracts if c['cmi_match_status'] == 'full_match'),
+                'partial_mismatch': sum(1 for c in result_contracts if c['cmi_match_status'] == 'partial_mismatch'),
+                'no_cmi_record': sum(1 for c in result_contracts if c['cmi_match_status'] == 'no_cmi_record'),
+                'cmi_only': len(cmi_only),
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @cmi_contracts_bp.route('/export', methods=['GET'])
 def export_contracts():
     try:
@@ -302,6 +512,92 @@ def export_contracts():
             'Content-Type': 'text/csv',
             'Content-Disposition': 'attachment; filename=cmi_contracts.csv'
         }
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@cmi_contracts_bp.route('/orphan-no-data/<placement_id>/submit', methods=['PUT'])
+def submit_orphan_no_data(placement_id):
+    try:
+        ensure_orphan_table()
+        data = request.json or {}
+        is_submitted = bool(data.get('is_submitted', False))
+        week_start = get_current_reporting_week_start()
+
+        session = get_session()
+        row = session.query(CmiOrphanNoDataSubmission).filter_by(
+            placement_id=str(placement_id),
+            reporting_week_start=week_start
+        ).first()
+
+        if is_submitted:
+            now = datetime.utcnow()
+            if row:
+                row.is_submitted = True
+                row.submitted_at = now
+                row.updated_at = now
+            else:
+                row = CmiOrphanNoDataSubmission(
+                    placement_id=str(placement_id),
+                    reporting_week_start=week_start,
+                    is_submitted=True,
+                    submitted_at=now
+                )
+                session.add(row)
+        else:
+            if row:
+                session.delete(row)
+
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'placement_id': str(placement_id),
+            'reporting_week_start': week_start.isoformat(),
+            'is_submitted': is_submitted
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@cmi_contracts_bp.route('/orphan-no-data/submissions', methods=['GET'])
+def get_orphan_no_data_submissions():
+    try:
+        ensure_orphan_table()
+        week_param = request.args.get('week')
+        if week_param:
+            week_start = datetime.strptime(week_param, '%Y-%m-%d').date()
+        else:
+            week_start = get_current_reporting_week_start()
+
+        session = get_session()
+        rows = session.query(CmiOrphanNoDataSubmission).filter_by(
+            reporting_week_start=week_start,
+            is_submitted=True
+        ).all()
+
+        submissions = [{
+            'placement_id': r.placement_id,
+            'reporting_week_start': r.reporting_week_start.isoformat(),
+            'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None
+        } for r in rows]
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'reporting_week_start': week_start.isoformat(),
+            'submissions': submissions
+        }), 200
 
     except Exception as e:
         return jsonify({

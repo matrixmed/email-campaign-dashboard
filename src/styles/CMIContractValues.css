@@ -253,3 +253,158 @@
   border-radius: 8px;
   margin-top: 20px;
 }
+
+.cmi-validation-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.cmi-summary-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.cmi-summary-match {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cmi-summary-mismatch {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cmi-summary-orphan {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.cmi-summary-cmionly {
+  background: rgba(0, 255, 255, 0.08);
+  color: #0ff;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+}
+
+.cmi-status-col {
+  width: 50px;
+  text-align: center;
+}
+
+.cmi-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cmi-badge-match {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.cmi-badge-mismatch {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.cmi-badge-orphan {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.cmi-badge-cmionly {
+  color: #0ff;
+  background: rgba(0, 255, 255, 0.12);
+}
+
+.cmi-cell-mismatch {
+  position: relative;
+  box-shadow: inset 0 0 0 1.5px rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.cmi-cell-mismatch:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.cmi-mismatch-tooltip {
+  z-index: 9999;
+  background: #1a1a1c;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  min-width: 160px;
+  max-width: 320px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.cmi-mismatch-label {
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.cmi-mismatch-value {
+  color: #fff;
+  word-break: break-word;
+}
+
+.cmi-mismatch-value em {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.cmi-only-divider td {
+  background: rgba(0, 255, 255, 0.06);
+  color: #0ff;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  border-top: 2px solid rgba(0, 255, 255, 0.3);
+}
+
+.cmi-row-cmionly td {
+  background: rgba(0, 255, 255, 0.03);
+}
+
+.cmi-row-cmionly:hover td {
+  background: rgba(0, 255, 255, 0.06);
+}
+
+.cmi-row-orphan td {
+  opacity: 0.85;
+}
+
+.cmi-btn-adopt {
+  padding: 6px 12px;
+  background: transparent;
+  color: #0ff;
+  border: 1px solid #0ff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.cmi-btn-adopt:hover {
+  background: rgba(0, 255, 255, 0.1);
+}

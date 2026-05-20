@@ -482,6 +482,28 @@ const DocumentationPage = () => {
               duplicating. This enables reverse lookup &mdash; "which campaigns has this HCP been targeted by?" &mdash;
               for attribution, frequency-capping, and engagement analysis.
             </p>
+
+            <h4>Target List Breakdown Modal (Recalculate Breakdown)</h4>
+            <p>
+              The campaign modal shows a "Target List vs Rest of Audience" split. <strong>Target List</strong> is
+              every email whose NPI is on the contracted buy file (resolved via <code>user_profiles.npi</code> &rarr; the
+              <code>target_lists</code> JSON tag). <strong>Rest of Audience</strong> is everything else &mdash; usually the
+              ~18&ndash;25 standing seed accounts (internal <code>@matrixmedcom.com</code> + a couple of HCP QA seeds).
+              When Rest of Audience is materially larger than that baseline, two data-quality factors typically explain it:
+            </p>
+            <ul>
+              <li><strong>NULL NPI in <code>user_profiles</code></strong> &mdash; the email was sent (because IQVIA/HLD has the NPI&rarr;email mapping at the ESP), but our user_profile has no NPI to reverse-resolve, so the email looks "rest" even though the underlying HCP was on the buy file.</li>
+              <li><strong>Dual-NPI ambiguity</strong> &mdash; the same email legitimately belongs to two different real HCPs (one record we own, one we license). Because <code>user_profiles.email</code> is unique, we can only store one NPI per email; if the buy file targeted the other NPI, the email is misclassified as rest.</li>
+            </ul>
+            <p>
+              To fix these case-by-case without overwriting existing real records, the breakdown SQL UNIONs in the
+              <code>target_list_overrides</code> table &mdash; a side table keyed by <code>(email, campaign_id_or_name)</code>
+              that records "this email should be counted as targeted for this specific campaign." Inserts happen via the
+              external diagnostic tool at
+              <code>C:\Users\AndrewDaly\Desktop\P2025\1tools\rest_of_audience_diagnostic\</code>, which cross-references
+              the buy file and NPPES per campaign and proposes HIGH-confidence overrides for manual approval. Never used
+              to blanket-backfill NPIs.
+            </p>
           </div>
 
           <div className="docs-card">
@@ -2243,6 +2265,60 @@ const DocumentationPage = () => {
           </div>
 
           <div className="docs-card">
+            <h3>Current Week - Three-Section Structure (CMI Placement Coverage)</h3>
+            <p>
+              The Current Week tab partitions every CMI <code>placement_id</code> into one of three mutually-exclusive sections,
+              all keyed by <code>cmi_placement_id</code>. This guarantees that no contracted placement is silently forgotten.
+            </p>
+            <ol>
+              <li>
+                <strong>Data to Report (Due This Week):</strong> Campaigns + AGGs that we are actively submitting for the current
+                reporting week. Source: <code>getCurrentWeekReports</code> + attached/standalone AGGs. Each row tracks Week 1/2/3
+                submission via checkboxes.
+              </li>
+              <li>
+                <strong>No Data to Report:</strong> Placement IDs that CMI <em>expects</em> data for (from <code>/api/unified/no-data</code>,
+                exposed as <code>cmiExpectedNoData.allExpectedPlacementIds</code>) but which are <em>not</em> in section 1. Split into
+                two sub-tables:
+                <ul>
+                  <li><strong>AGG Only:</strong> Expected aggregate-only placements with an Assign action to attach to a campaign.</li>
+                  <li><strong>PLD &amp; AGG:</strong> Expected PLD+AGG placements with a Move action to promote them into the Due This Week list.</li>
+                </ul>
+                Each row has a Confirmed checkbox (persisted as <code>{'{id}'}_no_data</code>).
+              </li>
+              <li>
+                <strong>Not Expected by CMI - AGG Only / PLD & AGG:</strong> Two sub-tables mirroring the No Data to Report layout
+                (section 2). Every <code>placement_id</code> in our <code>cmi_contract_values</code> table for the current year,
+                unioned with placements CMI tracks in <code>cmi_metadata_schedule</code> but that we don't have a contract row for
+                (fetched from <code>GET /api/cmi-contracts/validation?year=YYYY</code>), deduplicated by <code>placement_id</code>,
+                minus <code>dueThisWeekPlacementIds</code> minus <code>cmiExpectedNoData.allExpectedPlacementIds</code>.
+                <br/><br/>
+                <strong>Bucket classification</strong> (computed in <code>getOrphanedContractPlacements</code> per record):
+                <ul>
+                  <li><code>data_type === 'AGG'</code> → AGG Only bucket. Frequency defaults to <code>Monthly</code> unless an explicit value is set.</li>
+                  <li>Explicit <code>frequency === 'Monthly'</code> → AGG Only bucket (Monthly always implies AGG).</li>
+                  <li>Everything else → PLD &amp; AGG bucket. Frequency defaults to <code>Weekly</code>.</li>
+                </ul>
+                <strong>Metric default</strong>: <code>'Opens_Unique'</code> when the source row has none.
+                <br/><br/>
+                <strong>AGG Only visibility</strong>: shown only during the first week of the month
+                (via <code>isFirstWeekOfMonth()</code>) for prior-month reporting,
+                EXCEPT for explicit Weekly + AGG entries which always show. PLD &amp; AGG bucket has no week constraint.
+                <br/><br/>
+                <strong>Confirmed checkbox</strong> on every row records a per-week no-data submission, persisted in the
+                <code>cmi_orphan_no_data_submissions</code> table via <code>PUT /api/cmi-contracts/orphan-no-data/{'{placement_id}'}/submit</code>.
+                Initial state is loaded from <code>GET /api/cmi-contracts/orphan-no-data/submissions</code> on mount.
+                Unique constraint on <code>(placement_id, reporting_week_start)</code> — the checkbox resets each Monday
+                while prior weeks remain in the table as an audit record.
+                <br/><br/>
+                <strong>Batch JSON</strong>: AGG Only orphans flow into <code>agg_no_data</code>, PLD &amp; AGG orphans into
+                <code>pld_no_data</code>, deduplicated against entries already added from the expected no-data list and against
+                campaigns/aggregates being reported on. Search-filterable on brand, placement_id, notes, metric, placement_description, and vehicle.
+              </li>
+            </ol>
+          </div>
+
+          <div className="docs-card">
             <h3>Submission Tracking</h3>
             <p>
               Each report has per-week checkboxes (Week 1, 2, 3). Checking a box marks that week as submitted.
@@ -2335,9 +2411,15 @@ const DocumentationPage = () => {
             <ul>
               <li><strong>campaigns:</strong> All campaign-level CMI metadata keyed by campaign name.</li>
               <li><strong>aggregate:</strong> All AGG reports keyed by descriptive name.</li>
-              <li><strong>pld_no_data:</strong> Expected PLD reports with no data submitted.</li>
-              <li><strong>agg_no_data:</strong> Expected AGG reports with their metrics.</li>
+              <li><strong>pld_no_data:</strong> Expected PLD reports with no data submitted, plus orphaned contracts whose <code>data_type</code> is PLD, PLD&amp;AGG, or unspecified.</li>
+              <li><strong>agg_no_data:</strong> Expected AGG reports with their metrics, plus orphaned contracts whose <code>data_type</code> is AGG.</li>
             </ul>
+            <p>
+              Orphaned contract placements (Section 3 of the Current Week view) are folded into <code>pld_no_data</code> /
+              <code>agg_no_data</code> by contract <code>data_type</code>: <code>AGG</code> → <code>agg_no_data</code>; everything else → <code>pld_no_data</code>.
+              Deduplicated by <code>cmi_placement_id</code> against entries already added from the expected no-data list and against
+              campaigns/aggregates being reported on. Monthly orphans are still suppressed outside the first week of the month.
+            </p>
           </div>
 
           <div className="docs-card">
@@ -2764,14 +2846,15 @@ const DocumentationPage = () => {
               <li>NCOA files contain no NPI &mdash; matching is by normalized last name + first-name compatibility (one is a prefix of the other to allow nicknames) + normalized old address (with suite-stripping fallback).</li>
               <li>On <code>universal_profiles</code>, the old address is checked against both <code>mailing_address_1</code> and <code>practice_address_1</code>; whichever side matched is the side that gets updated.</li>
               <li>On <code>user_profiles</code> and <code>print_only_contacts</code>, matched against the single <code>address</code> column.</li>
-              <li>One NCOA row can match across multiple tables &mdash; the preview shows each match as its own row, tagged with the target table and side (Universal · mailing, Audience · address, etc.).</li>
+              <li>On <code>print_list_subscribers</code> (the table the JCAD/derm print list export pulls from), matched against <code>address_1</code> + <code>address_2</code> concatenated &mdash; ensures rows exported from the Print Lists UI are findable by NCOA.</li>
+              <li>One NCOA row can match across multiple tables &mdash; the preview shows each match as its own row, tagged with the target table and side (Universal · mailing, Audience · address, Print List · address, etc.).</li>
               <li>Rows where the new address already equals what we have land in &ldquo;Already Current&rdquo; (collapsible, no-op).</li>
             </ul>
 
             <h4>Return Code Behavior</h4>
             <ul>
-              <li><strong>Codes 19&ndash;29</strong> (foreign move, PO Box no-forwarding, vacant, undeliverable, etc.): Treated as undeliverable. Backend clears <code>print_lists_subscribed</code> JSONB and merges into <code>print_lists_unsubscribed</code> with reason <code>NCOA: &lt;decoded&gt;</code>; sets <code>is_active = FALSE</code> on universal_profiles and print_only_contacts (matching the standalone <code>ncoa.py</code> script). user_profiles keeps <code>is_active = TRUE</code> &mdash; print-undeliverable doesn&rsquo;t kill the email subscription.</li>
-              <li><strong>Codes 30&ndash;38</strong> (legitimate moves with a new address): Address fields are updated, the previous values shift to <code>old_*</code> columns, and an <code>address_update</code> event is pushed into <code>address_history</code> with source <code>walsworth_ncoa</code> and the return code.</li>
+              <li><strong>Codes 19&ndash;29</strong> (foreign move, PO Box no-forwarding, vacant, undeliverable, etc.): Treated as undeliverable. Backend clears <code>print_lists_subscribed</code> JSONB and merges into <code>print_lists_unsubscribed</code> with reason <code>NCOA: &lt;decoded&gt;</code>; sets <code>is_active = FALSE</code> on universal_profiles and print_only_contacts (matching the standalone <code>ncoa.py</code> script). On <code>print_list_subscribers</code>, the comma-separated <code>subscribed_lists</code> is merged into <code>unsubscribed_lists</code> with <code>is_subscribed = FALSE</code> + <code>unsubscribe_reason</code>/<code>unsubscribe_date</code>. user_profiles keeps <code>is_active = TRUE</code> &mdash; print-undeliverable doesn&rsquo;t kill the email subscription.</li>
+              <li><strong>Codes 30&ndash;38</strong> (legitimate moves with a new address): Address fields are updated, the previous values shift to <code>old_*</code> columns, and an <code>address_update</code> event is pushed into <code>address_history</code> with source <code>walsworth_ncoa</code> and the return code. The matched row updates directly; any other table holding the same NPI is updated via NPI cascade (source <code>walsworth_ncoa_cascade</code>).</li>
               <li><strong>Missing new address</strong> or <strong>old == new</strong>: Treated as undeliverable regardless of return code.</li>
               <li>Every write logs to <code>print_list_activity_log</code> with action <code>ncoa_address_update</code> or <code>ncoa_undeliverable</code>.</li>
             </ul>
@@ -2780,7 +2863,7 @@ const DocumentationPage = () => {
             <ul>
               <li><code>POST /api/list-management/ncoa/preview</code> &mdash; multipart CSV upload, returns <code>{`{address_updates, undeliverable, already_current, not_found, summary}`}</code>.</li>
               <li><code>POST /api/list-management/ncoa/apply</code> &mdash; JSON body with the user-selected entries from the preview, returns <code>{`{applied: {address_updates, undeliverable}, errors}`}</code>.</li>
-              <li>The legacy <code>/api/print-lists/ncoa-upload</code> endpoint (in <code>print_lists.py</code>, writes to the legacy <code>print_list_subscribers</code> flat table) is no longer used by the UI but is left in place.</li>
+              <li>The legacy <code>/api/print-lists/ncoa-upload</code> endpoint (in <code>print_lists.py</code>) is no longer used by the UI but is left in place. The active <code>/api/list-management/ncoa/*</code> path now writes to <code>print_list_subscribers</code> directly as well, so no functional gap remains.</li>
             </ul>
 
             <h4>CSV Schema (Walsworth)</h4>

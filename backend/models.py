@@ -139,6 +139,21 @@ class DashboardSave(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class TargetListOverride(Base):
+    __tablename__ = 'target_list_overrides'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False, index=True)
+    campaign_id_or_name = Column(String(500), nullable=False, index=True)
+    source_npi = Column(String(50))
+    verified_at = Column(DateTime, default=datetime.utcnow)
+    verified_by = Column(String(100))
+    notes = Column(Text)
+
+    __table_args__ = (
+        Index('tlo_email_campaign_unique', 'email', 'campaign_id_or_name', unique=True),
+    )
+
 class CampaignReportingMetadata(Base):
     __tablename__ = 'campaign_reporting_metadata'
 
@@ -246,6 +261,21 @@ class CMIExpectedReport(Base):
     __table_args__ = (
         Index('idx_expected_week_placement', 'reporting_week_start', 'cmi_placement_id'),
         Index('idx_expected_matched', 'is_matched', 'reporting_week_start'),
+    )
+
+class CmiOrphanNoDataSubmission(Base):
+    __tablename__ = 'cmi_orphan_no_data_submissions'
+
+    id = Column(Integer, primary_key=True)
+    placement_id = Column(String(100), nullable=False, index=True)
+    reporting_week_start = Column(Date, nullable=False, index=True)
+    is_submitted = Column(Boolean, default=True, nullable=False)
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_orphan_no_data_unique', 'placement_id', 'reporting_week_start', unique=True),
     )
 
 class BrandEditorAgency(Base):

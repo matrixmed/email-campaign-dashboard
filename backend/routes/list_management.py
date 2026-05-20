@@ -2156,6 +2156,18 @@ def ncoa_preview():
         for r in cur.fetchall():
             poc_idx[_norm_name(r['last_name'])].append(r)
 
+        cur.execute("""
+            SELECT id, email, npi, first_name, last_name,
+                   address_1, address_2, city, state, zipcode,
+                   subscribed_lists, unsubscribed_lists, is_subscribed
+            FROM print_list_subscribers
+            WHERE UPPER(TRIM(last_name)) = ANY(%s)
+              AND address_1 IS NOT NULL
+        """, (list(unique_last),))
+        pls_idx = defaultdict(list)
+        for r in cur.fetchall():
+            pls_idx[_norm_name(r['last_name'])].append(r)
+
         cur.close()
 
         address_updates = []
@@ -2234,6 +2246,18 @@ def ncoa_preview():
                 elif norm_new and _addresses_equal(addr_n, norm_new):
                     row_matches.append(('print_only_contacts', c, 'address', 'already_current'))
 
+            for c in pls_idx.get(norm_last, []):
+                if not _first_name_compatible(norm_first, c['first_name']):
+                    continue
+                full = ((c.get('address_1') or '') + ((' ' + c['address_2']) if c.get('address_2') else '')).strip()
+                addr_n = _norm_addr(full)
+                if norm_new and addr_n and addr_n == norm_new:
+                    row_matches.append(('print_list_subscribers', c, 'address', 'already_current'))
+                elif _addresses_equal(addr_n, norm_old):
+                    row_matches.append(('print_list_subscribers', c, 'address', 'match'))
+                elif norm_new and _addresses_equal(addr_n, norm_new):
+                    row_matches.append(('print_list_subscribers', c, 'address', 'already_current'))
+
             if not row_matches:
                 not_found.append({
                     'csv_idx': csv_idx,
@@ -2245,6 +2269,12 @@ def ncoa_preview():
                 continue
 
             for tbl, rec, side, kind in row_matches:
+                if tbl == 'print_list_subscribers':
+                    cur_sub = [s.strip() for s in (rec.get('subscribed_lists') or '').split(',') if s.strip()]
+                    cur_unsub = [s.strip() for s in (rec.get('unsubscribed_lists') or '').split(',') if s.strip()]
+                else:
+                    cur_sub = _as_list(rec.get('print_lists_subscribed'))
+                    cur_unsub = _as_list(rec.get('print_lists_unsubscribed'))
                 base = {
                     'csv_idx': csv_idx,
                     'table': tbl,
@@ -2252,8 +2282,8 @@ def ncoa_preview():
                     'npi': rec.get('npi'),
                     'name': f"{rec.get('first_name', '')} {rec.get('last_name', '')}".strip(),
                     'side': side,
-                    'current_lists': _as_list(rec.get('print_lists_subscribed')),
-                    'current_unsubscribed_lists': _as_list(rec.get('print_lists_unsubscribed')),
+                    'current_lists': cur_sub,
+                    'current_unsubscribed_lists': cur_unsub,
                     'old_address': old_addr,
                     'old_city': _ncoa_get(row, 'previous_city'),
                     'old_state': _ncoa_get(row, 'previous_state'),
@@ -2389,6 +2419,30 @@ def _ncoa_cascade_address_to_universal(cur, npi, addr1, addr2, city, state, zipc
     return cur.rowcount
 
 
+def _ncoa_cascade_address_to_print_list_subscribers(cur, npi, addr1, addr2, city, state, zipc, return_code, primary_id=None):
+    if not npi:
+        return 0
+    cur.execute("""
+        UPDATE print_list_subscribers
+        SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                'event', 'address_update',
+                'address_1', address_1, 'address_2', address_2,
+                'city', city, 'state', state, 'zipcode', zipcode,
+                'source', 'walsworth_ncoa_cascade',
+                'return_code', %s,
+                'changed_at', NOW()::text
+            )),
+            old_address_1 = address_1, old_address_2 = address_2,
+            old_city = city, old_state = state, old_zipcode = zipcode,
+            address_1 = %s, address_2 = %s,
+            city = %s, state = %s, zipcode = %s,
+            updated_at = NOW()
+        WHERE npi = %s
+          AND (address_1 IS NULL OR UPPER(TRIM(COALESCE(address_1, ''))) <> UPPER(TRIM(%s)))
+    """, (return_code, addr1, addr2, city, state, zipc, npi, addr1))
+    return cur.rowcount
+
+
 def _ncoa_apply_address_update(cur, entry):
     table = entry['table']
     rid = entry['id']
@@ -2401,7 +2455,7 @@ def _ncoa_apply_address_update(cur, entry):
     return_code = entry.get('return_code') or ''
     npi = entry.get('npi') or ''
     full_addr = (addr1 + (' ' + addr2 if addr2 else '')).strip()
-    cascade = {'user_profiles': 0, 'print_only_contacts': 0, 'universal_profiles': 0}
+    cascade = {'user_profiles': 0, 'print_only_contacts': 0, 'universal_profiles': 0, 'print_list_subscribers': 0}
 
     if table == 'universal_profiles':
         if side == 'mailing':
@@ -2479,6 +2533,25 @@ def _ncoa_apply_address_update(cur, entry):
             WHERE id = %s
         """, (return_code, full_addr, city, state, zipc, rid))
 
+    elif table == 'print_list_subscribers':
+        cur.execute("""
+            UPDATE print_list_subscribers
+            SET address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                    'event', 'address_update',
+                    'address_1', address_1, 'address_2', address_2,
+                    'city', city, 'state', state, 'zipcode', zipcode,
+                    'source', 'walsworth_ncoa',
+                    'return_code', %s,
+                    'changed_at', NOW()::text
+                )),
+                old_address_1 = address_1, old_address_2 = address_2,
+                old_city = city, old_state = state, old_zipcode = zipcode,
+                address_1 = %s, address_2 = %s,
+                city = %s, state = %s, zipcode = %s,
+                updated_at = NOW()
+            WHERE id = %s
+        """, (return_code, addr1, addr2, city, state, zipc, rid))
+
     if npi:
         if table != 'universal_profiles':
             cascade['universal_profiles'] = _ncoa_cascade_address_to_universal(
@@ -2492,6 +2565,10 @@ def _ncoa_apply_address_update(cur, entry):
             cascade['print_only_contacts'] = _ncoa_cascade_address_to_print_only(
                 cur, npi, full_addr, city, state, zipc, return_code
             )
+        if table != 'print_list_subscribers':
+            cascade['print_list_subscribers'] = _ncoa_cascade_address_to_print_list_subscribers(
+                cur, npi, addr1, addr2, city, state, zipc, return_code
+            )
     entry['_cascade'] = cascade
 
 
@@ -2500,8 +2577,39 @@ def _ncoa_cascade_undeliverable(cur, table, npi, return_code, decoded, old_addr,
         return {}
     reason = f"NCOA: {decoded}"
     cascade = {}
-    targets = [t for t in ('universal_profiles', 'user_profiles', 'print_only_contacts') if t != table]
+    targets = [t for t in ('universal_profiles', 'user_profiles', 'print_only_contacts', 'print_list_subscribers') if t != table]
     for tbl in targets:
+        if tbl == 'print_list_subscribers':
+            cur.execute("""
+                SELECT id, subscribed_lists, unsubscribed_lists
+                FROM print_list_subscribers WHERE npi = %s LIMIT 1
+            """, (npi,))
+            r = cur.fetchone()
+            if not r:
+                cascade[tbl] = 0
+                continue
+            cur_sub_str = (r.get('subscribed_lists') or '').strip()
+            cur_unsub_str = (r.get('unsubscribed_lists') or '').strip()
+            merged = ','.join([s for s in (cur_unsub_str, cur_sub_str) if s])
+            cur.execute("""
+                UPDATE print_list_subscribers
+                SET subscribed_lists = NULL,
+                    unsubscribed_lists = %s,
+                    is_subscribed = FALSE,
+                    unsubscribe_reason = %s,
+                    unsubscribe_date = NOW(),
+                    address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                        'event', 'undeliverable',
+                        'source', 'walsworth_ncoa_cascade',
+                        'return_code', %s, 'decoded', %s,
+                        'attempted_address', %s, 'changed_at', NOW()::text
+                    )),
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (merged, reason, return_code, decoded, old_addr, r['id']))
+            cascade[tbl] = 1
+            continue
+
         cur.execute(f"""
             SELECT id, print_lists_subscribed, print_lists_unsubscribed
             FROM {tbl} WHERE npi = %s LIMIT 1
@@ -2557,6 +2665,61 @@ def _ncoa_apply_undeliverable(cur, entry):
     npi = entry.get('npi') or ''
     reason = f"NCOA: {decoded}"
     status_value = f"NCOA: {decoded}" if decoded else 'NCOA: Undeliverable'
+
+    if table == 'print_list_subscribers':
+        cur.execute("""
+            SELECT subscribed_lists, unsubscribed_lists
+            FROM print_list_subscribers WHERE id = %s
+        """, (rid,))
+        row = cur.fetchone()
+        if not row:
+            return False
+        cur_sub_str = (row.get('subscribed_lists') or '').strip()
+        cur_unsub_str = (row.get('unsubscribed_lists') or '').strip()
+        merged = ','.join([s for s in (cur_unsub_str, cur_sub_str) if s])
+        cur.execute("""
+            UPDATE print_list_subscribers
+            SET subscribed_lists = NULL,
+                unsubscribed_lists = %s,
+                is_subscribed = FALSE,
+                unsubscribe_reason = %s,
+                unsubscribe_date = NOW(),
+                address_history = COALESCE(address_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                    'event', 'undeliverable',
+                    'source', 'walsworth_ncoa',
+                    'return_code', %s,
+                    'decoded', %s,
+                    'attempted_address', %s,
+                    'changed_at', NOW()::text
+                )),
+                updated_at = NOW()
+            WHERE id = %s
+        """, (merged, reason, return_code, decoded, old_addr, rid))
+
+        if npi:
+            cur.execute("""
+                UPDATE universal_profiles
+                SET provider_status = %s,
+                    provider_status_source = 'walsworth_ncoa',
+                    updated_at = NOW()
+                WHERE npi = %s
+                  AND (provider_status IS NULL OR provider_status = 'Active'
+                       OR provider_status_source IN ('walsworth_ncoa', 'walsworth', 'manual_unsubscribe', ''))
+            """, (status_value, npi))
+
+            cur.execute("""
+                UPDATE user_profiles
+                SET inactive_reason = COALESCE(NULLIF(inactive_reason, ''), %s),
+                    inactive_source = COALESCE(NULLIF(inactive_source, ''), 'walsworth_ncoa'),
+                    inactive_at = COALESCE(inactive_at, NOW()),
+                    inactive_detail = COALESCE(NULLIF(inactive_detail, ''), %s),
+                    inactive_event_at = NOW(),
+                    updated_at = NOW()
+                WHERE npi = %s
+            """, (status_value, reason, npi))
+
+            entry['_cascade'] = _ncoa_cascade_undeliverable(cur, table, npi, return_code, decoded, old_addr, rid)
+        return True
 
     cur.execute(f"""
         SELECT print_lists_subscribed, print_lists_unsubscribed

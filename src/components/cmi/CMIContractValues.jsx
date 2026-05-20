@@ -5,14 +5,18 @@ import { matchesSearchTerm } from '../../utils/searchUtils';
 
 const CMIContractValues = () => {
   const [contracts, setContracts] = useState([]);
+  const [cmiOnly, setCmiOnly] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterText, setFilterText] = useState('');
   const [selectedYear, setSelectedYear] = useState(2026);
-  const [newRowIds, setNewRowIds] = useState(new Set()); 
+  const [newRowIds, setNewRowIds] = useState(new Set());
   const [aaCounter, setAaCounter] = useState(1);
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
   const tableRef = useRef(null);
 
   const columns = [
@@ -33,10 +37,12 @@ const CMIContractValues = () => {
   const fetchContracts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts?year=${selectedYear}`);
+      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/validation?year=${selectedYear}`);
       const data = await response.json();
       if (data.status === 'success') {
         setContracts(data.contracts);
+        setCmiOnly(data.cmi_only || []);
+        setSummary(data.summary || null);
       }
     } catch (error) {
     } finally {
@@ -208,6 +214,35 @@ const CMIContractValues = () => {
     }
   };
 
+  const handleAdoptCmiOnly = async (row) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cmi-contracts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contract_number: row.contract_number || '',
+          client: row.client || '',
+          brand: row.brand || '',
+          vehicle: row.vehicle || '',
+          placement_id: row.placement_id,
+          placement_description: row.placement_description || '',
+          buy_component_type: row.buy_component_type || '',
+          media_tactic_id: row.media_tactic_id || '',
+          frequency: row.frequency || '',
+          metric: row.metric || '',
+          data_type: '',
+          notes: '',
+          year: selectedYear
+        })
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        fetchContracts();
+      }
+    } catch (error) {
+    }
+  };
+
   const handleDeleteRow = async (contractId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/${contractId}`, {
@@ -254,6 +289,13 @@ const CMIContractValues = () => {
     );
   });
 
+  const filteredCmiOnly = cmiOnly.filter(row => {
+    if (!filterText) return true;
+    return Object.values(row).some(val =>
+      matchesSearchTerm(String(val), filterText)
+    );
+  });
+
   const sortedContracts = [...filteredContracts].sort((a, b) => {
     const aIsNew = newRowIds.has(a.id);
     const bIsNew = newRowIds.has(b.id);
@@ -279,6 +321,9 @@ const CMIContractValues = () => {
     if (aVal > bVal) return 1;
     return 0;
   });
+
+  const hoveredContract = hoveredCell ? [...contracts].find(c => c.id === hoveredCell.contractId) : null;
+  const hoveredMismatch = hoveredContract && hoveredCell ? (hoveredContract.cmi_mismatches || {})[hoveredCell.columnKey] : null;
 
   return (
     <div className="cmi-contract-values">
@@ -335,11 +380,21 @@ const CMIContractValues = () => {
         </div>
       </div>
 
+      {summary && (
+        <div className="cmi-validation-summary">
+          <span className="cmi-summary-chip cmi-summary-match">✓ {summary.full_match} matched</span>
+          <span className="cmi-summary-chip cmi-summary-mismatch">⚠ {summary.partial_mismatch} mismatch</span>
+          <span className="cmi-summary-chip cmi-summary-orphan">○ {summary.no_cmi_record} no CMI record</span>
+          <span className="cmi-summary-chip cmi-summary-cmionly">+ {summary.cmi_only} CMI-only</span>
+        </div>
+      )}
+
       <div className="cmi-table-container">
         <div className="cmi-table-wrapper">
           <table className="cmi-table" ref={tableRef}>
             <thead>
               <tr>
+                <th className="cmi-status-col">CMI</th>
                 {columns.map(col => (
                   <th
                     key={col.key}
@@ -357,13 +412,41 @@ const CMIContractValues = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedContracts.map(contract => (
-                <tr key={contract.id}>
-                  {columns.map(col => (
+              {sortedContracts.map(contract => {
+                const status = contract.cmi_match_status;
+                const mismatches = contract.cmi_mismatches || {};
+                const rowClass =
+                  status === 'full_match' ? 'cmi-row-match' :
+                  status === 'partial_mismatch' ? 'cmi-row-mismatch' :
+                  'cmi-row-orphan';
+                const badge =
+                  status === 'full_match' ? <span className="cmi-badge cmi-badge-match" title="All fields match CMI">✓</span> :
+                  status === 'partial_mismatch' ? <span className="cmi-badge cmi-badge-mismatch" title={`${Object.keys(mismatches).length} mismatch(es)`}>⚠ {Object.keys(mismatches).length}</span> :
+                  <span className="cmi-badge cmi-badge-orphan" title="No matching CMI placement">○</span>;
+
+                return (
+                <tr key={contract.id} className={rowClass}>
+                  <td className="cmi-status-col">{badge}</td>
+                  {columns.map(col => {
+                    const mismatch = mismatches[col.key];
+                    const cellClass = [
+                      editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? 'editing' : '',
+                      mismatch ? 'cmi-cell-mismatch' : ''
+                    ].filter(Boolean).join(' ');
+
+                    return (
                     <td
                       key={col.key}
                       onClick={() => handleCellClick(contract.id, col.key, contract[col.key])}
-                      className={editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? 'editing' : ''}
+                      onMouseEnter={(e) => {
+                        if (mismatch) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setTooltipPos({ top: rect.top - 8, left: rect.left });
+                          setHoveredCell({ contractId: contract.id, columnKey: col.key });
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredCell(null)}
+                      className={cellClass}
                     >
                       {editingCell?.contractId === contract.id && editingCell?.columnKey === col.key ? (
                         <input
@@ -379,7 +462,8 @@ const CMIContractValues = () => {
                         <span>{contract[col.key] || ''}</span>
                       )}
                     </td>
-                  ))}
+                    );
+                  })}
                   <td>
                     <button
                       onClick={() => handleDeleteRow(contract.id)}
@@ -389,7 +473,38 @@ const CMIContractValues = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
+              {filteredCmiOnly.length > 0 && (
+                <>
+                  <tr className="cmi-only-divider">
+                    <td colSpan={columns.length + 2}>
+                      In CMI's metadata but missing from our contracts ({filteredCmiOnly.length}{filterText && cmiOnly.length !== filteredCmiOnly.length ? ` of ${cmiOnly.length}` : ''})
+                    </td>
+                  </tr>
+                  {filteredCmiOnly.map((row, idx) => (
+                    <tr key={`cmi-only-${row.placement_id}-${idx}`} className="cmi-row-cmionly">
+                      <td className="cmi-status-col">
+                        <span className="cmi-badge cmi-badge-cmionly" title="CMI has this placement, we don't">+</span>
+                      </td>
+                      {columns.map(col => (
+                        <td key={col.key}>
+                          <span>{row[col.key] || ''}</span>
+                        </td>
+                      ))}
+                      <td>
+                        <button
+                          onClick={() => handleAdoptCmiOnly(row)}
+                          className="cmi-btn-adopt"
+                          title="Insert this placement into our contracts table"
+                        >
+                          Add
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -401,6 +516,21 @@ const CMIContractValues = () => {
         </div>
       )}
       </>
+      )}
+
+      {hoveredMismatch && (
+        <div
+          className="cmi-mismatch-tooltip"
+          style={{
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translateY(-100%)'
+          }}
+        >
+          <div className="cmi-mismatch-label">CMI value:</div>
+          <div className="cmi-mismatch-value">{hoveredMismatch.cmi || <em>(empty)</em>}</div>
+        </div>
       )}
     </div>
   );

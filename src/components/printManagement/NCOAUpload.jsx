@@ -10,6 +10,7 @@ const TABLE_LABEL = {
   universal_profiles: 'Universal',
   user_profiles: 'Audience',
   print_only_contacts: 'Print-only',
+  print_list_subscribers: 'Print List',
 };
 
 const SIDE_LABEL = {
@@ -48,11 +49,24 @@ const renderUnsubLists = (entry) => {
   return <span style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic' }}>Not on any list. Flag + status only.</span>;
 };
 
+const TABLE_BG = {
+  universal_profiles: 'rgba(0,255,255,0.1)',
+  user_profiles: 'rgba(34,197,94,0.1)',
+  print_only_contacts: 'rgba(217,184,127,0.1)',
+  print_list_subscribers: 'rgba(168,85,247,0.1)',
+};
+const TABLE_FG = {
+  universal_profiles: '#0ff',
+  user_profiles: '#86efac',
+  print_only_contacts: '#d9b87f',
+  print_list_subscribers: '#c4b5fd',
+};
+
 const tableTag = (table, side) => (
   <span style={{
     display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: '0.7rem',
-    background: table === 'universal_profiles' ? 'rgba(0,255,255,0.1)' : table === 'user_profiles' ? 'rgba(34,197,94,0.1)' : 'rgba(217,184,127,0.1)',
-    color: table === 'universal_profiles' ? '#0ff' : table === 'user_profiles' ? '#86efac' : '#d9b87f',
+    background: TABLE_BG[table] || 'rgba(148,163,184,0.1)',
+    color: TABLE_FG[table] || '#cbd5e1',
     border: '1px solid currentColor', whiteSpace: 'nowrap',
   }}>
     {TABLE_LABEL[table] || table}

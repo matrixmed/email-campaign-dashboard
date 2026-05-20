@@ -8,6 +8,7 @@ const ReportsManager = () => {
     const [reportsData, setReportsData] = useState([]);
     const [campaignMetadata, setCampaignMetadata] = useState([]);
     const [cmiContractValues, setCmiContractValues] = useState([]);
+    const [cmiOnlyPlacements, setCmiOnlyPlacements] = useState([]);
     const [cmiExpectedNoData, setCmiExpectedNoData] = useState({ pldAndAgg: [], aggOnly: [], allExpectedPlacementIds: [] });
     const [loading, setLoading] = useState(true);
     const [checkedReports, setCheckedReports] = useState({});
@@ -269,6 +270,18 @@ const ReportsManager = () => {
                 } catch (contractsError) {
                 }
 
+                try {
+                    const currentYear = new Date().getFullYear();
+                    const validationResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts/validation?year=${currentYear}`);
+                    if (validationResponse.ok) {
+                        const validationResult = await validationResponse.json();
+                        if (validationResult.status === 'success') {
+                            setCmiOnlyPlacements(validationResult.cmi_only || []);
+                        }
+                    }
+                } catch (validationError) {
+                }
+
                 let noDataReports = { pldAndAgg: [], aggOnly: [] };
                 try {
                     const noDataResponse = await fetch(`${API_BASE_URL}/api/unified/no-data`);
@@ -328,6 +341,21 @@ const ReportsManager = () => {
                         newCheckedStates[`${report.id}_no_data`] = true;
                     }
                 });
+
+                try {
+                    const orphanResponse = await fetch(`${API_BASE_URL}/api/cmi-contracts/orphan-no-data/submissions`);
+                    if (orphanResponse.ok) {
+                        const orphanResult = await orphanResponse.json();
+                        if (orphanResult.status === 'success') {
+                            (orphanResult.submissions || []).forEach(s => {
+                                if (s.placement_id) {
+                                    newCheckedStates[`orphan_${s.placement_id}_no_data`] = true;
+                                }
+                            });
+                        }
+                    }
+                } catch (orphanError) {
+                }
 
                 try {
                     const savedMonthlyStates = JSON.parse(localStorage.getItem('monthlyReportStates') || '{}');
@@ -1270,6 +1298,95 @@ const ReportsManager = () => {
         return { pldAndAgg, aggOnly };
     }, [cmiExpectedNoData, dueThisWeekPlacementIds, movedReportIds, searchTerm]);
 
+    const getOrphanedContractPlacements = useMemo(() => {
+        const expectedSet = new Set((cmiExpectedNoData.allExpectedPlacementIds || []).map(String));
+        const isFirstWeek = isFirstWeekOfMonth();
+
+        const passesBaseFilters = (record) => {
+            const pid = record.placement_id ? String(record.placement_id) : '';
+            if (!pid) return false;
+            if (dueThisWeekPlacementIds.has(pid)) return false;
+            if (expectedSet.has(pid)) return false;
+            return true;
+        };
+
+        const classify = (record) => {
+            const dataType = (record.data_type || '').toUpperCase();
+            const explicitFreq = (record.frequency || '').toLowerCase();
+            const hasExplicitFreq = !!record.frequency;
+
+            let bucket;
+            let effectiveFrequency;
+
+            if (dataType === 'AGG') {
+                effectiveFrequency = record.frequency || 'Monthly';
+                bucket = 'agg';
+            } else if (hasExplicitFreq && explicitFreq === 'monthly') {
+                effectiveFrequency = 'Monthly';
+                bucket = 'agg';
+            } else {
+                effectiveFrequency = record.frequency || 'Weekly';
+                bucket = 'pld';
+            }
+
+            return {
+                ...record,
+                frequency: effectiveFrequency,
+                metric: record.metric || 'Opens_Unique',
+                _bucket: bucket
+            };
+        };
+
+        const seen = new Set();
+        const merged = [];
+
+        cmiContractValues.forEach(contract => {
+            const pid = contract.placement_id ? String(contract.placement_id) : '';
+            if (!pid || seen.has(pid)) return;
+            if (!passesBaseFilters(contract)) return;
+            seen.add(pid);
+            merged.push({ ...classify(contract), source: 'contract' });
+        });
+
+        cmiOnlyPlacements.forEach(record => {
+            const pid = record.placement_id ? String(record.placement_id) : '';
+            if (!pid || seen.has(pid)) return;
+            if (!passesBaseFilters(record)) return;
+            seen.add(pid);
+            merged.push({ ...classify(record), source: 'cmi_only' });
+        });
+
+        const sortByBrand = (a, b) => {
+            const brandA = (a.brand || '').toLowerCase();
+            const brandB = (b.brand || '').toLowerCase();
+            return brandA.localeCompare(brandB);
+        };
+
+        const applySearch = (records) => {
+            if (!searchTerm) return records;
+            return records.filter(record =>
+                matchesSearchTerm(record.brand, searchTerm) ||
+                matchesSearchTerm(record.placement_id, searchTerm) ||
+                matchesSearchTerm(record.notes, searchTerm) ||
+                matchesSearchTerm(record.metric, searchTerm) ||
+                matchesSearchTerm(record.placement_description, searchTerm) ||
+                matchesSearchTerm(record.vehicle, searchTerm)
+            );
+        };
+
+        const aggBucket = merged.filter(r => r._bucket === 'agg');
+        const pldBucket = merged.filter(r => r._bucket === 'pld');
+
+        const visibleAggOnly = isFirstWeek
+            ? aggBucket
+            : aggBucket.filter(r => (r.frequency || '').toLowerCase() === 'weekly');
+
+        const aggOnly = applySearch(visibleAggOnly).slice().sort(sortByBrand);
+        const pldAndAgg = applySearch(pldBucket).slice().sort(sortByBrand);
+
+        return { aggOnly, pldAndAgg };
+    }, [cmiContractValues, cmiOnlyPlacements, dueThisWeekPlacementIds, cmiExpectedNoData.allExpectedPlacementIds, searchTerm]);
+
     const getPastReports = useMemo(() => {
         const expandedReports = [];
 
@@ -1492,6 +1609,37 @@ const ReportsManager = () => {
 
         try {
             const response = await fetch(`${API_BASE_URL}/api/cmi/expected/${reportId}/submit`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_submitted: newCheckedState })
+            });
+
+            if (!response.ok) {
+                setCheckedReports(prev => ({
+                    ...prev,
+                    [key]: !newCheckedState
+                }));
+            }
+        } catch (error) {
+            setCheckedReports(prev => ({
+                ...prev,
+                [key]: !newCheckedState
+            }));
+        }
+    };
+
+    const handleOrphanCheckboxChange = async (placementId) => {
+        if (!placementId) return;
+        const key = `orphan_${placementId}_no_data`;
+        const newCheckedState = !checkedReports[key];
+
+        setCheckedReports(prev => ({
+            ...prev,
+            [key]: newCheckedState
+        }));
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/cmi-contracts/orphan-no-data/${placementId}/submit`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_submitted: newCheckedState })
@@ -2037,12 +2185,20 @@ const ReportsManager = () => {
             if (a.cmi_placement_id) reportingPlacementIds.add(String(a.cmi_placement_id));
         });
 
+        const uniqueKey = (bucket, baseName) => {
+            if (!(baseName in bucket)) return baseName;
+            let i = 2;
+            while (`${baseName} ${i}` in bucket) i++;
+            return `${baseName} ${i}`;
+        };
+
         pldAndAggReports.forEach(report => {
             const placementId = report.cmi_placement_id || '';
             if (placementId && reportingPlacementIds.has(String(placementId))) return;
 
             const contractInfo = getContractInfo(placementId);
-            const name = cleanName(report.contract_notes || report.brand || `${placementId}`);
+            const baseName = cleanName(report.contract_notes || report.brand || `${placementId}`);
+            const name = uniqueKey(pldNoData, baseName);
             const entry = {
                 cmi_placement_id: placementId,
                 client_placement_id: report.client_placement_id || '',
@@ -2057,11 +2213,8 @@ const ReportsManager = () => {
                 creative_code: contractInfo?.creative_code || ''
             };
 
-            const dataType = (contractInfo?.data_type || '').toUpperCase();
-            if (dataType.includes('AGG')) {
-                entry.metric = report.contract_metric || contractInfo?.metric || '';
-                entry.frequency = contractInfo?.frequency || report.frequency || 'Weekly';
-            }
+            entry.metric = report.contract_metric || contractInfo?.metric || 'Opens_Unique';
+            entry.frequency = contractInfo?.frequency || report.frequency || 'Weekly';
 
             pldNoData[name] = entry;
         });
@@ -2071,7 +2224,8 @@ const ReportsManager = () => {
             if (placementId && reportingPlacementIds.has(String(placementId))) return;
 
             const contractInfo = getContractInfo(placementId);
-            const name = cleanName(report.contract_notes || report.brand || `${placementId}`);
+            const baseName = cleanName(report.contract_notes || report.brand || `${placementId}`);
+            const name = uniqueKey(aggNoData, baseName);
             aggNoData[name] = {
                 cmi_placement_id: placementId,
                 client_placement_id: report.client_placement_id || '',
@@ -2084,9 +2238,54 @@ const ReportsManager = () => {
                 gcm_placement_id: [],
                 target_list_id: '',
                 creative_code: contractInfo?.creative_code || '',
-                metric: report.contract_metric || contractInfo?.metric || '',
+                metric: report.contract_metric || contractInfo?.metric || 'Opens_Unique',
                 frequency: contractInfo?.frequency || report.frequency || 'Monthly'
             };
+        });
+
+        const existingNoDataPlacementIds = new Set();
+        Object.values(pldNoData).forEach(e => { if (e.cmi_placement_id) existingNoDataPlacementIds.add(String(e.cmi_placement_id)); });
+        Object.values(aggNoData).forEach(e => { if (e.cmi_placement_id) existingNoDataPlacementIds.add(String(e.cmi_placement_id)); });
+
+        const buildOrphanEntry = (contract) => {
+            const placementId = String(contract.placement_id);
+            return {
+                cmi_placement_id: placementId,
+                client_placement_id: '',
+                brand_name: contract.brand || '',
+                vehicle_name: contract.vehicle || '',
+                media_tactic_id: contract.media_tactic_id || '',
+                contract_number: contract.contract_number || '',
+                placement_description: contract.placement_description || '',
+                buy_component_type: contract.buy_component_type || '',
+                gcm_placement_id: [],
+                target_list_id: '',
+                creative_code: contract.creative_code || '',
+                metric: contract.metric || 'Opens_Unique',
+                frequency: contract.frequency || 'Weekly'
+            };
+        };
+
+        (getOrphanedContractPlacements.aggOnly || []).forEach(contract => {
+            const placementId = contract.placement_id ? String(contract.placement_id) : '';
+            if (!placementId) return;
+            if (reportingPlacementIds.has(placementId)) return;
+            if (existingNoDataPlacementIds.has(placementId)) return;
+            const baseName = cleanName(contract.notes || contract.placement_description || contract.brand || `${placementId}`);
+            const name = uniqueKey(aggNoData, baseName);
+            aggNoData[name] = buildOrphanEntry(contract);
+            existingNoDataPlacementIds.add(placementId);
+        });
+
+        (getOrphanedContractPlacements.pldAndAgg || []).forEach(contract => {
+            const placementId = contract.placement_id ? String(contract.placement_id) : '';
+            if (!placementId) return;
+            if (reportingPlacementIds.has(placementId)) return;
+            if (existingNoDataPlacementIds.has(placementId)) return;
+            const baseName = cleanName(contract.notes || contract.placement_description || contract.brand || `${placementId}`);
+            const name = uniqueKey(pldNoData, baseName);
+            pldNoData[name] = buildOrphanEntry(contract);
+            existingNoDataPlacementIds.add(placementId);
         });
 
         const result = {
@@ -2819,6 +3018,54 @@ const ReportsManager = () => {
         return `${month}/${day}/${year}`;
     };
 
+    const renderOrphanRow = (contract, index) => {
+        const frequency = contract.frequency || '';
+        const isMonthly = frequency.toLowerCase() === 'monthly';
+        const description = contract.notes || contract.placement_description || '';
+        const placementId = contract.placement_id ? String(contract.placement_id) : '';
+        const orphanKey = `orphan_${placementId}_no_data`;
+        return (
+            <tr
+                key={`orphan_${contract.id || placementId}`}
+                className={`report-row no-data-row orphaned-contract-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} ${isMonthly ? 'monthly-agg-row' : ''}`}
+            >
+                <td className="campaign-column">
+                    <div className="no-data-info">
+                        <span className="no-data-brand" title={contract.brand || 'Unknown'}>
+                            {contract.brand || 'Unknown'}
+                        </span>
+                    </div>
+                </td>
+                <td className="no-data-placement-id-column">
+                    {placementId && <span className="placement-id-pill">{placementId}</span>}
+                </td>
+                <td className="no-data-frequency-column">
+                    {frequency && <span className={`frequency-badge frequency-${frequency.toLowerCase()}`}>{frequency}</span>}
+                </td>
+                <td className="no-data-metric-column">
+                    {contract.metric && <span className="reports-metric-value">{contract.metric}</span>}
+                </td>
+                <td className="no-data-notes-column">
+                    {description && (
+                        <span className="no-data-notes-text">
+                            {description}
+                        </span>
+                    )}
+                </td>
+                <td className="no-data-status-column">
+                    <label className="checkbox-container">
+                        <input
+                            type="checkbox"
+                            checked={checkedReports[orphanKey] || false}
+                            onChange={() => handleOrphanCheckboxChange(placementId)}
+                        />
+                        <span className="checkmark"></span>
+                    </label>
+                </td>
+            </tr>
+        );
+    };
+
     const renderNoDataReportRow = (report, rowIndex, isPLDAGG = false) => {
         const placementId = report.cmi_placement_id || '';
         const brandName = report.brand || 'Unknown';
@@ -3415,6 +3662,72 @@ const ReportsManager = () => {
                                                 </thead>
                                                 <tbody>
                                                     {getNoDataReportsByType.pldAndAgg.map((report, index) => renderNoDataReportRow(report, index, true))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {(getOrphanedContractPlacements.aggOnly.length > 0 || getOrphanedContractPlacements.pldAndAgg.length > 0) && (
+                            <>
+                                {getOrphanedContractPlacements.aggOnly.length > 0 && (
+                                    <div className="no-data-reports-section orphaned-contracts-section" style={{ marginTop: '40px' }}>
+                                        <div className="reports-section-header">
+                                            <h3>Not Expected by CMI - AGG Only</h3>
+                                            <div className="reports-header-stats">
+                                                <span className="reports-header-stat-item">
+                                                    <span className="reports-header-stat-label">Total:</span>
+                                                    <span className="reports-header-stat-value">{getOrphanedContractPlacements.aggOnly.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container table-rounded">
+                                            <table className="reports-table no-data-table orphaned-contracts-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">Brand</th>
+                                                        <th className="placement-id-header">Placement ID</th>
+                                                        <th className="frequency-header">Frequency</th>
+                                                        <th className="metric-header">Metric</th>
+                                                        <th className="notes-header">Notes / Description</th>
+                                                        <th className="status-header">Confirmed</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getOrphanedContractPlacements.aggOnly.map((contract, index) => renderOrphanRow(contract, index))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {getOrphanedContractPlacements.pldAndAgg.length > 0 && (
+                                    <div className="no-data-reports-section orphaned-contracts-section" style={{ marginTop: '40px' }}>
+                                        <div className="reports-section-header">
+                                            <h3>Not Expected by CMI - PLD & AGG</h3>
+                                            <div className="reports-header-stats">
+                                                <span className="reports-header-stat-item">
+                                                    <span className="reports-header-stat-label">Total:</span>
+                                                    <span className="reports-header-stat-value">{getOrphanedContractPlacements.pldAndAgg.length}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container table-rounded">
+                                            <table className="reports-table no-data-table orphaned-contracts-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="campaign-header">Brand</th>
+                                                        <th className="placement-id-header">Placement ID</th>
+                                                        <th className="frequency-header">Frequency</th>
+                                                        <th className="metric-header">Metric</th>
+                                                        <th className="notes-header">Notes / Description</th>
+                                                        <th className="status-header">Confirmed</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getOrphanedContractPlacements.pldAndAgg.map((contract, index) => renderOrphanRow(contract, index))}
                                                 </tbody>
                                             </table>
                                         </div>

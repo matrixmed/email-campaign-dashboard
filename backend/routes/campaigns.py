@@ -1117,20 +1117,26 @@ def target_list_info(campaign_id):
         """)
         target_npi_count = session.execute(target_npi_sql, {'f1': f1, 'f2': f2}).scalar() or 0
         target_email_sql = text("""
-            SELECT COUNT(DISTINCT u.npi) AS c
-            FROM user_profiles u
-            WHERE u.email IS NOT NULL AND u.email <> '' AND u.npi IS NOT NULL AND u.npi <> ''
-              AND u.npi IN (
-                SELECT npi FROM universal_profiles
-                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
-                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT LOWER(TRIM(u.email)) AS email
+                FROM user_profiles u
+                WHERE u.email IS NOT NULL AND u.email <> '' AND u.npi IS NOT NULL AND u.npi <> ''
+                  AND u.npi IN (
+                    SELECT npi FROM universal_profiles
+                    WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                      AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                    UNION
+                    SELECT npi FROM user_profiles
+                    WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
+                      AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
+                  )
                 UNION
-                SELECT npi FROM user_profiles
-                WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
-                  AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
-              )
+                SELECT DISTINCT LOWER(TRIM(email)) AS email
+                FROM target_list_overrides
+                WHERE campaign_id_or_name = :name
+            ) s
         """)
-        target_email_count = session.execute(target_email_sql, {'f1': f1, 'f2': f2}).scalar() or 0
+        target_email_count = session.execute(target_email_sql, {'f1': f1, 'f2': f2, 'name': campaign_id}).scalar() or 0
         return jsonify({
             'has_target_list': target_npi_count > 0,
             'target_npi_count': int(target_npi_count),
@@ -1172,6 +1178,10 @@ def target_list_breakdown(campaign_id):
                     WHERE target_lists IS NOT NULL AND npi IS NOT NULL AND npi <> ''
                       AND (target_lists::jsonb @> CAST(:f1 AS jsonb) OR target_lists::jsonb @> CAST(:f2 AS jsonb))
                   )
+                UNION
+                SELECT DISTINCT LOWER(TRIM(email)) AS email
+                FROM target_list_overrides
+                WHERE campaign_id_or_name = :name
             ),
             events AS (
                 SELECT LOWER(TRIM(email)) AS email, event_type
@@ -1189,7 +1199,7 @@ def target_list_breakdown(campaign_id):
             FROM events e
             GROUP BY cohort
         """)
-        rows = session.execute(sql, {'cids': campaign_ids, 'f1': f1, 'f2': f2}).fetchall()
+        rows = session.execute(sql, {'cids': campaign_ids, 'f1': f1, 'f2': f2, 'name': campaign_id}).fetchall()
         cohorts = {'target': None, 'rest': None}
         for r in rows:
             cohorts[r[0]] = _compute_metrics(

@@ -13,26 +13,27 @@ const BLOB_ACCOUNT = 'emaildash';
 const BLOB_CONTAINER = 'json-data';
 const SAS_TOKEN = process.env.REACT_APP_AZURE_SAS_TOKEN;
 const HCP_BLOB = `https://${BLOB_ACCOUNT}.blob.core.windows.net/${BLOB_CONTAINER}/hcp_cluster_blob.json?${SAS_TOKEN}`;
-const TRENDS_BLOB = `https://${BLOB_ACCOUNT}.blob.core.windows.net/${BLOB_CONTAINER}/hcp_trends_blob.json?${SAS_TOKEN}`;
+// const TRENDS_BLOB = `https://${BLOB_ACCOUNT}.blob.core.windows.net/${BLOB_CONTAINER}/hcp_trends_blob.json?${SAS_TOKEN}`;
 
 const HCPTargeting = ({ externalSearch = '' }) => {
   const [data, setData] = useState(null);
-  const [trendsData, setTrendsData] = useState(null);
+  // const [trendsData, setTrendsData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('hcp');
+  const [viewMode] = useState('hcp');
   const [activeGroupType, setActiveGroupType] = useState('disease');
   const [activeGroup, setActiveGroup] = useState('');
   const [sortField, setSortField] = useState('score');
   const [sortDir, setSortDir] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [trendCat, setTrendCat] = useState('all');
+  const [gaOnly, setGaOnly] = useState(false);
   const [sourceLookup, setSourceLookup] = useState({ by_email: {}, by_npi: {} });
   const [modalHCP, setModalHCP] = useState(null);
   const [modalIndex, setModalIndex] = useState(-1);
 
   useEffect(() => {
     fetch(HCP_BLOB).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
-    fetch(TRENDS_BLOB).then(r => r.json()).then(d => setTrendsData(d)).catch(() => {});
+    // fetch(TRENDS_BLOB).then(r => r.json()).then(d => setTrendsData(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
   }, [sourceLookup]);
 
   const groupTypes = useMemo(() => {
-    if (!data?.hcp_profiles) return { disease: { label: 'Disease State', groups: [] }, medium: { label: 'Content Medium', groups: [] }, special: { label: 'Engagement', groups: ['Non-Engagers'] } };
+    if (!data?.hcp_profiles) return { disease: { label: 'Disease State', groups: [] }, medium: { label: 'Content Medium', groups: [] }, special: { label: 'Engagement', groups: ['Non-Engagers', 'GA Matches'] } };
     const diseaseCounts = {};
     const mediumCounts = {};
     Object.values(data.hcp_profiles).forEach(p => {
@@ -72,7 +73,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
     return {
       disease: { label: 'Disease State', groups: Object.keys(diseaseCounts).sort((a, b) => diseaseCounts[b] - diseaseCounts[a]) },
       medium: { label: 'Content Medium', groups: Object.keys(mediumCounts).sort((a, b) => mediumCounts[b] - mediumCounts[a]) },
-      special: { label: 'Engagement', groups: ['Non-Engagers'] },
+      special: { label: 'Engagement', groups: ['Non-Engagers', 'GA Matches'] },
     };
   }, [data]);
 
@@ -99,9 +100,13 @@ const HCPTargeting = ({ externalSearch = '' }) => {
       rows = rows.filter(r => !r.is_anonymous_ga && r.medium_groups?.includes(activeGroup));
     } else if (activeGroup === 'Non-Engagers') {
       rows = rows.filter(r => !r.is_anonymous_ga && !r.topics?.length && !r.total_clicks);
+    } else if (activeGroup === 'GA Matches') {
+      rows = rows.filter(r => r.ga_matched);
     } else if (activeGroup === 'Anonymous GA Users') {
       rows = rows.filter(r => r.is_anonymous_ga);
     }
+
+    if (gaOnly) rows = rows.filter(r => r.ga_matched);
 
     rows = rows.map(r => {
       const topic = r.topics?.find(t => t.ta === activeGroup);
@@ -127,7 +132,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
     });
 
     return rows;
-  }, [data, externalSearch, activeGroupType, activeGroup, sortField, sortDir]);
+  }, [data, externalSearch, activeGroupType, activeGroup, sortField, sortDir, gaOnly]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -193,13 +198,13 @@ const HCPTargeting = ({ externalSearch = '' }) => {
     <div className="shadow-engagers">
       <div className="section-header-bar" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h4 style={{ margin: 0, fontFamily: "'Lora', serif" }}>HCP Targeting</h4>
-        <div className="anomaly-mode-toggle">
+        {/* <div className="anomaly-mode-toggle">
           <button className={`mode-toggle-btn ${viewMode === 'hcp' ? 'active' : ''}`} onClick={() => setViewMode('hcp')}>HCP</button>
           <button className={`mode-toggle-btn ${viewMode === 'trends' ? 'active' : ''}`} onClick={() => setViewMode('trends')}>Trends</button>
-        </div>
+        </div> */}
       </div>
 
-      {viewMode === 'trends' && (
+      {/* viewMode === 'trends' && (
         trendsData?.sections?.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {trendsData.sections.map((section, si) => (
@@ -283,7 +288,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
         ) : (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#8a8a8a' }}>Trends data not yet available. Run the trends analysis to populate.</div>
         )
-      )}
+      ) */}
 
       {viewMode === 'hcp' && (
         <>
@@ -312,6 +317,17 @@ const HCPTargeting = ({ externalSearch = '' }) => {
               <span>Last synced: {formatLastUpdated(data.generated_at)}</span>
             </div>
             <span className="shadow-result-count">{filtered.length.toLocaleString()} results</span>
+            <label style={{ fontSize: '0.78rem', color: gaOnly ? '#fff' : '#b8b8b8', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+              <span
+                role="switch"
+                aria-checked={gaOnly}
+                onClick={() => { setGaOnly(v => !v); setCurrentPage(1); }}
+                style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', flex: 'none', borderRadius: '20px', background: gaOnly ? '#22c55e' : '#3a3a3d', transition: 'background 0.2s ease' }}
+              >
+                <span style={{ position: 'absolute', top: '2px', left: '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', transform: gaOnly ? 'translateX(16px)' : 'translateX(0)', transition: 'transform 0.2s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
+              </span>
+              GA identified only
+            </label>
             {filtered.length > 0 && (
               <button className="export-button" onClick={exportCSV}>Export CSV</button>
             )}

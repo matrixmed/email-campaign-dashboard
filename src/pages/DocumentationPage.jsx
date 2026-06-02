@@ -3023,6 +3023,8 @@ const DocumentationPage = () => {
             </p>
             <ul>
               <li>Standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button at the top of the table.</li>
+              <li><strong>&ldquo;GA identified only&rdquo; toggle</strong> &mdash; a switch in the table controls bar (next to the result count) that, when enabled, restricts the current tab to rows with a GA match (<code>ga_matched</code>). Applies to every tab/category.</li>
+              <li><strong>Engagement &rarr; GA Matches tab</strong> &mdash; the Engagement category exposes a &ldquo;GA Matches&rdquo; tab alongside &ldquo;Non-Engagers&rdquo; that lists all GA-matched HCPs regardless of disease/medium grouping.</li>
               <li>Modal navigation arrows (or ← / → keys) step through the current page&rsquo;s rows; Esc closes.</li>
             </ul>
 

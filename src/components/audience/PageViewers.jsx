@@ -192,18 +192,25 @@ const PageViewers = ({ externalSearch = '' }) => {
 
       {result && summary && (
         <>
-          <div className="hpm-stat-grid" style={{ margin: '16px 0 10px' }}>
-            <div className="hpm-stat"><div className="hpm-stat-label">Total Viewers</div><div className="hpm-stat-value">{summary.total_viewers.toLocaleString()}</div></div>
-            <div className="hpm-stat"><div className="hpm-stat-label">Identified HCPs</div><div className="hpm-stat-value" style={{ color: '#22c55e' }}>{summary.identified_hcps.toLocaleString()}</div></div>
-            <div className="hpm-stat"><div className="hpm-stat-label">Anonymous</div><div className="hpm-stat-value">{summary.anonymous.toLocaleString()}</div></div>
-            <div className="hpm-stat"><div className="hpm-stat-label">Total Page Views</div><div className="hpm-stat-value">{summary.total_page_views.toLocaleString()}</div></div>
-            <div className="hpm-stat"><div className="hpm-stat-label">Total Time</div><div className="hpm-stat-value">{formatDuration(summary.total_engagement_sec)}</div></div>
+          <div className="campaign-metrics-summary" style={{ marginTop: '16px' }}>
+            <div className="metric-summary-card"><div className="metric-summary-label">Total Viewers</div><div className="metric-summary-value">{summary.total_viewers.toLocaleString()}</div></div>
+            <div className="metric-summary-card"><div className="metric-summary-label">Identified HCPs</div><div className="metric-summary-value" style={{ color: '#22c55e' }}>{summary.identified_hcps.toLocaleString()}</div></div>
+            <div className="metric-summary-card"><div className="metric-summary-label">Anonymous</div><div className="metric-summary-value">{summary.anonymous.toLocaleString()}</div></div>
+            <div className="metric-summary-card"><div className="metric-summary-label">Total Page Views</div><div className="metric-summary-value">{summary.total_page_views.toLocaleString()}</div></div>
+            <div className="metric-summary-card"><div className="metric-summary-label">Total Time</div><div className="metric-summary-value">{formatDuration(summary.total_engagement_sec)}</div></div>
           </div>
 
           <div className="shadow-table-controls" style={{ background: 'var(--color-bg-card, #2a2a2d)', border: '1px solid var(--color-border, #333336)', borderRadius: '4px', padding: '8px 12px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span className="shadow-result-count" title={submittedUrl} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripUrl(submittedUrl)}</span>
-            <label style={{ fontSize: '0.78rem', color: '#b8b8b8', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={onlyIdentified} onChange={e => { setOnlyIdentified(e.target.checked); setCurrentPage(1); }} />
+            <label style={{ fontSize: '0.78rem', color: onlyIdentified ? '#fff' : '#b8b8b8', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+              <span
+                role="switch"
+                aria-checked={onlyIdentified}
+                onClick={() => { setOnlyIdentified(v => !v); setCurrentPage(1); }}
+                style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', flex: 'none', borderRadius: '20px', background: onlyIdentified ? '#22c55e' : '#3a3a3d', transition: 'background 0.2s ease' }}
+              >
+                <span style={{ position: 'absolute', top: '2px', left: '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', transform: onlyIdentified ? 'translateX(16px)' : 'translateX(0)', transition: 'transform 0.2s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
+              </span>
               Identified only
             </label>
             <span className="shadow-result-count">{viewers.length.toLocaleString()} shown</span>

@@ -39,6 +39,8 @@ const ReportsManager = () => {
     const [archiveAGGs, setArchiveAGGs] = useState({});
     const [archiveStandaloneAGGs, setArchiveStandaloneAGGs] = useState([]);
     const [expandedArchiveRows, setExpandedArchiveRows] = useState({});
+    const [placementHistory, setPlacementHistory] = useState([]);
+    const [placementHistoryLoading, setPlacementHistoryLoading] = useState(false);
     const [futureReports, setFutureReports] = useState([]);
     const [moveMode, setMoveMode] = useState('attach'); 
     const [selectedAttachTarget, setSelectedAttachTarget] = useState(null);
@@ -643,17 +645,15 @@ const ReportsManager = () => {
 
                 if (!createResponse.ok) {
                     if (createResponse.status === 409 && createResult.existing_id) {
-                        setAddAggExistingId(createResult.existing_id);
-                        setAddAggError('');
+                        reportId = createResult.existing_id;
+                    } else {
+                        setAddAggError(createResult.message || 'Failed to create AGG entry');
                         setAddAggLoading(false);
                         return;
                     }
-                    setAddAggError(createResult.message || 'Failed to create AGG entry');
-                    setAddAggLoading(false);
-                    return;
+                } else {
+                    reportId = createResult.report.id;
                 }
-
-                reportId = createResult.report.id;
             }
 
             if (addAggMode === 'attach' && addAggSelectedCampaign) {
@@ -674,8 +674,7 @@ const ReportsManager = () => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            agg_metric: addAggContractData.metric || '',
-                            agg_value: ''
+                            agg_metric: addAggContractData.metric || ''
                         })
                     });
                     if (!aggResponse.ok) {
@@ -701,8 +700,7 @@ const ReportsManager = () => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            agg_metric: addAggContractData.metric || '',
-                            agg_value: ''
+                            agg_metric: addAggContractData.metric || ''
                         })
                     });
                     if (!aggResponse.ok) {
@@ -752,7 +750,7 @@ const ReportsManager = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
-                            agg_value: movingReport.agg_value || ''
+                            agg_value: movingReport.agg_value ?? null
                         })
                     });
                 }
@@ -783,7 +781,7 @@ const ReportsManager = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             agg_metric: movingReport.contract_metric || movingReport.agg_metric || '',
-                            agg_value: movingReport.agg_value || ''
+                            agg_value: movingReport.agg_value ?? null
                         })
                     });
                 }
@@ -1258,6 +1256,48 @@ const ReportsManager = () => {
         return lookup;
     }, [cmiContractValues]);
 
+    const knownPlacementIds = useMemo(() => {
+        const ids = new Set(Object.keys(contractsByPlacementId));
+        reportsData.forEach(report => {
+            if (report.cmi_placement_id) ids.add(String(report.cmi_placement_id));
+            if (report.client_placement_id) ids.add(String(report.client_placement_id));
+        });
+        (cmiExpectedNoData.allExpectedPlacementIds || []).forEach(id => {
+            if (id) ids.add(String(id));
+        });
+        return ids;
+    }, [contractsByPlacementId, reportsData, cmiExpectedNoData.allExpectedPlacementIds]);
+
+    const exactPlacementMatch = useMemo(() => {
+        const t = (searchTerm || '').trim();
+        return t && knownPlacementIds.has(t) ? t : null;
+    }, [searchTerm, knownPlacementIds]);
+
+    useEffect(() => {
+        let ignore = false;
+        if (!exactPlacementMatch) {
+            setPlacementHistory([]);
+            setPlacementHistoryLoading(false);
+            return;
+        }
+        setPlacementHistoryLoading(true);
+        setArchiveAgencyTab('CMI');
+        setArchiveCurrentPage(1);
+        fetch(`${API_BASE_URL}/api/cmi/placement-history/${exactPlacementMatch}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then(result => {
+                if (ignore) return;
+                setPlacementHistory(result && result.status === 'success' ? (result.events || []) : []);
+                setPlacementHistoryLoading(false);
+            })
+            .catch(() => {
+                if (ignore) return;
+                setPlacementHistory([]);
+                setPlacementHistoryLoading(false);
+            });
+        return () => { ignore = true; };
+    }, [exactPlacementMatch]);
+
     const getNoDataReportsByType = useMemo(() => {
 
         const filterMoved = (reports) => {
@@ -1391,6 +1431,8 @@ const ReportsManager = () => {
         const expandedReports = [];
 
         reportsData.forEach(report => {
+            if (report.is_no_data_report) return;
+
             const week = getReportWeek(report.send_date);
 
             if (week === null && report.send_date && report.monday_date) {
@@ -1398,6 +1440,8 @@ const ReportsManager = () => {
                 const mondayFromData = new Date(year, month - 1, day);
 
                 for (let w = 1; w <= 3; w++) {
+                    if (!report[`week_${w}_submitted`]) continue;
+
                     const weekStart = new Date(mondayFromData);
                     weekStart.setDate(mondayFromData.getDate() + (w - 1) * 7);
 
@@ -1423,34 +1467,90 @@ const ReportsManager = () => {
         getPastReports.forEach(report => {
             if (report.agency) agencies.add(report.agency);
         });
+        if (exactPlacementMatch) agencies.add('CMI');
         return Array.from(agencies).sort((a, b) => {
             if (a === 'CMI') return -1;
             if (b === 'CMI') return 1;
             return a.localeCompare(b);
         });
-    }, [getPastReports]);
+    }, [getPastReports, exactPlacementMatch]);
 
     const getFilteredArchiveReports = useMemo(() => {
+        if (exactPlacementMatch && archiveAgencyTab === 'CMI') {
+            const mapHistoryEventToRow = (ev, idx) => {
+                const weekStart = ev.reporting_week_start ? new Date(ev.reporting_week_start + 'T00:00:00') : null;
+                const weekEnd = ev.reporting_week_end ? new Date(ev.reporting_week_end + 'T00:00:00') : (weekStart ? new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)) : null);
+                const uniqueKey = `hist_${ev.source_type}_${ev.reporting_week_start || 'na'}_${ev.submitted_at || 'na'}_${idx}`;
+                if (ev.source_type === 'agg') {
+                    return {
+                        id: uniqueKey,
+                        campaign_name: ev.placement_description || ev.campaign_name || 'AGG',
+                        brand: ev.brand || 'Unknown',
+                        agency: 'CMI',
+                        send_date: ev.submitted_at || ev.reporting_week_start,
+                        week_number: 1,
+                        week_range: { start: weekStart, end: weekEnd },
+                        unique_key: uniqueKey,
+                        is_submitted: ev.is_submitted,
+                        is_standalone_agg: true,
+                        _isHistory: true,
+                        _agg: {
+                            ...ev,
+                            agg_value: ev.value,
+                            agg_metric: ev.metric,
+                            brand: ev.brand,
+                            contract_notes: ev.placement_description,
+                            submitted_at: ev.submitted_at
+                        }
+                    };
+                }
+                return {
+                    id: uniqueKey,
+                    campaign_name: ev.campaign_name || ev.placement_description || (ev.source_type === 'no_data' ? 'No Data Report' : 'Report'),
+                    brand: ev.brand || '-',
+                    agency: 'CMI',
+                    send_date: ev.submitted_at || ev.reporting_week_start,
+                    week_number: ev.week_number || 1,
+                    week_range: { start: weekStart, end: weekEnd },
+                    unique_key: uniqueKey,
+                    is_submitted: ev.is_submitted,
+                    is_no_data_report: ev.source_type === 'no_data',
+                    _isHistory: true
+                };
+            };
+            return placementHistory.map(mapHistoryEventToRow);
+        }
+
         const filtered = getPastReports.filter(r => r.agency === archiveAgencyTab);
 
         if (archiveAgencyTab === 'CMI' && archiveStandaloneAGGs.length > 0) {
-            const standaloneRows = archiveStandaloneAGGs.map(agg => {
-                const weekStart = agg.reporting_week_start ? new Date(agg.reporting_week_start + 'T00:00:00') : null;
-                const weekEnd = agg.reporting_week_end ? new Date(agg.reporting_week_end + 'T00:00:00') : (weekStart ? new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)) : null);
-                return {
-                    id: `standalone_agg_${agg.id}`,
-                    campaign_name: agg.contract_notes || agg.notes || agg.placement_description || agg.brand || 'Standalone AGG',
-                    brand: agg.brand || 'Unknown',
-                    agency: 'CMI',
-                    send_date: agg.submitted_at || agg.reporting_week_start,
-                    week_number: 1,
-                    week_range: { start: weekStart, end: weekEnd },
-                    unique_key: `standalone_agg_${agg.id}`,
-                    is_submitted: true,
-                    is_standalone_agg: true,
-                    _agg: agg
-                };
-            });
+            const aggMatches = (agg) => !searchTerm || (
+                matchesSearchTerm(agg.brand, searchTerm) ||
+                matchesSearchTerm(agg.cmi_placement_id, searchTerm) ||
+                matchesSearchTerm(agg.client_placement_id, searchTerm) ||
+                matchesSearchTerm(agg.contract_notes || agg.notes || agg.placement_description, searchTerm) ||
+                matchesSearchTerm(agg.agg_metric || agg.contract_metric, searchTerm)
+            );
+            const standaloneRows = archiveStandaloneAGGs
+                .filter(agg => ['moved_to_due', 'attached', 'standalone'].includes(agg.status))
+                .filter(aggMatches)
+                .map(agg => {
+                    const weekStart = agg.reporting_week_start ? new Date(agg.reporting_week_start + 'T00:00:00') : null;
+                    const weekEnd = agg.reporting_week_end ? new Date(agg.reporting_week_end + 'T00:00:00') : (weekStart ? new Date(new Date(weekStart).setDate(weekStart.getDate() + 6)) : null);
+                    return {
+                        id: `standalone_agg_${agg.id}`,
+                        campaign_name: agg.contract_notes || agg.notes || agg.placement_description || agg.brand || 'Standalone AGG',
+                        brand: agg.brand || 'Unknown',
+                        agency: 'CMI',
+                        send_date: agg.submitted_at || agg.reporting_week_start,
+                        week_number: 1,
+                        week_range: { start: weekStart, end: weekEnd },
+                        unique_key: `standalone_agg_${agg.id}`,
+                        is_submitted: true,
+                        is_standalone_agg: true,
+                        _agg: agg
+                    };
+                });
 
             const combined = [...filtered, ...standaloneRows];
             combined.sort((a, b) => {
@@ -1462,7 +1562,7 @@ const ReportsManager = () => {
         }
 
         return filtered;
-    }, [getPastReports, archiveAgencyTab, archiveStandaloneAGGs]);
+    }, [getPastReports, archiveAgencyTab, archiveStandaloneAGGs, searchTerm, exactPlacementMatch, placementHistory]);
 
     const getFilteredFutureReports = useMemo(() => {
         if (!searchTerm) return futureReports;
@@ -3369,7 +3469,7 @@ const ReportsManager = () => {
                         className={`tab-button ${activeTab === 'archive' ? 'active' : ''}`}
                         onClick={() => handleTabChange('archive')}
                     >
-                        <span>Archive ({getPastReports.length})</span>
+                        <span>Archive ({exactPlacementMatch ? placementHistory.length : getPastReports.length})</span>
                     </button>
                     {activeTab === 'current' ? (
                         <button
@@ -3524,6 +3624,7 @@ const ReportsManager = () => {
                                                                 <div className="agg-notes-cell">
                                                                     <span className={`standalone-agg-badge ${isMonthly ? 'monthly-agg-badge' : ''}`}>{isMonthly ? 'Monthly AGG' : 'Standalone'}</span>
                                                                     {notes || <span className="no-notes">-</span>}
+                                                                    {agg.cmi_placement_id && <span className="placement-id-pill">{agg.cmi_placement_id}</span>}
                                                                     {hasGcmIds && <span className="gcm-indicator" title="Has GCM IDs">📎</span>}
                                                                 </div>
                                                             </td>
@@ -3847,7 +3948,7 @@ const ReportsManager = () => {
                                     className={`archive-tab-button ${archiveAgencyTab === agency ? 'active' : ''}`}
                                     onClick={() => { setArchiveAgencyTab(agency); setArchiveCurrentPage(1); }}
                                 >
-                                    {agency} ({getPastReports.filter(r => r.agency === agency).length})
+                                    {agency} ({exactPlacementMatch && agency === 'CMI' ? placementHistory.length : getPastReports.filter(r => r.agency === agency).length})
                                 </button>
                             ))}
                         </div>
@@ -3868,7 +3969,9 @@ const ReportsManager = () => {
                                     {paginatedArchiveReports.length === 0 ? (
                                         <tr>
                                             <td colSpan="7" className="empty-state">
-                                                {searchTerm ? 'No matching past reports' : 'No past reports found'}
+                                                {exactPlacementMatch
+                                                    ? (placementHistoryLoading ? `Loading history for placement ${exactPlacementMatch}...` : `No submission history for placement ${exactPlacementMatch}`)
+                                                    : (searchTerm ? 'No matching past reports' : 'No past reports found')}
                                             </td>
                                         </tr>
                                     ) : (
@@ -3919,8 +4022,8 @@ const ReportsManager = () => {
                                                 <tr className={`report-row archive-row ${index % 2 === 0 ? 'even-row' : 'odd-row'} ${report.is_no_data_report ? 'no-data-row' : ''} ${hasArchiveAGGs ? 'has-attached-aggs' : ''}`}>
                                                     <td className="campaign-column">
                                                         <div
-                                                            className="campaign-text clickable-campaign"
-                                                            onClick={() => openCMIModal(report, report.week_number, filteredArchiveReports.filter(r => r.agency === report.agency))}
+                                                            className={`campaign-text ${report._isHistory ? '' : 'clickable-campaign'}`}
+                                                            onClick={report._isHistory ? undefined : () => openCMIModal(report, report.week_number, filteredArchiveReports.filter(r => r.agency === report.agency))}
                                                             title={report.campaign_name}
                                                         >
                                                             <span className={`campaign-name ${report.is_no_data_report ? 'no-data-campaign' : ''}`} title={report.campaign_name}>
@@ -3959,7 +4062,7 @@ const ReportsManager = () => {
                                                     <td className="week-column">Week {report.week_number}</td>
                                                     <td className="timeframe-column">{formatDateRange(report.week_range.start, report.week_range.end)}</td>
                                                     <td className="status-column">
-                                                        {report.is_submitted || report[`week_${report.week_number}_completed`] ? (
+                                                        {report.is_submitted || report[`week_${report.week_number}_completed`] || report[`week_${report.week_number}_submitted`] ? (
                                                             <span className="status-completed">Submitted</span>
                                                         ) : (
                                                             <span className="status-pending">Pending</span>

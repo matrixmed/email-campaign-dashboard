@@ -8,6 +8,7 @@ const ListPickerModal = ({
   onClose,
   searchPlaceholder = 'Search...',
   emptyLabel = 'No matches.',
+  loading = false,
 }) => {
   const [query, setQuery] = useState('');
 
@@ -58,7 +59,12 @@ const ListPickerModal = ({
           <div className="aqb-selection-count">{selected.length} selected</div>
         </div>
         <div className="aqb-modal-list">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="aqb-modal-loading">
+              <div className="aqb-modal-spinner" />
+              <p>Loading...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary, #b8b8b8)' }}>
               <p>{emptyLabel}</p>
             </div>

@@ -118,7 +118,7 @@ const TemplateSelectionModal = ({
         const isSelected = prev.find(c => c.campaign_name === campaign.campaign_name);
         if (isSelected) {
           return prev.filter(c => c.campaign_name !== campaign.campaign_name);
-        } else if (prev.length < 8) {
+        } else if (prev.length < 10) {
           return [...prev, campaign];
         }
         return prev;
@@ -391,7 +391,7 @@ const TemplateSelectionModal = ({
             <div>
               {campaignType !== 'single' && (
                 <p style={{ marginBottom: '20px', marginTop: '0px', color: '#6b7280', fontSize: '14px' }}>
-                  {`Select up to 8 campaigns to compare (${selectedCampaigns.length}/8 selected)`}
+                  {`Select up to 10 campaigns to compare (${selectedCampaigns.length}/10 selected)`}
                 </p>
               )}
 

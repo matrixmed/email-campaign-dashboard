@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AudienceQueryBuilder from '../components/audience/AudienceQueryBuilder';
 import NPIQuickLookup from '../components/listanalysis/NPIQuickLookup';
+import VendorMatchLookup from '../components/listanalysis/VendorMatchLookup';
 import SpecialtyLookup from '../components/listanalysis/SpecialtyLookup';
 import ListEfficiencyAnalysis from '../components/listanalysis/ListEfficiencyAnalysis';
 import DMABreakdown from '../components/listanalysis/DMABreakdown';
@@ -9,6 +10,7 @@ import PrintListManagement from '../components/printManagement/PrintListManageme
 import NCOAUpload from '../components/printManagement/NCOAUpload';
 import ShadowEngagers from '../components/audience/ShadowEngagers';
 import HCPTargeting from '../components/audience/HCPTargeting';
+import PageViewers from '../components/audience/PageViewers';
 import PrintListDisplay from '../components/audience/PrintListDisplay';
 import DigitalListDisplay from '../components/audience/DigitalListDisplay';
 import SubscriberIntake from '../components/audience/SubscriberIntake';
@@ -142,10 +144,22 @@ const AudienceAnalyticsPage = () => {
           <span>Specialty Lookup</span>
         </button>
         <button
+          className={`tab-button ${activeTab === 'vendor-match' ? 'active' : ''}`}
+          onClick={() => handleTabClick('vendor-match')}
+        >
+          <span>Vendor Match</span>
+        </button>
+        <button
           className={`tab-button ${activeTab === 'hcp-targeting' ? 'active' : ''}`}
           onClick={() => handleTabClick('hcp-targeting')}
         >
           <span>HCP Targeting</span>
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'page-viewers' ? 'active' : ''}`}
+          onClick={() => handleTabClick('page-viewers')}
+        >
+          <span>Page Viewers</span>
         </button>
         <button
           className={`tab-button ${activeTab === 'print-lists' ? 'active' : ''}`}
@@ -216,6 +230,9 @@ const AudienceAnalyticsPage = () => {
       {activeTab === 'specialty-lookup' && (
         <SpecialtyLookup />
       )}
+      {activeTab === 'vendor-match' && (
+        <VendorMatchLookup />
+      )}
       {activeTab === 'list-analysis' && (
         <ListEfficiencyAnalysis externalSearch={listEfficiencySearch} />
       )}
@@ -226,6 +243,9 @@ const AudienceAnalyticsPage = () => {
       */}
       {activeTab === 'hcp-targeting' && (
         <HCPTargeting externalSearch={targetingSearch} />
+      )}
+      {activeTab === 'page-viewers' && (
+        <PageViewers />
       )}
       {activeTab === 'shadow-engagers' && (
         <ShadowEngagers externalSearch={shadowSearch} />

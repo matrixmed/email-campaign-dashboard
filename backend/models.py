@@ -82,6 +82,8 @@ class UniversalProfile(Base):
     is_active = Column(Boolean, default=True, index=True)
     provider_status = Column(String(50), default='Active')
     provider_status_source = Column(String(20))
+    iqvia_match = Column(Boolean, default=False, nullable=False, index=True)
+    hld_match = Column(Boolean, default=False, nullable=False, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

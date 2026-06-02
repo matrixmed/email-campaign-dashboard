@@ -673,6 +673,37 @@
   padding: 10px 16px;
 }
 
+.aqb-modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 20px;
+  color: var(--color-text-secondary, #b8b8b8);
+}
+
+.aqb-modal-loading p {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.aqb-modal-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 255, 255, 0.15);
+  border-top-color: var(--color-accent, #0ff);
+  animation: aqbSpin 0.9s linear infinite;
+}
+
+@keyframes aqbSpin {
+  to { transform: rotate(360deg); }
+}
+
 .aqb-modal-list-item {
   display: flex;
   align-items: center;

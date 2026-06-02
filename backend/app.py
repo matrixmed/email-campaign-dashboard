@@ -46,6 +46,9 @@ from routes.market_intelligence import market_intelligence_bp
 from routes.list_management import list_management_bp
 from routes.subscriber_intake import subscriber_intake_bp
 from routes.list_leasing import list_leasing_bp
+from routes.ga_insights import ga_insights_bp
+from routes.deliverability import deliverability_bp
+from routes.vendor_match import vendor_match_bp
 
 app.register_blueprint(db_bp, url_prefix='/api/db')
 app.register_blueprint(dashboards_bp, url_prefix='/api/dashboards')
@@ -71,6 +74,9 @@ app.register_blueprint(market_intelligence_bp, url_prefix='/api/market-intellige
 app.register_blueprint(list_management_bp, url_prefix='/api/list-management')
 app.register_blueprint(subscriber_intake_bp, url_prefix='/api/subscriber-intake')
 app.register_blueprint(list_leasing_bp, url_prefix='/api/list-leasing')
+app.register_blueprint(ga_insights_bp, url_prefix='/api/ga-insights')
+app.register_blueprint(deliverability_bp, url_prefix='/api/deliverability')
+app.register_blueprint(vendor_match_bp, url_prefix='/api/vendor-match')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

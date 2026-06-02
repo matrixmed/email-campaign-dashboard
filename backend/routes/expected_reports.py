@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, or_, and_
-from models import CMIExpectedReport, CampaignReportingMetadata, CMIContractValue
+from models import CMIExpectedReport, CampaignReportingMetadata, CMIContractValue, CampaignReportManager, CmiOrphanNoDataSubmission
 from datetime import datetime, timedelta
 import os
 
@@ -266,6 +266,7 @@ def detach_expected_report(report_id):
 @expected_reports_bp.route('/expected/<int:report_id>/agg-values', methods=['POST'])
 @cross_origin()
 def set_agg_values(report_id):
+    session = None
     try:
         session = get_session()
         data = request.json
@@ -276,13 +277,16 @@ def set_agg_values(report_id):
 
         if data.get('agg_metric'):
             report.agg_metric = data['agg_metric']
-        if data.get('agg_value') is not None:
-            report.agg_value = data['agg_value']
+        if 'agg_value' in data:
+            raw_value = data['agg_value']
+            if raw_value is None or str(raw_value).strip() == '':
+                report.agg_value = None
+            else:
+                report.agg_value = int(str(raw_value).replace(',', '').strip())
 
         report.updated_at = datetime.utcnow()
 
         session.commit()
-        session.close()
 
         return jsonify({
             'status': 'success',
@@ -290,10 +294,15 @@ def set_agg_values(report_id):
         }), 200
 
     except Exception as e:
+        if session:
+            session.rollback()
         return jsonify({
             'status': 'error',
             'message': str(e)
         }), 500
+    finally:
+        if session:
+            session.close()
 
 @expected_reports_bp.route('/expected/<int:report_id>/submit', methods=['PUT'])
 @cross_origin()
@@ -767,6 +776,129 @@ def get_future_reports():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@expected_reports_bp.route('/placement-history/<placement_id>', methods=['GET'])
+@cross_origin()
+def get_placement_history(placement_id):
+    try:
+        session = get_session()
+        pid = str(placement_id)
+
+        events = []
+
+        actual_reports = session.query(CampaignReportManager).filter(
+            or_(
+                CampaignReportManager.cmi_placement_id == pid,
+                CampaignReportManager.client_placement_id == pid
+            )
+        ).all()
+
+        for r in actual_reports:
+            if r.batch == 'no_data':
+                continue
+            base = {
+                'source_type': 'actual',
+                'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
+                'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
+                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                'value': None,
+                'metric': None,
+                'data_type': r.data_type,
+                'campaign_name': r.campaign_name,
+                'placement_description': r.placement_description,
+                'brand': r.brand_name,
+                'cmi_placement_id': r.cmi_placement_id,
+                'client_placement_id': r.client_placement_id
+            }
+            submitted_weeks = []
+            if r.week_1_submitted:
+                submitted_weeks.append(1)
+            if r.week_2_submitted:
+                submitted_weeks.append(2)
+            if r.week_3_submitted:
+                submitted_weeks.append(3)
+            for w in submitted_weeks:
+                events.append({**base, 'week_number': w, 'is_submitted': True})
+
+        expected_reports = session.query(CMIExpectedReport).filter(
+            or_(
+                CMIExpectedReport.cmi_placement_id == pid,
+                CMIExpectedReport.client_placement_id == pid
+            )
+        ).all()
+
+        expected_no_data_weeks = set()
+        for r in expected_reports:
+            if not r.is_submitted:
+                continue
+            is_agg = bool(r.is_agg_only) or r.data_type == 'AGG' or r.attached_to_campaign_id is not None
+            source_type = 'agg' if is_agg else 'no_data'
+            if source_type == 'no_data' and r.reporting_week_start:
+                expected_no_data_weeks.add(r.reporting_week_start.isoformat())
+            events.append({
+                'source_type': source_type,
+                'reporting_week_start': r.reporting_week_start.isoformat() if r.reporting_week_start else None,
+                'reporting_week_end': r.reporting_week_end.isoformat() if r.reporting_week_end else None,
+                'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                'submitted_for_week': r.submitted_for_week.isoformat() if r.submitted_for_week else None,
+                'is_submitted': bool(r.is_submitted),
+                'week_number': None,
+                'value': r.agg_value if is_agg else None,
+                'metric': r.agg_metric,
+                'data_type': r.data_type,
+                'status': r.status,
+                'campaign_name': r.assigned_campaign_name or r.placement_description,
+                'placement_description': r.placement_description,
+                'brand': r.brand_name,
+                'cmi_placement_id': r.cmi_placement_id,
+                'client_placement_id': r.client_placement_id
+            })
+
+        try:
+            orphan_rows = session.query(CmiOrphanNoDataSubmission).filter(
+                CmiOrphanNoDataSubmission.placement_id == pid
+            ).all()
+            for r in orphan_rows:
+                if not r.is_submitted:
+                    continue
+                week_iso = r.reporting_week_start.isoformat() if r.reporting_week_start else None
+                if week_iso and week_iso in expected_no_data_weeks:
+                    continue
+                events.append({
+                    'source_type': 'no_data',
+                    'reporting_week_start': week_iso,
+                    'reporting_week_end': None,
+                    'submitted_at': r.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if r.submitted_at else None,
+                    'is_submitted': bool(r.is_submitted),
+                    'week_number': None,
+                    'value': None,
+                    'metric': None,
+                    'data_type': None,
+                    'campaign_name': None,
+                    'placement_description': None,
+                    'brand': None,
+                    'cmi_placement_id': pid,
+                    'client_placement_id': None
+                })
+        except Exception:
+            pass
+
+        events.sort(key=lambda e: (e.get('reporting_week_start') or '', e.get('submitted_at') or ''), reverse=True)
+
+        session.close()
+
+        return jsonify({
+            'status': 'success',
+            'placement_id': pid,
+            'count': len(events),
+            'events': events
+        }), 200
+
+    except Exception as e:
         return jsonify({
             'status': 'error',
             'message': str(e)

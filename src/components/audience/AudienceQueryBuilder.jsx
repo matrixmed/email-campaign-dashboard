@@ -52,6 +52,9 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const [availableLists, setAvailableLists] = useState([]);
     const [availableTags, setAvailableTags] = useState([]);
     const [availableSegments, setAvailableSegments] = useState([]);
+    const [listsLoading, setListsLoading] = useState(true);
+    const [tagsLoading, setTagsLoading] = useState(true);
+    const [segmentsLoading, setSegmentsLoading] = useState(true);
     const [specialties, setSpecialties] = useState([]);
     const [specialtiesLoading, setSpecialtiesLoading] = useState(true);
     const [campaigns, setCampaigns] = useState([]);
@@ -132,15 +135,60 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     }, [specialtyMergeMode]);
 
     useEffect(() => {
-        Promise.all([
-            fetch(`${API_BASE_URL}/api/list-management/digital-lists/overview`).then(r => r.json()).catch(() => ({})),
-            fetch(`${API_BASE_URL}/api/list-management/tags/overview`).then(r => r.json()).catch(() => ({})),
-            fetch(`${API_BASE_URL}/api/list-management/segments/overview`).then(r => r.json()).catch(() => ({})),
-        ]).then(([l, t, s]) => {
-            setAvailableLists(Object.entries(l.subscribed_counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
-            setAvailableTags(Object.entries(t.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
-            setAvailableSegments(Object.entries(s.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n })));
-        });
+        const CACHE_KEY = 'aqb_overviews_cache_v1';
+        const CACHE_TTL_MS = 10 * 60 * 1000;
+
+        try {
+            const cached = sessionStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const { ts, lists, tags, segments } = JSON.parse(cached);
+                if (Date.now() - ts < CACHE_TTL_MS) {
+                    setAvailableLists(lists || []);
+                    setAvailableTags(tags || []);
+                    setAvailableSegments(segments || []);
+                    setListsLoading(false);
+                    setTagsLoading(false);
+                    setSegmentsLoading(false);
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        const result = { lists: null, tags: null, segments: null };
+        const writeCache = () => {
+            if (result.lists && result.tags && result.segments) {
+                try {
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), ...result }));
+                } catch (e) {}
+            }
+        };
+
+        fetch(`${API_BASE_URL}/api/list-management/digital-lists/overview`)
+            .then(r => r.json()).catch(() => ({}))
+            .then(l => {
+                result.lists = Object.entries(l.subscribed_counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n }));
+                setAvailableLists(result.lists);
+                setListsLoading(false);
+                writeCache();
+            });
+
+        fetch(`${API_BASE_URL}/api/list-management/tags/overview`)
+            .then(r => r.json()).catch(() => ({}))
+            .then(t => {
+                result.tags = Object.entries(t.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n }));
+                setAvailableTags(result.tags);
+                setTagsLoading(false);
+                writeCache();
+            });
+
+        fetch(`${API_BASE_URL}/api/list-management/segments/overview`)
+            .then(r => r.json()).catch(() => ({}))
+            .then(s => {
+                result.segments = Object.entries(s.counts || {}).sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, count: n }));
+                setAvailableSegments(result.segments);
+                setSegmentsLoading(false);
+                writeCache();
+            });
     }, []);
 
     const fetchSpecialties = async () => {
@@ -1447,7 +1495,8 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                     onChange={setSelectedLists}
                     onClose={() => setShowListSelector(false)}
                     searchPlaceholder="Search lists"
-                    emptyLabel="No lists available. Run sync_lists.py to populate."
+                    loading={listsLoading}
+                    emptyLabel="No lists available."
                 />
             )}
 
@@ -1459,7 +1508,8 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                     onChange={setSelectedTags}
                     onClose={() => setShowTagSelector(false)}
                     searchPlaceholder="Search tags"
-                    emptyLabel="No tags available. Run sync_tags.py to populate."
+                    loading={tagsLoading}
+                    emptyLabel="No tags available."
                 />
             )}
 
@@ -1471,7 +1521,8 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                     onChange={setSelectedSegments}
                     onClose={() => setShowSegmentSelector(false)}
                     searchPlaceholder="Search segments"
-                    emptyLabel="No segments available. Run sync_segments.py to populate."
+                    loading={segmentsLoading}
+                    emptyLabel="No segments available."
                 />
             )}
         </div>

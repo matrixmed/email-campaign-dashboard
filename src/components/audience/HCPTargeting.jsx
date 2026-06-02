@@ -61,7 +61,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
   }, [sourceLookup]);
 
   const groupTypes = useMemo(() => {
-    if (!data?.hcp_profiles) return { disease: { label: 'Disease State', groups: [] }, medium: { label: 'Content Medium', groups: [] }, special: { label: 'Engagement', groups: ['Non-Engagers', 'Anonymous GA Users'] } };
+    if (!data?.hcp_profiles) return { disease: { label: 'Disease State', groups: [] }, medium: { label: 'Content Medium', groups: [] }, special: { label: 'Engagement', groups: ['Non-Engagers'] } };
     const diseaseCounts = {};
     const mediumCounts = {};
     Object.values(data.hcp_profiles).forEach(p => {
@@ -72,7 +72,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
     return {
       disease: { label: 'Disease State', groups: Object.keys(diseaseCounts).sort((a, b) => diseaseCounts[b] - diseaseCounts[a]) },
       medium: { label: 'Content Medium', groups: Object.keys(mediumCounts).sort((a, b) => mediumCounts[b] - mediumCounts[a]) },
-      special: { label: 'Engagement', groups: ['Non-Engagers', 'Anonymous GA Users'] },
+      special: { label: 'Engagement', groups: ['Non-Engagers'] },
     };
   }, [data]);
 
@@ -360,7 +360,7 @@ const HCPTargeting = ({ externalSearch = '' }) => {
                     <td>{h._opened}</td>
                     <td>{h._clicked}</td>
                     <td>{h.total_clicks || 0}</td>
-                    <td>{h.ga_matched && h.ga_profile?.recent_events?.length > 0 ? <span style={{ color: '#22c55e', fontWeight: 700 }}>&#10003;</span> : ''}</td>
+                    <td>{h.ga_matched ? <span style={{ color: '#22c55e', fontWeight: 700 }}>&#10003;</span> : ''}</td>
                   </tr>
                   );
                 })}

@@ -131,7 +131,7 @@ const HCPProfileModal = ({ hcp, position, hasPrev, hasNext, onPrev, onNext, onCl
   const isAnonymous = !!hcp?.is_anonymous_ga;
   const hcpEmail = (hcp?.email || '').trim();
   const hcpNpi = (hcp?.npi || '').trim();
-  const hasGA = !!(hcp?.ga_profile?.recent_events?.length || hcp?.ga_sessions?.length);
+  const hasGA = !!(hcp?.user_pseudo_id || hcp?.ga_profile?.recent_events?.length || hcp?.ga_sessions?.length);
 
   const tabs = useMemo(() => {
     const base = isAnonymous
@@ -650,7 +650,10 @@ const EngagementView = ({ hcp, totals, engagementByDisease }) => {
           <div className="hpm-section-title">Topic Affinity</div>
           {topics.map((t, i) => (
             <div key={i} className="hpm-aff-row">
-              <div className="hpm-aff-label">{t.ta}</div>
+              <div className="hpm-aff-label">
+                {t.ta}
+                {t.browsed > 0 && <span style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--color-success, #10b981)' }} title="Corroborated by on-site reading">read {t.browsed}</span>}
+              </div>
               <div className="hpm-aff-bar"><div className="hpm-aff-fill" style={{ width: `${Math.min(t.score, 100)}%` }} /></div>
               <div className="hpm-aff-value">{t.score.toFixed(0)}</div>
             </div>
@@ -748,40 +751,98 @@ const CampaignsView = ({ campaigns, recentClicks }) => {
 };
 
 const GAView = ({ hcp, expandedSession, setExpandedSession }) => {
-  const events = hcp?.ga_profile?.recent_events || [];
-  const probabilisticMatches = hcp?.ga_sessions || [];
+  const upid = (hcp?.user_pseudo_id || '').trim();
+  const [fetched, setFetched] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!upid) { setFetched(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`${API_BASE_URL}/api/ga-insights/user-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_pseudo_id: upid }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return;
+        if (d.success) setFetched(d); else setError(d.error || 'Failed to load events');
+        setLoading(false);
+      })
+      .catch(e => { if (!cancelled) { setError(e.message || 'Network error'); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [upid]);
+
+  const blobEvents = hcp?.ga_profile?.recent_events || [];
+  const events = (fetched?.events?.length ? fetched.events : blobEvents);
+  const summary = fetched?.summary;
+  const topicsBrowsed = fetched?.topics_browsed || [];
   const gaProfile = hcp?.ga_profile;
+  const probabilisticMatches = hcp?.ga_sessions || [];
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="hpm-loading">
+        <span className="hpm-loading-dot" /><span className="hpm-loading-dot" /><span className="hpm-loading-dot" />
+        <div style={{ marginTop: 12 }}>Loading full browsing history...</div>
+      </div>
+    );
+  }
 
   if (events.length === 0 && probabilisticMatches.length === 0) {
-    return <div className="hpm-empty">No GA session data for this user.</div>;
+    return <div className="hpm-empty">{error ? `Could not load GA events: ${error}` : 'No GA session data for this user.'}</div>;
   }
+
+  const sessionsCount = summary?.total_sessions ?? gaProfile?.total_sessions ?? 0;
+  const pageViewsCount = summary?.page_views ?? gaProfile?.page_views ?? 0;
+  const engSec = summary?.total_engagement_sec ?? gaProfile?.total_engagement_sec ?? 0;
+  const scrollsCount = summary?.scrolls ?? gaProfile?.scrolls ?? 0;
 
   return (
     <>
-      {gaProfile && events.length > 0 && (
+      {events.length > 0 && (
         <div className="hpm-stat-grid">
           <div className="hpm-stat">
             <div className="hpm-stat-label">Sessions</div>
-            <div className="hpm-stat-value">{gaProfile.total_sessions || 0}</div>
+            <div className="hpm-stat-value">{sessionsCount}</div>
           </div>
           <div className="hpm-stat">
             <div className="hpm-stat-label">Page Views</div>
-            <div className="hpm-stat-value">{gaProfile.page_views || 0}</div>
+            <div className="hpm-stat-value">{pageViewsCount}</div>
           </div>
           <div className="hpm-stat">
             <div className="hpm-stat-label">Total Time</div>
-            <div className="hpm-stat-value">{formatDuration((gaProfile.total_engagement_sec || 0) * 1000)}</div>
+            <div className="hpm-stat-value">{formatDuration(engSec * 1000)}</div>
           </div>
           <div className="hpm-stat">
             <div className="hpm-stat-label">Scrolls</div>
-            <div className="hpm-stat-value">{gaProfile.scrolls || 0}</div>
+            <div className="hpm-stat-value">{scrollsCount}</div>
           </div>
+        </div>
+      )}
+
+      {topicsBrowsed.length > 0 && (
+        <div className="hpm-section">
+          <div className="hpm-section-title">Topics Read On-Site</div>
+          {topicsBrowsed.map((t, i) => (
+            <div key={i} className="hpm-aff-row">
+              <div className="hpm-aff-label">{t.ta}</div>
+              <div className="hpm-aff-bar"><div className="hpm-aff-fill" style={{ width: `${Math.min(t.page_views / Math.max(topicsBrowsed[0].page_views, 1) * 100, 100)}%` }} /></div>
+              <div className="hpm-aff-value">{t.page_views} {t.page_views === 1 ? 'page' : 'pages'}</div>
+            </div>
+          ))}
         </div>
       )}
 
       {events.length > 0 && (
         <div className="hpm-section">
-          <div className="hpm-section-title">Sessions</div>
+          <div className="hpm-section-title">
+            Sessions
+            <span className="hpm-section-count">{events.length} events{fetched ? '' : ' (recent)'}{fetched?.truncated ? ' — capped at 5,000' : ''}</span>
+          </div>
           {(() => {
             const sessions = {};
             events.forEach(e => {

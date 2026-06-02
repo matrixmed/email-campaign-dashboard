@@ -10,6 +10,7 @@ import ClickAnalytics from './ClickAnalytics';
 import SubjectLineAnalysis from './SubjectLineAnalysis';
 import GeographicRates from './GeographicRates';
 import GeographicInsights from './GeographicInsights';
+import DeliverabilityAnalytics from './DeliverabilityAnalytics';
 import { useSearch } from '../../context/SearchContext';
 
 const AnalyticsHub = () => {
@@ -116,6 +117,7 @@ const AnalyticsHub = () => {
         <button className={`tab-button ${activeView === 'monthly' ? 'active' : ''}`} onClick={() => handleTabChange('monthly')}>Monthly Trends</button>
         <button className={`tab-button ${activeView === 'yearly' ? 'active' : ''}`} onClick={() => handleTabChange('yearly')}>Yearly Trends</button>
         <button className={`tab-button ${activeView === 'benchmarks' ? 'active' : ''}`} onClick={() => handleTabChange('benchmarks')}>Campaign Benchmarks</button>
+        <button className={`tab-button ${activeView === 'deliverability' ? 'active' : ''}`} onClick={() => handleTabChange('deliverability')}>Deliverability</button>
         <button className={`tab-button ${activeView === 'anomaly' ? 'active' : ''}`} onClick={() => handleTabChange('anomaly')}>Anomaly Detection</button>
         <button className={`tab-button ${activeView === 'subject-lines' ? 'active' : ''}`} onClick={() => handleTabChange('subject-lines')}>Subject Lines</button>
         <button className={`tab-button ${activeView === 'clicks' ? 'active' : ''}`} onClick={() => handleTabChange('clicks')}>Click Analytics</button>
@@ -181,6 +183,11 @@ const AnalyticsHub = () => {
         {visitedTabs['subject-lines'] && (
           <div style={{ display: activeView === 'subject-lines' ? 'block' : 'none' }}>
             <SubjectLineAnalysis key={`subject-lines-${clearKeys['subject-lines']}`} searchTerm={searchTerm} />
+          </div>
+        )}
+        {visitedTabs.deliverability && (
+          <div style={{ display: activeView === 'deliverability' ? 'block' : 'none' }}>
+            <DeliverabilityAnalytics key={`deliverability-${clearKeys.deliverability}`} searchTerm={searchTerm} />
           </div>
         )}
         {visitedTabs.geographic && (

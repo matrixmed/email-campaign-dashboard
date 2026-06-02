@@ -1,0 +1,398 @@
+.deliverability-analytics {
+  padding: 0;
+}
+
+.da-status {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  min-height: 320px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  font-size: 13px;
+}
+.da-status-error { color: #ff6b6b; }
+
+.da-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border, #333);
+  border-top-color: var(--color-accent, #0ff);
+  border-radius: 50%;
+  animation: da-spin 0.9s linear infinite;
+}
+@keyframes da-spin { to { transform: rotate(360deg); } }
+
+.da-sub-tabs {
+  margin: 14px 0 14px;
+}
+
+.da-callouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1px;
+  background: var(--color-border, #333336);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.da-callout {
+  background: var(--color-bg-card, #2a2a2d);
+  padding: 14px 16px;
+}
+.da-callout-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+.da-callout-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--color-text-primary, #fff);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 2px;
+}
+.da-callout-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary, #aaa);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.da-table-wrap {
+  background: var(--color-bg-card, #2a2a2d);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.da-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.da-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 4px;
+  color: var(--color-text-primary, #fff);
+  font-size: 13px;
+}
+.da-search:focus { outline: none; border-color: var(--color-accent, #0ff); }
+.da-min-sends {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #aaa);
+}
+.da-min-sends input {
+  width: 80px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 4px;
+  color: var(--color-text-primary, #fff);
+  font-size: 12px;
+}
+.da-row-count {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  margin-left: auto;
+}
+
+.da-table-scroll {
+  overflow-x: auto;
+}
+
+.da-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.da-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-card, #2a2a2d);
+  color: var(--color-text-secondary, #ccc);
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border, #333336);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  font-size: 12px;
+}
+.da-table thead th:hover { color: var(--color-text-primary, #fff); }
+.da-table thead th.num { text-align: right; }
+.da-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border, #333336);
+  color: var(--color-text-primary, #ddd);
+}
+.da-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.da-table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.da-table .da-campaign-row { cursor: pointer; }
+.da-table .da-campaign-row:hover td { background: rgba(0, 255, 255, 0.06); }
+.da-table .da-brand-cell { font-weight: 600; color: var(--color-text-primary, #fff); }
+.da-table .da-campaign-name {
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.da-table .da-empty {
+  text-align: center;
+  color: var(--color-text-tertiary, #8a8a8a);
+  font-style: italic;
+  padding: 24px 10px;
+}
+
+.da-brand-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 1;
+}
+.da-brand-chip {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 16px;
+  color: var(--color-text-secondary, #ccc);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.da-brand-chip:hover {
+  color: var(--color-text-primary, #fff);
+  border-color: var(--color-text-tertiary, #777);
+}
+.da-brand-chip.active {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: var(--color-accent, #0ff);
+  color: var(--color-accent, #0ff);
+}
+
+.da-matrix-section {
+  background: var(--color-bg-card, #2a2a2d);
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.da-matrix-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.da-matrix-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.da-matrix-toolbar .da-matrix-legend {
+  margin-bottom: 0;
+}
+.da-matrix-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.da-toggle-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 4px;
+  color: var(--color-text-secondary, #aaa);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.da-toggle-btn:hover {
+  color: var(--color-text-primary, #fff);
+  border-color: var(--color-text-tertiary, #666);
+}
+.da-toggle-btn.active {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: var(--color-accent, #0ff);
+  color: var(--color-accent, #0ff);
+}
+
+.da-metric-toggle,
+.da-topn-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.da-metric-toggle-btn,
+.da-topn-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--color-border, #333336);
+  color: var(--color-text-secondary, #aaa);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.da-metric-toggle-btn:last-child,
+.da-topn-btn:last-child { border-right: none; }
+.da-metric-toggle-btn:hover,
+.da-topn-btn:hover { color: var(--color-text-primary, #fff); }
+.da-metric-toggle-btn.active,
+.da-topn-btn.active {
+  background: rgba(0, 255, 255, 0.12);
+  color: var(--color-accent, #0ff);
+}
+
+.da-matrix-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.da-legend-text { margin-right: 6px; }
+.da-legend-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.da-matrix-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  border: 1px solid var(--color-border, #333336);
+  border-radius: 6px;
+}
+
+.da-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.da-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-card, #2a2a2d);
+  border-bottom: 1px solid var(--color-border, #333336);
+  z-index: 2;
+}
+.da-matrix .da-matrix-rowhead {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg-card, #2a2a2d);
+  border-right: 1px solid var(--color-border, #333336);
+  z-index: 1;
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #fff);
+  white-space: nowrap;
+  font-size: 12px;
+}
+.da-matrix thead .da-matrix-rowhead { z-index: 3; }
+.da-matrix .da-matrix-rowhead.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; color: var(--color-text-secondary, #aaa); }
+.da-matrix .da-matrix-brand-head {
+  padding: 8px 10px;
+  text-align: right;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--color-border, #333336);
+  min-width: 92px;
+}
+.da-matrix-brand-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-primary, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.da-matrix-brand-baseline {
+  font-size: 10px;
+  color: var(--color-text-tertiary, #8a8a8a);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+.da-matrix tbody td.da-matrix-cell {
+  padding: 7px 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--color-border, #333336);
+  color: var(--color-text-primary, #ddd);
+}
+.da-matrix tbody tr:hover .da-matrix-rowhead { background: rgba(255, 255, 255, 0.05); }
+.da-matrix tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+
+.da-trend-section { margin-top: 14px; }
+.da-trend-section .monthly-chart-container { margin-top: 0; }
+.da-trend-section .chart-legend {
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  font-size: 12px;
+}
+
+.metric-good { color: #51c878; }
+.metric-good-strong { color: #1f9854; font-weight: 700; }
+.metric-warn { color: #d4a014; }
+.metric-bad { color: #ff6b6b; font-weight: 700; }
+
+.da-matrix-cell.metric-good { background: rgba(81, 200, 120, 0.08); color: #51c878; }
+.da-matrix-cell.metric-good-strong { background: rgba(81, 200, 120, 0.16); color: #51c878; font-weight: 600; }
+.da-matrix-cell.metric-warn { background: rgba(212, 160, 20, 0.10); color: #d4a014; }
+.da-matrix-cell.metric-bad { background: rgba(255, 107, 107, 0.14); color: #ff6b6b; font-weight: 600; }
+
+.da-legend-chip.metric-good { background: rgba(81, 200, 120, 0.18); }
+.da-legend-chip.metric-good-strong { background: rgba(81, 200, 120, 0.28); }
+.da-legend-chip.metric-warn { background: rgba(212, 160, 20, 0.18); }
+.da-legend-chip.metric-bad { background: rgba(255, 107, 107, 0.18); }
+
+body.light .da-sub-tab.active { background: rgba(0, 120, 180, 0.08); }
+body.light .da-brand-chip.active { background: rgba(0, 120, 180, 0.10); }
+body.light .da-table tbody tr:hover td { background: rgba(0, 0, 0, 0.03); }
+body.light .da-metric-toggle-btn.active,
+body.light .da-topn-btn.active { background: rgba(0, 120, 180, 0.10); }
+body.light .metric-good { color: #1f9854; }
+body.light .metric-warn { color: #b3870f; }
+body.light .metric-bad { color: #c0392b; }
+body.light .da-matrix tbody tr:hover .da-matrix-rowhead,
+body.light .da-matrix tbody tr:hover td { background: rgba(0, 0, 0, 0.04); }
+
+body.space-theme .da-sub-tab.active { background: rgba(100, 100, 255, 0.18); }
+body.space-theme .da-brand-chip.active { background: rgba(100, 100, 255, 0.18); }
+body.space-theme .da-metric-toggle-btn.active,
+body.space-theme .da-topn-btn.active { background: rgba(100, 100, 255, 0.18); }
+body.space-theme .da-table tbody tr:hover td { background: rgba(100, 100, 255, 0.08); }
+body.space-theme .da-matrix tbody tr:hover td { background: rgba(100, 100, 255, 0.08); }

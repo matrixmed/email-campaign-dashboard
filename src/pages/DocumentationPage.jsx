@@ -577,6 +577,7 @@ const DocumentationPage = () => {
               <li>Specialty Insights</li>
               <li>Geographic (Campaign Rates / Audience &amp; Market)</li>
               <li>Timing Intelligence</li>
+              <li>Deliverability</li>
             </ul>
             <p>
               Tabs implement lazy loading: each sub-tab is only rendered once it has been visited, and its state is preserved
@@ -1038,6 +1039,77 @@ const DocumentationPage = () => {
               <code>Day of week derived from campaign send_date</code><br/>
               <code>Market assignment via brand-name matching (Brand Management table)</code>
             </div>
+          </div>
+
+          <div className="docs-card">
+            <h3>Deliverability</h3>
+            <p>
+              Domain reputation and deliverability metrics broken down by sending brand. The brand key is the
+              ActiveCampaign <code>fromname</code> attribute on each campaign &mdash; since every campaign is sent from
+              <code>subscriptions@matrixmedcom.com</code>, the from-name (JCAD, Oncology Matrix, JCAD NPPA, Nutrition Health Review,
+              etc.) is what differentiates one sending domain from another.
+            </p>
+
+            <h4>Data Source</h4>
+            <p>
+              Loads <code>deliverability_metrics.json</code> from blob storage (<code>emaildash/json-data</code>). The JSON is
+              produced by a weekly pipeline (<code>deliverability_pipeline.py</code> in P2025) that runs Sunday 11pm. The pipeline:
+            </p>
+            <ul>
+              <li>Fetches all campaigns from <code>GET /api/3/campaigns</code> to capture <code>id</code>, <code>name</code>, <code>sdate</code>, and <code>fromname</code>.</li>
+              <li>Aggregates <code>campaign_interactions</code> per campaign by <code>event_type</code> (<code>COUNT(DISTINCT email)</code>).</li>
+              <li>Joins <code>campaign_interactions.email</code> to <code>user_profiles</code> to pick up <code>practice_state</code> and <code>primary_taxonomy_code</code>.</li>
+              <li>Derives email domain from the local string split on <code>@</code>.</li>
+              <li>Buckets everything by the campaign&rsquo;s send month (not interaction timestamp) &mdash; so a campaign sent April 29 has its May opens counted in April.</li>
+              <li>Merges into the existing JSON: only the current send-month bucket is mutable; older months are append-only.</li>
+            </ul>
+
+            <h4>JSON Shape</h4>
+            <p>Raw counts only &mdash; all rates are computed client-side. Keys:</p>
+            <ul>
+              <li><code>by_brand[brand][YYYY-MM]</code> &mdash; <code>{`{sent, opens, clicks, bounces, unsubs}`}</code></li>
+              <li><code>by_brand_domain[brand][domain][YYYY-MM]</code></li>
+              <li><code>by_brand_specialty[brand][taxonomy_code][YYYY-MM]</code></li>
+              <li><code>by_brand_state[brand][state][YYYY-MM]</code></li>
+              <li><code>by_campaign</code> &mdash; flat list with <code>campaign_id, name, brand, sent_date,</code> and the five raw counts</li>
+            </ul>
+
+            <h4>Sub-tabs</h4>
+            <ul>
+              <li><strong>Overview:</strong> One card per brand with all-time totals + rates, plus a small-multiples chart grid (bounce % and unsub % by month, one chart per brand).</li>
+              <li><strong>Email Domain:</strong> Brand picker + sortable table of email domains (gmail.com, yahoo.com, etc.) with rates per domain.</li>
+              <li><strong>Specialty:</strong> Brand picker + sortable table of NPPES specialties (taxonomy code &rarr; label via <code>taxonomyMapping</code>).</li>
+              <li><strong>Location:</strong> Brand picker + sortable table by U.S. state.</li>
+              <li><strong>Per Campaign:</strong> Brand picker (or All) + sortable, searchable campaign list.</li>
+            </ul>
+
+            <h4>Rate Formulas</h4>
+            <div className="docs-table-wrapper">
+              <table className="docs-table">
+                <thead><tr><th>Metric</th><th>Formula</th></tr></thead>
+                <tbody>
+                  <tr><td>Delivered</td><td><code>sent &minus; bounces</code></td></tr>
+                  <tr><td>Open Rate</td><td><code>(opens / delivered) &times; 100</code></td></tr>
+                  <tr><td>Click Rate</td><td><code>(clicks / opens) &times; 100</code></td></tr>
+                  <tr><td>Bounce Rate</td><td><code>(bounces / sent) &times; 100</code></td></tr>
+                  <tr><td>Unsub Rate</td><td><code>(unsubs / delivered) &times; 100</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>Color Thresholds (Absolute, Not Derived)</h4>
+            <p>No composite "health score" &mdash; cells are color-coded by industry-standard absolute thresholds:</p>
+            <ul>
+              <li><strong>Bounce rate:</strong> green &lt; 2%, amber 2&ndash;5%, red &ge; 5%.</li>
+              <li><strong>Unsub rate:</strong> green &lt; 0.2%, amber 0.2&ndash;0.5%, red &ge; 0.5%.</li>
+            </ul>
+
+            <h4>Trend Chart</h4>
+            <p>
+              Inline SVG, one mini-chart per brand. Two lines (bounce % red, unsub % yellow) over time, with dashed
+              reference lines at the 2% and 5% bounce thresholds. Each data point is colored by its threshold band so the
+              visual cue lands without inventing a derived score.
+            </p>
           </div>
         </section>
 
@@ -1589,7 +1661,7 @@ const DocumentationPage = () => {
               <div className="docs-step">
                 <div className="docs-step-num">2</div>
                 <div className="docs-step-text">
-                  <strong>Campaign Type:</strong> Choose Single Campaign or Multi Campaign (up to 8 campaigns).
+                  <strong>Campaign Type:</strong> Choose Single Campaign or Multi Campaign (up to 10 campaigns).
                 </div>
               </div>
               <div className="docs-step">
@@ -2260,8 +2332,33 @@ const DocumentationPage = () => {
             <ul>
               <li><strong>Current Week:</strong> Reports due this week with 3 week columns for submission tracking. Includes search, sort, pagination (100 rows), batch export buttons, no-data section, and statistics header.</li>
               <li><strong>Future:</strong> CMI expected reports with future reporting weeks (not yet due). Displays Brand, Vehicle, Placement description, Data Type, Frequency, Week date range, and &ldquo;Upcoming&rdquo; status. 10 rows per page with pagination and search filtering.</li>
-              <li><strong>Archive:</strong> Past reports organized by agency tabs (CMI first, then alphabetical). 100 rows per page, grouped by week range.</li>
+              <li><strong>Archive:</strong> Past reports organized by agency tabs (CMI first, then alphabetical). 100 rows per page, grouped by week range. By default the CMI archive shows only actual data report-weeks that were submitted &mdash; no-data reports and non-submitted AGG rows are hidden, and standalone AGG rows now respect the search box. See the card below for the placement-history unlock.</li>
             </ul>
+          </div>
+
+          <div className="docs-card">
+            <h3>Archive &mdash; Default Filter & Placement Unlock</h3>
+            <p>
+              The Archive&rsquo;s default CMI view is intentionally narrow: it lists only the actual data reports that appeared in
+              &ldquo;Campaign Reports Due This Week&rdquo; and were submitted. A report-week is included only when its
+              <code>week_N_submitted</code> flag is true; rows flagged <code>is_no_data_report</code> are excluded. AGG rows appear only
+              when they were submitted and were part of the due-this-week flow (<code>status</code> in <code>moved_to_due</code>,
+              <code>attached</code>, or <code>standalone</code>), and they now filter against the search term (previously standalone
+              AGG rows ignored search).
+            </p>
+            <p>
+              <strong>Placement unlock:</strong> typing a value into the existing search box that <em>exactly</em> equals a known CMI
+              placement id (<code>searchTerm.trim() === placement_id</code>, matched against contract placement ids, report placement ids,
+              and expected placement ids) switches the archive into a full-history timeline for that placement. The view calls
+              <code>GET /api/cmi/placement-history/&#123;placement_id&#125;</code>, which returns a reverse-chronological union across
+              three tables: actual reports (<code>campaign_report_manager</code>), no-data submissions
+              (<code>cmi_expected_reports</code> + <code>cmi_orphan_no_data_submissions</code>), and AGGs (with submitted values). The
+              unlock is CMI-only; partial or non-matching search keeps the default filtered view.
+            </p>
+            <p>
+              <strong>Limitation:</strong> actual reports store a single <code>submitted_at</code> timestamp (not one per week), so an
+              actual report submitted across multiple weeks repeats that timestamp per submitted week in the timeline.
+            </p>
           </div>
 
           <div className="docs-card">
@@ -2496,8 +2593,8 @@ const DocumentationPage = () => {
             <h3>Overview</h3>
             <p>
               Audience Analytics provides tools for querying individual users, analyzing audience segments, looking up NPIs,
-              looking up HCPs by specialty, analyzing list crossover, breaking down DMAs, identifying shadow engagers, detecting engagement patterns, managing print subscriptions, processing NCOA address updates, and onboarding new subscribers from form exports. It is organized into 11 sub-tabs:
-              Find Users, Analyze Users, NPI Lookup, Specialty Lookup, HCP Targeting, Print Lists, Digital Lists, IQVIA List Efficiency, Subscriber Intake, DMA Breakdown, and Shadow Engagers.
+              looking up HCPs by specialty, matching NPIs against vendor universal lists, analyzing list crossover, breaking down DMAs, identifying shadow engagers, detecting engagement patterns, managing print subscriptions, processing NCOA address updates, and onboarding new subscribers from form exports. It is organized into the following sub-tabs:
+              Find Users, Analyze Users, NPI Lookup, Specialty Lookup, Vendor Match, HCP Targeting, Print Lists, Digital Lists, IQVIA List Efficiency, Subscriber Intake, DMA Breakdown, and Shadow Engagers.
             </p>
           </div>
 
@@ -2571,6 +2668,32 @@ const DocumentationPage = () => {
               <li><strong>Licensed:</strong> User is currently in only <code>IQVIA HCPs</code> and/or <code>HLD HCPs</code> segments (or, if no current segments, the most recent <code>added</code> event was IQVIA/HLD).</li>
               <li><strong>Market:</strong> User exists only in <code>universal_profiles</code> (not in our audience).</li>
             </ul>
+          </div>
+
+          <div className="docs-card">
+            <h3>Vendor Match</h3>
+            <p>
+              Checks a list of NPIs against the <strong>IQVIA</strong> and <strong>HealthLink (HLD)</strong> universal match lists &mdash;
+              the NPIs each data company returned when we ran a universal list match. It answers &ldquo;who from a target list could each
+              vendor potentially license to us,&rdquo; and is independent of who we have already licensed.
+            </p>
+            <h4>Input</h4>
+            <ul>
+              <li>Paste NPIs one per line, or click <strong>Upload File</strong> to load a CSV/text file (all 10-digit numbers are extracted automatically).</li>
+              <li>Non-10-digit entries are skipped and reported separately.</li>
+            </ul>
+            <h4>Results</h4>
+            <ul>
+              <li>Summary chips: IQVIA, HLD, Both, and Neither counts.</li>
+              <li>Table columns: NPI, IQVIA (Match / &mdash;), HLD (Match / &mdash;).</li>
+              <li>Standard pagination (100 rows per page) with an &ldquo;Export CSV&rdquo; button on the far right of the table header.</li>
+            </ul>
+            <h4>Data Source</h4>
+            <p>
+              Match status lives in two boolean columns on <code>universal_profiles</code> (<code>iqvia_match</code>, <code>hld_match</code>),
+              populated by a one-time ingest of the vendor &ldquo;All Matches&rdquo; file (<code>backend/scripts/ingest_vendor_match_list.py</code>).
+              Lookups hit <code>/api/vendor-match/lookup</code>. Refreshing the lists means re-running the ingest with a new file.
+            </p>
           </div>
 
           <div className="docs-card">
@@ -3020,7 +3143,7 @@ const DocumentationPage = () => {
           <div className="docs-card">
             <h3>Pagination &amp; Export Standard</h3>
             <p>
-              All tables in Audience Analytics &mdash; Find Users, Analyze Users, NPI Lookup, Specialty Lookup, HCP Targeting,
+              All tables in Audience Analytics &mdash; Find Users, Analyze Users, NPI Lookup, Specialty Lookup, Vendor Match, HCP Targeting,
               Print Lists, Digital Lists, and Shadow Engagers &mdash; use the same pagination component as Campaign Performance
               (Previous / numbered page buttons / Next, up to 5 page buttons visible) at <strong>100 rows per page</strong>
               with no rows-per-page selector. The &ldquo;Export CSV&rdquo; button is always anchored at the top-right of the

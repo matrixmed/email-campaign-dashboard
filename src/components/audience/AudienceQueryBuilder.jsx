@@ -82,6 +82,7 @@ const AudienceQueryBuilder = ({ activeSection }) => {
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisResults, setAnalysisResults] = useState(null);
     const [analysisError, setAnalysisError] = useState('');
+    const [analysisProgress, setAnalysisProgress] = useState(null);
 
     const [analyzeUsersTableState, setAnalyzeUsersTableState] = useState({
         sortColumn: null,
@@ -462,6 +463,7 @@ const AudienceQueryBuilder = ({ activeSection }) => {
         setAnalysisLoading(true);
         setAnalysisError('');
         setAnalysisResults(null);
+        setAnalysisProgress(null);
 
         try {
             const userList = analysisForm.userInput
@@ -473,29 +475,60 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                 throw new Error('Please provide user identifiers');
             }
 
-            const response = await fetch(`${API_BASE}/users/analyze-list`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    user_list: userList,
-                    input_type: analysisForm.inputType,
-                    export_csv: false
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP ${response.status}`);
+            const CHUNK_SIZE = 1500;
+            const chunks = [];
+            for (let i = 0; i < userList.length; i += CHUNK_SIZE) {
+                chunks.push(userList.slice(i, i + CHUNK_SIZE));
             }
 
-            const data = await response.json();
-            setAnalysisResults(data);
+            const allUsers = [];
+            const seenKeys = new Set();
+            let processed = 0;
+
+            for (const chunk of chunks) {
+                const response = await fetch(`${API_BASE}/users/analyze-list`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_list: chunk,
+                        input_type: analysisForm.inputType,
+                        export_csv: false
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.users) {
+                    for (const user of data.users) {
+                        const key = (user.email || user.npi || '').toLowerCase();
+                        if (key && seenKeys.has(key)) continue;
+                        if (key) seenKeys.add(key);
+                        allUsers.push(user);
+                    }
+                }
+
+                processed += chunk.length;
+                if (chunks.length > 1) {
+                    setAnalysisProgress({ processed, total: userList.length });
+                }
+            }
+
+            setAnalysisResults({
+                success: true,
+                total_count: allUsers.length,
+                users: allUsers
+            });
         } catch (err) {
             setAnalysisError(err.message || 'Failed to process request');
         } finally {
             setAnalysisLoading(false);
+            setAnalysisProgress(null);
         }
     };
 
@@ -1181,7 +1214,11 @@ const AudienceQueryBuilder = ({ activeSection }) => {
                                     className="submit-button"
                                     disabled={analysisLoading}
                                 >
-                                    {analysisLoading ? 'Analyzing...' : 'Analyze Users'}
+                                    {analysisLoading
+                                        ? (analysisProgress
+                                            ? `Analyzing ${analysisProgress.processed.toLocaleString()} / ${analysisProgress.total.toLocaleString()}...`
+                                            : 'Analyzing...')
+                                        : 'Analyze Users'}
                                 </button>
                             </div>
                         </form>

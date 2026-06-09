@@ -54,6 +54,27 @@
     line-height: 1;
 }
 
+.si-intro-text {
+    color: #aaa;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 16px;
+    max-width: 720px;
+}
+
+.si-clean-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    margin-top: 14px;
+    padding: 12px 14px;
+    background-color: #1d1d1d;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
 .si-result-header {
     margin-bottom: 16px;
 }

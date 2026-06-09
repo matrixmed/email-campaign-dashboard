@@ -13,7 +13,7 @@ import HCPTargeting from '../components/audience/HCPTargeting';
 import PageViewers from '../components/audience/PageViewers';
 import PrintListDisplay from '../components/audience/PrintListDisplay';
 import DigitalListDisplay from '../components/audience/DigitalListDisplay';
-import SubscriberIntake from '../components/audience/SubscriberIntake';
+import SubscriberIntakeTab from '../components/audience/SubscriberIntakeTab';
 import '../styles/AnalyticsHub.css';
 
 const AudienceAnalyticsPage = () => {
@@ -257,7 +257,7 @@ const AudienceAnalyticsPage = () => {
         <DigitalListDisplay externalSearch={digitalListSearch} />
       )}
       {activeTab === 'subscriber-intake' && (
-        <SubscriberIntake externalSearch={subscriberIntakeSearch} />
+        <SubscriberIntakeTab externalSearch={subscriberIntakeSearch} />
       )}
       {activeTab === 'ncoa-upload' && (
         <NCOAUpload />

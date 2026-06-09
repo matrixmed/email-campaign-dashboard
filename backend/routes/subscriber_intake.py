@@ -439,3 +439,206 @@ def run_digital():
         'skipped': skipped,
         'errors': errors,
     })
+
+
+DIGITAL_LIST_NAMES = {
+    'JCAD US Subscribers', 'JCAD International Subscribers', 'JCAD NPPA (MMC)',
+    'JCAD Comp', 'Oncology (MMC)', 'ICNS US Subscribers', 'ICNS International Subscribers',
+    'Nutrition Health Review',
+}
+PRINT_LIST_NAMES = {
+    'JCAD Print List', 'NP+PA Print List', 'JCAD Comp List',
+}
+
+
+@subscriber_intake_bp.route('/ingest-clean', methods=['POST'])
+def ingest_clean():
+    body = request.get_json(silent=True) or {}
+    rows = body.get('rows') or []
+    list_name = (body.get('list_name') or '').strip()
+    kind = (body.get('kind') or '').strip().lower()
+    if not list_name:
+        return jsonify({'error': 'No list_name provided'}), 400
+    if kind not in (BUCKET_PRINT, BUCKET_DIGITAL):
+        return jsonify({'error': "kind must be 'print' or 'digital'"}), 400
+    valid = PRINT_LIST_NAMES if kind == BUCKET_PRINT else DIGITAL_LIST_NAMES
+    if list_name not in valid:
+        return jsonify({'error': f"'{list_name}' is not a known {kind} list"}), 400
+    if not rows:
+        return jsonify({'error': 'No rows provided'}), 400
+
+    results = []
+    inserted = updated = skipped = failed = 0
+
+    with get_db_connection() as conn:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        for idx, raw in enumerate(rows):
+            r = {k: (str(v).strip() if v is not None else '') for k, v in (raw or {}).items()}
+            name = (r.get('first_name', '') + ' ' + r.get('last_name', '')).strip()
+            email = (r.get('email') or '').strip()
+            cur.execute('SAVEPOINT sp_row')
+            try:
+                if kind == BUCKET_DIGITAL:
+                    status, reason = _ingest_digital_row(cur, r, list_name, email)
+                else:
+                    status, reason = _ingest_print_row(cur, r, list_name, email)
+                cur.execute('RELEASE SAVEPOINT sp_row')
+            except Exception as e:
+                cur.execute('ROLLBACK TO SAVEPOINT sp_row')
+                status, reason = 'failed', str(e)
+            if status == 'inserted':
+                inserted += 1
+            elif status == 'updated':
+                updated += 1
+            elif status == 'skipped':
+                skipped += 1
+            else:
+                failed += 1
+            results.append({'row': idx + 1, 'name': name, 'email': email,
+                            'status': status, 'reason': reason})
+        conn.commit()
+        cur.close()
+
+    return jsonify({
+        'list_name': list_name,
+        'kind': kind,
+        'summary': {'inserted': inserted, 'updated': updated, 'skipped': skipped,
+                    'failed': failed, 'total': len(rows)},
+        'results': results,
+    })
+
+
+def _parse_json_list(raw):
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, str):
+        try:
+            v = json.loads(raw)
+            if isinstance(v, list):
+                return [str(x).strip() for x in v if str(x).strip()]
+        except Exception:
+            return [x.strip() for x in raw.split(',') if x.strip()]
+    return []
+
+
+def _ingest_digital_row(cur, r, list_name, email):
+    if not email:
+        return 'skipped', 'missing email'
+    cur.execute('SELECT id, digital_lists_subscribed FROM user_profiles WHERE LOWER(email) = LOWER(%s) LIMIT 1', (email,))
+    existing = cur.fetchone()
+    first = r.get('first_name', '')
+    last = r.get('last_name', '')
+    npi = r.get('npi', '')
+    specialty = r.get('specialty', '')
+    degree = r.get('degree', '')
+    addr1 = r.get('address1', '')
+    addr2 = r.get('address2', '')
+    full_addr = (addr1 + (' ' + addr2 if addr2 else '')).strip()
+    city = r.get('city', '')
+    state = r.get('state', '')
+    zipcode = r.get('zipcode', '')
+    country = r.get('country', '') or 'United States'
+    if existing:
+        current = _parse_json_list(existing.get('digital_lists_subscribed'))
+        if list_name in current:
+            return 'skipped', f'already on {list_name}'
+        new_lists = sorted(set(current) | {list_name})
+        cur.execute("""
+            UPDATE user_profiles
+            SET digital_lists_subscribed = %s,
+                first_name = COALESCE(NULLIF(%s, ''), first_name),
+                last_name = COALESCE(NULLIF(%s, ''), last_name),
+                npi = COALESCE(NULLIF(%s, ''), npi),
+                specialty = COALESCE(NULLIF(%s, ''), specialty),
+                degree = COALESCE(NULLIF(%s, ''), degree),
+                address = COALESCE(NULLIF(%s, ''), address),
+                city = COALESCE(NULLIF(%s, ''), city),
+                state = COALESCE(NULLIF(%s, ''), state),
+                zipcode = COALESCE(NULLIF(%s, ''), zipcode),
+                country = COALESCE(NULLIF(%s, ''), country),
+                is_active = TRUE,
+                updated_at = NOW()
+            WHERE id = %s
+        """, (Json(new_lists), first, last, npi, specialty, degree,
+              full_addr, city, state, zipcode, country, existing['id']))
+        return 'updated', f'added to {list_name}'
+    cur.execute("""
+        INSERT INTO user_profiles
+            (email, first_name, last_name, npi, specialty, degree,
+             address, city, state, zipcode, country,
+             digital_lists_subscribed, ac_segments, ac_tags,
+             is_active, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s,
+                TRUE, NOW(), NOW())
+    """, (email.lower(), first, last, npi or None, specialty, degree,
+          full_addr, city, state, zipcode, country,
+          Json([list_name]), Json([]), Json([])))
+    return 'inserted', f'new contact added to {list_name}'
+
+
+def _ingest_print_row(cur, r, list_name, email):
+    npi = r.get('npi', '')
+    first = r.get('first_name', '')
+    last = r.get('last_name', '')
+    zipcode = r.get('zipcode', '')
+    existing = None
+    if email:
+        cur.execute("SELECT id, subscribed_lists FROM print_list_subscribers WHERE email <> '' AND LOWER(email) = LOWER(%s) LIMIT 1", (email,))
+        existing = cur.fetchone()
+    if not existing and npi:
+        cur.execute("SELECT id, subscribed_lists FROM print_list_subscribers WHERE npi = %s LIMIT 1", (npi,))
+        existing = cur.fetchone()
+    if not existing and first and last and zipcode:
+        cur.execute("SELECT id, subscribed_lists FROM print_list_subscribers WHERE LOWER(first_name) = LOWER(%s) AND LOWER(last_name) = LOWER(%s) AND zipcode = %s LIMIT 1", (first, last, zipcode))
+        existing = cur.fetchone()
+    specialty = r.get('specialty', '')
+    degree = r.get('degree', '')
+    company = r.get('company', '')
+    addr1 = r.get('address1', '')
+    addr2 = r.get('address2', '')
+    city = r.get('city', '')
+    state = r.get('state', '')
+    country = r.get('country', '') or 'United States'
+    if existing:
+        current = {x.strip() for x in (existing.get('subscribed_lists') or '').split(',') if x.strip()}
+        if list_name in current:
+            return 'skipped', f'already on {list_name}'
+        new_lists = ', '.join(sorted(current | {list_name}))
+        cur.execute("""
+            UPDATE print_list_subscribers
+            SET subscribed_lists = %s,
+                email = COALESCE(NULLIF(%s, ''), email),
+                first_name = COALESCE(NULLIF(%s, ''), first_name),
+                last_name = COALESCE(NULLIF(%s, ''), last_name),
+                npi = COALESCE(NULLIF(%s, ''), npi),
+                specialty = COALESCE(NULLIF(%s, ''), specialty),
+                degree = COALESCE(NULLIF(%s, ''), degree),
+                address_1 = COALESCE(NULLIF(%s, ''), address_1),
+                address_2 = COALESCE(NULLIF(%s, ''), address_2),
+                city = COALESCE(NULLIF(%s, ''), city),
+                state = COALESCE(NULLIF(%s, ''), state),
+                zipcode = COALESCE(NULLIF(%s, ''), zipcode),
+                country = COALESCE(NULLIF(%s, ''), country),
+                company = COALESCE(NULLIF(%s, ''), company),
+                is_subscribed = TRUE,
+                updated_at = NOW()
+            WHERE id = %s
+        """, (new_lists, email, first, last, npi, specialty, degree,
+              addr1, addr2, city, state, zipcode, country, company, existing['id']))
+        return 'updated', f'added to {list_name}'
+    cur.execute("""
+        INSERT INTO print_list_subscribers
+            (npi, first_name, last_name, degree, email, specialty, company,
+             address_1, address_2, city, state, zipcode, country,
+             subscribed_lists, is_subscribed, source, subscribe_date, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                %s, TRUE, %s, NOW(), NOW(), NOW())
+    """, (npi or None, first, last, degree, email, specialty, company,
+          addr1, addr2, city, state, zipcode, country,
+          list_name, 'cleaned_list_import'))
+    return 'inserted', f'new contact added to {list_name}'

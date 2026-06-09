@@ -914,7 +914,7 @@ const ComponentSidebar = ({
     const component = {
       id: `social-media-${Date.now()}`,
       type: 'table',
-      title: 'LinkedIn Social Media Metrics',
+      title: 'Social Media Metrics',
       config: {
         dataType: 'custom',
         customData: [
@@ -3044,7 +3044,7 @@ const ComponentSidebar = ({
                       textAlign: 'left'
                     }}
                   >
-                    LinkedIn Social Media Metrics
+                    Social Media Metrics
                   </button>
                 </div>
               </div>

@@ -401,7 +401,7 @@ const SubscriberIntake = ({ externalSearch = '' }) => {
     return (
         <>
             <div className="section-header-bar">
-                <h3>Subscriber Intake</h3>
+                <h3>Raw File Processing</h3>
                 <button className="section-header-clear-btn" onClick={clearAll}>Clear</button>
             </div>
             <div className="subscriber-intake">
